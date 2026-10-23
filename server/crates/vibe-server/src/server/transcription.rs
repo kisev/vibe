@@ -189,7 +189,7 @@ impl From<StoredSegment> for whisper_rs::Segment {
 /// already finished. A chunk that runs out of memory is split in half and the
 /// halves are tried; the split is not persisted as a separate plan, so a resumed
 /// run reuses the finished result under the same index.
-fn transcribe_cached(
+pub(crate) fn transcribe_cached(
     ctx: &mut Engine,
     model_path: &str,
     samples: &[f32],

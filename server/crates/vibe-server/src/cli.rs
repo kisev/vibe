@@ -32,8 +32,14 @@ enum Command {
         vad_model: Option<String>,
         #[arg(long)]
         diarize_model: Option<String>,
-        #[arg(long)]
+        /// Directory for finished chunks, so an interrupted run resumes. Also
+        /// read from VIBE_SERVER_CACHE_DIR.
+        #[arg(long, env = "VIBE_SERVER_CACHE_DIR")]
         cache_dir: Option<String>,
+        /// Planned chunk length in seconds; defaults to the engine maximum
+        /// (25 for GigaAM, 30 for Parakeet and Nemotron).
+        #[arg(long)]
+        chunk_seconds: Option<f64>,
         #[arg(long, value_enum, default_value_t = OutputFormat::Txt)]
         format: OutputFormat,
         #[arg(long)]
@@ -75,6 +81,8 @@ enum Command {
         exit_with_parent: bool,
         #[arg(long, env = "VIBE_SERVER_UNLOAD_TIMEOUT", default_value = "0")]
         unload_timeout: crate::server::unload_timeout::UnloadTimeout,
+        /// Directory holding finished transcription chunks, reused across runs
+        /// and after an interruption.
         #[arg(long, env = "VIBE_SERVER_CACHE_DIR")]
         cache_dir: Option<String>,
     },
@@ -137,6 +145,7 @@ pub async fn run() -> anyhow::Result<()> {
             vad_model,
             diarize_model,
             cache_dir,
+            chunk_seconds,
             format,
             output,
             language,
@@ -160,6 +169,7 @@ pub async fn run() -> anyhow::Result<()> {
                     vad_model,
                     diarize_model,
                     cache_dir: cache_dir.clone(),
+                    chunk_seconds,
                     format,
                     output,
                     language,
@@ -246,10 +256,44 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
     // Validation raises the same language error the engine does, so the marker
     // has to cover both paths: a rejected language never reaches `transcribe`.
     ctx.validate_request(&options).map_err(unsupported_language_marker)?;
-    let result = ctx
-        .transcribe(&samples, options)
-        .inspect_err(|err| tracing::error!("transcription failed: {err:#}"))
-        .map_err(unsupported_language_marker)?;
+    if let (Some(requested), Some(maximum)) = (args.chunk_seconds, ctx.max_input_seconds()) {
+        if requested > maximum {
+            anyhow::bail!("--chunk-seconds must not exceed {maximum} for this engine");
+        }
+    }
+    let plan = crate::server::transcription::plan_for(
+        &mut ctx,
+        &samples,
+        &diar_segments,
+        options.vad_model_path.as_deref(),
+        args.chunk_seconds,
+    );
+    let options_json = serde_json::json!({
+        "language": options.language,
+        "detect_language": options.detect_language,
+        "translate": options.translate,
+        "prompt": options.prompt,
+        "temperature": options.temperature,
+        "word_timestamps": options.word_timestamps,
+        "max_segment_len": options.max_segment_len,
+        "stable_timestamps": options.stable_timestamps,
+        "vad_model": options.vad_model_path,
+    });
+    let result = match (plan.as_ref(), config.cache_dir()) {
+        (Some(plan), Some(root)) => crate::server::transcription::transcribe_cached(
+            &mut ctx,
+            &args.model,
+            &samples,
+            plan,
+            &options,
+            root,
+            options_json,
+        ),
+        (Some(plan), None) => ctx.transcribe_chunks(&samples, plan, options),
+        (None, _) => ctx.transcribe(&samples, options),
+    }
+    .inspect_err(|err| tracing::error!("transcription failed: {err:#}"))
+    .map_err(unsupported_language_marker)?;
 
     let rendered = if args.word_timestamps && args.format == OutputFormat::Txt {
         // whisper.cpp emits one segment per word here, plus a leading empty one for
@@ -359,7 +403,7 @@ mod tests {
     #[test]
     fn transcribe_help_lists_diarization_format_and_output() {
         let flags = long_flags();
-        for expected in ["diarize-model", "format", "output"] {
+        for expected in ["diarize-model", "format", "output", "cache-dir", "chunk-seconds"] {
             assert!(flags.iter().any(|flag| flag == expected), "missing --{expected} in {flags:?}");
         }
     }
@@ -419,6 +463,7 @@ struct TranscribeArgs {
     vad_model: Option<String>,
     diarize_model: Option<String>,
     cache_dir: Option<String>,
+    chunk_seconds: Option<f64>,
     format: OutputFormat,
     output: Option<String>,
     language: Option<String>,

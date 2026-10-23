@@ -41,9 +41,9 @@
 
 ## 6. CLI and server startup
 
-- [ ] 6.1 Add `--chunk-seconds` and `--cache-dir` to the transcribe command and `--cache-dir` to the serve command; verify help output and that the flags reach the planner and cache
-- [ ] 6.2 Verify the CLI path end-to-end: a long file with diarization produces speaker-consistent chunks, and a killed run resumes from the cache directory
-- [ ] 6.3 Document the flags and cache location in CLI help and user docs; verify every documented command runs as written
+- [x] 6.1 Add `--chunk-seconds` and `--cache-dir` to the transcribe command and `--cache-dir` to the serve command; verify help output and that the flags reach the planner and cache
+- [x] 6.2 Verify the CLI path end-to-end: a long file with diarization produces speaker-consistent chunks, and a killed run resumes from the cache directory
+- [x] 6.3 Document the flags and cache location in CLI help and user docs; verify every documented command runs as written
 
 ## 7. Desktop integration
 

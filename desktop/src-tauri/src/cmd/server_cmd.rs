@@ -108,7 +108,14 @@ pub async fn load_model(
     let spawn_server = |cpu_variant: crate::cmd::config::CpuVariant| -> Result<crate::server::ServerProcess> {
         let binary_path = resolve_server_binary(&app_handle)?;
         let ffmpeg_path = resolve_ffmpeg_path(&app_handle);
-        crate::server::ServerProcess::spawn(&binary_path, ffmpeg_path.as_deref(), unload_timeout_minutes, cpu_variant)
+        let cache_dir = transcription_cache_dir(&app_handle);
+        crate::server::ServerProcess::spawn(
+            &binary_path,
+            ffmpeg_path.as_deref(),
+            unload_timeout_minutes,
+            cpu_variant,
+            cache_dir.as_deref(),
+        )
     };
 
     // Spawn server if not running
@@ -197,6 +204,14 @@ pub async fn get_gpu_devices(app_handle: tauri::AppHandle) -> Result<Vec<crate::
     Ok(devices)
 }
 
+/// The cache lives beside the app's other local data so it is removed with the
+/// app and never mixes with user files.
+pub(crate) fn transcription_cache_dir(app_handle: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    use tauri::Manager as _;
+    let root = app_handle.path().app_local_data_dir().ok()?;
+    Some(root.join("transcribe-cache"))
+}
+
 #[tauri::command]
 pub async fn get_model_metadata(app_handle: tauri::AppHandle, model_path: String) -> Result<crate::server::ModelMetadata> {
     let server_state: State<'_, Mutex<ServerState>> = app_handle.state();
@@ -205,11 +220,13 @@ pub async fn get_model_metadata(app_handle: tauri::AppHandle, model_path: String
         let binary_path = resolve_server_binary(&app_handle)?;
         let ffmpeg_path = resolve_ffmpeg_path(&app_handle);
         let cpu_variant = crate::cmd::config::cpu_variant(&app_handle);
+        let cache_dir = transcription_cache_dir(&app_handle);
         state.process = Some(crate::server::ServerProcess::spawn(
             &binary_path,
             ffmpeg_path.as_deref(),
             5,
             cpu_variant,
+            cache_dir.as_deref(),
         )?);
     }
     state.process.as_ref().unwrap().model_metadata(&model_path).await
@@ -241,8 +258,14 @@ pub async fn start_api_server(
     if state_guard.process.is_none() {
         let binary_path = resolve_server_binary(&app_handle)?;
         let ffmpeg_path = resolve_ffmpeg_path(&app_handle);
-        let process =
-            crate::server::ServerProcess::spawn(&binary_path, ffmpeg_path.as_deref(), unload_timeout_minutes, cpu_variant)?;
+        let cache_dir = transcription_cache_dir(&app_handle);
+        let process = crate::server::ServerProcess::spawn(
+            &binary_path,
+            ffmpeg_path.as_deref(),
+            unload_timeout_minutes,
+            cpu_variant,
+            cache_dir.as_deref(),
+        )?;
         state_guard.process = Some(process);
     }
     let process = state_guard.process.as_ref().context("API server process missing")?;

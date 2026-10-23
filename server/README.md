@@ -96,6 +96,24 @@ See the full API reference here:
 - API docs: /docs
 - OpenAPI spec: /openapi.json
 
+### Long recordings and the chunk cache
+
+Long files are split into model inputs before inference. With a diarization
+model the split follows speaker turns, so one input never mixes two speakers
+except at an explicitly marked boundary; without one, the engine's own VAD
+splitting is used as before.
+
+- `--chunk-seconds <n>` sets the planned input length. It defaults to the
+  engine maximum (25 s for GigaAM, 30 s for Parakeet and Nemotron) and cannot
+  exceed it.
+- `--cache-dir <path>` (or `VIBE_SERVER_CACHE_DIR`) stores the chunk plan and
+  every finished chunk, so a run killed half-way resumes instead of starting
+  over. The key covers the decoded audio, the model, the engine, the options
+  and the plan, so changing any of them starts a fresh entry.
+- The cache is opt-in: without a directory nothing is written. Cached files
+  contain transcript text and live only on the local disk; delete the directory
+  at any time.
+
 ---
 
 ## Notes & Limitations

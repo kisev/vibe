@@ -138,6 +138,7 @@ impl ServerProcess {
         ffmpeg_path: Option<&Path>,
         unload_timeout_minutes: u32,
         cpu_variant: CpuVariant,
+        cache_dir: Option<&Path>,
     ) -> Result<Self> {
         tracing::debug!(
             "spawning server at {} (cpu variant {})",
@@ -163,6 +164,12 @@ impl ServerProcess {
             cmd.env("RUST_LOG", "warn");
         }
 
+        // Cached chunks contain transcript text, so the app keeps them in its
+        // own local data directory and cleans them by age.
+        if let Some(cache_dir) = cache_dir {
+            tracing::debug!("setting VIBE_SERVER_CACHE_DIR={}", cache_dir.display());
+            cmd.env("VIBE_SERVER_CACHE_DIR", cache_dir);
+        }
         if let Some(ffmpeg) = ffmpeg_path {
             tracing::debug!("setting VIBE_SERVER_FFMPEG_PATH={}", ffmpeg.display());
             cmd.env("VIBE_SERVER_FFMPEG_PATH", ffmpeg);
