@@ -205,6 +205,7 @@ fn probe_and_load_report_the_same_capabilities() {
     assert!(!probed.translation);
     assert!(probed.timestamps);
     assert!(!probed.text_prompts);
+    assert_eq!(probed.max_input_seconds, Some(25.0), "GigaAM's window");
 
     let loaded = gigaam_engine().expect("load GigaAM model").capabilities();
     assert_eq!(loaded.engine, probed.engine);
@@ -215,6 +216,19 @@ fn probe_and_load_report_the_same_capabilities() {
     assert_eq!(loaded.translation, probed.translation);
     assert_eq!(loaded.timestamps, probed.timestamps);
     assert_eq!(loaded.text_prompts, probed.text_prompts);
+    assert_eq!(loaded.max_input_seconds, probed.max_input_seconds);
+}
+
+#[test]
+fn engines_report_their_input_bound() {
+    // Whisper owns its long-form path, so it advertises no external bound.
+    assert_eq!(whisper_capabilities().max_input_seconds, None);
+    let parakeet = parakeet_capabilities(vec!["en".to_string()], true);
+    let nemotron = nemotron_capabilities(vec!["en".to_string()], true);
+    assert_eq!(parakeet.max_input_seconds, Some(30.0));
+    assert_eq!(nemotron.max_input_seconds, Some(30.0));
+    assert_eq!(parakeet.engine, "parakeet");
+    assert_eq!(nemotron.engine, "nemotron");
 }
 
 #[test]

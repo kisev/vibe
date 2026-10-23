@@ -20,6 +20,9 @@ pub struct EngineCapabilities {
     pub translation: bool,
     pub timestamps: bool,
     pub text_prompts: bool,
+    /// Longest audio the engine may receive, when it accepts externally
+    /// chunked input. Absent means the engine owns its own long-form path.
+    pub max_input_seconds: Option<f64>,
 }
 
 // One engine lives at a time, so the size gap between variants costs nothing.
@@ -282,28 +285,42 @@ impl Engine {
     pub fn capabilities(&self) -> EngineCapabilities {
         match self {
             Self::Whisper(_) => whisper_capabilities(),
-            Self::Nemotron { model, .. } => EngineCapabilities {
-                engine: "nemotron".to_string(),
-                requires_vad: true,
-                languages: model.info().languages.clone(),
-                language_detection: model.info().language_detection,
-                streaming: false,
-                translation: false,
-                timestamps: true,
-                text_prompts: false,
-            },
-            Self::Parakeet { model, .. } => EngineCapabilities {
-                engine: "parakeet".to_string(),
-                requires_vad: true,
-                languages: model.info().languages.clone(),
-                language_detection: model.info().language_detection,
-                streaming: false,
-                translation: false,
-                timestamps: true,
-                text_prompts: false,
-            },
+            Self::Nemotron { model, .. } => {
+                nemotron_capabilities(model.info().languages.clone(), model.info().language_detection)
+            }
+            Self::Parakeet { model, .. } => {
+                parakeet_capabilities(model.info().languages.clone(), model.info().language_detection)
+            }
             Self::Gigaam { model, .. } => gigaam_capabilities(model.info()),
         }
+    }
+}
+
+pub fn nemotron_capabilities(languages: Vec<String>, language_detection: bool) -> EngineCapabilities {
+    EngineCapabilities {
+        engine: "nemotron".to_string(),
+        requires_vad: true,
+        languages,
+        language_detection,
+        streaming: false,
+        translation: false,
+        timestamps: true,
+        text_prompts: false,
+        max_input_seconds: Some(30.0),
+    }
+}
+
+pub fn parakeet_capabilities(languages: Vec<String>, language_detection: bool) -> EngineCapabilities {
+    EngineCapabilities {
+        engine: "parakeet".to_string(),
+        requires_vad: true,
+        languages,
+        language_detection,
+        streaming: false,
+        translation: false,
+        timestamps: true,
+        text_prompts: false,
+        max_input_seconds: Some(30.0),
     }
 }
 
@@ -317,6 +334,7 @@ pub fn whisper_capabilities() -> EngineCapabilities {
         translation: true,
         timestamps: true,
         text_prompts: true,
+        max_input_seconds: None,
     }
 }
 
@@ -381,6 +399,7 @@ pub fn gigaam_capabilities(info: &gigaam_rs::ModelInfo) -> EngineCapabilities {
         translation: false,
         timestamps: true,
         text_prompts: false,
+        max_input_seconds: Some(25.0),
     }
 }
 
@@ -452,29 +471,13 @@ pub fn detect_model(path: &str) -> anyhow::Result<EngineCapabilities> {
     }
     if let Ok(info) = parakeet_rs::Model::metadata(path) {
         if info.architecture == "parakeet" && info.head_kind == "tdt" && info.variant.contains("v3") {
-            return Ok(EngineCapabilities {
-                engine: "parakeet".to_string(),
-                requires_vad: true,
-                languages: info.languages,
-                language_detection: info.language_detection,
-                streaming: false,
-                translation: false,
-                timestamps: true,
-                text_prompts: false,
-            });
+            return Ok(parakeet_capabilities(info.languages, info.language_detection));
         }
     }
     match nemotron_rs::Model::metadata(path) {
-        Ok(info) if info.architecture == "parakeet" && info.head_kind == "rnnt" => Ok(EngineCapabilities {
-            engine: "nemotron".to_string(),
-            requires_vad: true,
-            languages: info.languages,
-            language_detection: info.language_detection,
-            streaming: false,
-            translation: false,
-            timestamps: true,
-            text_prompts: false,
-        }),
+        Ok(info) if info.architecture == "parakeet" && info.head_kind == "rnnt" => {
+            Ok(nemotron_capabilities(info.languages, info.language_detection))
+        }
         Ok(info) => bail!(
             "unsupported GGUF architecture '{}' with head '{}'",
             info.architecture,

@@ -4,15 +4,15 @@
 
 ## 1. Chunk planning
 
-- [ ] 1.1 Add the plan types (`Chunk`, `Plan`) and a pure planning entry point; verify unit tests cover empty audio, a single short turn, and an exact-boundary turn
-- [ ] 1.2 Implement the turn sweep with gap merging and union preservation for boundary slivers; verify tests for overlap, adjacent turns, and sub-threshold slivers
-- [ ] 1.3 Derive pauses from VAD speech ranges and implement fixed-size fallback when no pauses or no VAD exist; verify pause ranges tile the non-speech intervals
-- [ ] 1.4 Implement cut selection with neighbor limits, preferred length, pause search window, inset, padding, and sample rounding; verify no chunk exceeds the bound and the same inputs produce identical plans across repeated runs
-- [ ] 1.5 Verify the plan bounds against engine limits: a GigaAM plan stays at or below the model window, and a configured smaller duration is respected
+- [x] 1.1 Add the plan types (`Chunk`, `Plan`) and a pure planning entry point; verify unit tests cover empty audio, a single short turn, and an exact-boundary turn
+- [x] 1.2 Implement the turn sweep with gap merging and union preservation for boundary slivers; verify tests for overlap, adjacent turns, and sub-threshold slivers
+- [x] 1.3 Derive pauses from VAD speech ranges and implement fixed-size fallback when no pauses or no VAD exist; verify pause ranges tile the non-speech intervals
+- [x] 1.4 Implement cut selection with neighbor limits, preferred length, pause search window, inset, padding, and sample rounding; verify no chunk exceeds the bound and the same inputs produce identical plans across repeated runs
+- [x] 1.5 Verify the plan bounds against engine limits: a GigaAM plan stays at or below the model window, and a configured smaller duration is respected
 
 ## 2. Engine chunk entry point
 
-- [ ] 2.1 Add `max_input_seconds` to engine capabilities, report it for Parakeet, Nemotron, and GigaAM, and leave it absent for Whisper; verify metadata tests assert the field per engine
+- [x] 2.1 Add `max_input_seconds` to engine capabilities, report it for Parakeet, Nemotron, and GigaAM, and leave it absent for Whisper; verify metadata tests assert the field per engine
 - [ ] 2.2 Add the chunked transcription entry point to the engine API and implement it for Parakeet and Nemotron by reusing their per-chunk decode path; verify their existing transcription tests still pass through the new wrapper
 - [ ] 2.3 Implement the chunked entry point for GigaAM, respecting its 25-second bound and token deduplication; verify the GigaAM tests pass through both the old and new paths
 - [ ] 2.4 Verify Whisper is excluded: a request with a plan and a Whisper model keeps the current internal long-form path and returns segments without plan speaker sets
@@ -27,10 +27,10 @@
 
 ## 4. Cache core
 
-- [ ] 4.1 Implement cache identity from schema version, decoded-audio hash, model stamp, engine, output-affecting options, and plan; verify changing any input changes the key
-- [ ] 4.2 Implement the on-disk layout, atomic temp-and-rename writes, and manifest/plan persistence; verify a simulated crash during a write leaves no visible finished result
-- [ ] 4.3 Implement the exclusive advisory lock and busy handling; verify two concurrent runs on the same key neither corrupt results nor observe partial files
-- [ ] 4.4 Verify cache-disabled operation: no directory is created and no file is written when no root is configured
+- [x] 4.1 Implement cache identity from schema version, decoded-audio hash, model stamp, engine, output-affecting options, and plan; verify changing any input changes the key
+- [x] 4.2 Implement the on-disk layout, atomic temp-and-rename writes, and manifest/plan persistence; verify a simulated crash during a write leaves no visible finished result
+- [x] 4.3 Implement the exclusive advisory lock and busy handling; verify two concurrent runs on the same key neither corrupt results nor observe partial files
+- [x] 4.4 Verify cache-disabled operation: no directory is created and no file is written when no root is configured
 
 ## 5. Cache integration
 

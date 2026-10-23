@@ -329,6 +329,7 @@ mod tests {
             "translation",
             "timestamps",
             "text_prompts",
+            "max_input_seconds",
         ];
         for field in expected {
             assert!(properties.contains_key(field), "missing capability field {field}");
