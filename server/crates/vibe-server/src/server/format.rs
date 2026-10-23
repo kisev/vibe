@@ -55,6 +55,38 @@ pub fn format_vtt(segments: &[Segment]) -> String {
     out
 }
 
+fn speaker_label(speaker_id: usize) -> String {
+    format!("Speaker {}", speaker_id + 1)
+}
+
+/// Markdown transcript with one timestamped block per segment. Speaker labels
+/// are included only when diarization produced one for that segment.
+pub fn format_markdown(segments: &[Segment], diar_segments: &[diarization::Segment]) -> String {
+    let mut out = String::from("# Transcript\n\n");
+    for segment in segments {
+        let start = cs_to_seconds(segment.start);
+        let end = cs_to_seconds(segment.end);
+        let speaker = match_speaker(start, end, diar_segments);
+        out.push_str("**[");
+        out.push_str(&cs_to_vtt_time(segment.start));
+        out.push_str(" --> ");
+        out.push_str(&cs_to_vtt_time(segment.end));
+        out.push(']');
+        if let Some(speaker) = speaker {
+            out.push_str(" ");
+            out.push_str(&speaker_label(speaker));
+        }
+        out.push_str("**\n\n");
+        out.push_str(segment.text.trim());
+        out.push_str("\n\n");
+    }
+    out
+}
+
+pub fn format_json(result: &TranscribeResult, diar_segments: &[diarization::Segment]) -> String {
+    serde_json::to_string_pretty(&build_verbose_json(result, diar_segments)).unwrap_or_else(|_| "{}".into())
+}
+
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct VerboseJson {
     pub text: String,
@@ -126,6 +158,89 @@ mod tests {
     }
 
     #[test]
+    fn markdown_labels_speakers_and_times() {
+        let segments = [Segment {
+            start: 100,
+            end: 250,
+            text: "привет".into(),
+            no_speech_prob: 0.0,
+        }];
+        let turns = [turn(0.5, 3.0, 0)];
+        let markdown = format_markdown(&segments, &turns);
+        assert!(markdown.contains("**[00:00:01.000 --> 00:00:02.500] Speaker 1**"));
+        assert!(markdown.contains("привет"));
+    }
+
+    fn segment(start: i64, end: i64, text: &str) -> Segment {
+        Segment {
+            start,
+            end,
+            text: text.into(),
+            no_speech_prob: 0.25,
+        }
+    }
+
+    fn result(segments: Vec<Segment>) -> TranscribeResult {
+        TranscribeResult { segments }
+    }
+
+    #[test]
+    fn markdown_has_text_and_timestamps_without_diarization() {
+        let markdown = format_markdown(&[segment(100, 250, "привет")], &[]);
+        assert!(markdown.starts_with("# Transcript\n\n"));
+        assert!(markdown.contains("**[00:00:01.000 --> 00:00:02.500]**"));
+        assert!(markdown.contains("привет"));
+        assert!(!markdown.contains("Speaker"));
+    }
+
+    #[test]
+    fn markdown_with_empty_segments_is_just_the_heading() {
+        assert_eq!(format_markdown(&[], &[]), "# Transcript\n\n");
+    }
+
+    #[test]
+    fn markdown_carries_synthetic_speaker_labels() {
+        let segments = [segment(100, 250, "привет"), segment(300, 400, "пока")];
+        let turns = [turn(1.0, 2.5, 1), turn(3.0, 4.0, 0)];
+        let markdown = format_markdown(&segments, &turns);
+        assert!(markdown.contains("**[00:00:01.000 --> 00:00:02.500] Speaker 2**"));
+        assert!(markdown.contains("**[00:00:03.000 --> 00:00:04.000] Speaker 1**"));
+    }
+
+    #[test]
+    fn json_has_text_segments_and_timestamps_without_diarization() {
+        let json = format_json(&result(vec![segment(100, 250, "привет")]), &[]);
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["text"], "привет");
+        let segments = value["segments"].as_array().unwrap();
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0]["start"], 1.0);
+        assert_eq!(segments[0]["end"], 2.5);
+        assert_eq!(segments[0]["text"], "привет");
+        assert_eq!(segments[0]["no_speech_prob"], 0.25);
+        assert!(segments[0].get("speaker").is_none());
+    }
+
+    #[test]
+    fn json_carries_synthetic_speaker_labels() {
+        let segments = [segment(100, 250, "привет"), segment(300, 400, "пока")];
+        let turns = [turn(1.0, 2.5, 1), turn(3.0, 4.0, 0)];
+        let json = format_json(&result(segments.to_vec()), &turns);
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let segments = value["segments"].as_array().unwrap();
+        assert_eq!(segments[0]["speaker"], 1);
+        assert_eq!(segments[1]["speaker"], 0);
+    }
+
+    #[test]
+    fn json_with_empty_segments_is_an_empty_document() {
+        let json = format_json(&result(vec![]), &[]);
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["text"], "");
+        assert_eq!(value["segments"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
     fn overlap_wins_over_proximity() {
         let turns = [turn(0.0, 10.0, 0), turn(10.0, 20.0, 1)];
         assert_eq!(match_speaker(9.0, 12.5, &turns), Some(1));
@@ -144,5 +259,40 @@ mod tests {
         let turns = [turn(0.0, 10.0, 0)];
         assert_eq!(match_speaker(12.0, 13.0, &turns), None);
         assert_eq!(match_speaker(1.0, 2.0, &[]), None);
+    }
+
+    #[test]
+    fn srt_writes_one_indexed_cue_per_segment() {
+        let segments = [segment(100, 250, "привет"), segment(300, 400, "пока")];
+        assert_eq!(
+            format_srt(&segments),
+            "1\n00:00:01,000 --> 00:00:02,500\nпривет\n\n2\n00:00:03,000 --> 00:00:04,000\nпока\n"
+        );
+    }
+
+    #[test]
+    fn vtt_writes_a_header_and_a_blank_line_between_cues() {
+        let segments = [segment(100, 250, "привет"), segment(300, 400, "пока")];
+        assert_eq!(
+            format_vtt(&segments),
+            "WEBVTT\n\n00:00:01.000 --> 00:00:02.500\nпривет\n\n00:00:03.000 --> 00:00:04.000\nпока\n"
+        );
+    }
+
+    #[test]
+    fn srt_uses_a_comma_and_vtt_a_dot_in_timestamps() {
+        let segments = [segment(110, 370, "привет")];
+        assert!(format_srt(&segments).contains("00:00:01,100 --> 00:00:03,700"));
+        assert!(format_vtt(&segments).contains("00:00:01.100 --> 00:00:03.700"));
+    }
+
+    #[test]
+    fn srt_with_empty_segments_is_an_empty_string() {
+        assert_eq!(format_srt(&[]), "");
+    }
+
+    #[test]
+    fn vtt_with_empty_segments_is_just_the_header() {
+        assert_eq!(format_vtt(&[]), "WEBVTT\n\n");
     }
 }

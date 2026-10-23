@@ -1,4 +1,4 @@
-mod diarization;
+pub(crate) mod diarization;
 mod form;
 pub(crate) mod format;
 mod routes;
@@ -265,10 +265,24 @@ pub(super) struct ErrorBody {
 /// client can act on, by reloading on the CPU when it was the GPU's, so it is named;
 /// everything else is `internal_error` with the message for a human.
 pub(super) fn engine_error_code(err: &anyhow::Error) -> &'static str {
+    if matches!(
+        err.downcast_ref::<gigaam_rs::Error>(),
+        Some(gigaam_rs::Error::UnsupportedLanguage(_))
+    ) {
+        return "unsupported_language";
+    }
     match err.downcast_ref::<whisper_rs::Error>() {
         Some(whisper_rs::Error::OutOfMemory { gpu: true, .. }) => "gpu_out_of_memory",
         Some(whisper_rs::Error::OutOfMemory { gpu: false, .. }) => "out_of_memory",
         _ => "internal_error",
+    }
+}
+
+pub(super) fn engine_error_status(err: &anyhow::Error) -> axum::http::StatusCode {
+    if engine_error_code(err) == "unsupported_language" {
+        axum::http::StatusCode::BAD_REQUEST
+    } else {
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR
     }
 }
 
@@ -286,3 +300,59 @@ pub(super) fn error(status: axum::http::StatusCode, code: &'static str, message:
 }
 
 use axum::response::IntoResponse;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The OpenAPI document clients and the desktop app read must keep
+    /// describing the same capability contract now that GigaAM was added.
+    #[test]
+    fn openapi_schema_keeps_capability_fields() {
+        let document = serde_json::to_value(ApiDoc::openapi()).expect("serialize OpenAPI");
+        assert!(
+            document["openapi"].as_str().is_some_and(|version| version.starts_with("3.")),
+            "unexpected OpenAPI version: {:?}",
+            document["openapi"]
+        );
+        assert!(document["paths"].get("/v1/audio/transcriptions").is_some());
+        assert!(document["paths"].get("/v1/models/metadata").is_some());
+
+        let capabilities = &document["components"]["schemas"]["EngineCapabilities"];
+        let properties = capabilities["properties"].as_object().expect("EngineCapabilities properties");
+        let expected = [
+            "engine",
+            "requires_vad",
+            "languages",
+            "language_detection",
+            "streaming",
+            "translation",
+            "timestamps",
+            "text_prompts",
+        ];
+        for field in expected {
+            assert!(properties.contains_key(field), "missing capability field {field}");
+        }
+        assert_eq!(properties.len(), expected.len(), "EngineCapabilities gained or lost fields");
+
+        let metadata = &document["components"]["schemas"]["ModelMetadataResponse"];
+        assert!(metadata["properties"].get("capabilities").is_some());
+    }
+
+    #[test]
+    fn unsupported_language_maps_to_a_400() {
+        let err = anyhow::Error::new(gigaam_rs::Error::UnsupportedLanguage("en".to_owned()));
+        assert_eq!(engine_error_code(&err), "unsupported_language");
+        assert_eq!(engine_error_status(&err), axum::http::StatusCode::BAD_REQUEST);
+
+        let response = error(engine_error_status(&err), engine_error_code(&err), &err.to_string());
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn unexpected_engine_errors_stay_internal() {
+        let err = anyhow::anyhow!("boom");
+        assert_eq!(engine_error_code(&err), "internal_error");
+        assert_eq!(engine_error_status(&err), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}

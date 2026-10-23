@@ -1,4 +1,4 @@
-<!-- source: 1d964213251f -->
+<!-- source: 674c5e6aa04b -->
 
 # 🌟 Modèles Vibe 🌟
 
@@ -31,6 +31,39 @@ Prend en charge le streaming et est particulièrement adapté à la dictée.
 
 [👉 Voir le modèle](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf)  
 [🔽 Télécharger Q4_K_M](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf?download=true)
+
+### 🇷🇺 GigaAM v3 (Russe)
+
+Reconnaissance vocale du russe avec capitalisation et ponctuation, par Salute Developers. Particulièrement adapté à la dictée en russe.
+
+[👉 Voir le modèle](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf)  
+[🔽 Télécharger Q8_0](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/gigaam-v3-e2e-rnnt-Q8_0.gguf?download=true)
+
+<details>
+<summary>Limites de GigaAM et exemples en ligne de commande</summary>
+
+**Limites**
+
+- Russe uniquement. Il n'y a pas de détection automatique de la langue : `--language ru` et `--language auto` sélectionnent tous deux le russe, et toute autre langue échoue avec `unsupported_language`.
+- Pas de streaming. La fenêtre du modèle est de 25 secondes, et le [modèle Silero VAD](https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin) est requis pour découper les enregistrements plus longs.
+- Pas de traduction ni de prompt textuel.
+- Les horodatages stables ne sont pas pris en charge et les demandes d'horodatages de mots sont ignorées. Chaque segment porte des horodatages de tokens à une résolution de 40 ms.
+- La diarisation des locuteurs fonctionne normalement.
+- Quatre variantes sont publiées sous `handy-computer` : [`gigaam-v3-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-rnnt-gguf), [`gigaam-v3-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-ctc-gguf), [`gigaam-v3-e2e-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf), et [`gigaam-v3-e2e-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf). Les variantes `e2e` ajoutent la capitalisation et la ponctuation ; les autres renvoient un texte en minuscules sans ponctuation.
+
+**Ligne de commande**
+
+Téléchargez le modèle VAD ci-dessus et passez-le avec `--vad-model` :
+
+```console
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format markdown --output transcript.md
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format json
+```
+
+`--format` accepte `txt` (par défaut), `markdown` (alias `md`), `json`, `srt` et `vtt`. `--output` écrit la transcription dans un fichier et refuse d'écraser un fichier existant. Ajoutez `--diarize-model <diar.gguf>` pour étiqueter les locuteurs dans les sorties Markdown et JSON.
+
+</details>
 
 ### Modèles optimisés pour d'autres langues
 

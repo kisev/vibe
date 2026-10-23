@@ -1,7 +1,68 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest'
-import { reconcileProjectName } from './use-transcribe-queue'
+import type { ModelCapabilities } from '~/lib/model'
+import type { Preference } from '~/providers/preference'
+import { buildSharedOptions, reconcileProjectName } from './use-transcribe-queue'
+
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn(async () => '/models') }))
+
+const gigaam: ModelCapabilities = {
+	engine: 'gigaam',
+	requires_vad: true,
+	languages: ['ru'],
+	language_detection: false,
+	streaming: false,
+	translation: false,
+	timestamps: true,
+	text_prompts: false,
+}
+
+const whisper: ModelCapabilities = {
+	engine: 'whisper',
+	requires_vad: false,
+	languages: ['en'],
+	language_detection: true,
+	streaming: true,
+	translation: true,
+	timestamps: true,
+	text_prompts: true,
+}
+
+function preferenceWith(capabilities: ModelCapabilities, overrides: { diarizeEnabled?: boolean; stableTimestampsEnabled?: boolean } = {}) {
+	return {
+		modelMetadata: { format: 'gguf', capabilities },
+		diarizeEnabled: false,
+		stableTimestampsEnabled: false,
+		...overrides,
+	} as unknown as Preference
+}
+
+describe('shared transcription options', () => {
+	it('passes the required VAD model to GigaAM', async () => {
+		expect(await buildSharedOptions(preferenceWith(gigaam))).toEqual({ vad_model: '/models/ggml-silero-v6.2.0.bin' })
+	})
+
+	it('keeps diarization working for GigaAM', async () => {
+		expect(await buildSharedOptions(preferenceWith(gigaam, { diarizeEnabled: true }))).toEqual({
+			diarize_model: '/models/diar_streaming_sortformer_4spk-v2.q8_0.gguf',
+			vad_model: '/models/ggml-silero-v6.2.0.bin',
+		})
+	})
+
+	it('never sends stable timestamps to GigaAM, even if the setting is left on', async () => {
+		const options = await buildSharedOptions(preferenceWith(gigaam, { stableTimestampsEnabled: true }))
+		expect(options).not.toHaveProperty('stable_timestamps')
+		expect(options).toEqual({ vad_model: '/models/ggml-silero-v6.2.0.bin' })
+	})
+
+	it('still sends stable timestamps to Whisper', async () => {
+		expect(await buildSharedOptions(preferenceWith(whisper, { stableTimestampsEnabled: true }))).toEqual({
+			vad_model: '/models/ggml-silero-v6.2.0.bin',
+			stable_timestamps: true,
+		})
+	})
+})
 
 describe('project name reconciliation', () => {
 	it('keeps reconciling when the live title changes during a slow rename', async () => {

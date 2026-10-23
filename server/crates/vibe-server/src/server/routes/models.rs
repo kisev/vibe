@@ -29,52 +29,10 @@ pub(in crate::server) async fn model_metadata(Json(request): Json<ModelMetadataR
     }
     let path = request.path.clone();
     match tokio::task::spawn_blocking(move || {
-        // Probing a whisper model with the GGUF readers only makes ggml log a
-        // magic mismatch, so files that are not GGUF go straight to whisper.
-        if !is_gguf(&path) {
-            return whisper_rs::validate_model_file(&path)
-                .map(|()| crate::engine::whisper_capabilities())
-                .map_err(|err| {
-                    tracing::error!(model = path, "model metadata check failed: {err}");
-                    err.to_string()
-                });
-        }
-
-        if let Ok(info) = parakeet_rs::Model::metadata(&path) {
-            if info.architecture == "parakeet" && info.head_kind == "tdt" && info.variant.contains("v3") {
-                return Ok(crate::engine::EngineCapabilities {
-                    engine: "parakeet".to_string(),
-                    requires_vad: true,
-                    languages: info.languages,
-                    language_detection: info.language_detection,
-                    streaming: false,
-                    translation: false,
-                    timestamps: true,
-                    text_prompts: false,
-                });
-            }
-        }
-
-        match nemotron_rs::Model::metadata(&path) {
-            Ok(info) if info.architecture == "parakeet" && info.head_kind == "rnnt" => Ok(crate::engine::EngineCapabilities {
-                engine: "nemotron".to_string(),
-                requires_vad: true,
-                languages: info.languages,
-                language_detection: info.language_detection,
-                streaming: false,
-                translation: false,
-                timestamps: true,
-                text_prompts: false,
-            }),
-            Ok(info) => Err(format!(
-                "unsupported GGUF architecture '{}' with head '{}'",
-                info.architecture, info.head_kind
-            )),
-            Err(err) => {
-                tracing::error!(model = path, "failed to read GGUF metadata: {err}");
-                Err(format!("failed to read GGUF metadata: {err}"))
-            }
-        }
+        crate::engine::detect_model(&path).map_err(|err| {
+            tracing::error!(model = path, "model metadata check failed: {err:#}");
+            err.to_string()
+        })
     })
     .await
     {
@@ -164,18 +122,50 @@ pub(in crate::server) async fn list_models(State(state): State<AppState>) -> imp
     (StatusCode::OK, Json(ModelListResponse { object: "list", data }))
 }
 
-/// Whether the file starts with the GGUF magic. Whisper models use the older
-/// GGML container and are handled by whisper.cpp instead.
-fn is_gguf(path: &str) -> bool {
-    use std::io::Read;
-
-    let mut magic = [0u8; 4];
-    std::fs::File::open(path).is_ok_and(|mut file| file.read_exact(&mut magic).is_ok()) && &magic == b"GGUF"
-}
-
 fn now_unix() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs() as i64)
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::body::to_bytes;
+
+    use super::*;
+
+    /// Minimal GGUF v3 file: one string metadata key, no tensors.
+    fn gguf_with_architecture(architecture: &str) -> tempfile::NamedTempFile {
+        let mut out = Vec::new();
+        out.extend_from_slice(b"GGUF");
+        out.extend_from_slice(&3u32.to_le_bytes()); // version
+        out.extend_from_slice(&0u64.to_le_bytes()); // tensor count
+        out.extend_from_slice(&1u64.to_le_bytes()); // metadata count
+        let key = "general.architecture";
+        out.extend_from_slice(&(key.len() as u64).to_le_bytes());
+        out.extend_from_slice(key.as_bytes());
+        out.extend_from_slice(&8u32.to_le_bytes()); // string value type
+        out.extend_from_slice(&(architecture.len() as u64).to_le_bytes());
+        out.extend_from_slice(architecture.as_bytes());
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), out).unwrap();
+        file
+    }
+
+    #[tokio::test]
+    async fn metadata_rejects_an_unsupported_gguf_architecture() {
+        let file = gguf_with_architecture("whisper");
+        let path = file.path().to_string_lossy().into_owned();
+        let response = model_metadata(Json(ModelMetadataRequest { path })).await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value["error"]["code"], "unsupported_model");
+        let message = value["error"]["message"].as_str().unwrap();
+        assert!(
+            message.contains("whisper"),
+            "message should name the architecture, got {message}"
+        );
+    }
 }

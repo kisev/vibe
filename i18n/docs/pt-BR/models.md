@@ -1,4 +1,4 @@
-<!-- source: 1d964213251f -->
+<!-- source: 674c5e6aa04b -->
 
 # 🌟 Modelos do Vibe 🌟
 
@@ -31,6 +31,39 @@ Suporta streaming e é o mais indicado para ditado.
 
 [👉 Ver Modelo](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf)  
 [🔽 Baixar Q4_K_M](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf?download=true)
+
+### 🇷🇺 GigaAM v3 (Russo)
+
+Reconhecimento de fala em russo com maiúsculas e pontuação, por Salute Developers. Mais indicado para ditado em russo.
+
+[👉 Ver Modelo](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf)  
+[🔽 Baixar Q8_0](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/gigaam-v3-e2e-rnnt-Q8_0.gguf?download=true)
+
+<details>
+<summary>Limitações do GigaAM e exemplos de linha de comando</summary>
+
+**Limitações**
+
+- Somente russo. Não há detecção automática de idioma: `--language ru` e `--language auto` selecionam russo, e qualquer outro idioma falha com `unsupported_language`.
+- Não é streaming. A janela do modelo é de 25 segundos, e o [modelo Silero VAD](https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin) é necessário para dividir gravações mais longas.
+- Sem tradução e sem prompt de texto.
+- Marcações de tempo estáveis não são suportadas, e solicitações de carimbos de data e hora por palavra são ignoradas. Cada segmento carrega carimbos de data e hora por token com resolução de 40 ms.
+- A diarização de falantes funciona normalmente.
+- Quatro variantes são publicadas em `handy-computer`: [`gigaam-v3-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-rnnt-gguf), [`gigaam-v3-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-ctc-gguf), [`gigaam-v3-e2e-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf) e [`gigaam-v3-e2e-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf). As variantes `e2e` adicionam maiúsculas e pontuação; as outras retornam texto em minúsculas e sem pontuação.
+
+**Linha de comando**
+
+Baixe o modelo VAD acima e passe-o com `--vad-model`:
+
+```console
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format markdown --output transcript.md
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format json
+```
+
+`--format` aceita `txt` (padrão), `markdown` (alias `md`), `json`, `srt` e `vtt`. `--output` grava a transcrição em um arquivo e se recusa a sobrescrever um existente. Adicione `--diarize-model <diar.gguf>` para rotular falantes na saída Markdown e JSON.
+
+</details>
 
 ### Modelos otimizados para outros idiomas
 

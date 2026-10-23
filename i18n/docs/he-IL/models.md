@@ -1,4 +1,4 @@
-<!-- source: 1d964213251f -->
+<!-- source: 674c5e6aa04b -->
 
 # 🌟 מודלים של Vibe 🌟
 
@@ -31,6 +31,39 @@
 
 [👈 צפייה במודל](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf)  
 [🔽 הורדת Q4_K_M](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf?download=true)
+
+### 🇷🇺 GigaAM v3 (רוסית)
+
+זיהוי דיבור ברוסית עם אותיות גדולות ופיסוק, מבית Salute Developers. מתאים במיוחד להכתבה ברוסית.
+
+[👈 צפייה במודל](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf)  
+[🔽 הורדת Q8_0](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/gigaam-v3-e2e-rnnt-Q8_0.gguf?download=true)
+
+<details>
+<summary>מגבלות GigaAM ודוגמאות לשורת הפקודה</summary>
+
+**מגבלות**
+
+- רוסית בלבד. אין זיהוי אוטומטי של השפה: `--language ru` ו-`--language auto` בוחרים ברוסית, וכל שפה אחרת נכשלת עם `unsupported_language`.
+- אינו תומך בהזרמה (streaming). חלון המודל הוא 25 שניות, ומודל [Silero VAD](https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin) נדרש כדי לפצל הקלטות ארוכות.
+- אין תרגום ואין הנחיית טקסט.
+- חותמות זמן יציבות אינן נתמכות, והמודל מתעלם מבקשות לחותמות זמן ברמת מילה. כל מקטע כולל חותמות זמן של אסימונים ברזולוציה של 40 ms.
+- זיהוי דוברים פועל כרגיל.
+- ארבע גרסאות מפורסמות תחת `handy-computer`: [`gigaam-v3-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-rnnt-gguf), [`gigaam-v3-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-ctc-gguf), [`gigaam-v3-e2e-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf), ו-[`gigaam-v3-e2e-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf). גרסאות ה-`e2e` מוסיפות אותיות גדולות ופיסוק; האחרות מחזירות טקסט באותיות קטנות ללא פיסוק.
+
+**שורת פקודה**
+
+הורידו את מודל ה-VAD שלמעלה והעבירו אותו עם `--vad-model`:
+
+```console
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format markdown --output transcript.md
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format json
+```
+
+`--format` מקבל `txt` (ברירת מחדל), `markdown` (כינוי `md`), `json`, `srt` ו-`vtt`. `--output` כותב את התמלול לקובץ ומסרב לדרוס קובץ קיים. הוסיפו `--diarize-model <diar.gguf>` כדי לתייג דוברים בפלט Markdown ו-JSON.
+
+</details>
 
 ### מודלים המותאמים לשפות נוספות
 

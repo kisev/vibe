@@ -155,7 +155,7 @@ export function isModelFile(filename: string) {
 }
 
 export interface ModelCapabilities {
-	engine: 'whisper' | 'nemotron' | string
+	engine: 'whisper' | 'nemotron' | 'parakeet' | 'gigaam' | string
 	requires_vad: boolean
 	languages: string[]
 	language_detection: boolean
@@ -163,6 +163,35 @@ export interface ModelCapabilities {
 	translation: boolean
 	timestamps: boolean
 	text_prompts: boolean
+}
+
+/** Only Whisper exposes stable timestamps, word timestamps, sentence splitting, and decoding knobs. */
+export function isWhisperEngine(capabilities: ModelCapabilities | null | undefined) {
+	return capabilities?.engine === 'whisper'
+}
+
+/**
+ * Whether the Whisper-only controls should be hidden. Unknown capabilities keep the controls
+ * visible: a model whose metadata has not loaded yet may still be Whisper.
+ */
+export function hidesWhisperOnlyOptions(capabilities: ModelCapabilities | null | undefined) {
+	return Boolean(capabilities) && !isWhisperEngine(capabilities)
+}
+
+/** A model with no metadata yet is not known to require VAD. */
+export function requiresVad(capabilities: ModelCapabilities | null | undefined) {
+	return capabilities?.requires_vad === true
+}
+
+/**
+ * Pick the language a model can actually run. GigaAM, for example, reports only `["ru"]` and
+ * `language_detection: false`, so any stale `auto` or English choice becomes Russian.
+ */
+export function resolveModelLanguage(capabilities: ModelCapabilities | null | undefined, current: string) {
+	if (!capabilities) return current
+	const supported = current === 'auto' ? capabilities.language_detection : capabilities.languages.includes(current)
+	if (supported) return current
+	return capabilities.language_detection ? 'auto' : (capabilities.languages[0] ?? current)
 }
 
 export interface ModelMetadata {
@@ -174,17 +203,39 @@ export interface ModelMetadata {
 interface EngineSpecificOptions {
 	init_prompt?: string
 	translate?: boolean
+	word_timestamps?: boolean
+	max_sentence_len?: number
+	sampling_strategy?: 'greedy' | 'beam search'
+	best_of?: number
+	beam_size?: number
+	temperature?: number
+	max_text_ctx?: number
 }
+
+/** Decoding knobs the server only reads for Whisper. */
+const WHISPER_ONLY_OPTIONS = [
+	'word_timestamps',
+	'max_sentence_len',
+	'sampling_strategy',
+	'best_of',
+	'beam_size',
+	'temperature',
+	'max_text_ctx',
+] as const satisfies readonly (keyof EngineSpecificOptions)[]
 
 /**
  * Drop the Whisper-only options a model cannot use instead of letting server reject the run.
- * A prompt written for Turbo stays saved in settings, so switching to Parakeet or Nemotron
- * and back needs no retyping. Unknown capabilities (no metadata yet) leave the options alone.
+ * A prompt written for Turbo stays saved in settings, so switching to GigaAM, Parakeet, or
+ * Nemotron and back needs no retyping. Unknown capabilities (no metadata yet) leave the options
+ * alone, because the model may still turn out to be Whisper.
  */
 export function withoutUnsupportedOptions<T extends EngineSpecificOptions>(options: T, capabilities: ModelCapabilities | null | undefined): T {
 	if (!capabilities) return options
 	const next = { ...options }
 	if (!capabilities.text_prompts) delete next.init_prompt
 	if (!capabilities.translation) delete next.translate
+	if (!isWhisperEngine(capabilities)) {
+		for (const key of WHISPER_ONLY_OPTIONS) delete next[key]
+	}
 	return next
 }

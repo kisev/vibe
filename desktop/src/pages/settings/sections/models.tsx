@@ -8,7 +8,7 @@ import NumberField from '~/components/number-field'
 import { Input } from '~/components/ui/input'
 import { Switch } from '~/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
-import { ActionRow, IconAction, SettingsGroup, SettingsRow, rowControlClass, type SettingsViewModel } from './shared'
+import { ActionRow, IconAction, SettingsGroup, SettingsNote, SettingsRow, rowControlClass, type SettingsViewModel } from './shared'
 import { getFriendlyModelName } from '~/lib/model'
 import { ModelGlyph } from '~/components/brand-glyph'
 
@@ -90,6 +90,12 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 					)}
 				</SettingsRow>
 			</SettingsGroup>
+
+			{vm.preference.modelMetadata?.capabilities.engine === 'gigaam' && (
+				<SettingsGroup title={m.modelLimitations()}>
+					<SettingsNote>{m.gigaamLimitations()}</SettingsNote>
+				</SettingsGroup>
+			)}
 
 			<SettingsGroup title={m.settingsHardware()}>
 				<SettingsRow label={m.transcribeOnCpu()} description={m.transcribeOnCpuInfo()}>

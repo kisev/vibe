@@ -1,0 +1,352 @@
+//! Tests for the engine integration.
+//!
+//! Model-gated tests run when `GIGAAM_MODEL` points at a GGUF; VAD and audio
+//! tests additionally need `GIGAAM_VAD_MODEL` and `GIGAAM_AUDIO`.
+
+use std::sync::{Arc, Mutex};
+
+use super::*;
+
+fn gigaam_model() -> Option<String> {
+    std::env::var("GIGAAM_MODEL")
+        .ok()
+        .filter(|path| std::path::Path::new(path).exists())
+}
+
+fn vad_model() -> Option<String> {
+    std::env::var("GIGAAM_VAD_MODEL")
+        .ok()
+        .filter(|path| std::path::Path::new(path).exists())
+}
+
+fn audio() -> Option<Vec<f32>> {
+    let path = std::env::var("GIGAAM_AUDIO").ok()?;
+    let mut reader = hound::WavReader::open(path).ok()?;
+    Some(
+        reader
+            .samples::<i16>()
+            .map(|sample| sample.expect("audio sample") as f32 / 32768.0)
+            .collect(),
+    )
+}
+
+fn gigaam_engine() -> Option<Engine> {
+    let path = gigaam_model()?;
+    Some(Engine::load(&path, ContextOptions::default()).expect("load GigaAM model"))
+}
+
+fn transcription_options(vad_model_path: Option<String>) -> TranscribeOptions {
+    TranscribeOptions {
+        vad_model_path,
+        ..TranscribeOptions::default()
+    }
+}
+
+/// GigaAM token timestamps land on 40 ms encoder frames, so every emitted
+/// segment must sit on a 4-centisecond boundary and have a real span.
+fn assert_timestamped(segments: &[Segment]) {
+    assert!(!segments.is_empty(), "expected at least one segment");
+    for segment in segments {
+        assert!(!segment.text.is_empty(), "empty segment text: {segment:?}");
+        assert!(segment.start >= 0, "negative start: {segment:?}");
+        assert!(segment.start < segment.end, "empty span: {segment:?}");
+        assert_eq!(
+            segment.start % GIGAAM_CENTISECONDS_PER_FRAME,
+            0,
+            "start is not on a 40 ms frame: {segment:?}"
+        );
+        assert_eq!(
+            segment.end % GIGAAM_CENTISECONDS_PER_FRAME,
+            0,
+            "end is not on a 40 ms frame: {segment:?}"
+        );
+    }
+}
+
+#[test]
+fn gigaam_vad_options_cap_chunks_below_its_window() {
+    let options = gigaam_vad_options();
+    assert_eq!(options.max_chunk_ms, 24_000);
+    assert_eq!(options.overlap_ms, 0);
+    assert!(options.max_chunk_ms < 25_000);
+
+    // Parakeet and Nemotron pass `vad_rs::Options::default()` straight
+    // through; Whisper only builds a VAD for stable timestamps. Neither
+    // reaches the GigaAM cap.
+    let default = vad_rs::Options::default();
+    assert_eq!(default.max_chunk_ms, 30_000);
+    assert_ne!(options, default);
+}
+
+#[test]
+fn vad_cache_is_keyed_by_path_and_options() {
+    let Some(vad_path) = vad_model() else { return };
+    let mut cache = None;
+
+    let vad = engine_vad(&mut cache, Some(&vad_path), gigaam_vad_options(), "GigaAM").expect("load VAD");
+    assert_eq!(vad.options(), gigaam_vad_options());
+    assert_eq!(cache.as_ref().expect("cached VAD").path, vad_path);
+
+    // Same path and options keep the loaded instance.
+    engine_vad(&mut cache, Some(&vad_path), gigaam_vad_options(), "GigaAM").expect("reuse VAD");
+    assert_eq!(cache.as_ref().expect("cached VAD").options, gigaam_vad_options());
+
+    // Different options reload with the requested option set.
+    engine_vad(&mut cache, Some(&vad_path), vad_rs::Options::default(), "GigaAM").expect("reload VAD");
+    assert_eq!(cache.as_ref().expect("cached VAD").options, vad_rs::Options::default());
+
+    // Different path reloads as well.
+    let directory = tempfile::tempdir().expect("temp dir");
+    let copied_path = directory.path().join("vad.bin");
+    std::fs::copy(&vad_path, &copied_path).expect("copy VAD model");
+    let copied_path = copied_path.to_string_lossy().into_owned();
+    engine_vad(&mut cache, Some(&copied_path), vad_rs::Options::default(), "GigaAM").expect("reload VAD");
+    assert_eq!(cache.as_ref().expect("cached VAD").path, copied_path);
+}
+
+#[test]
+fn gigaam_vad_never_returns_a_chunk_over_the_bound() {
+    let (Some(vad_path), Some(samples)) = (vad_model(), audio()) else {
+        return;
+    };
+    // Repeat a real utterance until it is longer than two GigaAM windows,
+    // so the VAD has to split it instead of returning it whole.
+    let long = samples
+        .iter()
+        .copied()
+        .cycle()
+        .take(vad_rs::SAMPLE_RATE * 60)
+        .collect::<Vec<_>>();
+    let mut vad = vad_rs::Vad::new(&vad_path, gigaam_vad_options()).expect("load VAD");
+    let segments = vad.segments(&long).expect("VAD segments");
+
+    assert!(!segments.is_empty(), "expected detected speech");
+    let bound = gigaam_vad_options().max_chunk_ms as usize * vad_rs::SAMPLE_RATE / 1000;
+    for segment in segments {
+        assert!(
+            segment.end_sample - segment.start_sample <= bound,
+            "chunk of {} samples exceeds the {bound}-sample bound",
+            segment.end_sample - segment.start_sample
+        );
+    }
+}
+
+#[test]
+fn gigaam_rejects_unsupported_options_but_ignores_word_timestamps() {
+    let base = TranscribeOptions::default();
+    let rejected = [
+        (
+            TranscribeOptions {
+                translate: true,
+                ..base.clone()
+            },
+            "translation",
+        ),
+        (
+            TranscribeOptions {
+                prompt: Some("prompt".to_string()),
+                ..base.clone()
+            },
+            "text prompts",
+        ),
+        (
+            TranscribeOptions {
+                stable_timestamps: true,
+                ..base.clone()
+            },
+            "stable timestamps",
+        ),
+    ];
+    for (options, needle) in rejected {
+        let err = validate_gigaam_options(&options).expect_err(needle);
+        assert!(err.to_string().contains(needle), "{err}");
+    }
+
+    let word_timestamps = TranscribeOptions {
+        word_timestamps: true,
+        ..base
+    };
+    assert!(validate_gigaam_options(&word_timestamps).is_ok());
+}
+
+#[test]
+fn unsupported_gguf_is_rejected_by_architecture_name() {
+    let directory = std::env::temp_dir().join("vibe-engine-tests");
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("whisper.gguf");
+    // A GGUF header with one key and no tensors; enough to name the architecture.
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"GGUF\x03\x00\x00\x00");
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&1u64.to_le_bytes());
+    let key = b"general.architecture";
+    bytes.extend_from_slice(&(key.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(key);
+    bytes.extend_from_slice(&8u32.to_le_bytes());
+    let value = b"whisper";
+    bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(value);
+    std::fs::write(&path, bytes).unwrap();
+
+    let error = detect_model(path.to_str().unwrap()).expect_err("whisper is not a supported GGUF");
+    assert!(error.to_string().contains("'whisper'"), "{error}");
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn probe_and_load_report_the_same_capabilities() {
+    let Some(path) = gigaam_model() else { return };
+    let probed = detect_model(&path).expect("metadata probe");
+    assert_eq!(probed.engine, "gigaam");
+    assert_eq!(probed.languages, vec!["ru".to_string()]);
+    assert!(probed.requires_vad);
+    assert!(!probed.language_detection);
+    assert!(!probed.streaming);
+    assert!(!probed.translation);
+    assert!(probed.timestamps);
+    assert!(!probed.text_prompts);
+
+    let loaded = gigaam_engine().expect("load GigaAM model").capabilities();
+    assert_eq!(loaded.engine, probed.engine);
+    assert_eq!(loaded.requires_vad, probed.requires_vad);
+    assert_eq!(loaded.languages, probed.languages);
+    assert_eq!(loaded.language_detection, probed.language_detection);
+    assert_eq!(loaded.streaming, probed.streaming);
+    assert_eq!(loaded.translation, probed.translation);
+    assert_eq!(loaded.timestamps, probed.timestamps);
+    assert_eq!(loaded.text_prompts, probed.text_prompts);
+}
+
+#[test]
+fn gigaam_request_contract_and_segments() {
+    let (Some(mut engine), Some(vad_path), Some(samples)) = (gigaam_engine(), vad_model(), audio()) else {
+        return;
+    };
+    assert_eq!(engine.capabilities().engine, "gigaam");
+    assert!(engine.requires_vad());
+
+    // Missing VAD is refused before inference starts.
+    let err = engine
+        .transcribe(&samples, transcription_options(None))
+        .expect_err("VAD is required");
+    assert!(err.to_string().contains("vad_model_path is required for GigaAM"), "{err}");
+
+    // Russian, auto, and an omitted language are accepted; anything else
+    // is an `unsupported_language` error that maps to HTTP 400.
+    let accepted = [None, Some("ru".to_string()), Some("auto".to_string()), Some(String::new())];
+    for language in accepted {
+        let options = TranscribeOptions {
+            language,
+            ..transcription_options(Some(vad_path.clone()))
+        };
+        engine.validate_request(&options).expect("Russian is accepted");
+    }
+    for language in ["en", "de", "ru-RU"] {
+        let options = TranscribeOptions {
+            language: Some(language.to_string()),
+            ..transcription_options(Some(vad_path.clone()))
+        };
+        let err = engine.validate_request(&options).expect_err("language is not supported");
+        assert_eq!(crate::server::engine_error_code(&err), "unsupported_language");
+        assert_eq!(crate::server::engine_error_status(&err), axum::http::StatusCode::BAD_REQUEST);
+        assert!(matches!(
+            err.downcast_ref::<gigaam_rs::Error>(),
+            Some(gigaam_rs::Error::UnsupportedLanguage(_))
+        ));
+    }
+
+    // The request gate rejects the same options as the engine.
+    for options in [
+        TranscribeOptions {
+            translate: true,
+            ..transcription_options(Some(vad_path.clone()))
+        },
+        TranscribeOptions {
+            prompt: Some("prompt".to_string()),
+            ..transcription_options(Some(vad_path.clone()))
+        },
+        TranscribeOptions {
+            stable_timestamps: true,
+            ..transcription_options(Some(vad_path.clone()))
+        },
+    ] {
+        engine.validate_request(&options).expect_err("option is not supported");
+    }
+
+    // Word timestamps are ignored; the result still carries segment times.
+    let result = engine
+        .transcribe(
+            &samples,
+            TranscribeOptions {
+                word_timestamps: true,
+                ..transcription_options(Some(vad_path))
+            },
+        )
+        .expect("transcribe GigaAM");
+    assert_timestamped(&result.segments);
+    if let Ok(expected) = std::env::var("GIGAAM_EXPECTED") {
+        let text = result.text().to_lowercase();
+        assert!(
+            text.contains(&expected.to_lowercase()),
+            "expected {expected:?}, got {:?}",
+            result.text()
+        );
+    }
+}
+
+#[test]
+fn gigaam_streaming_contract() {
+    let (Some(mut engine), Some(vad_path), Some(samples)) = (gigaam_engine(), vad_model(), audio()) else {
+        return;
+    };
+
+    // An unsupported language is rejected before the first event, so a
+    // streaming request cannot leak a partial transcript.
+    let emitted = Arc::new(Mutex::new(0usize));
+    let counter = Arc::clone(&emitted);
+    let err = engine
+        .transcribe_stream(
+            &samples,
+            TranscribeOptions {
+                language: Some("en".to_string()),
+                ..transcription_options(Some(vad_path.clone()))
+            },
+            StreamCallbacks {
+                on_progress: Some(Box::new(|_| {})),
+                on_segment: Some(Box::new(move |_| {
+                    *counter.lock().expect("counter") += 1;
+                })),
+                should_abort: None,
+            },
+        )
+        .expect_err("unsupported language");
+    assert_eq!(crate::server::engine_error_code(&err), "unsupported_language");
+    assert_eq!(*emitted.lock().expect("counter"), 0);
+
+    // A Russian stream emits every timestamped segment the final result
+    // reports, which is what the NDJSON endpoint serializes.
+    let streamed = Arc::new(Mutex::new(Vec::new()));
+    let collect = Arc::clone(&streamed);
+    let result = engine
+        .transcribe_stream(
+            &samples,
+            transcription_options(Some(vad_path)),
+            StreamCallbacks {
+                on_progress: Some(Box::new(|_| {})),
+                on_segment: Some(Box::new(move |segment| {
+                    collect.lock().expect("segments").push(segment);
+                })),
+                should_abort: None,
+            },
+        )
+        .expect("stream GigaAM");
+    let streamed = streamed.lock().expect("segments");
+    assert_eq!(streamed.len(), result.segments.len());
+    assert_timestamped(streamed.as_slice());
+    assert_timestamped(&result.segments);
+    for (streamed, final_segment) in streamed.iter().zip(&result.segments) {
+        assert_eq!(streamed.start, final_segment.start);
+        assert_eq!(streamed.end, final_segment.end);
+        assert_eq!(streamed.text, final_segment.text);
+    }
+}

@@ -2,6 +2,14 @@ use anyhow::{bail, Context as _};
 use serde::Serialize;
 use whisper_rs::{ContextOptions, Segment, StreamCallbacks, TranscribeOptions, TranscribeResult};
 
+/// One VAD instance per model path and option set. GigaAM caps chunks below
+/// its 25-second window while the other engines keep the 30-second default.
+pub struct VadCache {
+    path: String,
+    options: vad_rs::Options,
+    vad: vad_rs::Vad,
+}
+
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct EngineCapabilities {
     pub engine: String,
@@ -20,38 +28,40 @@ pub enum Engine {
     Whisper(whisper_rs::Context),
     Nemotron {
         model: Box<nemotron_rs::Model>,
-        vad: Option<(String, vad_rs::Vad)>,
+        vad: Option<VadCache>,
     },
     Parakeet {
         model: Box<parakeet_rs::Model>,
-        vad: Option<(String, vad_rs::Vad)>,
+        vad: Option<VadCache>,
+    },
+    Gigaam {
+        model: Box<gigaam_rs::Model>,
+        vad: Option<VadCache>,
     },
 }
 
 impl Engine {
     pub fn requires_vad(&self) -> bool {
-        matches!(self, Self::Nemotron { .. } | Self::Parakeet { .. })
+        matches!(self, Self::Nemotron { .. } | Self::Parakeet { .. } | Self::Gigaam { .. })
     }
 
     pub fn load(path: &str, options: ContextOptions) -> anyhow::Result<Self> {
-        if path.ends_with(".gguf") {
-            if let Ok(info) = parakeet_rs::Model::metadata(path) {
-                if info.architecture == "parakeet" && info.variant.contains("v3") {
-                    return Ok(Self::Parakeet {
-                        model: Box::new(parakeet_rs::Model::load(path)?),
-                        vad: None,
-                    });
-                }
-            }
-            // A GGUF file is never a whisper model, so report why the GGUF
-            // engines rejected it instead of handing it to whisper.cpp.
-            let model = nemotron_rs::Model::load(path).context("GGUF file could not be loaded as Parakeet or Nemotron")?;
-            return Ok(Self::Nemotron {
-                model: Box::new(model),
+        let capabilities = detect_model(path)?;
+        match capabilities.engine.as_str() {
+            "whisper" => Ok(Self::Whisper(whisper_rs::Context::new(path, options)?)),
+            "gigaam" => Ok(Self::Gigaam {
+                model: Box::new(gigaam_rs::Model::load(path).context("GigaAM model failed to load")?),
                 vad: None,
-            });
+            }),
+            "parakeet" => Ok(Self::Parakeet {
+                model: Box::new(parakeet_rs::Model::load(path).context("Parakeet model failed to load")?),
+                vad: None,
+            }),
+            _ => Ok(Self::Nemotron {
+                model: Box::new(nemotron_rs::Model::load(path).context("Nemotron model failed to load")?),
+                vad: None,
+            }),
         }
-        Ok(Self::Whisper(whisper_rs::Context::new(path, options)?))
     }
 
     pub fn transcribe(&mut self, samples: &[f32], options: TranscribeOptions) -> anyhow::Result<TranscribeResult> {
@@ -69,18 +79,9 @@ impl Engine {
                 } else {
                     options.language.as_deref().unwrap_or("en-US")
                 };
-                let vad_model_path = options
-                    .vad_model_path
-                    .as_deref()
-                    .context("vad_model_path is required for Nemotron")?;
-                if vad.as_ref().is_none_or(|(path, _)| path != vad_model_path) {
-                    *vad = Some((
-                        vad_model_path.to_string(),
-                        vad_rs::Vad::new(vad_model_path, vad_rs::Options::default())?,
-                    ));
-                }
+                let vad = engine_vad(vad, options.vad_model_path.as_deref(), vad_rs::Options::default(), "Nemotron")?;
                 let result = model
-                    .transcribe(&mut vad.as_mut().unwrap().1, samples, language)
+                    .transcribe(vad, samples, language)
                     .context("Nemotron inference failed")?;
                 Ok(TranscribeResult {
                     segments: result
@@ -103,12 +104,25 @@ impl Engine {
                 } else {
                     options.language.as_deref().unwrap_or("en")
                 };
-                let vad = parakeet_vad(vad, options.vad_model_path.as_deref())?;
+                let vad = engine_vad(vad, options.vad_model_path.as_deref(), vad_rs::Options::default(), "Parakeet")?;
                 let result = model
                     .transcribe(vad, samples, language)
                     .context("Parakeet inference failed")?;
                 Ok(TranscribeResult {
                     segments: result.segments.iter().filter_map(parakeet_segment).collect(),
+                })
+            }
+            Self::Gigaam { model, vad } => {
+                validate_gigaam_options(&options)?;
+                let language = if options.detect_language {
+                    "auto"
+                } else {
+                    options.language.as_deref().unwrap_or("ru")
+                };
+                let vad = engine_vad(vad, options.vad_model_path.as_deref(), gigaam_vad_options(), "GigaAM")?;
+                let result = model.transcribe(vad, samples, language).context("GigaAM inference failed")?;
+                Ok(TranscribeResult {
+                    segments: result.segments.iter().filter_map(gigaam_segment).collect(),
                 })
             }
         }
@@ -134,23 +148,14 @@ impl Engine {
                 } else {
                     options.language.as_deref().unwrap_or("en-US")
                 };
-                let vad_model_path = options
-                    .vad_model_path
-                    .as_deref()
-                    .context("vad_model_path is required for Nemotron")?;
-                if vad.as_ref().is_none_or(|(path, _)| path != vad_model_path) {
-                    *vad = Some((
-                        vad_model_path.to_string(),
-                        vad_rs::Vad::new(vad_model_path, vad_rs::Options::default())?,
-                    ));
-                }
+                let vad = engine_vad(vad, options.vad_model_path.as_deref(), vad_rs::Options::default(), "Nemotron")?;
                 let StreamCallbacks {
                     mut on_progress,
                     mut on_segment,
                     mut should_abort,
                 } = callbacks;
                 let result = model.transcribe_with(
-                    &mut vad.as_mut().unwrap().1,
+                    vad,
                     samples,
                     language,
                     || should_abort.as_mut().is_some_and(|callback| callback()),
@@ -178,7 +183,7 @@ impl Engine {
                 } else {
                     options.language.as_deref().unwrap_or("en")
                 };
-                let vad = parakeet_vad(vad, options.vad_model_path.as_deref())?;
+                let vad = engine_vad(vad, options.vad_model_path.as_deref(), vad_rs::Options::default(), "Parakeet")?;
                 let StreamCallbacks {
                     mut on_progress,
                     mut on_segment,
@@ -206,6 +211,71 @@ impl Engine {
                     segments: result.segments.iter().filter_map(parakeet_segment).collect(),
                 })
             }
+            Self::Gigaam { model, vad } => {
+                validate_gigaam_options(&options)?;
+                let language = if options.detect_language {
+                    "auto"
+                } else {
+                    options.language.as_deref().unwrap_or("ru")
+                };
+                let vad = engine_vad(vad, options.vad_model_path.as_deref(), gigaam_vad_options(), "GigaAM")?;
+                let StreamCallbacks {
+                    mut on_progress,
+                    mut on_segment,
+                    mut should_abort,
+                } = callbacks;
+                let result = model
+                    .transcribe_with(
+                        vad,
+                        samples,
+                        language,
+                        || should_abort.as_mut().is_some_and(|callback| callback()),
+                        |transcription| {
+                            if let (Some(callback), Some(segment)) = (on_segment.as_mut(), gigaam_segment(transcription)) {
+                                callback(segment);
+                            }
+                        },
+                        |progress| {
+                            if let Some(callback) = on_progress.as_mut() {
+                                callback(progress);
+                            }
+                        },
+                    )
+                    .context("GigaAM inference failed")?;
+                Ok(TranscribeResult {
+                    segments: result.segments.iter().filter_map(gigaam_segment).collect(),
+                })
+            }
+        }
+    }
+
+    /// Rejects options the loaded engine cannot honor before any audio is
+    /// decoded, so CLI and streaming requests fail with a specific reason.
+    pub fn validate_request(&self, options: &TranscribeOptions) -> anyhow::Result<()> {
+        match self {
+            Self::Whisper(_) => Ok(()),
+            Self::Gigaam { .. } => {
+                validate_gigaam_options(options)?;
+                let language = if options.detect_language {
+                    "auto"
+                } else {
+                    options.language.as_deref().unwrap_or("ru")
+                };
+                if !language.is_empty() && language != "auto" && language != "ru" {
+                    return Err(gigaam_rs::Error::UnsupportedLanguage(language.to_owned()).into());
+                }
+                Ok(())
+            }
+            Self::Parakeet { .. } => validate_parakeet_options(options),
+            Self::Nemotron { .. } => {
+                if options.translate {
+                    bail!("Nemotron does not support translation");
+                }
+                if options.prompt.is_some() {
+                    bail!("Nemotron does not support text prompts");
+                }
+                Ok(())
+            }
         }
     }
 
@@ -232,6 +302,7 @@ impl Engine {
                 timestamps: true,
                 text_prompts: false,
             },
+            Self::Gigaam { model, .. } => gigaam_capabilities(model.info()),
         }
     }
 }
@@ -268,12 +339,24 @@ fn validate_parakeet_options(options: &TranscribeOptions) -> anyhow::Result<()> 
     Ok(())
 }
 
-fn parakeet_vad<'a>(cached: &'a mut Option<(String, vad_rs::Vad)>, path: Option<&str>) -> anyhow::Result<&'a mut vad_rs::Vad> {
-    let path = path.context("vad_model_path is required for Parakeet")?;
-    if cached.as_ref().is_none_or(|(cached_path, _)| cached_path != path) {
-        *cached = Some((path.to_owned(), vad_rs::Vad::new(path, vad_rs::Options::default())?));
+fn engine_vad<'a>(
+    cached: &'a mut Option<VadCache>,
+    path: Option<&str>,
+    options: vad_rs::Options,
+    engine: &str,
+) -> anyhow::Result<&'a mut vad_rs::Vad> {
+    let path = path.with_context(|| format!("vad_model_path is required for {engine}"))?;
+    let stale = cached
+        .as_ref()
+        .is_none_or(|cached| cached.path != path || cached.options != options);
+    if stale {
+        *cached = Some(VadCache {
+            path: path.to_owned(),
+            options,
+            vad: vad_rs::Vad::new(path, options)?,
+        });
     }
-    Ok(&mut cached.as_mut().expect("VAD initialized").1)
+    Ok(&mut cached.as_mut().expect("VAD initialized").vad)
 }
 
 fn parakeet_segment(transcription: &parakeet_rs::Transcription) -> Option<Segment> {
@@ -287,3 +370,158 @@ fn parakeet_segment(transcription: &parakeet_rs::Transcription) -> Option<Segmen
         no_speech_prob: 0.0,
     })
 }
+
+pub fn gigaam_capabilities(info: &gigaam_rs::ModelInfo) -> EngineCapabilities {
+    EngineCapabilities {
+        engine: "gigaam".to_string(),
+        requires_vad: true,
+        languages: info.languages.clone(),
+        language_detection: false,
+        streaming: false,
+        translation: false,
+        timestamps: true,
+        text_prompts: false,
+    }
+}
+
+/// GigaAM is trained for utterances up to about 25 seconds, so its VAD chunks
+/// stay below that bound with no cross-chunk overlap.
+fn gigaam_vad_options() -> vad_rs::Options {
+    vad_rs::Options {
+        max_chunk_ms: 24_000,
+        overlap_ms: 0,
+        ..vad_rs::Options::default()
+    }
+}
+
+fn validate_gigaam_options(options: &TranscribeOptions) -> anyhow::Result<()> {
+    if options.translate {
+        bail!("GigaAM does not support translation");
+    }
+    if options.prompt.is_some() {
+        bail!("GigaAM does not support text prompts");
+    }
+    if options.stable_timestamps {
+        bail!("GigaAM does not support stable timestamps");
+    }
+    Ok(())
+}
+
+/// GigaAM reports token timestamps at the 40 ms encoder frame rate.
+const GIGAAM_CENTISECONDS_PER_FRAME: i64 = 4;
+
+fn gigaam_segment(transcription: &gigaam_rs::Transcription) -> Option<Segment> {
+    (!transcription.text.is_empty()).then(|| Segment {
+        start: transcription
+            .tokens
+            .first()
+            .map_or(0, |token| token.frame as i64 * GIGAAM_CENTISECONDS_PER_FRAME),
+        end: transcription
+            .tokens
+            .last()
+            .map_or(0, |token| (token.frame as i64 + 1) * GIGAAM_CENTISECONDS_PER_FRAME),
+        text: transcription.text.clone(),
+        no_speech_prob: 0.0,
+    })
+}
+
+/// Whether the file starts with the GGUF magic. Whisper models use the older
+/// GGML container and are handled by whisper.cpp instead.
+pub fn is_gguf(path: &str) -> bool {
+    use std::io::Read;
+
+    let mut magic = [0u8; 4];
+    std::fs::File::open(path).is_ok_and(|mut file| file.read_exact(&mut magic).is_ok()) && &magic == b"GGUF"
+}
+
+/// Reads model metadata once and reports the engine the server would load.
+/// `Engine::load` and the metadata route share this function so a model cannot
+/// be listed as supported and then rejected, or the other way round.
+pub fn detect_model(path: &str) -> anyhow::Result<EngineCapabilities> {
+    if !is_gguf(path) {
+        whisper_rs::validate_model_file(path)?;
+        return Ok(whisper_capabilities());
+    }
+    // Read `general.architecture` once so an unsupported file is rejected by
+    // name instead of by whichever key the last engine reader happened to miss.
+    let architecture = gguf_architecture(path);
+    if let Ok(info) = gigaam_rs::Model::metadata(path) {
+        if info.architecture == "gigaam" {
+            return Ok(gigaam_capabilities(&info));
+        }
+    }
+    if let Ok(info) = parakeet_rs::Model::metadata(path) {
+        if info.architecture == "parakeet" && info.head_kind == "tdt" && info.variant.contains("v3") {
+            return Ok(EngineCapabilities {
+                engine: "parakeet".to_string(),
+                requires_vad: true,
+                languages: info.languages,
+                language_detection: info.language_detection,
+                streaming: false,
+                translation: false,
+                timestamps: true,
+                text_prompts: false,
+            });
+        }
+    }
+    match nemotron_rs::Model::metadata(path) {
+        Ok(info) if info.architecture == "parakeet" && info.head_kind == "rnnt" => Ok(EngineCapabilities {
+            engine: "nemotron".to_string(),
+            requires_vad: true,
+            languages: info.languages,
+            language_detection: info.language_detection,
+            streaming: false,
+            translation: false,
+            timestamps: true,
+            text_prompts: false,
+        }),
+        Ok(info) => bail!(
+            "unsupported GGUF architecture '{}' with head '{}'",
+            info.architecture,
+            info.head_kind
+        ),
+        Err(err) => {
+            tracing::error!(model = path, "failed to read GGUF metadata: {err}");
+            match architecture {
+                Some(architecture) => bail!("unsupported GGUF architecture '{architecture}'"),
+                None => bail!("failed to read GGUF metadata: {err}"),
+            }
+        }
+    }
+}
+
+/// Reads `general.architecture` from a GGUF without materializing tensors.
+fn gguf_architecture(path: &str) -> Option<String> {
+    use gigaam_rs::sys;
+    use std::ffi::{CStr, CString};
+
+    let path = CString::new(path).ok()?;
+    let key = CString::new("general.architecture").ok()?;
+    unsafe {
+        let mut tensors = std::ptr::null_mut();
+        let gguf = sys::gguf_init_from_file(
+            path.as_ptr(),
+            sys::gguf_init_params {
+                no_alloc: true,
+                ctx: &mut tensors,
+            },
+        );
+        if gguf.is_null() {
+            return None;
+        }
+        let id = sys::gguf_find_key(gguf, key.as_ptr());
+        let architecture = (id >= 0)
+            .then(|| sys::gguf_get_val_str(gguf, id))
+            .filter(|value| !value.is_null())
+            .map(|value| CStr::from_ptr(value).to_string_lossy().into_owned());
+        if !tensors.is_null() {
+            sys::ggml_free(tensors);
+        }
+        sys::gguf_free(gguf);
+        architecture
+    }
+}
+
+#[cfg(test)]
+#[path = "engine_tests.rs"]
+mod tests;

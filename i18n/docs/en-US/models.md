@@ -30,6 +30,39 @@ Supports streaming and is best suited for dictation.
 [👉 View Model](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf)  
 [🔽 Download Q4_K_M](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf?download=true)
 
+### 🇷🇺 GigaAM v3 (Russian)
+
+Russian speech recognition with capitalization and punctuation, by Salute Developers. Best suited for Russian dictation.
+
+[👉 View Model](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf)  
+[🔽 Download Q8_0](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/gigaam-v3-e2e-rnnt-Q8_0.gguf?download=true)
+
+<details>
+<summary>GigaAM limitations and command-line examples</summary>
+
+**Limitations**
+
+- Russian only. There is no language auto-detect: `--language ru` and `--language auto` both select Russian, and any other language fails with `unsupported_language`.
+- Not streaming. The model window is 25 seconds, and the [Silero VAD model](https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin) is required to split longer recordings.
+- No translation and no text prompt.
+- Stable timestamps are unsupported, and word-timestamp requests are ignored. Each segment carries token timestamps at 40 ms resolution.
+- Speaker diarization works as usual.
+- Four variants are published under `handy-computer`: [`gigaam-v3-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-rnnt-gguf), [`gigaam-v3-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-ctc-gguf), [`gigaam-v3-e2e-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf), and [`gigaam-v3-e2e-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf). The `e2e` variants add capitalization and punctuation; the others return lowercase text without punctuation.
+
+**Command line**
+
+Download the VAD model above and pass it with `--vad-model`:
+
+```console
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format markdown --output transcript.md
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format json
+```
+
+`--format` accepts `txt` (default), `markdown` (alias `md`), `json`, `srt`, and `vtt`. `--output` writes the transcript to a file and refuses to overwrite an existing one. Add `--diarize-model <diar.gguf>` to label speakers in Markdown and JSON output.
+
+</details>
+
 ### Models optimised for other languages
 
 <details>

@@ -1,5 +1,5 @@
 use crate::engine::Engine;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use whisper_rs::{ContextOptions, TranscribeOptions};
 
 use crate::server::format;
@@ -30,6 +30,12 @@ enum Command {
         audio: String,
         #[arg(long)]
         vad_model: Option<String>,
+        #[arg(long)]
+        diarize_model: Option<String>,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Txt)]
+        format: OutputFormat,
+        #[arg(long)]
+        output: Option<String>,
         #[arg(short, long)]
         language: Option<String>,
         #[arg(long)]
@@ -110,6 +116,9 @@ pub async fn run() -> anyhow::Result<()> {
             model,
             audio,
             vad_model,
+            diarize_model,
+            format,
+            output,
             language,
             detect_language,
             enhance_audio,
@@ -129,6 +138,9 @@ pub async fn run() -> anyhow::Result<()> {
                     model,
                     audio,
                     vad_model,
+                    diarize_model,
+                    format,
+                    output,
                     language,
                     detect_language,
                     enhance_audio,
@@ -181,49 +193,89 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
         },
     )
     .inspect_err(|err| tracing::error!(model = args.model, "failed to load model: {err:#}"))?;
-    let result = ctx
-        .transcribe(
-            &samples,
-            TranscribeOptions {
-                language: args.language,
-                detect_language: args.detect_language,
-                translate: args.translate,
-                threads: args.threads,
-                prompt: args.prompt,
-                verbose: config.verbose(),
-                temperature: args.temperature,
-                max_text_ctx: args.max_text_ctx,
-                word_timestamps: args.word_timestamps,
-                // One word per segment is what --word-timestamps is asking for, unless
-                // the caller picked a length themselves.
-                max_segment_len: if args.word_timestamps && args.max_segment_len == 0 {
-                    1
-                } else {
-                    args.max_segment_len
-                },
-                best_of: args.best_of,
-                beam_size: args.beam_size,
-                vad_model_path: args.vad_model,
-                ..TranscribeOptions::default()
-            },
-        )
-        .inspect_err(|err| tracing::error!("transcription failed: {err:#}"))?;
 
-    if args.word_timestamps {
+    let diar_segments = args.diarize_model.as_deref().map_or_else(Vec::new, |model_path| {
+        crate::server::diarization::diarize(model_path, &samples)
+    });
+
+    let options = TranscribeOptions {
+        language: args.language,
+        detect_language: args.detect_language,
+        translate: args.translate,
+        threads: args.threads,
+        prompt: args.prompt,
+        verbose: config.verbose(),
+        temperature: args.temperature,
+        max_text_ctx: args.max_text_ctx,
+        word_timestamps: args.word_timestamps,
+        // One word per segment is what --word-timestamps is asking for, unless
+        // the caller picked a length themselves.
+        max_segment_len: if args.word_timestamps && args.max_segment_len == 0 {
+            1
+        } else {
+            args.max_segment_len
+        },
+        best_of: args.best_of,
+        beam_size: args.beam_size,
+        vad_model_path: args.vad_model,
+        ..TranscribeOptions::default()
+    };
+    // Validation raises the same language error the engine does, so the marker
+    // has to cover both paths: a rejected language never reaches `transcribe`.
+    ctx.validate_request(&options).map_err(unsupported_language_marker)?;
+    let result = ctx
+        .transcribe(&samples, options)
+        .inspect_err(|err| tracing::error!("transcription failed: {err:#}"))
+        .map_err(unsupported_language_marker)?;
+
+    let rendered = if args.word_timestamps && args.format == OutputFormat::Txt {
         // whisper.cpp emits one segment per word here, plus a leading empty one for
         // the silence before speech starts.
-        let words = result.segments.iter().filter(|segment| !segment.text.trim().is_empty());
-        for word in words {
-            println!(
-                "[{} --> {}] {}",
+        let mut out = String::new();
+        for word in result.segments.iter().filter(|segment| !segment.text.trim().is_empty()) {
+            out.push_str(&format!(
+                "[{} --> {}] {}\n",
                 format::cs_to_vtt_time(word.start),
                 format::cs_to_vtt_time(word.end),
                 word.text.trim()
-            );
+            ));
         }
+        out
     } else {
-        println!("{}", result.text());
+        match args.format {
+            OutputFormat::Txt => format!("{}\n", result.text()),
+            OutputFormat::Markdown => format::format_markdown(&result.segments, &diar_segments),
+            OutputFormat::Json => format::format_json(&result, &diar_segments),
+            OutputFormat::Srt => format::format_srt(&result.segments),
+            OutputFormat::Vtt => format::format_vtt(&result.segments),
+        }
+    };
+
+    match args.output {
+        Some(path) => write_output(&rendered, &path)?,
+        None => print!("{rendered}"),
     }
+    Ok(())
+}
+
+/// Replace a rejected GigaAM language with the marker the CLI contract documents.
+fn unsupported_language_marker(err: anyhow::Error) -> anyhow::Error {
+    match err.downcast_ref::<gigaam_rs::Error>() {
+        Some(gigaam_rs::Error::UnsupportedLanguage(language)) => anyhow::anyhow!("unsupported_language: {language:?}"),
+        _ => err,
+    }
+}
+
+/// Write the rendered transcript to a new file. `create_new` refuses an existing
+/// path, so a previous transcript is never overwritten.
+fn write_output(rendered: &str, path: &str) -> anyhow::Result<()> {
+    use std::io::Write as _;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(|err| anyhow::anyhow!("cannot create output file {path:?}: {err}"))?;
+    file.write_all(rendered.as_bytes())?;
     Ok(())
 }
 
@@ -247,10 +299,104 @@ fn devices_command(config: AppConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum OutputFormat {
+    /// Plain text transcript.
+    Txt,
+    /// Markdown with timestamped, speaker-labelled blocks.
+    #[value(alias = "md")]
+    Markdown,
+    /// JSON document with text and timestamped segments.
+    Json,
+    /// SubRip subtitles.
+    Srt,
+    /// WebVTT subtitles.
+    Vtt,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    fn transcribe_command_definition() -> clap::Command {
+        Cli::command()
+            .find_subcommand("transcribe")
+            .expect("transcribe subcommand")
+            .clone()
+    }
+
+    fn long_flags() -> Vec<String> {
+        transcribe_command_definition()
+            .get_arguments()
+            .filter_map(|arg| arg.get_long().map(str::to_string))
+            .collect()
+    }
+
+    #[test]
+    fn transcribe_help_lists_diarization_format_and_output() {
+        let flags = long_flags();
+        for expected in ["diarize-model", "format", "output"] {
+            assert!(flags.iter().any(|flag| flag == expected), "missing --{expected} in {flags:?}");
+        }
+    }
+
+    #[test]
+    fn format_defaults_to_txt_and_accepts_md_alias() {
+        let cli = Cli::try_parse_from(["vibe-server", "transcribe", "model.bin", "audio.wav"]).unwrap();
+        let Command::Transcribe { format, .. } = cli.command else {
+            panic!("expected transcribe");
+        };
+        assert_eq!(format, OutputFormat::Txt);
+
+        let cli = Cli::try_parse_from(["vibe-server", "transcribe", "model.bin", "audio.wav", "--format", "md"]).unwrap();
+        let Command::Transcribe { format, .. } = cli.command else {
+            panic!("expected transcribe");
+        };
+        assert_eq!(format, OutputFormat::Markdown);
+    }
+
+    #[test]
+    fn write_output_creates_a_new_file_with_the_whole_transcript() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("transcript.md");
+        let path = path.to_str().unwrap();
+
+        write_output("# Transcript\n\nhello\n", path).unwrap();
+
+        assert_eq!(std::fs::read_to_string(path).unwrap(), "# Transcript\n\nhello\n");
+    }
+
+    #[test]
+    fn write_output_refuses_an_existing_path_and_leaves_it_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("transcript.md");
+        std::fs::write(&path, "previous").unwrap();
+        let path = path.to_str().unwrap();
+
+        let error = write_output("new", path).unwrap_err();
+
+        assert!(error.to_string().contains(path), "error should name the path: {error}");
+        assert_eq!(std::fs::read_to_string(path).unwrap(), "previous");
+    }
+
+    #[test]
+    fn write_output_creates_nothing_when_the_path_is_unusable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("missing-dir").join("transcript.md");
+
+        assert!(write_output("new", path.to_str().unwrap()).is_err());
+        assert!(!path.exists());
+    }
+}
+
 struct TranscribeArgs {
     model: String,
     audio: String,
     vad_model: Option<String>,
+    diarize_model: Option<String>,
+    format: OutputFormat,
+    output: Option<String>,
     language: Option<String>,
     detect_language: bool,
     enhance_audio: bool,

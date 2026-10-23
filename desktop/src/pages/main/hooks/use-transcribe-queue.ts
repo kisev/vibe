@@ -31,7 +31,7 @@ import {
 } from '~/lib/transcripts-store'
 import type { NamedPath, ProjectSource } from '~/lib/types'
 import { ErrorModalContext } from '~/providers/error-modal'
-import { withoutUnsupportedOptions } from '~/lib/model'
+import { hidesWhisperOnlyOptions, withoutUnsupportedOptions } from '~/lib/model'
 import { type Preference, usePreferenceProvider } from '~/providers/preference'
 
 export type JobStatus = 'queued' | 'running' | 'done' | 'error' | 'cancelled'
@@ -143,15 +143,20 @@ function nextJobId() {
 	return `job-${jobCounter}`
 }
 
-/** Options shared by every file of a run (diarize / vad model paths). */
-async function buildSharedOptions(preference: Preference) {
-	const requiresVad = preference.modelMetadata?.capabilities.requires_vad ?? false
-	const needsFolder = preference.diarizeEnabled || preference.stableTimestampsEnabled || requiresVad
+/**
+ * Options shared by every file of a run (diarize / vad model paths). Stable timestamps survive in
+ * settings after switching away from Whisper, but they are only sent to engines that accept them.
+ */
+export async function buildSharedOptions(preference: Preference) {
+	const capabilities = preference.modelMetadata?.capabilities
+	const stableTimestamps = preference.stableTimestampsEnabled && !hidesWhisperOnlyOptions(capabilities)
+	const requiresVad = capabilities?.requires_vad ?? false
+	const needsFolder = preference.diarizeEnabled || stableTimestamps || requiresVad
 	const modelsFolder = needsFolder ? await invoke<string>('get_models_folder') : null
 	return {
 		...(preference.diarizeEnabled ? { diarize_model: `${modelsFolder}/${config.diarizeModelFilename}` } : {}),
-		...(preference.stableTimestampsEnabled || requiresVad ? { vad_model: `${modelsFolder}/${config.vadModelFilename}` } : {}),
-		...(preference.stableTimestampsEnabled ? { stable_timestamps: true } : {}),
+		...(stableTimestamps || requiresVad ? { vad_model: `${modelsFolder}/${config.vadModelFilename}` } : {}),
+		...(stableTimestamps ? { stable_timestamps: true } : {}),
 	}
 }
 

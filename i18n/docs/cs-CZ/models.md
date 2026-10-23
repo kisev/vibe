@@ -1,4 +1,4 @@
-<!-- source: 1d964213251f -->
+<!-- source: 674c5e6aa04b -->
 
 # 🌟 Modely Vibe 🌟
 
@@ -31,6 +31,39 @@ Podporuje streamování a nejlépe se hodí pro diktování.
 
 [👉 Zobrazit model](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf)  
 [🔽 Stáhnout Q4_K_M](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf?download=true)
+
+### 🇷🇺 GigaAM v3 (Ruština)
+
+Rozpoznávání ruské řeči s velkými písmeny a interpunkcí od Salute Developers. Nejlépe se hodí pro ruské diktování.
+
+[👉 Zobrazit model](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf)  
+[🔽 Stáhnout Q8_0](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/gigaam-v3-e2e-rnnt-Q8_0.gguf?download=true)
+
+<details>
+<summary>Omezení GigaAM v3 a příklady příkazového řádku</summary>
+
+**Omezení**
+
+- Pouze ruština. Automatická detekce jazyka neexistuje: `--language ru` i `--language auto` vyberou ruštinu a jakýkoli jiný jazyk selže s `unsupported_language`.
+- Nepodporuje streamování. Okno modelu je 25 sekund a pro rozdělení delších nahrávek je vyžadován [model Silero VAD](https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin).
+- Žádný překlad a žádná textová výzva.
+- Stabilní časové značky nejsou podporovány a požadavky na časové značky slov se ignorují. Každý segment nese časové značky tokenů s rozlišením 40 ms.
+- Diarizace mluvčích funguje jako obvykle.
+- Pod `handy-computer` jsou publikovány čtyři varianty: [`gigaam-v3-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-rnnt-gguf), [`gigaam-v3-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-ctc-gguf), [`gigaam-v3-e2e-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf) a [`gigaam-v3-e2e-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf). Varianty `e2e` přidávají velká písmena a interpunkci; ostatní vracejí text malými písmeny bez interpunkce.
+
+**Příkazový řádek**
+
+Stáhněte výše uvedený VAD model a předejte jej pomocí `--vad-model`:
+
+```console
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format markdown --output transcript.md
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format json
+```
+
+`--format` přijímá `txt` (výchozí), `markdown` (alias `md`), `json`, `srt` a `vtt`. `--output` zapíše přepis do souboru a odmítne přepsat existující soubor. Přidejte `--diarize-model <diar.gguf>` pro označení mluvčích ve výstupu Markdown a JSON.
+
+</details>
 
 ### Modely optimalizované pro jiné jazyky
 

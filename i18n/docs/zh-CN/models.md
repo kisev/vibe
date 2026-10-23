@@ -1,4 +1,4 @@
-<!-- source: 1d964213251f -->
+<!-- source: 674c5e6aa04b -->
 
 # 🌟 Vibe 模型 🌟
 
@@ -31,6 +31,39 @@
 
 [👉 查看模型](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf)  
 [🔽 下载 Q4_K_M](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf?download=true)
+
+### 🇷🇺 GigaAM v3（俄语）
+
+由 Salute Developers 提供的俄语语音识别，支持大小写和标点。最适合用于俄语听写。
+
+[👉 查看模型](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf)  
+[🔽 下载 Q8_0](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/gigaam-v3-e2e-rnnt-Q8_0.gguf?download=true)
+
+<details>
+<summary>GigaAM 的限制和命令行示例</summary>
+
+**限制**
+
+- 仅支持俄语。没有语言自动检测：`--language ru` 和 `--language auto` 都会选择俄语，任何其他语言都会以 `unsupported_language` 失败。
+- 不支持流式转录。模型窗口为 25 秒，需要 [Silero VAD 模型](https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin)来切分更长的录音。
+- 不支持翻译，也不支持文本提示词。
+- 不支持稳定时间戳，单词时间戳请求会被忽略。每个片段带有 40 毫秒分辨率的词元时间戳。
+- 发言者分离可照常使用。
+- 在 `handy-computer` 下发布了四个变体：[`gigaam-v3-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-rnnt-gguf)、[`gigaam-v3-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-ctc-gguf)、[`gigaam-v3-e2e-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf) 和 [`gigaam-v3-e2e-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf)。`e2e` 变体会增加大小写和标点；其他变体返回不带标点的小写文本。
+
+**命令行**
+
+下载上方的 VAD 模型，并通过 `--vad-model` 传入：
+
+```console
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format markdown --output transcript.md
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format json
+```
+
+`--format` 接受 `txt`（默认）、`markdown`（别名 `md`）、`json`、`srt` 和 `vtt`。`--output` 将转录写入文件，并拒绝覆盖已存在的文件。添加 `--diarize-model <diar.gguf>` 可在 Markdown 和 JSON 输出中标注说话人。
+
+</details>
 
 ### 针对其他语言优化的模型
 

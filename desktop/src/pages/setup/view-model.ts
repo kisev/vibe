@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { emit, listen } from '@tauri-apps/api/event'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { m } from '~/paraglide/messages.js'
 import { ErrorModalContext } from '~/providers/error-modal'
 import { usePreferenceProvider } from '~/providers/preference'
 import * as utils from '~/lib/model'
@@ -9,6 +10,7 @@ import * as osExt from '@tauri-apps/plugin-os'
 import * as config from '~/lib/config'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { join } from '@tauri-apps/api/path'
+import { ensureVadModel } from '~/lib/vad'
 
 export function viewModel() {
 	const location = useLocation()
@@ -42,24 +44,30 @@ export function viewModel() {
 	}
 
 	async function ensureRequiredVad(metadata: utils.ModelMetadata | null) {
-		if (!metadata?.capabilities.requires_vad) return true
 		const modelsFolder = await invoke<string>('get_models_folder')
 		const vadPath = await join(modelsFolder, config.vadModelFilename)
-		if (await utils.isModelFileUsable(vadPath)) return true
-
-		const confirmed = await ask('This transcription model requires Silero VAD. Download it before selecting the model?', {
-			title: 'Download required VAD model',
-			kind: 'info',
+		return ensureVadModel({
+			metadata,
+			vadPath,
+			isUsable: utils.isModelFileUsable,
+			confirm: () => ask(m.downloadRequiredVadModelQuestion(), { title: m.downloadRequiredVadModel(), kind: 'info' }),
+			download: async (url, path) => {
+				await invoke('download_model', { url, path })
+			},
 		})
-		if (!confirmed) return false
-		await invoke('download_model', { url: config.vadModelUrl, path: vadPath })
-		return true
 	}
 
 	async function selectDownloadedModel(modelPath: string) {
 		const metadata = await readModelMetadata(modelPath)
 		if (!(await ensureRequiredVad(metadata))) return false
 		preference.setModelMetadata(metadata)
+		if (metadata) {
+			// A freshly downloaded model may not support the language left over from before.
+			preference.setModelOptions({
+				...preference.modelOptions,
+				lang: utils.resolveModelLanguage(metadata.capabilities, preference.modelOptions.lang),
+			})
+		}
 		preference.setModelPath(modelPath)
 		return true
 	}

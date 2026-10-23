@@ -1,4 +1,4 @@
-<!-- source: 1d964213251f -->
+<!-- source: 674c5e6aa04b -->
 
 # 🌟 Vibe 모델 🌟
 
@@ -31,6 +31,39 @@ Vibe 모델 페이지에 오신 것을 환영합니다! 이 페이지에서는 V
 
 [👉 모델 보기](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf)  
 [🔽 Q4_K_M 다운로드](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf?download=true)
+
+### 🇷🇺 GigaAM v3 (러시아어)
+
+Salute Developers가 만든 러시아어 음성 인식 모델로, 대문자화와 문장 부호를 처리합니다. 러시아어 받아쓰기에 가장 적합합니다.
+
+[👉 모델 보기](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf)  
+[🔽 Q8_0 다운로드](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/gigaam-v3-e2e-rnnt-Q8_0.gguf?download=true)
+
+<details>
+<summary>GigaAM 제한 사항 및 명령줄 예제</summary>
+
+**제한 사항**
+
+- 러시아어만 지원하며 언어 자동 감지 기능이 없습니다. `--language ru`와 `--language auto`는 모두 러시아어를 선택하고, 다른 언어는 `unsupported_language` 오류로 실패합니다.
+- 스트리밍을 지원하지 않습니다. 모델 창은 25초이며, 더 긴 녹음을 나누려면 [Silero VAD 모델](https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin)이 필요합니다.
+- 번역과 텍스트 프롬프트를 지원하지 않습니다.
+- 안정적인 타임스탬프는 지원하지 않으며, 단어 타임스탬프 요청은 무시됩니다. 각 세그먼트에는 40ms 해상도의 토큰 타임스탬프가 포함됩니다.
+- 화자 분리는 평소와 같이 동작합니다.
+- `handy-computer` 아래에 네 가지 변형이 게시되어 있습니다: [`gigaam-v3-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-rnnt-gguf), [`gigaam-v3-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-ctc-gguf), [`gigaam-v3-e2e-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf), [`gigaam-v3-e2e-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf). `e2e` 변형은 대문자화와 문장 부호를 추가하고, 나머지는 문장 부호 없는 소문자 텍스트를 반환합니다.
+
+**명령줄**
+
+위에서 VAD 모델을 다운로드하고 `--vad-model`로 전달하세요:
+
+```console
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format markdown --output transcript.md
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format json
+```
+
+`--format`은 `txt`(기본값), `markdown`(별칭 `md`), `json`, `srt`, `vtt`를 지원합니다. `--output`은 트랜스크립트를 파일로 저장하며 기존 파일을 덮어쓰지 않습니다. `--diarize-model <diar.gguf>`를 추가하면 Markdown 및 JSON 출력에 화자 레이블이 표시됩니다.
+
+</details>
 
 ### 다른 언어에 최적화된 모델
 

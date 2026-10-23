@@ -15,7 +15,7 @@ import { DEFAULT_AI, migrateLegacy, type AiSettings } from '~/lib/ai'
 import { readConfig } from '~/lib/config-store'
 import { message } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
-import type { ModelMetadata } from '~/lib/model'
+import { resolveModelLanguage, type ModelMetadata } from '~/lib/model'
 
 /** Which build of the engine's CPU backend to run; `auto` lets CPUID decide. */
 export type CpuVariant = 'auto' | 'avx2' | 'baseline'
@@ -307,6 +307,16 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 			})
 	}, [modelPath])
 
+	// A model can only run the languages it reports. This catches the persisted choice after a
+	// restart, and the stale `auto` or English left behind when switching to GigaAM.
+	useEffect(() => {
+		if (!modelMetadata) return
+		setModelOptions((previous) => {
+			const lang = resolveModelLanguage(modelMetadata.capabilities, previous.lang)
+			return lang === previous.lang ? previous : { ...previous, lang }
+		})
+	}, [modelMetadata, setModelOptions])
+
 	useEffect(() => {
 		load(config.storeFilename).then((store) => {
 			store.get<boolean>('analytics_enabled').then((val) => {
@@ -344,7 +354,9 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 
 	function setLanguageDefaults() {
 		if (supportedLanguages[preference.displayLanguage]) {
-			preference.setModelOptions({ ...preference.modelOptions, lang: preference.displayLanguage.split('-')[0].toLowerCase() })
+			const preferred = preference.displayLanguage.split('-')[0].toLowerCase()
+			const lang = resolveModelLanguage(modelMetadata?.capabilities, preferred)
+			preference.setModelOptions({ ...preference.modelOptions, lang })
 			preference.setTextAreaDirection(getTextDirection())
 		}
 	}

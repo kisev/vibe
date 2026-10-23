@@ -1,4 +1,4 @@
-<!-- source: 1d964213251f -->
+<!-- source: 674c5e6aa04b -->
 
 # 🌟 Vibe-modeller 🌟
 
@@ -31,6 +31,39 @@ Støtter streaming og er best egnet for diktering.
 
 [👉 Vis modell](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf)  
 [🔽 Last ned Q4_K_M](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf?download=true)
+
+### 🇷🇺 GigaAM v3 (Russisk)
+
+Russisk talegjenkjenning med store og små bokstaver og tegnsetting, av Salute Developers. Best egnet for russisk diktering.
+
+[👉 Vis modell](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf)  
+[🔽 Last ned Q8_0](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/gigaam-v3-e2e-rnnt-Q8_0.gguf?download=true)
+
+<details>
+<summary>GigaAM-begrensninger og kommandolinjeeksempler</summary>
+
+**Begrensninger**
+
+- Bare russisk. Det finnes ingen automatisk språkregistrering: `--language ru` og `--language auto` velger begge russisk, og alle andre språk gir feilen `unsupported_language`.
+- Ikke streaming. Modellvinduet er 25 sekunder, og [Silero VAD-modellen](https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin) kreves for å dele opp lengre opptak.
+- Ingen oversettelse og ingen tekstprompt.
+- Stabile tidskoder støttes ikke, og forespørsler om ordtidsstempler ignoreres. Hvert segment har tokentidsstempler med 40 ms oppløsning.
+- Talergjenkjenning fungerer som vanlig.
+- Fire varianter er publisert under `handy-computer`: [`gigaam-v3-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-rnnt-gguf), [`gigaam-v3-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-ctc-gguf), [`gigaam-v3-e2e-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf) og [`gigaam-v3-e2e-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf). `e2e`-variantene legger til store og små bokstaver og tegnsetting; de andre returnerer tekst med bare små bokstaver og uten tegnsetting.
+
+**Kommandolinje**
+
+Last ned VAD-modellen ovenfor og send den med `--vad-model`:
+
+```console
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format markdown --output transcript.md
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format json
+```
+
+`--format` godtar `txt` (standard), `markdown` (alias `md`), `json`, `srt` og `vtt`. `--output` skriver transkripsjonen til en fil og nekter å overskrive en eksisterende fil. Legg til `--diarize-model <diar.gguf>` for å merke talere i Markdown- og JSON-utdata.
+
+</details>
 
 ### Modeller optimalisert for andre språk
 

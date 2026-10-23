@@ -6,6 +6,7 @@ import { Button } from '~/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { Switch } from '~/components/ui/switch'
 import { openSettingsSection } from '~/lib/app'
+import { hidesWhisperOnlyOptions } from '~/lib/model'
 import { useModelGates } from '~/providers/model-gates'
 import { useSession } from '../session'
 
@@ -57,12 +58,14 @@ export default function QuietRow() {
 							checked={preference.diarizeEnabled}
 							onChange={(value) => void modelGates.toggleDiarization(value)}
 						/>
-						<OptionRow
-							label={m.stableTimestamps()}
-							note={m.stableTimestampsSlowNote()}
-							checked={preference.stableTimestampsEnabled}
-							onChange={(value) => void modelGates.toggleStableTimestamps(value)}
-						/>
+						{!hidesWhisperOnlyOptions(preference.modelMetadata?.capabilities) && (
+							<OptionRow
+								label={m.stableTimestamps()}
+								note={m.stableTimestampsSlowNote()}
+								checked={preference.stableTimestampsEnabled}
+								onChange={(value) => void modelGates.toggleStableTimestamps(value)}
+							/>
+						)}
 					</div>
 					<Button variant="ghost" size="sm" className="mt-3 w-full justify-between rounded-xl px-3" onClick={() => openSection('tuning')}>
 						<span className="flex items-center gap-2">

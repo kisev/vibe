@@ -59,6 +59,17 @@ pub(super) async fn transcribe(
         ));
     }
 
+    if let Some(ctx) = model.ctx.as_ref() {
+        let options = build_options(&form, config.verbose(), stable_timestamps, vad_model_path.clone());
+        if let Err(err) = ctx.validate_request(&options) {
+            return Err(error(
+                super::engine_error_status(&err),
+                super::engine_error_code(&err),
+                &err.to_string(),
+            ));
+        }
+    }
+
     if stream {
         return stream_transcription(config, model, samples, form, stable_timestamps, vad_model_path, diar_segments)
             .map_err(|err| *err);
@@ -82,7 +93,7 @@ pub(super) async fn transcribe(
     let result = ctx.transcribe(&samples, opts).map_err(|err| {
         tracing::error!(samples = samples.len(), "transcription failed: {err:#}");
         error(
-            StatusCode::INTERNAL_SERVER_ERROR,
+            super::engine_error_status(&err),
             super::engine_error_code(&err),
             &format!("transcription failed: {err}"),
         )
@@ -136,5 +147,32 @@ fn format_response(
         )
             .into_response(),
         _ => Json(TextResponse { text: result.text() }).into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn form_fields_reach_the_engine_options() {
+        let form = HashMap::from([
+            ("language".to_string(), "en".to_string()),
+            ("translate".to_string(), "true".to_string()),
+            ("word_timestamps".to_string(), "true".to_string()),
+        ]);
+        let options = build_options(&form, false, false, Some("/tmp/vad.bin".to_string()));
+        assert_eq!(options.language.as_deref(), Some("en"));
+        assert!(options.translate);
+        assert!(options.word_timestamps);
+        assert_eq!(options.vad_model_path.as_deref(), Some("/tmp/vad.bin"));
+    }
+
+    #[test]
+    fn stable_timestamps_flag_is_carried_into_options() {
+        let options = build_options(&HashMap::new(), false, true, None);
+        assert!(options.stable_timestamps);
+        assert!(options.language.is_none());
+        assert!(!options.translate);
     }
 }

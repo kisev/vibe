@@ -1,4 +1,4 @@
-<!-- source: 1d964213251f -->
+<!-- source: 674c5e6aa04b -->
 
 # 🌟 Vibeモデル 🌟
 
@@ -31,6 +31,39 @@ Vibeモデルのページへようこそ！ここではVibeで使用するおす
 
 [👉 モデルを見る](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf)  
 [🔽 Q4_K_Mをダウンロード](https://huggingface.co/vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf?download=true)
+
+### 🇷🇺 GigaAM v3（ロシア語）
+
+Salute Developersによる、大文字と小文字の区別および句読点を備えたロシア語音声認識です。ロシア語のディクテーション（口述筆記）に最適です。
+
+[👉 モデルを見る](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf)  
+[🔽 Q8_0をダウンロード](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/gigaam-v3-e2e-rnnt-Q8_0.gguf?download=true)
+
+<details>
+<summary>GigaAMの制限事項とコマンドラインの例</summary>
+
+**制限事項**
+
+- ロシア語専用です。言語の自動検出はありません。`--language ru` と `--language auto` はどちらもロシア語を選択し、その他の言語は `unsupported_language` で失敗します。
+- ストリーミングには対応していません。モデルのウィンドウは25秒で、より長い録音を分割するには[Silero VADモデル](https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin)が必要です。
+- 翻訳とテキストプロンプトには対応していません。
+- 安定タイムスタンプには対応しておらず、単語タイムスタンプのリクエストは無視されます。各セグメントには40 ms分解能のトークンタイムスタンプが付きます。
+- 話者分離は通常どおり動作します。
+- `handy-computer` では4つのバリアントが公開されています：[`gigaam-v3-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-rnnt-gguf)、[`gigaam-v3-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-ctc-gguf)、[`gigaam-v3-e2e-rnnt-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf)、[`gigaam-v3-e2e-ctc-gguf`](https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf)。`e2e` バリアントは大文字と小文字の区別および句読点を追加しますが、その他は句読点のない小文字のテキストを返します。
+
+**コマンドライン**
+
+上記のVADモデルをダウンロードし、`--vad-model` で指定してください。
+
+```console
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format markdown --output transcript.md
+vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.bin --format json
+```
+
+`--format` は `txt`（デフォルト）、`markdown`（エイリアス `md`）、`json`、`srt`、`vtt` を受け付けます。`--output` は文字起こしをファイルに書き込み、既存のファイルへの上書きは行いません。`--diarize-model <diar.gguf>` を追加すると、Markdown と JSON の出力に話者ラベルが付きます。
+
+</details>
 
 ### 他言語に最適化されたモデル
 

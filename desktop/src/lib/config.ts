@@ -39,6 +39,14 @@ export const modelUrls: Record<'default' | 'hebrew', ModelDownload[]> = {
 	hebrew: [{ url: 'https://huggingface.co/ivrit-ai/whisper-large-v3-turbo-ggml/resolve/main/ggml-model.bin' }],
 }
 
+/**
+ * GigaAM v3 (Russian). Published by handy-computer rather than the vibe-app org, so the catalog
+ * links straight at Hugging Face. The other v3 variants in the same org — `rnnt`, `ctc`, and
+ * `e2e-ctc` — use the same filename pattern.
+ */
+export const gigaamModelFilename = 'gigaam-v3-e2e-rnnt-Q8_0.gguf'
+export const gigaamModelUrl = `https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/${gigaamModelFilename}`
+
 export const embeddingModelFilename = 'wespeaker_en_voxceleb_CAM++.onnx'
 export const segmentModelFilename = 'segmentation-3.0.onnx'
 export const embeddingModelUrl = 'https://github.com/thewh1teagle/vibe/releases/download/v0.0.1/wespeaker_en_voxceleb_CAM++.onnx'

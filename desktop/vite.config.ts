@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import tailwindcss from '@tailwindcss/vite'
@@ -28,6 +29,9 @@ export default defineConfig(async () => ({
 		},
 	},
 	clearScreen: false,
+	test: {
+		setupFiles: ['./src/vitest.setup.ts'],
+	},
 	server: {
 		port: 1420,
 		strictPort: true,

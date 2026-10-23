@@ -6,6 +6,7 @@ members = [
     "crates/vibe-server",
     "crates/vad-rs",
     "crates/ggml-rs-sys",
+    "crates/gigaam-rs",
     "crates/whisper-rs",
 ]
 resolver = "2"
