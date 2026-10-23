@@ -81,6 +81,34 @@ The system SHALL publish the bundles of a run to one prerelease tagged `dev`, re
 - **WHEN** the `dev` release exists
 - **THEN** it does not become the repository's latest release
 
+#### Scenario: Version changes
+
+- **WHEN** a run publishes bundles under a version the release does not hold yet
+- **THEN** the assets of the previous version are removed from the release, so it holds only the newest build
+
+### Requirement: Dev version is identifiable
+
+The build SHALL carry a version that marks it as a dev build: the application version from the tracked configuration with a `-dev.<short-commit>` suffix, and the bundled server SHALL report the same version.
+
+#### Scenario: Application version
+
+- **WHEN** a dev build is installed
+- **THEN** the application reports a version ending in `-dev.<short-commit>`, for example `3.2.2-dev.a9c3b34`
+
+#### Scenario: Server version
+
+- **WHEN** the bundled server is asked for its version
+- **THEN** it reports the same dev version as the application
+
+### Requirement: Dev builds never self-update
+
+A dev build MUST NOT check the upstream update channel, so it can never offer to replace itself with the release it was branched from.
+
+#### Scenario: No update offered
+
+- **WHEN** a dev build starts and the upstream release is newer or equal
+- **THEN** no update is offered
+
 ### Requirement: Independent platform jobs
 
 A failure on one platform SHALL NOT stop the other platforms from building or publishing.

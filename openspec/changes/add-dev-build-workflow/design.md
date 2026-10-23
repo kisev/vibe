@@ -69,13 +69,28 @@ exist yet.
 
 **Disable updater artifacts with `--config
 '{"bundle":{"createUpdaterArtifacts":false}}'`.** This is exactly what the
-`upgrade` task does locally; it removes the signing-key requirement. The app's
-updater keeps pointing at the upstream channel, which is acceptable for dev
-builds and is stated as out of scope.
+`upgrade` task does locally; it removes the signing-key requirement.
 
-**Leave the app version at the value in `tauri.conf.json`.** Bundle names then
-repeat, and the `--clobber` upload replaces them. The built commit is recorded
-in the release title and body instead of in the version string.
+**Version the build `<base>-dev.<short-sha>`, derived from `tauri.conf.json`.**
+A dev build must not claim to be the release it was branched from. Build
+metadata (`3.2.2+dev.abc`) is rejected because NSIS turns the version into
+`VIProductVersion`, which requires four numeric components; a prerelease keeps
+that field at `3.2.2.0` while the displayed version stays readable. NSIS allows
+the resulting downgrade (`allow_downgrades` defaults to true), so installing a
+dev build over the released app works. The same string is passed as
+`VIBE_SERVER_VERSION`, so the app and its sidecar agree.
+
+**Turn the updater off with `"plugins":{"updater":{"endpoints":[]}}`.** A
+prerelease sorts below its base version, so the upstream channel would offer
+`3.2.2` as an "update" and replace the dev build with the release. The provider
+logs check failures without surfacing them, so an empty endpoint list is quiet.
+Alternative: keep the channel and accept being asked to downgrade — rejected.
+
+**Delete stale release assets in a job that runs after the matrix.** Asset names
+carry the version, so a version change leaves the previous files in place — and
+the macOS `app.tar.gz` files carry no version at all, so matching on the version
+string would delete current assets. The final job instead removes every asset
+whose `updatedAt` predates the run, which leaves exactly what this run uploaded.
 
 **Keep jobs independent (`fail-fast: false`) and let runs queue
 (`cancel-in-progress: false`).** A cancelled run could leave the release holding
@@ -93,6 +108,23 @@ builds across two runners.
 Windows runner's GNU tar does not; `actions` supports `shell: python`, which
 removes the difference.
 
+**Disable LTO and raise codegen units for dev builds.** The root `Cargo.toml`
+sets `lto = true` and `codegen-units = 1`, which is right for a release and is
+the largest cost in a dev build. Setting `CARGO_PROFILE_RELEASE_LTO=false` and
+`CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16` in the job environment leaves the
+tracked profile untouched and applies to both Cargo invocations. The server
+workspace already uses Cargo's default release profile, so this is a no-op
+there.
+
+**Cache `server/target` as a second rust-cache workspace.** The action defaults
+to the repository root, and the server builds in its own workspace, so its
+dependencies were recompiled on every run. Alternative: accept the 1–4 minute
+rebuild — rejected, but the cache budget (10 GB per repository) is the reason
+this is measured rather than assumed.
+
+**Keep `paths-ignore` out.** The agreed contract is a build on every push to
+`main`; skipping doc-only pushes would quietly narrow it.
+
 ## Risks / Trade-offs
 
 - **The rolling release keeps no history** → the release body records the commit
@@ -109,9 +141,13 @@ removes the difference.
   disabled in the fork's Actions settings rather than edited.
 - **`test-release.yml` takes the newest release** → it will pick up the `dev`
   prerelease; acceptable for a manual workflow, but worth remembering.
-- **Five jobs per push** → roughly 15–25 minutes each on a public fork, free of
-  charge but slow. `paths` filters were rejected because the user asked for a
-  build on every push.
+- **Five jobs per push** → the critical path was 14 minutes before the LTO
+  change; the target is under ten. `paths` filters were rejected because the
+  user asked for a build on every push.
+- **The server cache may evict platform entries** → the repository has a 10 GB
+  cache budget and five platforms; drop the `server -> target` workspace if the
+  cache complaints appear.
+- **Dev binaries are larger without LTO** → acceptable for builds nobody ships.
 
 ## Migration Plan
 

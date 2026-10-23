@@ -22,6 +22,11 @@ engine therefore means building the server and the app by hand on one machine.
   `chore`.
 - Disable updater artifacts for dev builds, so no signing key or other secret
   is required.
+- Stamp the version as `<base>-dev.<short-commit>` and turn the update channel
+  off, so a dev build never claims to be the release it was branched from and
+  never offers to replace itself with one.
+- Keep the build fast enough to be useful: no LTO, a cached server workspace,
+  and a lean dependency install.
 - Publish the bundles as a rolling prerelease tagged `dev`, replaced on every
   successful run, so one stable URL always holds the newest build.
 - Leave every upstream-owned file untouched: `release.yml`, the `chorefile`s,
