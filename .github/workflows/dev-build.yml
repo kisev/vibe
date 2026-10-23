@@ -1,0 +1,153 @@
+# Dev builds for the fork: every push to main produces unsigned bundles for all
+# five release platforms and replaces the assets of the rolling `dev` prerelease.
+#
+# This is deliberately a separate file from release.yml, which belongs to the
+# upstream release flow and stays untouched. The sidecars are built from the
+# tree instead of being downloaded from a `server-v*` release, because the
+# pinned `.server-version` may name a release that does not exist yet, and the
+# build must carry the engine changes on main.
+name: Dev Build
+
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+# Queue runs instead of cancelling: a cancelled matrix would leave the release
+# holding a mix of old and new assets.
+concurrency:
+    group: dev-build-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    build:
+        timeout-minutes: 90
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - runner: macos-latest
+                      triple: aarch64-apple-darwin
+                      libs: darwin-arm64
+                      exe: ""
+                      ffmpeg: https://www.osxexperts.net/ffmpeg80arm.zip
+                    - runner: macos-latest
+                      triple: x86_64-apple-darwin
+                      libs: darwin-x86_64
+                      exe: ""
+                      ffmpeg: https://www.osxexperts.net/ffmpeg80intel.zip
+                    - runner: ubuntu-22.04
+                      triple: x86_64-unknown-linux-gnu
+                      libs: linux-x86_64
+                      exe: ""
+                    - runner: ubuntu-22.04-arm
+                      triple: aarch64-unknown-linux-gnu
+                      libs: linux-aarch64
+                      exe: ""
+                    - runner: windows-latest
+                      triple: x86_64-pc-windows-msvc
+                      libs: windows-amd64-msvc
+                      exe: .exe
+                      ffmpeg: https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+        runs-on: ${{ matrix.runner }}
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  package_json_file: desktop/package.json
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  cache-dependency-path: desktop/pnpm-lock.yaml
+
+            - name: Install Rust stable
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  # macos-latest is arm64; the Intel bundle is cross-compiled here.
+                  targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+            - name: Rust cache
+              uses: swatinem/rust-cache@v2
+
+            - name: Install Linux build dependencies
+              if: runner.os == 'Linux'
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y pkg-config build-essential libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev clang cmake libssl-dev libasound2-dev libxdo-dev libayatana-appindicator3-dev rpm
+
+            # The release tag is derived from the pinned files so a libs/ bump is
+            # picked up without touching this workflow.
+            - name: Fetch prebuilt GGML libraries
+              shell: bash
+              run: |
+                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
+                  url="https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-${{ matrix.libs }}.tar.gz"
+                  echo "fetching $url"
+                  curl -fsSL "$url" -o "$RUNNER_TEMP/ggml-libs.tar.gz"
+                  rm -rf "$RUNNER_TEMP/ggml-libs" server/libs/lib
+                  mkdir -p "$RUNNER_TEMP/ggml-libs"
+                  tar -xzf "$RUNNER_TEMP/ggml-libs.tar.gz" -C "$RUNNER_TEMP/ggml-libs"
+                  mv "$RUNNER_TEMP/ggml-libs/lib" server/libs/lib
+
+            - name: Build vibe-server
+              shell: bash
+              env:
+                  VIBE_SERVER_VERSION: dev
+                  VIBE_SERVER_COMMIT: ${{ github.sha }}
+              run: |
+                  exe="${{ matrix.exe }}"
+                  cd server
+                  cargo build -p vibe-server --release --target "${{ matrix.triple }}"
+                  mkdir -p ../desktop/src-tauri/binaries
+                  cp "target/${{ matrix.triple }}/release/vibe-server$exe" \
+                     "../desktop/src-tauri/binaries/vibe-server-${{ matrix.triple }}$exe"
+
+            # Linux takes a system ffmpeg; the other platforms bundle one as a
+            # sidecar, but only where the model needs it, so this has to match
+            # what tauri.*.windows.conf.json and the macOS build expect.
+            - name: Fetch ffmpeg
+              if: matrix.ffmpeg != ''
+              shell: bash
+              run: |
+                  exe="${{ matrix.exe }}"
+                  tmp="$RUNNER_TEMP/ffmpeg-download"
+                  mkdir -p "$tmp"
+                  curl -fsSL "${{ matrix.ffmpeg }}" -o "$tmp/ffmpeg.zip"
+                  # Both bsdtar (macOS, Windows) and the runner's tar read zip.
+                  member="$(tar -tf "$tmp/ffmpeg.zip" | grep -E "(^|/)ffmpeg$exe\$" | head -n1)"
+                  test -n "$member"
+                  mkdir -p "$tmp/out"
+                  tar -xf "$tmp/ffmpeg.zip" -C "$tmp/out" "$member"
+                  mkdir -p desktop/src-tauri/binaries
+                  mv "$tmp/out/$member" "desktop/src-tauri/binaries/ffmpeg-${{ matrix.triple }}$exe"
+                  chmod 755 "desktop/src-tauri/binaries/ffmpeg-${{ matrix.triple }}$exe"
+
+            - name: Install frontend dependencies
+              run: pnpm install --frozen-lockfile
+              working-directory: ./desktop
+
+            # tauri-action reuses an existing release for the same tag, which is
+            # how the five matrix jobs share one release.
+            - name: Build and publish
+              uses: tauri-apps/tauri-action@v0
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
+              with:
+                  tagName: dev
+                  releaseName: Dev build
+                  releaseBody: "Automated build of main at ${{ github.sha }}."
+                  releaseCommitish: ${{ github.sha }}
+                  prerelease: true
+                  uploadUpdaterJson: false
+                  args: --target ${{ matrix.triple }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
+                  projectPath: ./desktop
+                  tauriScript: pnpm exec tauri
