@@ -162,9 +162,9 @@ stall is accepted and recorded below rather than worked around.
   disabled in the fork's Actions settings rather than edited.
 - **`test-release.yml` takes the newest release** → it will pick up the `dev`
   prerelease; acceptable for a manual workflow, but worth remembering.
-- **Five jobs per push** → the critical path was 14 minutes before the LTO
-  change; the target is under ten. `paths` filters were rejected because the
-  user asked for a build on every push.
+- **Five jobs per push** → the critical path is a warm Windows job at 7m45,
+  down from 14m06. `paths` filters were rejected because the user asked for a
+  build on every push.
 - **The server cache may evict platform entries** → the repository has a 10 GB
   cache budget and five platforms; drop the `server -> target` workspace if the
   cache complaints appear.
