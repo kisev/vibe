@@ -117,6 +117,17 @@ jobs:
                   cp "target/${{ matrix.triple }}/release/vibe-server$exe" \
                      "../desktop/src-tauri/binaries/vibe-server-${{ matrix.triple }}$exe"
 
+            # The version proves the build env reached the crate; the commit is
+            # printed by `serve` at startup, so check it is embedded instead of
+            # starting a server on every runner.
+            - name: Check the server sidecar
+              shell: bash
+              run: |
+                  exe="${{ matrix.exe }}"
+                  binary="desktop/src-tauri/binaries/vibe-server-${{ matrix.triple }}$exe"
+                  "$binary" --version
+                  grep -aq "${{ github.sha }}" "$binary"
+
             # Linux takes a system ffmpeg; the other platforms bundle one as a
             # sidecar, but only where the model needs it, so this has to match
             # what tauri.*.windows.conf.json and the macOS build expect.
@@ -175,3 +186,12 @@ jobs:
                   args: --target ${{ matrix.triple }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
                   projectPath: ./desktop
                   tauriScript: pnpm exec tauri
+
+            # tauri-action only writes the body when it creates the release, so
+            # a rolling release would keep naming the commit of the first run.
+            - name: Record the built commit in the release
+              if: success()
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: gh release edit dev --repo "${{ github.repository }}" --notes "Automated build of main at ${{ github.sha }}."
