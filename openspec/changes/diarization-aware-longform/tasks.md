@@ -19,10 +19,10 @@
 
 ## 3. Server planning integration
 
-- [ ] 3.1 Wire planning into both the non-streaming and NDJSON streaming paths; verify both produce chunks from the same plan and the same segments
-- [ ] 3.2 Propagate chunk speaker sets to segments and emit both `speaker` and `speakers`; verify a single-speaker chunk yields one id and a boundary chunk yields a union with the ambiguity marker
-- [ ] 3.3 Keep overlap-based speaker matching as the fallback when no diarization model is supplied; verify a run without diarization produces the same speakers as before
-- [ ] 3.4 Validate `chunk_seconds` against `max_input_seconds` and reject values above the engine maximum before decoding audio; verify HTTP and CLI validation errors
+- [x] 3.1 Wire planning into both the non-streaming and NDJSON streaming paths; verify both produce chunks from the same plan and the same segments
+- [x] 3.2 Propagate chunk speaker sets to segments and emit both `speaker` and `speakers`; verify a single-speaker chunk yields one id and a boundary chunk yields a union with the ambiguity marker
+- [x] 3.3 Keep overlap-based speaker matching as the fallback when no diarization model is supplied; verify a run without diarization produces the same speakers as before
+- [x] 3.4 Validate `chunk_seconds` against `max_input_seconds` and reject values above the engine maximum before decoding audio; verify HTTP and CLI validation errors
 - [ ] 3.5 Measure planning overhead on an hour-long recording and verify it stays a marginal fraction of total transcription time
 
 ## 4. Cache core

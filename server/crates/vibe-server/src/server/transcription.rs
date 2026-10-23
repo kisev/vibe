@@ -12,6 +12,10 @@ use crate::server::form::FormValues;
 use crate::server::stream::stream_transcription;
 use crate::server::unload_timeout::ModelLease;
 use crate::server::{error, format, TextResponse};
+use crate::{
+    engine::Engine,
+    plan::{self, Plan, Settings},
+};
 
 pub(super) struct TranscriptionRequest {
     pub file: Vec<u8>,
@@ -24,7 +28,7 @@ pub(super) async fn transcribe(
     request: TranscriptionRequest,
 ) -> Result<Response, Response> {
     let TranscriptionRequest { file, form } = request;
-    let (diarize_model, enhance_audio, stable_timestamps, vad_model_path, stream, response_format) = {
+    let (diarize_model, enhance_audio, stable_timestamps, vad_model_path, stream, response_format, chunk_seconds) = {
         let values = FormValues::new(&form);
         (
             values.string("diarize_model"),
@@ -33,8 +37,18 @@ pub(super) async fn transcribe(
             values.string("vad_model"),
             values.bool("stream"),
             values.str_or("response_format", "json").to_string(),
+            values.f32("chunk_seconds"),
         )
     };
+    let chunk_seconds = (chunk_seconds > 0.0).then_some(f64::from(chunk_seconds));
+
+    // The bound is known before any audio is decoded, so a request that can
+    // never succeed is refused here.
+    if let Some(ctx) = model.ctx.as_ref() {
+        if let Some(message) = chunk_seconds_error(chunk_seconds, ctx.max_input_seconds()) {
+            return Err(error(StatusCode::BAD_REQUEST, "invalid_request", &message));
+        }
+    }
     let audio_options = audio::ReadOptions {
         enhance_audio,
         verbose: config.verbose(),
@@ -71,8 +85,21 @@ pub(super) async fn transcribe(
     }
 
     if stream {
-        return stream_transcription(config, model, samples, form, stable_timestamps, vad_model_path, diar_segments)
-            .map_err(|err| *err);
+        let plan = model
+            .ctx
+            .as_mut()
+            .and_then(|ctx| plan_for(ctx, &samples, &diar_segments, vad_model_path.as_deref(), chunk_seconds));
+        return stream_transcription(
+            config,
+            model,
+            samples,
+            form,
+            stable_timestamps,
+            vad_model_path,
+            diar_segments,
+            plan,
+        )
+        .map_err(|err| *err);
     }
 
     let verbose = config.verbose();
@@ -89,8 +116,13 @@ pub(super) async fn transcribe(
         ));
     }
 
-    let opts = build_options(&form, verbose, stable_timestamps, vad_model_path);
-    let result = ctx.transcribe(&samples, opts).map_err(|err| {
+    let opts = build_options(&form, verbose, stable_timestamps, vad_model_path.clone());
+    let plan = plan_for(ctx, &samples, &diar_segments, vad_model_path.as_deref(), chunk_seconds);
+    let result = match plan.as_ref() {
+        Some(plan) => ctx.transcribe_chunks(&samples, plan, opts),
+        None => ctx.transcribe(&samples, opts),
+    }
+    .map_err(|err| {
         tracing::error!(samples = samples.len(), "transcription failed: {err:#}");
         error(
             super::engine_error_status(&err),
@@ -99,7 +131,63 @@ pub(super) async fn transcribe(
         )
     })?;
 
-    Ok(format_response(&response_format, &result, &diar_segments))
+    let speaker_sets = plan.as_ref().map(|plan| format::planned_speakers(&result, plan));
+    Ok(format_response(
+        &response_format,
+        &result,
+        &diar_segments,
+        speaker_sets.as_deref(),
+    ))
+}
+
+/// A message when the requested chunk duration cannot be honoured by this
+/// engine, which is known before any audio is decoded.
+fn chunk_seconds_error(requested: Option<f64>, maximum: Option<f64>) -> Option<String> {
+    match (requested, maximum) {
+        (Some(requested), Some(maximum)) if requested > maximum => {
+            Some(format!("'chunk_seconds' must not exceed {maximum} for this engine"))
+        }
+        _ => None,
+    }
+}
+
+/// Build the chunk plan when the engine accepts explicit chunks and a
+/// diarization model supplied the turns. Without either, the engine keeps its
+/// own VAD chunking and speakers stay attributed by overlap.
+pub(super) fn plan_for(
+    ctx: &mut Engine,
+    samples: &[f32],
+    diar_segments: &[diarization::Segment],
+    vad_model_path: Option<&str>,
+    chunk_seconds: Option<f64>,
+) -> Option<Plan> {
+    let maximum = ctx.max_input_seconds()?;
+    if diar_segments.is_empty() {
+        return None;
+    }
+    let speech = match ctx.speech_ranges(samples, vad_model_path) {
+        Ok(ranges) => ranges,
+        Err(err) => {
+            tracing::warn!("skipping chunk planning: {err:#}");
+            return None;
+        }
+    };
+    let max_input_seconds = chunk_seconds.map_or(maximum, |value| value.min(maximum));
+    let settings = Settings {
+        max_input_seconds,
+        preferred_seconds: Settings::default().preferred_seconds.min(max_input_seconds),
+        ..Settings::default()
+    };
+    let turns: Vec<plan::DiarSegment> = diar_segments
+        .iter()
+        .map(|segment| plan::DiarSegment {
+            start: segment.start,
+            end: segment.end,
+            speaker: u16::try_from(segment.speaker_id).unwrap_or(u16::MAX),
+        })
+        .collect();
+    let duration = samples.len() as f64 / plan::SAMPLE_RATE;
+    Some(plan::plan(duration, &turns, &speech, settings))
 }
 
 pub(super) fn build_options(
@@ -132,9 +220,10 @@ fn format_response(
     response_format: &str,
     result: &whisper_rs::TranscribeResult,
     diar_segments: &[diarization::Segment],
+    speaker_sets: Option<&[Vec<u16>]>,
 ) -> Response {
     match response_format {
-        "verbose_json" => Json(format::build_verbose_json(result, diar_segments)).into_response(),
+        "verbose_json" => Json(format::build_verbose_json(result, diar_segments, speaker_sets)).into_response(),
         "text" => ([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], result.text()).into_response(),
         "srt" => (
             [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
@@ -166,6 +255,16 @@ mod tests {
         assert!(options.translate);
         assert!(options.word_timestamps);
         assert_eq!(options.vad_model_path.as_deref(), Some("/tmp/vad.bin"));
+    }
+
+    #[test]
+    fn a_chunk_duration_above_the_engine_maximum_is_rejected() {
+        let message = chunk_seconds_error(Some(30.0), Some(25.0)).expect("rejected");
+        assert!(message.contains("25"), "{message}");
+        assert!(chunk_seconds_error(Some(20.0), Some(25.0)).is_none());
+        // Whisper advertises no bound, so nothing to validate against.
+        assert!(chunk_seconds_error(Some(30.0), None).is_none());
+        assert!(chunk_seconds_error(None, Some(25.0)).is_none());
     }
 
     #[test]

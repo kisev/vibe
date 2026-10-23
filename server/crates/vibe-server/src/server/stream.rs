@@ -22,6 +22,7 @@ pub(super) fn stream_transcription(
     stable_timestamps: bool,
     vad_model_path: Option<String>,
     diar_segments: Vec<diarization::Segment>,
+    plan: Option<crate::plan::Plan>,
 ) -> Result<Response, Box<Response>> {
     if model.ctx.is_none() {
         return Err(Box::new(error(
@@ -48,6 +49,7 @@ pub(super) fn stream_transcription(
     let segment_tx = tx.clone();
     let final_tx = tx.clone();
     let segment_diar_segments = diar_segments.clone();
+    let segment_plan = plan.clone();
 
     tokio::task::spawn_blocking(move || {
         let Some(ctx) = model.ctx.as_mut() else {
@@ -61,45 +63,63 @@ pub(super) fn stream_transcription(
             return;
         };
 
-        let result = ctx.transcribe_stream(
-            &samples,
-            opts,
-            StreamCallbacks {
-                on_progress: Some(Box::new(move |progress| {
-                    if send_event(
-                        &progress_tx,
-                        serde_json::json!({
-                            "type": "progress",
-                            "progress": progress,
-                        }),
-                    )
-                    .is_err()
-                    {
-                        abort_for_progress.store(true, Ordering::SeqCst);
+        let callbacks = StreamCallbacks {
+            on_progress: Some(Box::new(move |progress| {
+                if send_event(
+                    &progress_tx,
+                    serde_json::json!({
+                        "type": "progress",
+                        "progress": progress,
+                    }),
+                )
+                .is_err()
+                {
+                    abort_for_progress.store(true, Ordering::SeqCst);
+                }
+            })),
+            on_segment: Some(Box::new(move |segment| {
+                let start = format::cs_to_seconds(segment.start);
+                let end = format::cs_to_seconds(segment.end);
+                let mut event = serde_json::json!({
+                    "type": "segment",
+                    "start": start,
+                    "end": end,
+                    "text": segment.text,
+                    "no_speech_prob": segment.no_speech_prob,
+                });
+                let planned = segment_plan.as_ref().map(|plan| {
+                    let middle = (start + end) / 2.0;
+                    plan.chunks
+                        .iter()
+                        .find(|chunk| middle >= chunk.core_start && middle <= chunk.core_end)
+                        .map_or_else(Vec::new, |chunk| chunk.speakers.clone())
+                });
+                match planned.filter(|set| !set.is_empty()) {
+                    Some(set) => {
+                        event["speaker"] = serde_json::json!(set[0]);
+                        event["speakers"] = serde_json::json!(set);
                     }
-                })),
-                on_segment: Some(Box::new(move |segment| {
-                    let start = format::cs_to_seconds(segment.start);
-                    let end = format::cs_to_seconds(segment.end);
-                    let mut event = serde_json::json!({
-                        "type": "segment",
-                        "start": start,
-                        "end": end,
-                        "text": segment.text,
-                        "no_speech_prob": segment.no_speech_prob,
-                    });
-                    if let Some(speaker) = format::match_speaker(start, end, &segment_diar_segments) {
-                        event["speaker"] = serde_json::json!(speaker);
+                    None => {
+                        if let Some(speaker) = format::match_speaker(start, end, &segment_diar_segments) {
+                            event["speaker"] = serde_json::json!(speaker);
+                        }
                     }
-                    if send_event(&segment_tx, event).is_err() {
-                        abort_for_segment.store(true, Ordering::SeqCst);
-                    }
-                })),
-                should_abort: Some(Box::new(move || {
-                    abort_for_poll.load(Ordering::SeqCst) || final_tx.is_closed()
-                })),
-            },
-        );
+                }
+                if send_event(&segment_tx, event).is_err() {
+                    abort_for_segment.store(true, Ordering::SeqCst);
+                }
+            })),
+            should_abort: Some(Box::new(move || {
+                abort_for_poll.load(Ordering::SeqCst) || final_tx.is_closed()
+            })),
+        };
+        let result = match plan.as_ref() {
+            Some(plan) => {
+                let ranges = crate::engine::chunk_ranges(plan, samples.len());
+                ctx.transcribe_chunks_with(&samples, &ranges, opts, callbacks)
+            }
+            None => ctx.transcribe_stream(&samples, opts, callbacks),
+        };
 
         match result {
             Ok(result) => {

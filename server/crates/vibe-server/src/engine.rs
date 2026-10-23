@@ -131,6 +131,33 @@ impl Engine {
         }
     }
 
+    /// Longest input the engine accepts from an external plan.
+    pub fn max_input_seconds(&self) -> Option<f64> {
+        self.capabilities().max_input_seconds
+    }
+
+    /// Speech ranges in seconds, from the engine's cached VAD. The planner uses
+    /// them as the pauses it may cut in.
+    pub fn speech_ranges(&mut self, samples: &[f32], vad_model_path: Option<&str>) -> anyhow::Result<Vec<(f64, f64)>> {
+        let (vad, label, options) = match self {
+            Self::Whisper(_) => bail!("whisper keeps its own long-form path"),
+            Self::Nemotron { vad, .. } => (vad, "Nemotron", vad_rs::Options::default()),
+            Self::Parakeet { vad, .. } => (vad, "Parakeet", vad_rs::Options::default()),
+            Self::Gigaam { vad, .. } => (vad, "GigaAM", gigaam_vad_options()),
+        };
+        let vad = engine_vad(vad, vad_model_path, options, label)?;
+        let ranges = vad.segments(samples).context("VAD segmentation failed")?;
+        Ok(ranges
+            .into_iter()
+            .map(|range| {
+                (
+                    range.start_sample as f64 / crate::plan::SAMPLE_RATE,
+                    range.end_sample as f64 / crate::plan::SAMPLE_RATE,
+                )
+            })
+            .collect())
+    }
+
     /// Transcribe the plan's chunks. Every input is exactly the audio the plan
     /// chose, so a chunk that belongs to one speaker is never widened by the
     /// engine's own VAD pass.
@@ -148,7 +175,7 @@ impl Engine {
         self.transcribe_chunks_with(samples, &ranges, options, callbacks)
     }
 
-    fn transcribe_chunks_with(
+    pub(crate) fn transcribe_chunks_with(
         &mut self,
         samples: &[f32],
         ranges: &[(usize, usize)],

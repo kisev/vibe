@@ -13,6 +13,22 @@ fn gigaam_model() -> Option<String> {
         .filter(|path| std::path::Path::new(path).exists())
 }
 
+fn parakeet_engine() -> Option<Engine> {
+    let path = std::env::var("PARAKEET_MODEL").ok()?;
+    if !std::path::Path::new(&path).exists() {
+        return None;
+    }
+    Some(Engine::load(&path, ContextOptions::default()).expect("load Parakeet model"))
+}
+
+fn nemotron_engine() -> Option<Engine> {
+    let path = std::env::var("NEMOTRON_MODEL").ok()?;
+    if !std::path::Path::new(&path).exists() {
+        return None;
+    }
+    Some(Engine::load(&path, ContextOptions::default()).expect("load Nemotron model"))
+}
+
 fn vad_model() -> Option<String> {
     std::env::var("GIGAAM_VAD_MODEL")
         .ok()
@@ -217,6 +233,45 @@ fn probe_and_load_report_the_same_capabilities() {
     assert_eq!(loaded.timestamps, probed.timestamps);
     assert_eq!(loaded.text_prompts, probed.text_prompts);
     assert_eq!(loaded.max_input_seconds, probed.max_input_seconds);
+}
+
+/// The plan path must produce the same transcript as the engine's own VAD loop
+/// when the plan is one chunk covering the whole recording.
+fn assert_chunk_path_matches(engine: &mut Engine, vad: String, samples: &[f32]) {
+    let from_vad = engine
+        .transcribe(samples, transcription_options(Some(vad.clone())))
+        .expect("VAD path");
+    let duration = samples.len() as f64 / crate::plan::SAMPLE_RATE;
+    let plan = crate::plan::Plan {
+        chunks: vec![crate::plan::Chunk {
+            input_start: 0.0,
+            input_end: duration,
+            core_start: 0.0,
+            core_end: duration,
+            speakers: vec![1],
+        }],
+        max_input_seconds: 30.0,
+    };
+    let from_plan = engine
+        .transcribe_chunks(samples, &plan, transcription_options(Some(vad)))
+        .expect("plan path");
+    assert_eq!(from_vad.text(), from_plan.text());
+}
+
+#[test]
+fn parakeet_chunk_path_matches_the_vad_path() {
+    let (Some(mut engine), Some(vad), Some(samples)) = (parakeet_engine(), vad_model(), audio()) else {
+        return;
+    };
+    assert_chunk_path_matches(&mut engine, vad, &samples);
+}
+
+#[test]
+fn nemotron_chunk_path_matches_the_vad_path() {
+    let (Some(mut engine), Some(vad), Some(samples)) = (nemotron_engine(), vad_model(), audio()) else {
+        return;
+    };
+    assert_chunk_path_matches(&mut engine, vad, &samples);
 }
 
 #[test]

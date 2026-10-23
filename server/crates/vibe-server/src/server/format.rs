@@ -84,7 +84,7 @@ pub fn format_markdown(segments: &[Segment], diar_segments: &[diarization::Segme
 }
 
 pub fn format_json(result: &TranscribeResult, diar_segments: &[diarization::Segment]) -> String {
-    serde_json::to_string_pretty(&build_verbose_json(result, diar_segments)).unwrap_or_else(|_| "{}".into())
+    serde_json::to_string_pretty(&build_verbose_json(result, diar_segments, None)).unwrap_or_else(|_| "{}".into())
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -100,23 +100,69 @@ pub struct VerboseSegment {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub speaker: Option<usize>,
+    /// Present only when the chunk plan supplied the speakers; a boundary chunk
+    /// carries more than one id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speakers: Option<Vec<u16>>,
     pub no_speech_prob: f32,
 }
 
-pub fn build_verbose_json(result: &TranscribeResult, diar_segments: &[diarization::Segment]) -> VerboseJson {
+pub fn build_verbose_json(
+    result: &TranscribeResult,
+    diar_segments: &[diarization::Segment],
+    speaker_sets: Option<&[Vec<u16>]>,
+) -> VerboseJson {
     VerboseJson {
         text: result.text(),
         segments: result
             .segments
             .iter()
-            .map(|segment| VerboseSegment {
-                start: cs_to_seconds(segment.start),
-                end: cs_to_seconds(segment.end),
-                text: segment.text.clone(),
-                speaker: match_speaker(cs_to_seconds(segment.start), cs_to_seconds(segment.end), diar_segments),
-                no_speech_prob: segment.no_speech_prob,
+            .enumerate()
+            .map(|(index, segment)| {
+                let planned = speaker_sets.and_then(|sets| sets.get(index)).filter(|set| !set.is_empty());
+                VerboseSegment {
+                    start: cs_to_seconds(segment.start),
+                    end: cs_to_seconds(segment.end),
+                    text: segment.text.clone(),
+                    speaker: planned.map_or_else(
+                        || match_speaker(cs_to_seconds(segment.start), cs_to_seconds(segment.end), diar_segments),
+                        |set| Some(usize::from(set[0])),
+                    ),
+                    speakers: planned.cloned(),
+                    no_speech_prob: segment.no_speech_prob,
+                }
             })
             .collect(),
+    }
+}
+
+/// The speaker set of the planned chunk each segment's middle falls into.
+pub fn planned_speakers(result: &TranscribeResult, plan: &crate::plan::Plan) -> Vec<Vec<u16>> {
+    result
+        .segments
+        .iter()
+        .map(|segment| {
+            let middle = (cs_to_seconds(segment.start) + cs_to_seconds(segment.end)) / 2.0;
+            plan.chunks
+                .iter()
+                .find(|chunk| middle >= chunk.core_start && middle <= chunk.core_end)
+                .or_else(|| {
+                    plan.chunks
+                        .iter()
+                        .min_by(|a, b| distance(a, middle).total_cmp(&distance(b, middle)))
+                })
+                .map_or_else(Vec::new, |chunk| chunk.speakers.clone())
+        })
+        .collect()
+}
+
+fn distance(chunk: &crate::plan::Chunk, point: f64) -> f64 {
+    if point < chunk.core_start {
+        chunk.core_start - point
+    } else if point > chunk.core_end {
+        point - chunk.core_end
+    } else {
+        0.0
     }
 }
 
@@ -294,5 +340,82 @@ mod tests {
     #[test]
     fn vtt_with_empty_segments_is_just_the_header() {
         assert_eq!(format_vtt(&[]), "WEBVTT\n\n");
+    }
+}
+
+#[cfg(test)]
+mod planner_tests {
+    use super::*;
+    use crate::plan::{Chunk, Plan};
+
+    fn segment(start: i64, end: i64) -> Segment {
+        Segment {
+            start,
+            end,
+            text: "hello".to_string(),
+            no_speech_prob: 0.0,
+        }
+    }
+
+    fn plan() -> Plan {
+        Plan {
+            chunks: vec![
+                Chunk {
+                    input_start: 0.0,
+                    input_end: 10.0,
+                    core_start: 0.0,
+                    core_end: 10.0,
+                    speakers: vec![1],
+                },
+                Chunk {
+                    input_start: 10.0,
+                    input_end: 20.0,
+                    core_start: 10.0,
+                    core_end: 20.0,
+                    speakers: vec![1, 2],
+                },
+            ],
+            max_input_seconds: 25.0,
+        }
+    }
+
+    fn result() -> TranscribeResult {
+        TranscribeResult {
+            segments: vec![segment(100, 200), segment(1500, 1900)],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn each_segment_carries_its_chunk_speakers() {
+        let sets = planned_speakers(&result(), &plan());
+        assert_eq!(sets, vec![vec![1], vec![1, 2]]);
+    }
+
+    #[test]
+    fn verbose_json_reports_the_union_for_a_boundary_chunk() {
+        let result = result();
+        let sets = planned_speakers(&result, &plan());
+        let json = build_verbose_json(&result, &[], Some(&sets));
+        assert_eq!(json.segments[0].speaker, Some(1));
+        assert_eq!(json.segments[0].speakers, Some(vec![1]));
+        assert_eq!(json.segments[1].speaker, Some(1));
+        assert_eq!(json.segments[1].speakers, Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn without_a_plan_the_overlap_speaker_is_used() {
+        let result = TranscribeResult {
+            segments: vec![segment(0, 100)],
+            ..Default::default()
+        };
+        let diar = [diarization::Segment {
+            start: 0.0,
+            end: 1.0,
+            speaker_id: 3,
+        }];
+        let json = build_verbose_json(&result, &diar, None);
+        assert_eq!(json.segments[0].speaker, Some(3));
+        assert!(json.segments[0].speakers.is_none());
     }
 }
