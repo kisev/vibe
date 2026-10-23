@@ -81,6 +81,18 @@ in the release title and body instead of in the version string.
 (`cancel-in-progress: false`).** A cancelled run could leave the release holding
 a mix of old and new assets.
 
+**Build on `ubuntu-24.04-arm` for Linux aarch64.** The prebuilt aarch64 ggml
+libraries come from `server-libs.yml`, which builds them on 24.04; linking them
+from 22.04 fails on `__isoc23_strto*` (glibc 2.38). The x86_64 libraries are
+built on 22.04, so that job stays on `ubuntu-22.04`. The consequence is that the
+aarch64 bundle links a newer glibc than the release bundle does — acceptable for
+a dev build, and the only alternative would be splitting the server and app
+builds across two runners.
+
+**Extract ffmpeg with Python, not `tar`.** macOS runner `tar` reads zip, but the
+Windows runner's GNU tar does not; `actions` supports `shell: python`, which
+removes the difference.
+
 ## Risks / Trade-offs
 
 - **The rolling release keeps no history** → the release body records the commit
@@ -91,6 +103,8 @@ a mix of old and new assets.
   are not byte-reproducible; pin a versioned package URL if it ever breaks.
 - **Unsigned installers** → SmartScreen and Gatekeeper warn; users bypass them
   manually. Not a defect of this pipeline.
+- **The aarch64 Linux bundle needs glibc 2.39** → it will not run on older
+  distributions; rebuild on 22.04 with locally built libraries if that matters.
 - **`website.yml` also fires on pushes to `main` that touch `i18n/`** → must be
   disabled in the fork's Actions settings rather than edited.
 - **`test-release.yml` takes the newest release** → it will pick up the `dev`

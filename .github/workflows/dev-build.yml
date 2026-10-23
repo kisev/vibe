@@ -44,7 +44,10 @@ jobs:
                       triple: x86_64-unknown-linux-gnu
                       libs: linux-x86_64
                       exe: ""
-                    - runner: ubuntu-22.04-arm
+                    # The aarch64 ggml libraries come from server-libs.yml, which
+                    # builds them on 24.04; linking them from 22.04 fails on the
+                    # glibc 2.38 string symbols.
+                    - runner: ubuntu-24.04-arm
                       triple: aarch64-unknown-linux-gnu
                       libs: linux-aarch64
                       exe: ""
@@ -92,11 +95,14 @@ jobs:
                   tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
                   url="https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-${{ matrix.libs }}.tar.gz"
                   echo "fetching $url"
-                  curl -fsSL "$url" -o "$RUNNER_TEMP/ggml-libs.tar.gz"
-                  rm -rf "$RUNNER_TEMP/ggml-libs" server/libs/lib
-                  mkdir -p "$RUNNER_TEMP/ggml-libs"
-                  tar -xzf "$RUNNER_TEMP/ggml-libs.tar.gz" -C "$RUNNER_TEMP/ggml-libs"
-                  mv "$RUNNER_TEMP/ggml-libs/lib" server/libs/lib
+                  # Relative paths only: the Windows runner's GNU tar reads a
+                  # drive letter in an absolute path as a remote host.
+                  curl -fsSL "$url" -o ggml-libs.tar.gz
+                  rm -rf ggml-libs server/libs/lib
+                  mkdir -p ggml-libs
+                  tar -xzf ggml-libs.tar.gz -C ggml-libs
+                  mv ggml-libs/lib server/libs/lib
+                  rm -rf ggml-libs ggml-libs.tar.gz
 
             - name: Build vibe-server
               shell: bash
@@ -114,22 +120,40 @@ jobs:
             # Linux takes a system ffmpeg; the other platforms bundle one as a
             # sidecar, but only where the model needs it, so this has to match
             # what tauri.*.windows.conf.json and the macOS build expect.
+            # Python because the runners' tar differs: macOS has bsdtar, which
+            # reads zip; the Windows runner's GNU tar does not.
             - name: Fetch ffmpeg
               if: matrix.ffmpeg != ''
-              shell: bash
+              shell: python
+              env:
+                  FFMPEG_URL: ${{ matrix.ffmpeg }}
+                  TRIPLE: ${{ matrix.triple }}
+                  EXE: ${{ matrix.exe }}
               run: |
-                  exe="${{ matrix.exe }}"
-                  tmp="$RUNNER_TEMP/ffmpeg-download"
-                  mkdir -p "$tmp"
-                  curl -fsSL "${{ matrix.ffmpeg }}" -o "$tmp/ffmpeg.zip"
-                  # Both bsdtar (macOS, Windows) and the runner's tar read zip.
-                  member="$(tar -tf "$tmp/ffmpeg.zip" | grep -E "(^|/)ffmpeg$exe\$" | head -n1)"
-                  test -n "$member"
-                  mkdir -p "$tmp/out"
-                  tar -xf "$tmp/ffmpeg.zip" -C "$tmp/out" "$member"
-                  mkdir -p desktop/src-tauri/binaries
-                  mv "$tmp/out/$member" "desktop/src-tauri/binaries/ffmpeg-${{ matrix.triple }}$exe"
-                  chmod 755 "desktop/src-tauri/binaries/ffmpeg-${{ matrix.triple }}$exe"
+                  import os
+                  import pathlib
+                  import urllib.request
+                  import zipfile
+
+                  url = os.environ["FFMPEG_URL"]
+                  triple = os.environ["TRIPLE"]
+                  exe = os.environ["EXE"]
+                  tmp = pathlib.Path(os.environ["RUNNER_TEMP"]) / "ffmpeg-download"
+                  tmp.mkdir(parents=True, exist_ok=True)
+                  archive = tmp / "ffmpeg.zip"
+                  urllib.request.urlretrieve(url, archive)
+                  with zipfile.ZipFile(archive) as bundle:
+                      member = next(
+                          name
+                          for name in bundle.namelist()
+                          if pathlib.PurePosixPath(name).name == "ffmpeg" + exe
+                      )
+                      bundle.extract(member, tmp / "out")
+                  target = pathlib.Path("desktop/src-tauri/binaries") / f"ffmpeg-{triple}{exe}"
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  os.replace(tmp / "out" / member, target)
+                  os.chmod(target, 0o755)
+                  print(f"installed {target}")
 
             - name: Install frontend dependencies
               run: pnpm install --frozen-lockfile
