@@ -117,6 +117,15 @@ impl Identity<'_> {
     }
 }
 
+/// SHA-256 of the decoded samples, kept in the manifest for debugging.
+pub fn audio_hash(audio: &[f32]) -> String {
+    let mut hasher = Sha256::new();
+    for sample in audio {
+        hasher.update(sample.to_bits().to_le_bytes());
+    }
+    hex(&hasher.finalize())
+}
+
 /// Small adapter so the audio loop does not inline the digest plumbing.
 struct Hasher<'a>(&'a mut Sha256);
 

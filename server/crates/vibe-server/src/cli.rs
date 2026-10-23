@@ -32,6 +32,8 @@ enum Command {
         vad_model: Option<String>,
         #[arg(long)]
         diarize_model: Option<String>,
+        #[arg(long)]
+        cache_dir: Option<String>,
         #[arg(long, value_enum, default_value_t = OutputFormat::Txt)]
         format: OutputFormat,
         #[arg(long)]
@@ -73,6 +75,8 @@ enum Command {
         exit_with_parent: bool,
         #[arg(long, env = "VIBE_SERVER_UNLOAD_TIMEOUT", default_value = "0")]
         unload_timeout: crate::server::unload_timeout::UnloadTimeout,
+        #[arg(long, env = "VIBE_SERVER_CACHE_DIR")]
+        cache_dir: Option<String>,
     },
     Pull {
         url: String,
@@ -87,6 +91,9 @@ pub struct AppConfig {
     verbose: bool,
     version: &'static str,
     commit: &'static str,
+    /// Root of the transcription cache, when the caller configured one. The
+    /// string lives for the process lifetime, so the config stays `Copy`.
+    cache_dir: Option<&'static str>,
 }
 
 impl AppConfig {
@@ -101,6 +108,17 @@ impl AppConfig {
     pub fn commit(&self) -> &'static str {
         self.commit
     }
+
+    pub fn cache_dir(&self) -> Option<&'static str> {
+        self.cache_dir
+    }
+
+    fn with_cache_dir(self, dir: Option<String>) -> Self {
+        Self {
+            cache_dir: dir.map(|dir| &*Box::leak(dir.into_boxed_str())),
+            ..self
+        }
+    }
 }
 
 pub async fn run() -> anyhow::Result<()> {
@@ -109,6 +127,7 @@ pub async fn run() -> anyhow::Result<()> {
         verbose: cli.verbose,
         version: VERSION,
         commit: COMMIT,
+        cache_dir: None,
     };
 
     match cli.command {
@@ -117,6 +136,7 @@ pub async fn run() -> anyhow::Result<()> {
             audio,
             vad_model,
             diarize_model,
+            cache_dir,
             format,
             output,
             language,
@@ -139,6 +159,7 @@ pub async fn run() -> anyhow::Result<()> {
                     audio,
                     vad_model,
                     diarize_model,
+                    cache_dir: cache_dir.clone(),
                     format,
                     output,
                     language,
@@ -155,7 +176,7 @@ pub async fn run() -> anyhow::Result<()> {
                     beam_size,
                     gpu_device,
                 },
-                config,
+                config.with_cache_dir(cache_dir),
             )
             .await
         }
@@ -165,7 +186,9 @@ pub async fn run() -> anyhow::Result<()> {
             port,
             exit_with_parent,
             unload_timeout,
+            cache_dir,
         } => {
+            let config = config.with_cache_dir(cache_dir);
             if exit_with_parent {
                 crate::parent::watch();
             }
@@ -395,6 +418,7 @@ struct TranscribeArgs {
     audio: String,
     vad_model: Option<String>,
     diarize_model: Option<String>,
+    cache_dir: Option<String>,
     format: OutputFormat,
     output: Option<String>,
     language: Option<String>,

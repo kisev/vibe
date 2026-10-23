@@ -34,10 +34,10 @@
 
 ## 5. Cache integration
 
-- [ ] 5.1 Reuse finished chunks during a run and across runs; verify a repeated run performs no inference for cached chunks and produces a byte-identical transcript
-- [ ] 5.2 Implement resume after interruption; verify a run killed mid-file continues from finished chunks on the next attempt
+- [x] 5.1 Reuse finished chunks during a run and across runs; verify a repeated run performs no inference for cached chunks and produces a byte-identical transcript
+- [x] 5.2 Implement resume after interruption; verify a run killed mid-file continues from finished chunks on the next attempt
 - [ ] 5.3 Implement out-of-memory split detection, persistence, and reuse; verify a resumed run does not retry the failing chunk size and stops splitting at the minimum length
-- [ ] 5.4 Verify cache identity invalidation end-to-end: changing language, chunk duration, or model forces recomputation and produces the expected transcript
+- [x] 5.4 Verify cache identity invalidation end-to-end: changing language, chunk duration, or model forces recomputation and produces the expected transcript
 
 ## 6. CLI and server startup
 
