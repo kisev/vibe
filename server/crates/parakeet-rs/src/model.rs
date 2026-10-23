@@ -154,22 +154,38 @@ impl Model {
         vad: &mut vad_rs::Vad,
         samples: &[f32],
         language: &str,
-        mut should_abort: impl FnMut() -> bool,
-        mut on_segment: impl FnMut(&Transcription),
-        mut on_progress: impl FnMut(i32),
+        should_abort: impl FnMut() -> bool,
+        on_segment: impl FnMut(&Transcription),
+        on_progress: impl FnMut(i32),
     ) -> Result<LongFormTranscription> {
-        let all_started = Instant::now();
         let vad_started = Instant::now();
         let ranges = vad.segments(samples).map_err(|error| Error::Vad(error.to_string()))?;
+        let ranges: Vec<(usize, usize)> = ranges.iter().map(|range| (range.start_sample, range.end_sample)).collect();
         eprintln!(
             "[parakeet][vad] elapsed_ms={} audio_s={:.3} chunks={}",
             vad_started.elapsed().as_millis(),
             samples.len() as f64 / 16000.0,
             ranges.len()
         );
+        self.transcribe_ranges(samples, &ranges, language, should_abort, on_segment, on_progress)
+    }
+
+    /// Transcribe exactly these sample ranges, in order. The long-form entry
+    /// point above derives the ranges from VAD; the server supplies its own
+    /// plan so that each range belongs to one speaker.
+    pub fn transcribe_ranges(
+        &self,
+        samples: &[f32],
+        ranges: &[(usize, usize)],
+        language: &str,
+        mut should_abort: impl FnMut() -> bool,
+        mut on_segment: impl FnMut(&Transcription),
+        mut on_progress: impl FnMut(i32),
+    ) -> Result<LongFormTranscription> {
+        let all_started = Instant::now();
         let total_samples = ranges
             .iter()
-            .map(|range| range.end_sample.saturating_sub(range.start_sample))
+            .map(|(start, end)| end.saturating_sub(*start))
             .sum::<usize>()
             .max(1);
         let mut processed_samples = 0;
@@ -178,19 +194,19 @@ impl Model {
             segments: Vec::with_capacity(ranges.len()),
         };
         let mut last_frame = None;
-        for (chunk_index, range) in ranges.into_iter().enumerate() {
+        for (chunk_index, (start, end)) in ranges.iter().copied().enumerate() {
             if should_abort() {
                 return Err(Error::Aborted);
             }
             eprintln!(
                 "[parakeet][vad] chunk={} start={} end={} duration_s={:.3}",
                 chunk_index,
-                range.start_sample,
-                range.end_sample,
-                (range.end_sample - range.start_sample) as f64 / 16000.0
+                start,
+                end,
+                (end - start) as f64 / 16000.0
             );
-            let mut transcription = self.transcribe_chunk(&samples[range.start_sample..range.end_sample], language)?;
-            let frame_offset = range.start_sample / 1280;
+            let mut transcription = self.transcribe_chunk(&samples[start..end], language)?;
+            let frame_offset = start / 1280;
             for token in &mut transcription.tokens {
                 token.frame += frame_offset;
             }
@@ -204,7 +220,7 @@ impl Model {
                 on_segment(&segment);
                 result.segments.push(segment);
             }
-            processed_samples += range.end_sample.saturating_sub(range.start_sample);
+            processed_samples += end.saturating_sub(start);
             on_progress(((processed_samples * 100) / total_samples).min(100) as i32);
         }
         eprintln!(

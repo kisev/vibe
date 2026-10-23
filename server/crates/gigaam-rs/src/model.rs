@@ -191,16 +191,32 @@ impl Model {
         vad: &mut vad_rs::Vad,
         samples: &[f32],
         language: &str,
+        should_abort: impl FnMut() -> bool,
+        on_segment: impl FnMut(&Transcription),
+        on_progress: impl FnMut(i32),
+    ) -> Result<LongFormTranscription> {
+        let ranges = vad.segments(samples).map_err(|error| Error::Vad(error.to_string()))?;
+        let ranges: Vec<(usize, usize)> = ranges.iter().map(|range| (range.start_sample, range.end_sample)).collect();
+        self.transcribe_ranges(samples, &ranges, language, should_abort, on_segment, on_progress)
+    }
+
+    /// Transcribe exactly these sample ranges, in order. The long-form entry
+    /// point above derives the ranges from VAD; the server supplies its own
+    /// plan so that each range belongs to one speaker.
+    pub fn transcribe_ranges(
+        &self,
+        samples: &[f32],
+        ranges: &[(usize, usize)],
+        language: &str,
         mut should_abort: impl FnMut() -> bool,
         mut on_segment: impl FnMut(&Transcription),
         mut on_progress: impl FnMut(i32),
     ) -> Result<LongFormTranscription> {
         self.validate_language(language)?;
         let all_started = Instant::now();
-        let ranges = vad.segments(samples).map_err(|error| Error::Vad(error.to_string()))?;
         let total_samples = ranges
             .iter()
-            .map(|range| range.end_sample.saturating_sub(range.start_sample))
+            .map(|(start, end)| end.saturating_sub(*start))
             .sum::<usize>()
             .max(1);
         let mut processed_samples = 0;
@@ -209,13 +225,13 @@ impl Model {
             segments: Vec::with_capacity(ranges.len()),
         };
         let mut last_frame = None;
-        for range in ranges {
+        for (start, end) in ranges.iter().copied() {
             if should_abort() {
                 return Err(Error::Aborted);
             }
-            let chunk = &samples[range.start_sample..range.end_sample];
+            let chunk = &samples[start..end];
             let mut transcription = self.transcribe_chunk(chunk, language)?;
-            let frame_offset = range.start_sample / FRAME_SAMPLES;
+            let frame_offset = start / FRAME_SAMPLES;
             for token in &mut transcription.tokens {
                 token.frame += frame_offset;
             }
@@ -227,7 +243,7 @@ impl Model {
                 on_segment(&segment);
                 result.segments.push(segment);
             }
-            processed_samples += range.end_sample.saturating_sub(range.start_sample);
+            processed_samples += end.saturating_sub(start);
             on_progress(((processed_samples * 100) / total_samples).min(100) as i32);
         }
         eprintln!(

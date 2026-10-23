@@ -13,8 +13,8 @@
 ## 2. Engine chunk entry point
 
 - [x] 2.1 Add `max_input_seconds` to engine capabilities, report it for Parakeet, Nemotron, and GigaAM, and leave it absent for Whisper; verify metadata tests assert the field per engine
-- [ ] 2.2 Add the chunked transcription entry point to the engine API and implement it for Parakeet and Nemotron by reusing their per-chunk decode path; verify their existing transcription tests still pass through the new wrapper
-- [ ] 2.3 Implement the chunked entry point for GigaAM, respecting its 25-second bound and token deduplication; verify the GigaAM tests pass through both the old and new paths
+- [x] 2.2 Add the chunked transcription entry point to the engine API and implement it for Parakeet and Nemotron by reusing their per-chunk decode path; verify their existing transcription tests still pass through the new wrapper
+- [x] 2.3 Implement the chunked entry point for GigaAM, respecting its 25-second bound and token deduplication; verify the GigaAM tests pass through both the old and new paths
 - [ ] 2.4 Verify Whisper is excluded: a request with a plan and a Whisper model keeps the current internal long-form path and returns segments without plan speaker sets
 
 ## 3. Server planning integration

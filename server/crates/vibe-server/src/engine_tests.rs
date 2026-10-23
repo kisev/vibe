@@ -220,6 +220,68 @@ fn probe_and_load_report_the_same_capabilities() {
 }
 
 #[test]
+fn gigaam_chunk_path_matches_the_vad_path() {
+    let (Some(mut engine), Some(vad), Some(samples)) = (gigaam_engine(), vad_model(), audio()) else {
+        return;
+    };
+    let from_vad = engine
+        .transcribe(&samples, transcription_options(Some(vad.clone())))
+        .expect("VAD path");
+
+    let duration = samples.len() as f64 / crate::plan::SAMPLE_RATE;
+    let plan = crate::plan::Plan {
+        chunks: vec![crate::plan::Chunk {
+            input_start: 0.0,
+            input_end: duration,
+            core_start: 0.0,
+            core_end: duration,
+            speakers: vec![1],
+        }],
+        max_input_seconds: 25.0,
+    };
+    let from_plan = engine
+        .transcribe_chunks(&samples, &plan, transcription_options(Some(vad)))
+        .expect("plan path");
+    assert_eq!(from_vad.text(), from_plan.text());
+}
+
+#[test]
+fn chunk_ranges_follow_the_plan_and_clip_to_the_audio() {
+    use crate::plan::{Chunk, Plan};
+    let plan = Plan {
+        chunks: vec![
+            Chunk {
+                input_start: 0.0,
+                input_end: 1.0,
+                core_start: 0.0,
+                core_end: 0.8,
+                speakers: vec![1],
+            },
+            Chunk {
+                input_start: 1.0,
+                input_end: 2.0,
+                core_start: 1.0,
+                core_end: 2.0,
+                speakers: vec![2],
+            },
+            Chunk {
+                input_start: 2.0,
+                input_end: 5.0,
+                core_start: 2.0,
+                core_end: 2.5,
+                speakers: vec![2],
+            },
+        ],
+        max_input_seconds: 25.0,
+    };
+    // 2.5 seconds of audio: the last chunk is clipped, not dropped.
+    let ranges = chunk_ranges(&plan, 40_000);
+    assert_eq!(ranges, vec![(0, 16_000), (16_000, 32_000), (32_000, 40_000)]);
+    // With no audio left, a chunk produces nothing.
+    assert_eq!(chunk_ranges(&plan, 32_000).len(), 2);
+}
+
+#[test]
 fn engines_report_their_input_bound() {
     // Whisper owns its long-form path, so it advertises no external bound.
     assert_eq!(whisper_capabilities().max_input_seconds, None);
