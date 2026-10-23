@@ -20,9 +20,9 @@
 
 ## 4. Dev identity and release hygiene
 
-- [ ] 4.1 Build the version as `<base>-dev.<short-sha>` from `tauri.conf.json`, pass it through `--config` together with `"plugins":{"updater":{"endpoints":[]}}`, and pass the same string as `VIBE_SERVER_VERSION`; verify the app reports it, offers no update, and `vibe-server --version` matches
+- [x] 4.1 Build the version as `<base>-dev.<short-sha>` from `tauri.conf.json`, pass it through `--config` together with `"plugins":{"updater":{"endpoints":[]}}`, and pass the same string as `VIBE_SERVER_VERSION`; verify the app reports it, offers no update, and `vibe-server --version` matches
 - [x] 4.2 Publish each commit to its own prerelease tagged `dev.<short-commit>` instead of one shared `dev` release; verify two consecutive commits produce two independent releases and a failed run leaves the older one untouched
-- [ ] 4.3 Confirm the updater stays silent: start a dev build with an upstream release available and verify no update affordance appears
+- [x] 4.3 Confirm the updater stays silent: start a dev build with an upstream release available and verify no update affordance appears
 
 ## 5. Build speed
 
@@ -34,9 +34,9 @@
 ## 6. Verification
 
 - [x] 6.1 Push to `main` and wait for a full run; verify all five jobs finish and the `dev` release holds a `.dmg`, a `.deb` and `.rpm`, and an `.exe` installer
-- [ ] 6.2 Install the Windows build on the test machine, confirm the app starts, and confirm the bundled server reports the pushed commit via `vibe-server --version`; verify GigaAM models are listed and one file transcribes end to end
+- [x] 6.2 Install the Windows build on the test machine, confirm the app starts, and confirm the bundled server reports the pushed commit via `vibe-server --version`; verify GigaAM models are listed and one file transcribes end to end
 - [x] 6.3 Verify the `dev` release is marked as a prerelease and is not the repository's latest release, and that its body names the built commit
-- [ ] 6.4 Enable Actions for the fork and disable the inherited `Deploy Website` workflow; verify a push to `main` starts only the dev build
+- [x] 6.4 Enable Actions for the fork and disable the inherited `Deploy Website` workflow; verify a push to `main` starts only the dev build
 
 ## Workflow follow-up
 
