@@ -509,6 +509,27 @@ mod tests {
     }
 
     #[test]
+    fn planning_an_hour_costs_milliseconds() {
+        // An hour of alternating speakers, cut by pauses every few seconds.
+        let diarization: Vec<_> = (0..120)
+            .map(|i| DiarSegment {
+                start: i as f64 * 30.0,
+                end: (i + 1) as f64 * 30.0,
+                speaker: (i % 2) as u16 + 1,
+            })
+            .collect();
+        let speech: Vec<_> = (0..720).map(|i| (i as f64 * 5.0, i as f64 * 5.0 + 4.5)).collect();
+        let started = std::time::Instant::now();
+        let plan = plan(3600.0, &diarization, &speech, settings(25.0));
+        let elapsed = started.elapsed();
+        assert!(!plan.chunks.is_empty());
+        assert!(
+            elapsed < std::time::Duration::from_millis(50),
+            "planning took {elapsed:?}, far more than arithmetic should"
+        );
+    }
+
+    #[test]
     fn the_same_inputs_produce_the_same_plan() {
         let diarization = [
             DiarSegment {
