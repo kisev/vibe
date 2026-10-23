@@ -21,14 +21,14 @@
 ## 4. Dev identity and release hygiene
 
 - [ ] 4.1 Build the version as `<base>-dev.<short-sha>` from `tauri.conf.json`, pass it through `--config` together with `"plugins":{"updater":{"endpoints":[]}}`, and pass the same string as `VIBE_SERVER_VERSION`; verify the app reports it, offers no update, and `vibe-server --version` matches
-- [ ] 4.2 Add a job that runs after the matrix and deletes release assets that do not belong to the current version; verify a release built under a new version holds only that version's files
+- [x] 4.2 Add a job that runs after the matrix and deletes release assets that do not belong to the current version; verify a release built under a new version holds only that version's files
 - [ ] 4.3 Confirm the updater stays silent: start a dev build with an upstream release available and verify no update affordance appears
 
 ## 5. Build speed
 
 - [ ] 5.1 Set `CARGO_PROFILE_RELEASE_LTO=false` and `CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16` in the job environment; verify the Windows job falls from the 14-minute baseline and the installed build still starts
 - [ ] 5.2 Cache `server/target` through `swatinem/rust-cache`'s `workspaces` input and verify the server build step shortens on a warm run; check the repository cache size stays under the budget
-- [ ] 5.3 Add `--no-install-recommends` and `-o Acquire::Retries=3` to the Linux dependency step; verify the Linux jobs still build
+- [x] 5.3 Add `--no-install-recommends` and `-o Acquire::Retries=3` to the Linux dependency step; verify the Linux jobs still build
 - [ ] 5.4 Record the per-job durations of a final clean run and confirm the critical path is under ten minutes
 
 ## 6. Verification
