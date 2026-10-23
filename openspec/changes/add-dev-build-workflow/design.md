@@ -133,6 +133,11 @@ own cache at the cost of one more entry per platform.
 **Keep `paths-ignore` out.** The agreed contract is a build on every push to
 `main`; skipping doc-only pushes would quietly narrow it.
 
+**Keep Linux x86_64 on `ubuntu-22.04`.** Moving it to 24.04 would remove the
+stalls in the dependency step, but it would push the bundles' glibc floor to
+2.39. Compatibility with older distributions was chosen over build time; the
+stall is accepted and recorded below rather than worked around.
+
 ## Risks / Trade-offs
 
 - **The rolling release keeps no history** → the release body records the commit
@@ -156,6 +161,10 @@ own cache at the cost of one more entry per platform.
   cache budget and five platforms; drop the `server -> target` workspace if the
   cache complaints appear.
 - **Dev binaries are larger without LTO** → acceptable for builds nobody ships.
+- **The `ubuntu-22.04` dependency step occasionally takes 20–30 minutes** → seen
+  in two of four runs while `ubuntu-24.04-arm` installs the same list in a
+  minute; nothing in the workflow causes it, and the agreed fix (moving to
+  24.04) was rejected for glibc compatibility.
 
 ## Migration Plan
 
