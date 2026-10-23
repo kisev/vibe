@@ -23,6 +23,9 @@ pub struct ServerState {
 pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     // Create app directories
     let local_app_data_dir = app.path().app_local_data_dir()?;
+    // Entries older than this are never reused in practice, and the cache holds
+    // transcript text, so it should not grow forever.
+    cleanup_transcription_cache(app.handle());
     let app_config_dir = app.path().app_config_dir()?;
     fs::create_dir_all(&local_app_data_dir)
         .unwrap_or_else(|_| panic!("cant create local app data directory at {}", local_app_data_dir.display()));
@@ -172,4 +175,90 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     // in the background, so an offline or slow network never delays launch.
     crate::handoff::restore_on_startup(app.handle());
     Ok(())
+}
+
+/// Cache entries nobody touched for this long are removed at startup.
+const CACHE_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(30 * 24 * 60 * 60);
+
+fn cleanup_transcription_cache(app: &tauri::AppHandle) {
+    let Some(directory) = crate::cmd::server_cmd::transcription_cache_dir(app) else {
+        return;
+    };
+    match prune_older_than(&directory, CACHE_MAX_AGE, std::time::SystemTime::now()) {
+        Ok(0) => {}
+        Ok(removed) => tracing::info!("removed {removed} stale transcription cache entries"),
+        Err(err) => tracing::warn!("transcription cache cleanup failed: {err}"),
+    }
+}
+
+/// Remove cache entry directories whose newest file predates `max_age`.
+pub(crate) fn prune_older_than(
+    root: &std::path::Path,
+    max_age: std::time::Duration,
+    now: std::time::SystemTime,
+) -> std::io::Result<usize> {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        // No cache directory: nothing was ever written.
+        return Ok(0);
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let newest = newest_modified(&path)?;
+        if now.duration_since(newest).unwrap_or_default() > max_age {
+            std::fs::remove_dir_all(&path)?;
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+fn newest_modified(path: &std::path::Path) -> std::io::Result<std::time::SystemTime> {
+    let mut newest = std::fs::metadata(path)?
+        .modified()
+        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+    if path.is_dir() {
+        for entry in std::fs::read_dir(path)?.flatten() {
+            let child = newest_modified(&entry.path())?;
+            if child > newest {
+                newest = child;
+            }
+        }
+    }
+    Ok(newest)
+}
+
+#[cfg(test)]
+mod cache_cleanup_tests {
+    use super::*;
+    use std::time::{Duration, SystemTime};
+
+    #[test]
+    fn stale_entries_are_removed_and_fresh_ones_survive() {
+        let dir = tempfile::tempdir().unwrap();
+        let stale = dir.path().join("stale");
+        let fresh = dir.path().join("fresh");
+        std::fs::create_dir_all(stale.join("parts")).unwrap();
+        std::fs::create_dir_all(&fresh).unwrap();
+        std::fs::write(stale.join("parts").join("part-000000.json"), b"{}").unwrap();
+        std::fs::write(fresh.join("manifest.json"), b"{}").unwrap();
+
+        // Both were just created, so pick a moment far in the future and a
+        // window shorter than it: the stale entry is the one we age by hand.
+        let now = SystemTime::now() + Duration::from_secs(60);
+        let file = std::fs::File::options()
+            .write(true)
+            .open(stale.join("parts").join("part-000000.json"))
+            .unwrap();
+        file.set_modified(SystemTime::now() - Duration::from_secs(90 * 24 * 3600))
+            .unwrap();
+
+        let removed = prune_older_than(dir.path(), Duration::from_secs(30 * 24 * 3600), now).unwrap();
+        assert_eq!(removed, 1);
+        assert!(!stale.exists());
+        assert!(fresh.exists());
+    }
 }
