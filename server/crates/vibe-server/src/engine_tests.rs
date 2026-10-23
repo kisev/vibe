@@ -13,6 +13,14 @@ fn gigaam_model() -> Option<String> {
         .filter(|path| std::path::Path::new(path).exists())
 }
 
+fn whisper_engine() -> Option<Engine> {
+    let path = std::env::var("WHISPER_MODEL").ok()?;
+    if !std::path::Path::new(&path).exists() {
+        return None;
+    }
+    Some(Engine::load(&path, ContextOptions::default()).expect("load Whisper model"))
+}
+
 fn parakeet_engine() -> Option<Engine> {
     let path = std::env::var("PARAKEET_MODEL").ok()?;
     if !std::path::Path::new(&path).exists() {
@@ -256,6 +264,31 @@ fn assert_chunk_path_matches(engine: &mut Engine, vad: String, samples: &[f32]) 
         .transcribe_chunks(samples, &plan, transcription_options(Some(vad)))
         .expect("plan path");
     assert_eq!(from_vad.text(), from_plan.text());
+}
+
+#[test]
+fn whisper_is_never_planned() {
+    let (Some(mut engine), Some(samples)) = (whisper_engine(), audio()) else {
+        return;
+    };
+    assert_eq!(engine.max_input_seconds(), None, "no external bound");
+    let diar = [crate::server::diarization::Segment {
+        start: 0.0,
+        end: 2.0,
+        speaker_id: 1,
+    }];
+    // Even with diarization present, Whisper keeps its internal long-form path.
+    assert!(crate::server::transcription::plan_for(&mut engine, &samples, &diar, None, None).is_none());
+    assert!(engine
+        .transcribe_chunks(
+            &samples,
+            &crate::plan::Plan {
+                chunks: Vec::new(),
+                max_input_seconds: 30.0
+            },
+            transcription_options(None)
+        )
+        .is_err());
 }
 
 #[test]

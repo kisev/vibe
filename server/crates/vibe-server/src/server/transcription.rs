@@ -154,7 +154,7 @@ fn chunk_seconds_error(requested: Option<f64>, maximum: Option<f64>) -> Option<S
 /// Build the chunk plan when the engine accepts explicit chunks and a
 /// diarization model supplied the turns. Without either, the engine keeps its
 /// own VAD chunking and speakers stay attributed by overlap.
-pub(super) fn plan_for(
+pub(crate) fn plan_for(
     ctx: &mut Engine,
     samples: &[f32],
     diar_segments: &[diarization::Segment],
