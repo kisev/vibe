@@ -62,29 +62,29 @@ The dev build MUST run without any repository secret and MUST NOT require an ext
 - **WHEN** a dev build finishes
 - **THEN** its bundles carry no updater artifacts and require no signing key
 
-### Requirement: Rolling dev release
+### Requirement: One release per commit
 
-The system SHALL publish the bundles of a run to one prerelease tagged `dev`, replacing the assets of the previous run, so a single URL always holds the newest build.
+Each run SHALL publish its bundles to a prerelease tagged `dev.<short-commit>`, so every build is a complete snapshot of one revision and never shares a release with another.
 
-#### Scenario: First build
+#### Scenario: New commit
 
-- **WHEN** no `dev` release exists
-- **THEN** the build creates it as a prerelease and attaches the bundles
+- **WHEN** a run builds a commit that has no release yet
+- **THEN** it creates the prerelease `dev.<short-commit>` and attaches the bundles
+
+#### Scenario: Failed run
+
+- **WHEN** a run fails to produce some platform bundles
+- **THEN** no assets of that run land in a release of a different commit
 
 #### Scenario: Later builds
 
-- **WHEN** a `dev` release already exists
-- **THEN** the run replaces its assets with the new bundles
+- **WHEN** a later commit is built
+- **THEN** its bundles go to its own release and the earlier releases keep their assets unchanged
 
 #### Scenario: Latest release unaffected
 
-- **WHEN** the `dev` release exists
+- **WHEN** a dev release exists
 - **THEN** it does not become the repository's latest release
-
-#### Scenario: Version changes
-
-- **WHEN** a run publishes bundles under a version the release does not hold yet
-- **THEN** the assets of the previous version are removed from the release, so it holds only the newest build
 
 ### Requirement: Dev version is identifiable
 

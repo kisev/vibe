@@ -61,11 +61,19 @@ behind `main`), or reuse `chore server-build` (still requires `chore`).
 Computing the ggml release tag from the pinned files instead of hardcoding it
 means a `libs/` bump is picked up automatically.
 
-**Publish with `tauri-action`, tag `dev`, `prerelease: true`.** Upstream already
-uses five parallel `tauri-action` jobs against one release tag, so the action
-handles an existing release and asset replacement. Alternative: `gh release
-upload --clobber` from each job — more shell, and racy when the release does not
-exist yet.
+**Publish with `tauri-action`, one release per commit.** The tag is
+`dev.<short-commit>` and the action's handling of an existing release is what
+lets five parallel jobs fill one release — the same mechanism upstream uses.
+
+The first implementation used a single rolling `dev` release. That broke as soon
+as a run failed: the cleanup job only ran after a fully green matrix, so a
+partially built run left its assets beside the previous commit's, and the
+release showed a mix of versions. A snapshot per commit removes the shared state
+entirely — a failed run simply leaves an incomplete release of its own commit,
+and the earlier ones stay intact. Alternative: keep the rolling tag and make
+cleanup run even on failure — rejected because it would delete the newest
+platform bundles whenever a runner is declined capacity, leaving a release that
+holds neither version.
 
 **Disable updater artifacts with `--config
 '{"bundle":{"createUpdaterArtifacts":false}}'`.** This is exactly what the
@@ -86,11 +94,10 @@ prerelease sorts below its base version, so the upstream channel would offer
 logs check failures without surfacing them, so an empty endpoint list is quiet.
 Alternative: keep the channel and accept being asked to downgrade — rejected.
 
-**Delete stale release assets in a job that runs after the matrix.** Asset names
-carry the version, so a version change leaves the previous files in place — and
-the macOS `app.tar.gz` files carry no version at all, so matching on the version
-string would delete current assets. The final job instead removes every asset
-whose `updatedAt` predates the run, which leaves exactly what this run uploaded.
+**No cleanup job.** With one release per commit there is nothing to clean up;
+the versioned tag is the boundary. Old releases accumulate, which is the point —
+each one is a downloadable snapshot. Pruning can be added later if the list
+becomes unwieldy.
 
 **Keep jobs independent (`fail-fast: false`) and let runs queue
 (`cancel-in-progress: false`).** A cancelled run could leave the release holding
@@ -140,10 +147,11 @@ stall is accepted and recorded below rather than worked around.
 
 ## Risks / Trade-offs
 
-- **The rolling release keeps no history** → the release body records the commit
-  and date; switching to `dev-<sha>` tags later is a one-line change.
-- **The `dev` tag stays at the commit that first created the release** →
-  cosmetic only; the body names the built commit.
+- **Releases accumulate one per push** → each is a snapshot worth keeping; prune
+  by hand or add a retention step if the list grows unmanageable.
+- **Runner capacity can leave an incomplete release** → a macOS job declined by
+  GitHub cancels, so that commit's release may lack a platform; re-running the
+  workflow for that commit fills it in.
 - **`gyan.dev`'s `release-essentials.zip` follows the newest ffmpeg** → builds
   are not byte-reproducible; pin a versioned package URL if it ever breaks.
 - **Unsigned installers** → SmartScreen and Gatekeeper warn; users bypass them

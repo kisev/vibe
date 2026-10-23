@@ -107,15 +107,22 @@ jobs:
               shell: bash
               run: |
                   base=$(jq -r .version desktop/src-tauri/tauri.conf.json)
-                  version="$base-dev.${GITHUB_SHA:0:7}"
+                  short=${GITHUB_SHA:0:7}
+                  version="$base-dev.$short"
+                  # One release per commit: a shared release accumulated assets
+                  # from several builds whenever a run failed to finish.
+                  tag="dev.$short"
                   # One no-space JSON: tauri-action splits args on whitespace.
                   config=$(jq -cn --arg v "$version" '{
                       version: $v,
                       bundle: { createUpdaterArtifacts: false },
                       plugins: { updater: { endpoints: [] } }
                   }')
-                  echo "version=$version" >> "$GITHUB_OUTPUT"
-                  echo "config=$config" >> "$GITHUB_OUTPUT"
+                  {
+                      echo "version=$version"
+                      echo "tag=$tag"
+                      echo "config=$config"
+                  } >> "$GITHUB_OUTPUT"
 
             # The release tag is derived from the pinned files so a libs/ bump is
             # picked up without touching this workflow.
@@ -207,39 +214,12 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ github.token }}
               with:
-                  tagName: dev
-                  releaseName: Dev build
-                  releaseBody: "Automated build of main at ${{ github.sha }}."
+                  tagName: ${{ steps.dev-version.outputs.tag }}
+                  releaseName: Dev build ${{ steps.dev-version.outputs.version }}
+                  releaseBody: "Dev build of main at ${{ github.sha }}."
                   releaseCommitish: ${{ github.sha }}
                   prerelease: true
                   uploadUpdaterJson: false
                   args: --target ${{ matrix.triple }} --config ${{ steps.dev-version.outputs.config }}
                   projectPath: ./desktop
                   tauriScript: pnpm exec tauri
-
-            # tauri-action only writes the body when it creates the release, so
-            # a rolling release would keep naming the commit of the first run.
-            - name: Record the built commit in the release
-              if: success()
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: gh release edit dev --repo "${{ github.repository }}" --notes "Dev build ${{ steps.dev-version.outputs.version }} of main at ${{ github.sha }}."
-
-    # Version changes rename every asset, and tauri-action only replaces names it
-    # already knows, so leftovers from earlier builds would pile up.
-    cleanup:
-        needs: build
-        runs-on: ubuntu-22.04
-        steps:
-            - name: Remove assets left by earlier runs
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  started=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
-                  gh release view dev --repo "$GITHUB_REPOSITORY" --json assets \
-                      --jq ".assets[] | select(.updatedAt < \"$started\") | .name" |
-                  while read -r asset; do
-                      [ -n "$asset" ] || continue
-                      gh release delete-asset dev "$asset" --repo "$GITHUB_REPOSITORY" --yes
-                  done

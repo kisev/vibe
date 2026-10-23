@@ -21,7 +21,7 @@
 ## 4. Dev identity and release hygiene
 
 - [ ] 4.1 Build the version as `<base>-dev.<short-sha>` from `tauri.conf.json`, pass it through `--config` together with `"plugins":{"updater":{"endpoints":[]}}`, and pass the same string as `VIBE_SERVER_VERSION`; verify the app reports it, offers no update, and `vibe-server --version` matches
-- [x] 4.2 Add a job that runs after the matrix and deletes release assets that do not belong to the current version; verify a release built under a new version holds only that version's files
+- [ ] 4.2 Publish each commit to its own prerelease tagged `dev.<short-commit>` instead of one shared `dev` release; verify two consecutive commits produce two independent releases and a failed run leaves the older one untouched
 - [ ] 4.3 Confirm the updater stays silent: start a dev build with an upstream release available and verify no update affordance appears
 
 ## 5. Build speed
