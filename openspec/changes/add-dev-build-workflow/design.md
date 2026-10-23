@@ -118,9 +118,17 @@ there.
 
 **Cache `server/target` as a second rust-cache workspace.** The action defaults
 to the repository root, and the server builds in its own workspace, so its
-dependencies were recompiled on every run. Alternative: accept the 1–4 minute
-rebuild — rejected, but the cache budget (10 GB per repository) is the reason
-this is measured rather than assumed.
+dependencies were recompiled on every run. `desktop/src-tauri` is a member of
+the root workspace, so its artifacts already live in the root `target/` and need
+no separate entry — the directories rust-cache sees are exactly `vibe/vibe` and
+`vibe/vibe/server`. Alternative: accept the 1–4 minute rebuild — rejected, but
+the cache budget (10 GB per repository) is the reason this is measured rather
+than assumed.
+
+**Key the cache by target triple.** `rust-cache` derives its key from the host,
+so the two macOS cells — same arm64 runner, different `--target` — share one
+entry and overwrite each other. Passing `key: matrix.triple` gives each cell its
+own cache at the cost of one more entry per platform.
 
 **Keep `paths-ignore` out.** The agreed contract is a build on every push to
 `main`; skipping doc-only pushes would quietly narrow it.

@@ -91,6 +91,10 @@ jobs:
                   workspaces: |
                       . -> target
                       server -> target
+                  # rust-cache keys on the host triple, and both macOS cells run
+                  # on the same arm64 runner with different --target values, so
+                  # without this they would overwrite each other's cache.
+                  key: ${{ matrix.triple }}
 
             - name: Install Linux build dependencies
               if: runner.os == 'Linux'
