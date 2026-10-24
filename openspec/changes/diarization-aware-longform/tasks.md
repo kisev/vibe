@@ -47,8 +47,8 @@
 
 ## 7. Desktop integration
 
-- [ ] 7.1 Pass an app-owned cache directory when spawning the server; verify the server receives it and writes entries there
-- [ ] 7.2 Add age-based cache cleanup next to the existing log and temp cleanup; verify stale entries are removed and fresh ones survive
+- [x] 7.1 Pass an app-owned cache directory when spawning the server; verify the server receives it and writes entries there
+- [x] 7.2 Add age-based cache cleanup next to the existing log and temp cleanup; verify stale entries are removed and fresh ones survive
 - [ ] 7.3 Extend the desktop transcript model and view with the optional speaker set; verify a union label renders with an ambiguity note and single-speaker lines are unchanged
 - [ ] 7.4 Verify batch and retranscription flows with diarization enabled: chunks are speaker-consistent and a retranscription reuses finished chunks
 

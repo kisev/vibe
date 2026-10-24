@@ -217,15 +217,18 @@ pub(crate) fn prune_older_than(
 }
 
 fn newest_modified(path: &std::path::Path) -> std::io::Result<std::time::SystemTime> {
-    let mut newest = std::fs::metadata(path)?
-        .modified()
-        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-    if path.is_dir() {
-        for entry in std::fs::read_dir(path)?.flatten() {
-            let child = newest_modified(&entry.path())?;
-            if child > newest {
-                newest = child;
-            }
+    if path.is_file() {
+        return Ok(std::fs::metadata(path)?
+            .modified()
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH));
+    }
+    // A directory's own mtime changes when an entry is created inside it, which
+    // says nothing about when the cache last used the chunk; only files count.
+    let mut newest = std::time::SystemTime::UNIX_EPOCH;
+    for entry in std::fs::read_dir(path)?.flatten() {
+        let child = newest_modified(&entry.path())?;
+        if child > newest {
+            newest = child;
         }
     }
     Ok(newest)
@@ -238,9 +241,10 @@ mod cache_cleanup_tests {
 
     #[test]
     fn stale_entries_are_removed_and_fresh_ones_survive() {
-        let dir = tempfile::tempdir().unwrap();
-        let stale = dir.path().join("stale");
-        let fresh = dir.path().join("fresh");
+        let root = std::env::temp_dir().join(format!("vibe-cache-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let stale = root.join("stale");
+        let fresh = root.join("fresh");
         std::fs::create_dir_all(stale.join("parts")).unwrap();
         std::fs::create_dir_all(&fresh).unwrap();
         std::fs::write(stale.join("parts").join("part-000000.json"), b"{}").unwrap();
@@ -256,9 +260,10 @@ mod cache_cleanup_tests {
         file.set_modified(SystemTime::now() - Duration::from_secs(90 * 24 * 3600))
             .unwrap();
 
-        let removed = prune_older_than(dir.path(), Duration::from_secs(30 * 24 * 3600), now).unwrap();
+        let removed = prune_older_than(&root, Duration::from_secs(30 * 24 * 3600), now).unwrap();
         assert_eq!(removed, 1);
         assert!(!stale.exists());
         assert!(fresh.exists());
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
