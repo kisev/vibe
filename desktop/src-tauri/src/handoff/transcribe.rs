@@ -224,6 +224,7 @@ impl HandoffHandler {
                     end,
                     text,
                     speaker,
+                    speakers,
                 }) => {
                     // Server reports seconds as f64; the wire format wants centiseconds.
                     let segment = crate::transcript::Segment {
@@ -231,6 +232,7 @@ impl HandoffHandler {
                         stop: (end * 100.0) as i64,
                         text,
                         speaker,
+                        speakers,
                     };
                     segments.push(segment.clone());
                     write_event(
@@ -240,6 +242,7 @@ impl HandoffHandler {
                             stop: segment.stop,
                             text: segment.text,
                             speaker: segment.speaker,
+                            speakers: segment.speakers,
                         },
                     )
                     .await?;

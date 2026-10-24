@@ -142,6 +142,8 @@ pub enum ServerEvent {
         end: f64,
         text: String,
         speaker: Option<i32>,
+        /// The planned chunk's speakers; more than one marks a turn boundary.
+        speakers: Option<Vec<u16>>,
     },
     Result {
         text: String,

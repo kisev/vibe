@@ -38,6 +38,26 @@ async fn reports_invalid_json_instead_of_dropping_it() {
 }
 
 #[tokio::test]
+async fn segment_events_carry_the_chunk_speaker_set_when_there_is_one() {
+    let lines = concat!(
+        "{\"type\":\"segment\",\"start\":0.0,\"end\":1.0,\"text\":\"a\",\"speaker\":1,\"speakers\":[1]}\n",
+        "{\"type\":\"segment\",\"start\":1.0,\"end\":2.0,\"text\":\"b\",\"speaker\":1,\"speakers\":[1,2]}\n",
+        "{\"type\":\"segment\",\"start\":2.0,\"end\":3.0,\"text\":\"c\",\"speaker\":0}\n",
+    );
+    let chunks = stream::iter([Ok::<_, std::io::Error>(Bytes::from_static(lines.as_bytes()))]);
+    let events = decode_event_reader(StreamReader::new(chunks)).collect::<Vec<_>>().await;
+
+    let sets: Vec<_> = events
+        .iter()
+        .filter_map(|event| match event {
+            Ok(ServerEvent::Segment { speakers, .. }) => Some(speakers.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(sets, vec![Some(vec![1]), Some(vec![1, 2]), None]);
+}
+
+#[tokio::test]
 async fn accepts_result_lines_larger_than_the_default_codec_limit() {
     let text = "a".repeat(16 * 1024);
     let line = format!("{{\"type\":\"result\",\"text\":\"{text}\"}}\n");

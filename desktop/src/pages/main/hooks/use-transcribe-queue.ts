@@ -649,8 +649,10 @@ export function useTranscribeQueue(): TranscribeQueue {
 		(jobId: string, segmentIndex: number, speaker: number) => {
 			const job = jobsRef.current.find((candidate) => candidate.id === jobId)
 			const segment = job?.segments[segmentIndex]
-			if (!job || !segment || segment.speaker === speaker) return
-			const segments = job.segments.map((item, index) => (index === segmentIndex ? { ...item, speaker } : item))
+			// Picking a speaker also settles a boundary line, so an unchanged `speaker` still wins
+			// when the line was uncertain.
+			if (!job || !segment || (segment.speaker === speaker && !segment.speakers)) return
+			const segments = job.segments.map((item, index) => (index === segmentIndex ? { ...item, speaker, speakers: undefined } : item))
 			commit(jobsRef.current.map((candidate) => (candidate.id === jobId ? { ...candidate, segments } : candidate)))
 			if (job.savedPath) void updateTranscriptSegments(job.savedPath, segments)
 		},

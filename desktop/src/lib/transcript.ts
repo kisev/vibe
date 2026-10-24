@@ -14,6 +14,11 @@ export interface Segment {
 	stop: number
 	text: string
 	speaker?: number
+	/**
+	 * Every speaker the planned chunk held. More than one means the line sits on a turn boundary,
+	 * so it is shown as uncertain instead of being attributed to one speaker.
+	 */
+	speakers?: number[]
 }
 
 /** Display names chosen for diarized speakers, keyed by the segment's zero-based speaker index. */

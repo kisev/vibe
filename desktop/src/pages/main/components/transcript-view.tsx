@@ -323,6 +323,7 @@ const SegmentBlock = memo(function SegmentBlock({
 				{options.showSpeakers && (
 					<SpeakerLabel
 						speaker={segment.speaker}
+						speakerSet={segment.speakers}
 						speakers={speakers}
 						speakerNames={speakerNames}
 						editable={editable}
@@ -606,7 +607,12 @@ export default function TranscriptView({
 	const renameSpeaker = useCallback((speaker: number, name: string) => queue.setSpeakerName(job.id, speaker, name), [job.id, queue])
 	const assignSpeaker = useCallback((index: number, speaker: number) => queue.setSegmentSpeaker(job.id, index, speaker), [job.id, queue])
 	const speakers = useMemo(
-		() => [...new Set(job.segments.flatMap((segment) => (segment.speaker != null ? [segment.speaker] : [])))].sort((a, b) => a - b),
+		() =>
+			[
+				...new Set(
+					job.segments.flatMap((segment) => [...(segment.speaker != null ? [segment.speaker] : []), ...(segment.speakers ?? [])]),
+				),
+			].sort((a, b) => a - b),
 		[job.segments],
 	)
 

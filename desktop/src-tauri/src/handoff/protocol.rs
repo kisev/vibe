@@ -102,6 +102,9 @@ pub enum HandoffEvent {
         stop: i64,
         text: String,
         speaker: Option<i32>,
+        /// The planned chunk's speakers; more than one marks a turn boundary.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        speakers: Option<Vec<u16>>,
     },
     /// Terminal success. `saved_path` is where the desktop kept the recording:
     /// the audio only ever existed on the phone until now, so it is saved like any
@@ -345,6 +348,7 @@ mod tests {
             stop: 1,
             text: String::new(),
             speaker: None,
+            speakers: None,
         }
         .is_terminal());
     }
@@ -376,6 +380,7 @@ mod tests {
                 stop: 350,
                 text: "hello there".to_string(),
                 speaker: None,
+                speakers: None,
             }],
             language: Some("he".to_string()),
             model_path: Some("/models/ggml-medium.bin".to_string()),

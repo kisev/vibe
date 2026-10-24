@@ -9,6 +9,11 @@ import { cn } from '~/lib/style'
 interface SpeakerLabelProps {
 	/** This line's speaker; undefined when diarization left the line unattributed. */
 	speaker?: number
+	/**
+	 * Every speaker the line's planned chunk held. Two or more means the line sits where turns
+	 * meet, so it is shown as a union with an uncertainty note instead of one speaker.
+	 */
+	speakerSet?: number[]
 	/** Every speaker index the transcript knows, in order. */
 	speakers: number[]
 	speakerNames?: SpeakerNames
@@ -29,9 +34,12 @@ const interactiveChipClass =
  * same popover moves just this line to another speaker. A line diarization missed gets a dashed
  * placeholder instead, so it can be given a speaker too.
  */
-export function SpeakerLabel({ speaker, speakers, speakerNames, editable, onRename, onAssign }: SpeakerLabelProps) {
+export function SpeakerLabel({ speaker, speakerSet, speakers, speakerNames, editable, onRename, onAssign }: SpeakerLabelProps) {
 	const label = m.speakerPrefix()
-	const current = speaker != null ? speakerNames?.[speaker] : undefined
+	// A chunk that held two speakers cannot be attributed to one: the line shows the union and
+	// says so, and the popover only offers to move it to a single speaker.
+	const uncertain = speakerSet && speakerSet.length > 1 ? speakerSet : null
+	const current = speaker != null && !uncertain ? speakerNames?.[speaker] : undefined
 	const [open, setOpen] = useState(false)
 	const [draft, setDraft] = useState(current ?? '')
 	// Escape throws the draft away; every other way of closing (Enter, clicking elsewhere) keeps it.
@@ -41,11 +49,31 @@ export function SpeakerLabel({ speaker, speakers, speakerNames, editable, onRena
 		if (open) setDraft(current ?? '')
 	}, [current, open])
 
-	if (speaker == null && (!editable || speakers.length === 0)) return null
-	if (speaker != null && !editable) return <span className={chipClass}>{speakerName(speaker, label, speakerNames)}</span>
+	if (speaker == null && !uncertain && (!editable || speakers.length === 0)) return null
+
+	const shown = uncertain
+		? uncertain.map((index) => speakerName(index, label, speakerNames)).join(' / ')
+		: speaker != null
+			? speakerName(speaker, label, speakerNames)
+			: null
+	const note = uncertain ? m.speakerUncertain() : undefined
+	const marker = uncertain ? (
+		<span aria-hidden className="ms-0.5 text-[10px] font-bold">
+			?
+		</span>
+	) : null
+
+	if (shown != null && !editable) {
+		return (
+			<span className={chipClass} title={note}>
+				{shown}
+				{marker}
+			</span>
+		)
+	}
 
 	function saveName() {
-		if (speaker != null) onRename(speaker, draft)
+		if (speaker != null && !uncertain) onRename(speaker, draft)
 	}
 
 	function handleOpenChange(next: boolean) {
@@ -59,7 +87,9 @@ export function SpeakerLabel({ speaker, speakers, speakerNames, editable, onRena
 		cancelledRef.current = true
 		saveName()
 		setOpen(false)
-		if (target !== speaker) onAssign(target)
+		// An uncertain line moves even when the target is the first of its set: picking one
+		// speaker is what resolves the ambiguity.
+		if (target !== speaker || uncertain) onAssign(target)
 	}
 
 	const nextSpeaker = speakers.length ? Math.max(...speakers) + 1 : 0
@@ -67,9 +97,10 @@ export function SpeakerLabel({ speaker, speakers, speakerNames, editable, onRena
 	return (
 		<Popover open={open} onOpenChange={handleOpenChange}>
 			<PopoverTrigger asChild>
-				{speaker != null ? (
-					<button type="button" title={m.renameSpeaker()} className={cn(chipClass, interactiveChipClass)}>
-						{speakerName(speaker, label, speakerNames)}
+				{shown != null ? (
+					<button type="button" title={note ?? m.renameSpeaker()} className={cn(chipClass, interactiveChipClass)}>
+						{shown}
+						{marker}
 					</button>
 				) : (
 					<button
@@ -86,7 +117,7 @@ export function SpeakerLabel({ speaker, speakers, speakerNames, editable, onRena
 				)}
 			</PopoverTrigger>
 			<PopoverContent align="start" className="w-64 rounded-2xl p-3">
-				{speaker != null && (
+				{speaker != null && !uncertain && (
 					<form
 						className="mb-3"
 						onSubmit={(event) => {
@@ -114,11 +145,11 @@ export function SpeakerLabel({ speaker, speakers, speakerNames, editable, onRena
 						<button
 							key={candidate}
 							type="button"
-							aria-pressed={candidate === speaker}
+							aria-pressed={candidate === speaker && !uncertain}
 							onClick={() => assign(candidate)}
 							className={cn(
 								'cursor-pointer rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors duration-150',
-								candidate === speaker
+								candidate === speaker && !uncertain
 									? 'border-foreground/20 bg-foreground text-background'
 									: 'border-border bg-muted/50 text-muted-foreground hover:text-foreground',
 							)}>
