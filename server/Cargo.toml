@@ -1,14 +1,5 @@
 [workspace]
-members = [
-    "crates/diarize-rs",
-    "crates/nemotron-rs",
-    "crates/parakeet-rs",
-    "crates/vibe-server",
-    "crates/vad-rs",
-    "crates/ggml-rs-sys",
-    "crates/gigaam-rs",
-    "crates/whisper-rs",
-]
+members = ["crates/vibe-server"]
 resolver = "2"
 
 [workspace.package]

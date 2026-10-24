@@ -59,8 +59,11 @@ https://github.com/thewh1teagle/vibe/releases?q=server-v
 
 ### 2. Download a model
 
+Models are GGUF files (the legacy whisper.cpp `.bin` container is no longer
+supported; the error names it and points at the catalog).
+
 ```console
-./vibe-server pull https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+./vibe-server pull https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf
 ```
 
 ### 3. Start vibe-server

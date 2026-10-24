@@ -39,12 +39,10 @@ jobs:
                 include:
                     - runner: macos-latest
                       triple: aarch64-apple-darwin
-                      libs: darwin-arm64
                       exe: ""
                       ffmpeg: https://www.osxexperts.net/ffmpeg80arm.zip
                     - runner: macos-latest
                       triple: x86_64-apple-darwin
-                      libs: darwin-x86_64
                       exe: ""
                       ffmpeg: https://www.osxexperts.net/ffmpeg80intel.zip
                     # x86_64 distribution builds pin the portable AVX floor
@@ -54,19 +52,13 @@ jobs:
                     # kernels for the matmul hot path.
                     - runner: ubuntu-22.04
                       triple: x86_64-unknown-linux-gnu
-                      libs: linux-x86_64
                       exe: ""
                       cmake_args: -DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF
-                    # The aarch64 ggml libraries come from server-libs.yml, which
-                    # builds them on 24.04; linking them from 22.04 fails on the
-                    # glibc 2.38 string symbols.
                     - runner: ubuntu-24.04-arm
                       triple: aarch64-unknown-linux-gnu
-                      libs: linux-aarch64
                       exe: ""
                     - runner: windows-latest
                       triple: x86_64-pc-windows-msvc
-                      libs: windows-amd64-msvc
                       exe: .exe
                       cmake_args: -DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF
                       ffmpeg: https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
@@ -136,23 +128,6 @@ jobs:
                       echo "tag=$tag"
                       echo "config=$config"
                   } >> "$GITHUB_OUTPUT"
-
-            # The release tag is derived from the pinned files so a libs/ bump is
-            # picked up without touching this workflow.
-            - name: Fetch prebuilt GGML libraries
-              shell: bash
-              run: |
-                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
-                  url="https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-${{ matrix.libs }}.tar.gz"
-                  echo "fetching $url"
-                  # Relative paths only: the Windows runner's GNU tar reads a
-                  # drive letter in an absolute path as a remote host.
-                  curl -fsSL "$url" -o ggml-libs.tar.gz
-                  rm -rf ggml-libs server/libs/lib
-                  mkdir -p ggml-libs
-                  tar -xzf ggml-libs.tar.gz -C ggml-libs
-                  mv ggml-libs/lib server/libs/lib
-                  rm -rf ggml-libs ggml-libs.tar.gz
 
             - name: Build vibe-server
               shell: bash

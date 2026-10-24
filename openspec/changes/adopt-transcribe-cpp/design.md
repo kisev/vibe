@@ -124,6 +124,23 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
   pins the bump (same inputs, different key at version 1 vs 2) and one proves a
   schema-1 directory with stored output is left untouched by a fresh run.
 
+## Phase 5: deletion (tasks 5.1–5.2)
+
+- Removed: `whisper-rs`, `gigaam-rs`, `parakeet-rs`, `nemotron-rs`, `ggml-rs-sys`,
+  `vad-rs`, `diarize-rs` (the workspace's only member is `vibe-server`), the
+  prebuilt-libs pipeline (`server/libs/`, `server-libs.yml`, the dev-build fetch
+  step, `chore fetch-libs` in server-release and the root chorefile's
+  server-build), and vibe-server's legacy `build.rs` (cpu-variant linker
+  surgery + Vulkan delayload — both meaningless without the second ggml).
+- Link check on the release binary: 515 defined `ggml_*` symbols, zero
+  duplicates; `ggml_backend_cpu_reg` and `ggml_time_init` defined exactly once.
+  The binary transcribes the whisper fixture from GGUF correctly (25 MB).
+- Post-deletion regression: the full gated suite (94 unit + 1 route + 10 CLI,
+  all families incl. the five new ones) is green; clippy `-D warnings` clean.
+- Docs updated: `server/README.md` (GGUF pull example, legacy .bin notice),
+  `server/docs/ARCHITECTURE.md` and `docs/ARCHITECTURE.md` (unified engine,
+  cmake-from-source build, one-ggml link).
+
 ## Risks / Trade-offs
 
 - [C++ toolchain friction on one of the five platforms] → Spike covers WSL + a Windows runner first; MSVC/gcc/clang all support the required C++ standard, and dev-build already compiles C (ggml) everywhere.

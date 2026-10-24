@@ -27,7 +27,6 @@ task server-build target=$TRIPLE {
     exe=""
     if $1 contains windows { exe=.exe }
     cd server
-    chore fetch-libs
     cargo build -p vibe-server --release
     cd $ROOT
     mkdir $bin

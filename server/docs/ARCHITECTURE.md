@@ -41,15 +41,16 @@ High-level layout of the codebase:
     - Converts input to `16kHz` mono `float32`
     - Fallback to `ffmpeg` for all other formats
 
-- `crates/whisper-rs`  
-  Rust/bindgen wrapper over `whisper.cpp`:
-    - Segment callbacks
-    - Progress callbacks
-    - Abort callbacks for cancellation
-    - Stable timestamp/VAD support
+- `crates/vibe-server/src/engine.rs`  
+  The unified transcription engine. One facade over the vendored
+  transcribe.cpp for every family (whisper, gigaam, parakeet, nemotron,
+  canary, qwen3, voxtral): capability tables, per-family input windows,
+  VAD-planned chunking, streaming, and timestamp granularity mapping.
 
-- `crates/diarize-rs`  
-  In-process Sortformer diarization.
+- `crates/transcribe-cpp` / `crates/transcribe-cpp-sys`  
+  Vendored transcribe.cpp 0.4.1 (pinned upstream tree, ggml included) with a
+  safe Rust wrapper. The sys crate compiles the C++ tree via cmake; VAD
+  (Silero) and diarization (Sortformer) run through it too.
 
 - `crates/vibe-server/src/server`  
   HTTP layer:
@@ -75,7 +76,7 @@ High-level layout of the codebase:
 
 4. On `SIGINT` / `SIGTERM`:
     - stop accepting new connections
-    - unload model by dropping the whisper context
+    - unload model by dropping the engine
     - exit cleanly
 
 This design makes vibe-server easy to supervise from another process.
@@ -161,7 +162,7 @@ Events are emitted as newline-delimited JSON objects:
 - `error`
     - `message` if inference fails before disconnect
 
-Closing the client connection cancels inference immediately via the whisper abort callback.
+Closing the client connection cancels inference immediately via the engine's abort callback.
 
 ---
 
@@ -185,10 +186,11 @@ Scaling is explicit and process-level:
 
 ## Build & Packaging 🛠️
 
-- Whisper commit pinned via `.whispercpp-commit`
-- Platform-specific static libs downloaded to `libs/lib` (ignored)
-- Headers fetched to `libs/include` (checked in)
-- Rust binary links against platform whisper / ggml libs
+- The engine is the vendored transcribe.cpp tree (pinned revision, see the
+  crates' `VENDOR.md`), compiled from source by cmake during `cargo build`;
+  no prebuilt libs are fetched and exactly one ggml links into the binary
+- x86_64 distribution builds pin the portable AVX floor (SSE4.2 + AVX + F16C)
+  so one binary runs on every x86-64 CPU; local builds stay native-tuned
 - Release packaging bundles:
     - `vibe-server`
     - `ffmpeg` binary (when applicable)

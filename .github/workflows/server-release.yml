@@ -68,11 +68,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      # No Vulkan SDK: the loader is opened at runtime (libs/patches/0003), so the binary links nothing from it.
       - name: Setup chore
         uses: getchore/setup-chore@v1
-      - name: Download prebuilt GGML libs
-        run: chore fetch-libs
       - name: Build vibe-server
         shell: bash
         env:

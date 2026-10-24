@@ -24,8 +24,8 @@
 
 ## 5. Removal
 
-- [ ] 5.1 Delete `whisper-rs`, `gigaam-rs`, `parakeet-rs`, `nemotron-rs`, and `ggml-rs-sys` from the workspace once every family's parity proofs pass, and verify the workspace builds with exactly one ggml (link check for a single set of `ggml_*` definitions)
-- [ ] 5.2 Run the full server test suite plus the gated CLI regression across families and verify zero failures; update `server/README.md` engine documentation to describe the unified engine and families
+- [x] 5.1 Delete `whisper-rs`, `gigaam-rs`, `parakeet-rs`, `nemotron-rs`, and `ggml-rs-sys` from the workspace once every family's parity proofs pass, and verify the workspace builds with exactly one ggml (link check for a single set of `ggml_*` definitions)
+- [x] 5.2 Run the full server test suite plus the gated CLI regression across families and verify zero failures; update `server/README.md` engine documentation to describe the unified engine and families
 
 ## Workflow follow-up
 
