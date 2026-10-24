@@ -42,8 +42,14 @@ export const CONFIG_KEYS = {
 	autoExport: 'transcription.autoExport',
 
 	// Recording
+	/** Legacy enumeration-index ids; kept only so old stored values can be ignored. */
 	inputDeviceId: 'recording.inputDeviceId',
 	outputDeviceId: 'recording.outputDeviceId',
+	/** Selections by stable device name, plus the user's hidden-device lists per direction. */
+	inputDeviceName: 'recording.inputDeviceName',
+	outputDeviceName: 'recording.outputDeviceName',
+	hiddenInputDevices: 'recording.hiddenInputDevices',
+	hiddenOutputDevices: 'recording.hiddenOutputDevices',
 	recordingShortcutEnabled: 'recording.shortcutEnabled',
 	recordingShortcut: 'recording.shortcut',
 	meetingDetectionEnabled: 'recording.meetingDetectionEnabled',

@@ -134,12 +134,38 @@ function RecordPanel() {
 				'[&_label]:text-[11px] [&_label]:font-medium [&_label]:tracking-[0.08em] [&_label]:text-muted-foreground [&_label]:uppercase',
 			)}>
 			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 [&>div]:space-y-1.5 [&_button]:h-10 [&_button]:rounded-xl">
-				<AudioDeviceInput type="input" devices={recording.devices} device={recording.inputDevice} setDevice={recording.setInputDevice} />
-				<AudioDeviceInput type="output" devices={recording.devices} device={recording.outputDevice} setDevice={recording.setOutputDevice} />
+				<AudioDeviceInput
+					type="input"
+					devices={recording.devices}
+					device={recording.inputDevice}
+					setDevice={recording.setInputDevice}
+					unavailableName={recording.inputUnavailableName}
+					hiddenNames={recording.hiddenInputDevices}
+					onHide={recording.hideInputDevice}
+					onRestore={recording.restoreInputDevice}
+					onOpen={() => void recording.refreshDevices()}
+				/>
+				<AudioDeviceInput
+					type="output"
+					devices={recording.devices}
+					device={recording.outputDevice}
+					setDevice={recording.setOutputDevice}
+					unavailableName={recording.outputUnavailableName}
+					hiddenNames={recording.hiddenOutputDevices}
+					onHide={recording.hideOutputDevice}
+					onRestore={recording.restoreOutputDevice}
+					onOpen={() => void recording.refreshDevices()}
+				/>
 			</div>
 			<Button
 				onClick={() => recording.startRecord()}
-				disabled={!preference.modelPath || (!recording.inputDevice && !recording.outputDevice)}
+				disabled={
+					!preference.modelPath ||
+					(!recording.inputDevice &&
+						!recording.outputDevice &&
+						!recording.inputUnavailableName &&
+						!recording.outputUnavailableName)
+				}
 				className="h-10 w-full rounded-xl disabled:opacity-40">
 				<Mic className="h-4 w-4" />
 				{m.startRecord()}
