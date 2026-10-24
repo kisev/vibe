@@ -18,6 +18,8 @@ const whisper: ModelCapabilities = {
 	translation: true,
 	timestamps: true,
 	text_prompts: true,
+	stable_timestamps: true,
+	decoding_options: true,
 }
 
 /** The exact metadata the server reports for a GigaAM v3 GGUF. */
@@ -30,6 +32,8 @@ const gigaam: ModelCapabilities = {
 	translation: false,
 	timestamps: true,
 	text_prompts: false,
+	stable_timestamps: false,
+	decoding_options: false,
 }
 
 function vmWith(capabilities: ModelCapabilities | null) {

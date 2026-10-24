@@ -11,6 +11,8 @@ const gigaamLike: ModelCapabilities = {
 	translation: false,
 	timestamps: true,
 	text_prompts: false,
+	stable_timestamps: false,
+	decoding_options: false,
 }
 
 /** Same gaps, different engine name: the note must be identical. */
@@ -25,6 +27,8 @@ const full: ModelCapabilities = {
 	translation: true,
 	timestamps: true,
 	text_prompts: true,
+	stable_timestamps: true,
+	decoding_options: true,
 }
 
 describe('modelLimitations', () => {

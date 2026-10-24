@@ -6,7 +6,7 @@ import { Button } from '~/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { Switch } from '~/components/ui/switch'
 import { openSettingsSection } from '~/lib/app'
-import { hidesWhisperOnlyOptions } from '~/lib/model'
+import { hidesStableTimestamps } from '~/lib/model'
 import { useModelGates } from '~/providers/model-gates'
 import { useSession } from '../session'
 
@@ -58,7 +58,7 @@ export default function QuietRow() {
 							checked={preference.diarizeEnabled}
 							onChange={(value) => void modelGates.toggleDiarization(value)}
 						/>
-						{!hidesWhisperOnlyOptions(preference.modelMetadata?.capabilities) && (
+						{!hidesStableTimestamps(preference.modelMetadata?.capabilities) && (
 							<OptionRow
 								label={m.stableTimestamps()}
 								note={m.stableTimestampsSlowNote()}

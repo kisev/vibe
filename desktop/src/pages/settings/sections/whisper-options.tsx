@@ -1,6 +1,6 @@
 import { message } from '@tauri-apps/plugin-dialog'
 import { RotateCcw } from 'lucide-react'
-import { hidesWhisperOnlyOptions } from '~/lib/model'
+import { hidesDecodingOptions } from '~/lib/model'
 import { m } from '~/paraglide/messages.js'
 import NumberField from '~/components/number-field'
 import { Switch } from '~/components/ui/switch'
@@ -17,9 +17,9 @@ export function WhisperOptionsSection({ vm }: { vm: SettingsViewModel }) {
 	const promptLength = vm.preference.modelOptions?.init_prompt?.length ?? 0
 	const isGreedy = vm.preference.modelOptions.sampling_strategy === 'greedy'
 
-	// GigaAM, Parakeet, and Nemotron reject or ignore these decoding options. Reaching this page
-	// with one of them selected (for example from a stale deep link) shows why, not dead controls.
-	const whisperOnlyHidden = hidesWhisperOnlyOptions(vm.preference.modelMetadata?.capabilities)
+	// Models that report no decoding options reject or ignore these controls. Reaching this page
+	// with one selected (for example from a stale deep link) shows why, not dead controls.
+	const whisperOnlyHidden = hidesDecodingOptions(vm.preference.modelMetadata?.capabilities)
 
 	return (
 		<div className="space-y-6">

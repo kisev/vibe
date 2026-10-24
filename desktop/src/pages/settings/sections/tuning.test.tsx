@@ -18,6 +18,8 @@ const whisper: ModelCapabilities = {
 	translation: true,
 	timestamps: true,
 	text_prompts: true,
+	stable_timestamps: true,
+	decoding_options: true,
 }
 
 const gigaam: ModelCapabilities = {
@@ -29,6 +31,8 @@ const gigaam: ModelCapabilities = {
 	translation: false,
 	timestamps: true,
 	text_prompts: false,
+	stable_timestamps: false,
+	decoding_options: false,
 	max_input_seconds: 25,
 }
 
@@ -74,6 +78,15 @@ describe('tuning section engine gating', () => {
 	it('hides the chunk length from an unbounded engine', () => {
 		render(<TuningSection vm={vmWith(whisper)} onOpenWhisper={vi.fn()} onOpenAudio={vi.fn()} />)
 		expect(screen.queryByLabelText(m.chunkLength())).toBeNull()
+	})
+
+	it('keys option visibility off capability flags, not the engine name', () => {
+		// A model that is not Whisper by name but reports Whisper-grade flags gets the same controls.
+		const futureEngine = { ...gigaam, engine: 'some-future-engine', stable_timestamps: true, decoding_options: true }
+		render(<TuningSection vm={vmWith(futureEngine)} onOpenWhisper={vi.fn()} onOpenAudio={vi.fn()} />)
+		expect(screen.getByText(m.enableStableTimestamps())).toBeTruthy()
+		expect(screen.getByText(m.whisperOptions())).toBeTruthy()
+		expect(screen.queryByText(m.whisperOnlyOptionsNote())).toBeNull()
 	})
 
 	it('clamps an oversized chunk length to the engine maximum', () => {

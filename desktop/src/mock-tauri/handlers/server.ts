@@ -183,6 +183,9 @@ export const serverHandlers: CommandHandlerMap = {
 			translation: true,
 			timestamps: true,
 			text_prompts: true,
+			stable_timestamps: true,
+			decoding_options: true,
+			max_input_seconds: null,
 		},
 	}),
 

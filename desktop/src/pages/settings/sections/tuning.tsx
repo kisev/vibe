@@ -1,6 +1,6 @@
 import { ChevronRight, SlidersHorizontal, AudioLines } from 'lucide-react'
 import { DEFAULT_MODEL_OPTIONS } from '~/providers/preference'
-import { hidesWhisperOnlyOptions } from '~/lib/model'
+import { hidesDecodingOptions, hidesStableTimestamps } from '~/lib/model'
 import { m } from '~/paraglide/messages.js'
 import { Input } from '~/components/ui/input'
 import { Switch } from '~/components/ui/switch'
@@ -17,7 +17,9 @@ export function parseChunkSeconds(raw: string, max: number): number | null {
 
 export function TuningSection({ vm, onOpenWhisper, onOpenAudio }: { vm: SettingsViewModel; onOpenWhisper: () => void; onOpenAudio: () => void }) {
 	const options = vm.preference.modelOptions
-	const whisperOnlyHidden = hidesWhisperOnlyOptions(vm.preference.modelMetadata?.capabilities)
+	const hidesStable = hidesStableTimestamps(vm.preference.modelMetadata?.capabilities)
+	const hidesDecoding = hidesDecodingOptions(vm.preference.modelMetadata?.capabilities)
+	const whisperOnlyHidden = hidesStable || hidesDecoding
 	const customized =
 		Boolean(options.translate) ||
 		(Object.keys(DEFAULT_MODEL_OPTIONS) as (keyof typeof DEFAULT_MODEL_OPTIONS)[])

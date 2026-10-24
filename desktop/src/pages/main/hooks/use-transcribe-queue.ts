@@ -31,7 +31,7 @@ import {
 } from '~/lib/transcripts-store'
 import type { NamedPath, ProjectSource } from '~/lib/types'
 import { ErrorModalContext } from '~/providers/error-modal'
-import { hidesWhisperOnlyOptions, withoutUnsupportedOptions } from '~/lib/model'
+import { hidesStableTimestamps, withoutUnsupportedOptions } from '~/lib/model'
 import { type Preference, usePreferenceProvider } from '~/providers/preference'
 
 export type JobStatus = 'queued' | 'running' | 'done' | 'error' | 'cancelled'
@@ -149,7 +149,7 @@ function nextJobId() {
  */
 export async function buildSharedOptions(preference: Preference) {
 	const capabilities = preference.modelMetadata?.capabilities
-	const stableTimestamps = preference.stableTimestampsEnabled && !hidesWhisperOnlyOptions(capabilities)
+	const stableTimestamps = preference.stableTimestampsEnabled && !hidesStableTimestamps(capabilities)
 	const requiresVad = capabilities?.requires_vad ?? false
 	const needsFolder = preference.diarizeEnabled || stableTimestamps || requiresVad
 	const modelsFolder = needsFolder ? await invoke<string>('get_models_folder') : null

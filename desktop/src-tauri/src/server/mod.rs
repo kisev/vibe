@@ -37,6 +37,11 @@ pub struct ModelCapabilities {
     pub translation: bool,
     pub timestamps: bool,
     pub text_prompts: bool,
+    // Optional for tolerance against an older server: a missing flag means
+    // "unknown", and the UI keeps the control rather than hiding it.
+    pub stable_timestamps: Option<bool>,
+    pub decoding_options: Option<bool>,
+    pub max_input_seconds: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

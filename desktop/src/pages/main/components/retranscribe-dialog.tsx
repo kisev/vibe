@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/u
 import { Switch } from '~/components/ui/switch'
 import { openSettingsSection } from '~/lib/app'
 import { useModelGates } from '~/providers/model-gates'
-import { getFriendlyModelName, hidesWhisperOnlyOptions } from '~/lib/model'
+import { getFriendlyModelName, hidesStableTimestamps } from '~/lib/model'
 import { usePreferenceProvider } from '~/providers/preference'
 
 function OptionRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
@@ -60,7 +60,7 @@ export default function RetranscribeDialog({
 							checked={preference.diarizeEnabled}
 							onChange={(value) => void modelGates.toggleDiarization(value)}
 						/>
-						{!hidesWhisperOnlyOptions(preference.modelMetadata?.capabilities) && (
+						{!hidesStableTimestamps(preference.modelMetadata?.capabilities) && (
 							<OptionRow
 								label={m.stableTimestamps()}
 								checked={preference.stableTimestampsEnabled}

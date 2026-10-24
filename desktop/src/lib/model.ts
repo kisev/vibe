@@ -165,11 +165,21 @@ export interface ModelCapabilities {
 	text_prompts: boolean
 	/** Upper bound per model input for long recordings; null means the engine owns its own long-form path. */
 	max_input_seconds?: number | null
+	/** Stable-timestamp correction. Missing means unknown: keep the control, the model may support it. */
+	stable_timestamps?: boolean | null
+	/** The Whisper-style decoding knobs. Missing means unknown: keep the controls. */
+	decoding_options?: boolean | null
 }
 
-/** Only Whisper exposes stable timestamps, word timestamps, sentence splitting, and decoding knobs. */
-export function isWhisperEngine(capabilities: ModelCapabilities | null | undefined) {
-	return capabilities?.engine === 'whisper'
+/** Whether stable-timestamp correction is unavailable. Derived from the capability flag alone,
+ * so a future engine reporting `stable_timestamps: true` gets the toggle without code changes. */
+export function hidesStableTimestamps(capabilities: ModelCapabilities | null | undefined) {
+	return capabilities?.stable_timestamps === false
+}
+
+/** Whether the Whisper-style decoding options page is unavailable, from the capability flag alone. */
+export function hidesDecodingOptions(capabilities: ModelCapabilities | null | undefined) {
+	return capabilities?.decoding_options === false
 }
 
 export type ModelLimitation =
@@ -192,14 +202,6 @@ export function modelLimitations(capabilities: ModelCapabilities | null | undefi
 	if (!capabilities.translation) limitations.push({ kind: 'translation' })
 	if (!capabilities.text_prompts) limitations.push({ kind: 'prompts' })
 	return limitations
-}
-
-/**
- * Whether the Whisper-only controls should be hidden. Unknown capabilities keep the controls
- * visible: a model whose metadata has not loaded yet may still be Whisper.
- */
-export function hidesWhisperOnlyOptions(capabilities: ModelCapabilities | null | undefined) {
-	return Boolean(capabilities) && !isWhisperEngine(capabilities)
 }
 
 /** A model with no metadata yet is not known to require VAD. */
@@ -236,7 +238,7 @@ interface EngineSpecificOptions {
 	max_text_ctx?: number
 }
 
-/** Decoding knobs the server only reads for Whisper. */
+/** Decoding knobs the server only reads for models that report `decoding_options`. */
 const WHISPER_ONLY_OPTIONS = [
 	'word_timestamps',
 	'max_sentence_len',
@@ -258,7 +260,7 @@ export function withoutUnsupportedOptions<T extends EngineSpecificOptions>(optio
 	const next = { ...options }
 	if (!capabilities.text_prompts) delete next.init_prompt
 	if (!capabilities.translation) delete next.translate
-	if (!isWhisperEngine(capabilities)) {
+	if (hidesDecodingOptions(capabilities)) {
 		for (const key of WHISPER_ONLY_OPTIONS) delete next[key]
 	}
 	return next

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hidesWhisperOnlyOptions, isWhisperEngine, requiresVad, resolveModelLanguage, withoutUnsupportedOptions, type ModelCapabilities } from './model'
+import { hidesDecodingOptions, hidesStableTimestamps, requiresVad, resolveModelLanguage, withoutUnsupportedOptions, type ModelCapabilities } from './model'
 
 const whisper: ModelCapabilities = {
 	engine: 'whisper',
@@ -10,6 +10,8 @@ const whisper: ModelCapabilities = {
 	translation: true,
 	timestamps: true,
 	text_prompts: true,
+	stable_timestamps: true,
+	decoding_options: true,
 }
 
 /** The exact metadata the server reports for a GigaAM v3 GGUF. */
@@ -22,6 +24,8 @@ const gigaam: ModelCapabilities = {
 	translation: false,
 	timestamps: true,
 	text_prompts: false,
+	stable_timestamps: false,
+	decoding_options: false,
 }
 
 const options = { lang: 'en', init_prompt: 'Punctuate. Use full sentences.', translate: true, n_threads: 4 }
@@ -43,7 +47,7 @@ describe('withoutUnsupportedOptions', () => {
 	})
 
 	it('drops the prompt and translation for engines that reject them, keeping the rest', () => {
-		expect(withoutUnsupportedOptions(options, { ...whisper, engine: 'parakeet', text_prompts: false, translation: false })).toEqual({
+		expect(withoutUnsupportedOptions(options, { ...whisper, engine: 'parakeet', text_prompts: false, translation: false, stable_timestamps: false, decoding_options: false })).toEqual({
 			lang: 'en',
 			n_threads: 4,
 		})
@@ -60,14 +64,31 @@ describe('withoutUnsupportedOptions', () => {
 })
 
 describe('capability gates', () => {
-	it('recognises Whisper and hides its options for GigaAM', () => {
-		expect(isWhisperEngine(whisper)).toBe(true)
-		expect(isWhisperEngine(gigaam)).toBe(false)
-		expect(hidesWhisperOnlyOptions(whisper)).toBe(false)
-		expect(hidesWhisperOnlyOptions(gigaam)).toBe(true)
-		// Metadata that has not loaded yet must not hide controls from a model that may be Whisper.
-		expect(hidesWhisperOnlyOptions(null)).toBe(false)
-		expect(hidesWhisperOnlyOptions(undefined)).toBe(false)
+	it('hides the Whisper-style controls for models that report no support', () => {
+		expect(hidesStableTimestamps(whisper)).toBe(false)
+		expect(hidesDecodingOptions(whisper)).toBe(false)
+		expect(hidesStableTimestamps(gigaam)).toBe(true)
+		expect(hidesDecodingOptions(gigaam)).toBe(true)
+		// Metadata that has not loaded yet must not hide controls from a model that may support them.
+		expect(hidesStableTimestamps(null)).toBe(false)
+		expect(hidesStableTimestamps(undefined)).toBe(false)
+		expect(hidesDecodingOptions(null)).toBe(false)
+		expect(hidesDecodingOptions(undefined)).toBe(false)
+	})
+
+	it('reads the flags, not the engine name: equal capabilities gate alike', () => {
+		const futureEngine = { ...whisper, engine: 'some-future-engine' }
+		expect(hidesStableTimestamps(futureEngine)).toBe(false)
+		expect(hidesDecodingOptions(futureEngine)).toBe(false)
+		const unflaggedWhisper = { ...gigaam, engine: 'whisper' }
+		expect(hidesStableTimestamps(unflaggedWhisper)).toBe(true)
+		expect(hidesDecodingOptions(unflaggedWhisper)).toBe(true)
+	})
+
+	it('keeps the controls when the flags are missing entirely', () => {
+		const legacy = { ...whisper, stable_timestamps: undefined, decoding_options: undefined }
+		expect(hidesStableTimestamps(legacy)).toBe(false)
+		expect(hidesDecodingOptions(legacy)).toBe(false)
 	})
 
 	it('reports VAD as required only when the model says so', () => {

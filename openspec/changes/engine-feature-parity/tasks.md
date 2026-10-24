@@ -19,6 +19,7 @@
 
 - [x] 4.1 Replace the `engine === 'gigaam'` conditional in `desktop/src/pages/settings/sections/models.tsx` with a limitations note derived from capability flags (single language without detection, no translation, no streaming, no prompts), listing the actual gaps; verify with a component test that two capability-equal models with different engine names render identical notes and that no desktop code path branches on an engine-name string (grep check)
 - [x] 4.2 Update the transplanted gigaam limitation copy into capability-driven text in en-US + locales via the `/translate` flow; verify the i18n audit is clean
+- [x] 4.3 Derive the Whisper-only gates from the new `stable_timestamps` and `decoding_options` capability flags instead of the engine name; extend `EngineCapabilities` and the desktop-Rust mirror (which also stops dropping `max_input_seconds`); verify with unit tests on both sides and a UI test that a non-Whisper engine name with Whisper-grade flags renders the same controls
 
 ## 5. Integration
 

@@ -330,6 +330,8 @@ mod tests {
             "translation",
             "timestamps",
             "text_prompts",
+            "stable_timestamps",
+            "decoding_options",
             "max_input_seconds",
         ];
         for field in expected {

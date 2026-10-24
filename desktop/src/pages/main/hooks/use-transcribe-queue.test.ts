@@ -16,6 +16,8 @@ const gigaam: ModelCapabilities = {
 	translation: false,
 	timestamps: true,
 	text_prompts: false,
+	stable_timestamps: false,
+	decoding_options: false,
 	max_input_seconds: 25,
 }
 
@@ -28,6 +30,8 @@ const whisper: ModelCapabilities = {
 	translation: true,
 	timestamps: true,
 	text_prompts: true,
+	stable_timestamps: true,
+	decoding_options: true,
 }
 
 function preferenceWith(

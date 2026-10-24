@@ -533,3 +533,45 @@ fn gigaam_streaming_contract() {
         assert_eq!(streamed.text, final_segment.text);
     }
 }
+
+/// The Whisper-only gates clients derive from capability flags, never from the engine name.
+#[test]
+fn capability_flags_name_the_whisper_only_features() {
+    let whisper = whisper_capabilities();
+    assert!(whisper.stable_timestamps);
+    assert!(whisper.decoding_options);
+
+    let nemotron = nemotron_capabilities(vec!["en".to_string()], false);
+    assert!(!nemotron.stable_timestamps);
+    assert!(!nemotron.decoding_options);
+
+    let parakeet = parakeet_capabilities(vec!["en".to_string()], false);
+    assert!(!parakeet.stable_timestamps);
+    assert!(!parakeet.decoding_options);
+
+    let info = gigaam_rs::ModelInfo {
+        architecture: "conformer".to_string(),
+        variant: "v3".to_string(),
+        head_kind: "rotary".to_string(),
+        languages: vec!["ru".to_string()],
+        language_detection: false,
+        tensor_count: 0,
+        encoder_layers: 0,
+        encoder_dimension: 0,
+        encoder_heads: 0,
+        encoder_d_ff: 0,
+        encoder_conv_kernel: 0,
+        subsampling_factor: 0,
+        subs_kernel_size: 0,
+        pos_emb_base: 0,
+        frontend: Default::default(),
+        predictor_hidden: 0,
+        predictor_layers: 0,
+        joint_hidden: 0,
+        classes: 0,
+        max_input_seconds: 25.0,
+    };
+    let gigaam = gigaam_capabilities(&info);
+    assert!(!gigaam.stable_timestamps);
+    assert!(!gigaam.decoding_options);
+}

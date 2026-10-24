@@ -20,6 +20,12 @@ pub struct EngineCapabilities {
     pub translation: bool,
     pub timestamps: bool,
     pub text_prompts: bool,
+    /// Whether stable-timestamp correction applies. Only Whisper implements it today;
+    /// clients gate the control on this flag, never on the engine name.
+    pub stable_timestamps: bool,
+    /// Whether the Whisper-style decoding knobs apply (sampling strategy, beams,
+    /// temperature, word timestamps, sentence splitting). Clients gate on this flag.
+    pub decoding_options: bool,
     /// Longest audio the engine may receive, when it accepts externally
     /// chunked input. Absent means the engine owns its own long-form path.
     pub max_input_seconds: Option<f64>,
@@ -447,6 +453,8 @@ pub fn nemotron_capabilities(languages: Vec<String>, language_detection: bool) -
         translation: false,
         timestamps: true,
         text_prompts: false,
+        stable_timestamps: false,
+        decoding_options: false,
         max_input_seconds: Some(30.0),
     }
 }
@@ -461,6 +469,8 @@ pub fn parakeet_capabilities(languages: Vec<String>, language_detection: bool) -
         translation: false,
         timestamps: true,
         text_prompts: false,
+        stable_timestamps: false,
+        decoding_options: false,
         max_input_seconds: Some(30.0),
     }
 }
@@ -501,6 +511,8 @@ pub fn whisper_capabilities() -> EngineCapabilities {
         translation: true,
         timestamps: true,
         text_prompts: true,
+        stable_timestamps: true,
+        decoding_options: true,
         max_input_seconds: None,
     }
 }
@@ -566,6 +578,8 @@ pub fn gigaam_capabilities(info: &gigaam_rs::ModelInfo) -> EngineCapabilities {
         translation: false,
         timestamps: true,
         text_prompts: false,
+        stable_timestamps: false,
+        decoding_options: false,
         max_input_seconds: Some(25.0),
     }
 }

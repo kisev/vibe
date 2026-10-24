@@ -15,6 +15,8 @@ const gigaam: ModelMetadata = {
 		translation: false,
 		timestamps: true,
 		text_prompts: false,
+		stable_timestamps: false,
+		decoding_options: false,
 	},
 }
 
