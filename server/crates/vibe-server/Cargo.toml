@@ -11,7 +11,9 @@ name = "vibe-server"
 path = "src/main.rs"
 
 [dependencies]
-transcribe-cpp = { path = "../transcribe-cpp", default-features = false }
+# Exact pin: engine upgrades are deliberate events (parity re-run), never a
+# cargo update side effect.
+transcribe-cpp = { version = "=0.4.1", default-features = false }
 
 anyhow = "1"
 axum = { version = "0.8", features = ["multipart"] }

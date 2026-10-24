@@ -2,7 +2,7 @@
 
 ## 1. Spike
 
-- [x] 1.1 Vendor the pinned transcribe.cpp revision under `server/crates/` with a build script that compiles it, and build a trivial inference (tiny whisper GGUF, one utterance) into a local test binary on WSL; verify the transcript matches expectations and record the answers: GGUF-only input, whisper decode options exposed, C++ standard needed
+- [x] 1.1 Consume transcribe.cpp as an exact-pinned crates.io dependency (`=0.4.1`; initially validated against a local pinned copy, later swapped to the published crates per the design revision) whose build script compiles it, and build a trivial inference (tiny whisper GGUF, one utterance) into a local test binary on WSL; verify the transcript matches expectations and record the answers: GGUF-only input, whisper decode options exposed, C++ standard needed
 - [x] 1.2 Build the same spike in the CI matrix (one Linux runner + one Windows runner) and verify linking, symbol visibility (no `ggml_*` clashes with `ggml-rs-sys` in the same test binary), and baseline x86_64 execution; record CPU dispatch findings in the design's decisions
 
 ## 2. Wrapper and engine registry

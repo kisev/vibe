@@ -15,12 +15,12 @@ Vibe is a desktop transcription app built with **Tauri** (Rust + TypeScript fron
 
 ### Server (`server/`)
 
-- **Language**: Rust on ggml, via the vendored transcribe.cpp tree (`server/crates/transcribe-cpp`, `transcribe-cpp-sys`; pinned upstream revision, see their `VENDOR.md`)
+- **Language**: Rust on ggml, via the transcribe.cpp dependency (`transcribe-cpp` 0.4.1 from crates.io, exact-pinned)
 - **Location**: `server/` in this repository, its own Cargo workspace; crate and binary `vibe-server`
 - **Purpose**: single local process for audio transcription, model loading, streaming, and diarization, behind an OpenAI-compatible HTTP API
 - Bundled as the `vibe-server` sidecar with the desktop app
-- Every ASR family (whisper, gigaam, parakeet, nemotron, canary, qwen3, voxtral) plus Silero VAD and Sortformer diarization run through the one vendored ggml — exactly one `ggml_*` symbol set links into the binary
-- **Build**: cmake compiles the vendored C++ tree during `cargo build` (no prebuilt libraries); `server-release.yml` publishes `server-v*` prereleases; `server-test.yml` runs a release across platforms
+- Every ASR family (whisper, gigaam, parakeet, nemotron, canary, qwen3, voxtral) plus Silero VAD and Sortformer diarization run through the one ggml — exactly one `ggml_*` symbol set links into the binary
+- **Build**: cmake compiles the transcribe.cpp C++ sources during `cargo build` (no prebuilt libraries); `server-release.yml` publishes `server-v*` prereleases; `server-test.yml` runs a release across platforms
 - **Distribution**: the app downloads the release named by `.server-version` at build time (`setup` task in the root `chorefile`); `chore server-build` stages an in-tree build instead
 
 ### FFmpeg Helper

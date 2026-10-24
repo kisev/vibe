@@ -42,15 +42,15 @@ High-level layout of the codebase:
     - Fallback to `ffmpeg` for all other formats
 
 - `crates/vibe-server/src/engine.rs`  
-  The unified transcription engine. One facade over the vendored
+  The unified transcription engine. One facade over the
   transcribe.cpp for every family (whisper, gigaam, parakeet, nemotron,
   canary, qwen3, voxtral): capability tables, per-family input windows,
   VAD-planned chunking, streaming, and timestamp granularity mapping.
 
-- `crates/transcribe-cpp` / `crates/transcribe-cpp-sys`  
-  Vendored transcribe.cpp 0.4.1 (pinned upstream tree, ggml included) with a
-  safe Rust wrapper. The sys crate compiles the C++ tree via cmake; VAD
-  (Silero) and diarization (Sortformer) run through it too.
+- `transcribe-cpp` / `transcribe-cpp-sys` (crates.io, exact-pinned 0.4.1)  
+  transcribe.cpp with a safe Rust wrapper: the sys crate compiles the C++
+  tree and ggml via cmake during `cargo build`. VAD (Silero) and diarization
+  (Sortformer) run through it too.
 
 - `crates/vibe-server/src/server`  
   HTTP layer:
@@ -186,9 +186,9 @@ Scaling is explicit and process-level:
 
 ## Build & Packaging 🛠️
 
-- The engine is the vendored transcribe.cpp tree (pinned revision, see the
-  crates' `VENDOR.md`), compiled from source by cmake during `cargo build`;
-  no prebuilt libs are fetched and exactly one ggml links into the binary
+- The engine is the transcribe-cpp dependency (exact-pinned 0.4.1), compiled
+  from source by cmake during `cargo build`; no prebuilt libs are fetched and
+  exactly one ggml links into the binary
 - x86_64 distribution builds pin the portable AVX floor (SSE4.2 + AVX + F16C)
   so one binary runs on every x86-64 CPU; local builds stay native-tuned
 - Release packaging bundles:

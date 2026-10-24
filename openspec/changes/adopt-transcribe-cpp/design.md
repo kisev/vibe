@@ -21,8 +21,19 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
 
 ## Decisions
 
-- **Vendor transcribe.cpp as a pinned subtree under `server/crates/` behind a thin FFI wrapper crate.** Pin an upstream revision; keep patches in a tracked series, upstream-first. Alternatives: a git submodule (CI checkouts get heavier) or a dynamic library per platform (packaging overhead on five platforms).
-- **The two ggmls never link into one binary (spike finding, task 1.2).** transcribe's ggml objects carry GLOBAL HIDDEN visibility, but rust-lld still rejects them next to `ggml-rs-sys`'s GLOBAL DEFAULT copies (`duplicate symbol: ggml_backend_register`, and the whole registry set); there is no upstream symbol-prefix mechanism, and objcopy redefine-sym surgery is MSVC-fragile. So the transition cannot coexist in-process: vibe-server switches its engine arm wholesale to the vendored engine, the legacy crates stay in-tree unlinked until the delete phase, and parity (task 3.1) is proven by comparing transcripts of the pre-switch binary against the new binary on the same fixtures, not by one binary hosting both engines.
+- **Consume transcribe.cpp as a crates.io dependency, exact-pinned (`=0.4.1`).** The
+  published `transcribe-cpp` / `transcribe-cpp-sys` pair carries the C++ tree and
+  builds it via cmake during `cargo build`, so a normal dependency gives source
+  builds with no vendored copy in this repo and no external artifacts. The exact
+  pin keeps engine upgrades deliberate (a bump changes transcripts, so it re-runs
+  the parity proof), and `Cargo.lock` pins it further per build.
+  *Revision history:* the change originally vendored the pinned upstream revision
+  as a subtree under `server/crates/`; the user rejected that as a C++-world
+  anachronism ("pulling dependencies is absolutely normal") and the swap to the
+  published crates landed before archiving. The spike had pinned upstream commit
+  `4d7c1ccefd39e5a9ea36cca5f8fefc6dcc14b99b`, which is the `release: 0.4.1`
+  tag, so the published crates are the same code the parity proofs ran against.
+- **The two ggmls never link into one binary (spike finding, task 1.2).** transcribe's ggml objects carry GLOBAL HIDDEN visibility, but rust-lld still rejects them next to `ggml-rs-sys`'s GLOBAL DEFAULT copies (`duplicate symbol: ggml_backend_register`, and the whole registry set); there is no upstream symbol-prefix mechanism, and objcopy redefine-sym surgery is MSVC-fragile. So the transition cannot coexist in-process: vibe-server switches its engine arm wholesale to the unified engine, the legacy crates stay in-tree unlinked until the delete phase, and parity (task 3.1) is proven by comparing transcripts of the pre-switch binary against the new binary on the same fixtures, not by one binary hosting both engines.
 - **Phase the cutover so the binary never carries two live ggml paths in a release.** Phase 1 spike (link a hello-world inference into a test binary on WSL + one CI runner; answer: GGUF-only input? whisper decode options? CPU dispatch behavior?). Phase 2 wrapper crate + engine registry routing per family. Phase 3 family-by-family parity proofs. Phase 4 delete `whisper-rs`, `gigaam-rs`, `parakeet-rs`, `nemotron-rs`, `ggml-rs-sys`; the shipped binary then contains transcribe.cpp's ggml only.
 - **Keep the `Engine` enum surface and capability tables.** Families route through existing `detect_model`-style metadata detection; each family maps to the capability flags its transcribe.cpp metadata and the handy catalog document. The planner's `max_input_seconds` per family carries over (25 s GigaAM, 30 s parakeet/nemotron; whisper unbounded).
 - **CPU variants ride on ggml's runtime dispatch inside transcribe.cpp.** The AVX-baseline fallback (`server_cmd.rs`) keeps working by shipping the same two server builds; the spike verifies baseline x86_64 behavior before phase 3.
@@ -35,14 +46,14 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
 - **Whisper decode options?** Core `RunOptions` carries language, translation task, prompts, vocabulary, timestamp kinds; the `Whisper` run extension adds initial_prompt, temperature(+inc), thresholds, prev-context tokens, seed, max_initial_timestamp. Beam search (`beam_size`/`best_of`/`sampling_strategy`) is NOT exposed — upstream decodes greedy with a multi-tier temperature fallback. Phase 2 must map those knobs to greedy or upstream a patch adding them.
 - **C++ standard:** C++17 required (root CMakeLists), gcc 16.2 clean; no bindgen/libclang needed (bindings are committed upstream); cmake 4.4 works unpatched.
 - **ggml coexistence:** transcribe's ggml objects carry GLOBAL HIDDEN visibility, so a transition binary linking both `ggml-rs-sys` and the vendored engine does not collide; final proof is the 1.2 CI spike linking both into one binary.
-- **Build:** ~44 s cold for the whole C++ tree on the WSL host; the wrapper's test suite runs green with one local patch (test `repo_root` resolution — see the crates' VENDOR.md). A canonical jfk.wav run through whisper-tiny Q5_K_M reproduces the reference transcript ("...my fellow Americans...") with segment timestamps and auto-detected `en`.
+- **Build:** ~44 s cold for the whole C++ tree on the WSL host; the wrapper's test suite runs green; the crates.io build needs no patches (the vendoring-era patch was test-only and never ran in our CI). A canonical jfk.wav run through whisper-tiny Q5_K_M reproduces the reference transcript ("...my fellow Americans...") with segment timestamps and auto-detected `en`.
 
 ## Phase 2 findings and the VAD/diarization pivot (user-approved)
 
 - **VAD and diarization move onto transcribe.cpp in this change.** The original plan kept the
   vad-rs and diarize-rs Rust adapters, but both depend on `ggml-rs-sys`, and the spike proved two
   ggmls cannot share a binary — so any server build with the unified engine would fail to link.
-  Silero VAD now runs through the vendored `VadSession` (the legacy `ggml-silero-v6.2.0.bin`
+  Silero VAD now runs through the transcribe.cpp `VadSession` (the legacy `ggml-silero-v6.2.0.bin`
   container still loads), and diarization through `SortformerDiarizeSession`; the `diarize`
   cargo feature is gone because the engine is one library now.
 - **vibe owns the input windows and engine names.** Upstream reports `max_audio_ms = 0` for every
@@ -83,7 +94,7 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
 - **The old two-backends-in-one-binary mechanism does not carry over, and is not
   needed.** The legacy build baked `ggml-cpu` twice (`_hsw` AVX2 + `_x64` AVX
   baseline, symbols suffixed by `chore build-libs`) and a Rust forwarder picked
-  one at runtime. The vendored ggml has no static multi-variant mode; its
+  one at runtime. The transcribe.cpp ggml has no static multi-variant mode; its
   runtime-dispatch alternative (`TRANSCRIBE_GGML_BACKEND_DL` + per-ISA modules)
   forces a shared libtranscribe plus module files next to the sidecar — a
   packaging overhaul across all five platforms that this change does not buy.
@@ -140,6 +151,21 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
 - Docs updated: `server/README.md` (GGUF pull example, legacy .bin notice),
   `server/docs/ARCHITECTURE.md` and `docs/ARCHITECTURE.md` (unified engine,
   cmake-from-source build, one-ggml link).
+
+## Post-approval revision: crates.io dependency instead of the vendored subtree
+
+Before archiving the user reversed the vendoring decision: the vendored
+`server/crates/transcribe-cpp{,-sys}` trees (and their VENDOR.md patch notes)
+were deleted and vibe-server now depends on the published crates
+(`transcribe-cpp = { version = "=0.4.1", default-features = false }`), which
+carry the same C++ sources at the same revision the parity proofs ran against.
+Verified after the swap: the release build reproduces the whisper fixture
+transcript byte for byte, the full gated suite (94 + 1 + 10) is green, and the
+link check still shows zero duplicate `ggml_*` definitions. The spike CI
+workflow now builds vibe-server with the dependency and runs a real inference
+on Linux and Windows (no libclang, no SDKs). The one vendoring-era local patch
+lived in the wrapper's own test suite, which our CI never ran, so nothing was
+lost; future patches go upstream-first and arrive as dependency releases.
 
 ## Risks / Trade-offs
 

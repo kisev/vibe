@@ -1,12 +1,8 @@
-# Spike CI for the vendored transcribe.cpp engine (change: adopt-transcribe-cpp).
-#
-# One Linux and one Windows runner build the vendored crates from source and
-# run a real inference through whisper-tiny. The same-binary ggml clash test
-# this spike originally planned does not exist: rust-lld rejects transcribe's
-# GLOBAL HIDDEN ggml next to ggml-rs-sys's GLOBAL DEFAULT copies, so the two
-# ggmls never share a binary (see the change's design.md). What this workflow
-# proves instead: the C++ tree configures, compiles, and infers on both
-# platforms with the stock runner toolchains.
+# Engine spike CI (change: adopt-transcribe-cpp): one Linux and one Windows
+# runner compile the transcribe.cpp dependency from source (the sys crate's
+# cmake build) and run a real inference through the vibe-server binary with
+# whisper-tiny. Proves the dependency configures, compiles, and infers on both
+# platforms with the stock runner toolchains — no libclang, no SDKs.
 
 name: transcribe-spike
 
@@ -15,13 +11,13 @@ on:
     push:
         branches: [main]
         paths:
-            - 'server/crates/transcribe-cpp-sys/**'
-            - 'server/crates/transcribe-cpp/**'
+            - 'server/crates/vibe-server/**'
+            - 'server/Cargo.lock'
             - '.github/workflows/transcribe-spike.yml'
     pull_request:
         paths:
-            - 'server/crates/transcribe-cpp-sys/**'
-            - 'server/crates/transcribe-cpp/**'
+            - 'server/crates/vibe-server/**'
+            - 'server/Cargo.lock'
             - '.github/workflows/transcribe-spike.yml'
 
 concurrency:
@@ -32,8 +28,7 @@ env:
     # Matches the handy-computer catalog entry for whisper-tiny Q5_K_M.
     SPIKE_MODEL_URL: https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf
     SPIKE_MODEL_SHA256: 72cfa8ee436a635a5b6fb373cc056a828b9efe96d32d6eb8769ed3cc5b429719
-    # Pinned to the vendored revision so the fixture never drifts.
-    SPIKE_AUDIO_URL: https://github.com/handy-computer/transcribe.cpp/raw/4d7c1ccefd39e5a9ea36cca5f8fefc6dcc14b99b/samples/jfk.wav
+    SPIKE_AUDIO_URL: https://github.com/ggml-org/whisper.cpp/raw/master/samples/jfk.wav
 
 jobs:
     spike:
@@ -53,21 +48,13 @@ jobs:
 
             - uses: dtolnay/rust-toolchain@stable
 
-            - name: Install libclang for ggml-rs-sys bindgen
-              if: runner.os == 'Linux'
-              run: sudo apt-get update && sudo apt-get install -y libclang-dev
+            # Compiles the transcribe-cpp-sys dependency (the whole C++ tree)
+            # via cmake, then links vibe-server against it.
+            - name: Build vibe-server with the engine dependency
+              run: cargo build --release -p vibe-server
 
-            - name: Set LIBCLANG_PATH
-              if: runner.os == 'Windows'
-              shell: bash
-              run: echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> "$GITHUB_ENV"
-
-            - name: Build the vendored engine from source
-              run: cargo build -p transcribe-cpp-sys -p transcribe-cpp
-
-            - name: No-model wrapper tests
-              run: cargo test -p transcribe-cpp
-              # Model-gated suites skip cleanly here; the next step runs them for real.
+            - name: No-model server tests
+              run: cargo test -p vibe-server --bin vibe-server
 
             - name: Fetch the spike model and audio
               shell: bash
@@ -76,13 +63,14 @@ jobs:
                   echo "$SPIKE_MODEL_SHA256  $RUNNER_TEMP/whisper-tiny-Q5_K_M.gguf" | sha256sum -c -
                   curl -sSL -o "$RUNNER_TEMP/jfk.wav" "$SPIKE_AUDIO_URL"
 
-            - name: Run a real inference through the wrapper
+            - name: Run a real inference through vibe-server
               shell: bash
               run: |
-                  cargo test -p transcribe-cpp --test transcribe --test streaming -- --nocapture
-              env:
-                  TRANSCRIBE_SMOKE_MODEL: ${{ runner.temp }}/whisper-tiny-Q5_K_M.gguf
-                  TRANSCRIBE_SMOKE_AUDIO: ${{ runner.temp }}/jfk.wav
-
-            - name: vibe-server still builds untouched
-              run: cargo build -p vibe-server
+                  exe="target/release/vibe-server"
+                  if [[ "${{ runner.os }}" == "Windows" ]]; then exe="${exe}.exe"; fi
+                  text="$("$exe" transcribe "$RUNNER_TEMP/whisper-tiny-Q5_K_M.gguf" "$RUNNER_TEMP/jfk.wav" --format text)"
+                  echo "transcript: $text"
+                  case "$text" in
+                      *fellow*Americans*) echo "reference transcript reproduced" ;;
+                      *) echo "::error::unexpected transcript"; exit 1 ;;
+                  esac

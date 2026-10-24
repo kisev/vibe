@@ -158,7 +158,7 @@ fn ensure_backends() {
     INIT.get_or_init(|| transcribe_cpp::init_backends_default().expect("init_backends_default"));
 }
 
-/// The unified ASR engine: every family loads through the vendored
+/// The unified ASR engine: every family loads through the transcribe.cpp
 /// transcribe.cpp model, and the planner drives bounded families.
 pub struct Engine {
     model: Model,
