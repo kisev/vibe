@@ -42,3 +42,17 @@ Clients SHALL NOT send or present options that the reported capabilities mark un
 #### Scenario: Translation and prompts
 - **WHEN** a model reports translation or prompt support as off
 - **THEN** those options are neither sent with a request nor shown as active
+
+### Requirement: Clients adapt by capabilities, not engine names
+
+Clients SHALL derive model notes, limitations, and option visibility from reported capability flags and MUST NOT branch on the engine name, so two models with equal capabilities are presented identically.
+
+#### Scenario: Equal capabilities render alike
+
+- **WHEN** two models report the same capability flags but different engine names
+- **THEN** both show the same limitation notes and the same available options
+
+#### Scenario: No engine-name conditionals
+
+- **WHEN** the desktop code renders model-dependent UI
+- **THEN** no code path keys off an engine-name string
