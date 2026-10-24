@@ -68,7 +68,7 @@ jobs:
               run: |
                   exe="target/release/vibe-server"
                   if [[ "${{ runner.os }}" == "Windows" ]]; then exe="${exe}.exe"; fi
-                  text="$("$exe" transcribe "$RUNNER_TEMP/whisper-tiny-Q5_K_M.gguf" "$RUNNER_TEMP/jfk.wav" --format text)"
+                  text="$("$exe" transcribe "$RUNNER_TEMP/whisper-tiny-Q5_K_M.gguf" "$RUNNER_TEMP/jfk.wav" --format json | jq -r .text)"
                   echo "transcript: $text"
                   case "$text" in
                       *fellow*Americans*) echo "reference transcript reproduced" ;;

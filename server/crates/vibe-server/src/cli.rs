@@ -462,7 +462,12 @@ mod tests {
 
         let error = write_output("new", path).unwrap_err();
 
-        assert!(error.to_string().contains(path), "error should name the path: {error}");
+        // Windows reports the 8.3 short form of the temp path (RUNNER~1...),
+        // so the full path never matches; the file name appears in both forms.
+        assert!(
+            error.to_string().contains("transcript.md"),
+            "error should name the file: {error}"
+        );
         assert_eq!(std::fs::read_to_string(path).unwrap(), "previous");
     }
 
