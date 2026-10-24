@@ -121,10 +121,13 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
   matrix (Linux + Windows) is green — cmake ≥ 3.16 is the only build-time
   requirement and every hosted runner has it; libclang is never needed
   (bindings are committed upstream).
-- **GPU on Linux/Windows regresses to CPU-only in this change.** The legacy
-  build linked a prebuilt `libggml-vulkan` and dlopened the Vulkan loader at
-  runtime; the unified engine builds CPU-only there by default. Metal on macOS
-  is unchanged (the sys crate's default feature). Restoring Vulkan is a
+- **GPU on Linux/Windows regresses to CPU-only in this change; macOS keeps
+  Metal.** The legacy build linked a prebuilt `libggml-vulkan` and dlopened the
+  Vulkan loader at runtime; the unified engine builds CPU-only there. On macOS
+  the legacy ggml-rs-sys linked `ggml-metal` and the Metal frameworks, so
+  vibe-server enables the sys crate's `metal` feature for Apple targets
+  (a no-op elsewhere) — verification caught the initial omission, where
+  `default-features = false` silently built macOS CPU-only. Restoring Vulkan is a
   follow-up wiring job, not a fork: the `vulkan` cargo feature exists in
   `transcribe-cpp-sys` (`TRANSCRIBE_VULKAN=ON`); what is missing is SDK/glslc
   provisioning in CI and runtime-loader packaging.
