@@ -279,7 +279,7 @@
 	"speakerRecognition": "Reconnaissance du locuteur",
 	"speakers": "Haut-parleurs",
 	"start": "Démarrer",
-	"startRecord": "Enregistrer et transcrire",
+	"startRecord": "Enregistrer",
 	"stop": "Arrêter",
 	"stopAndTranscribe": "Arrête d'enregistrer",
 	"stopRecording": "Arrêter l'enregistrement",

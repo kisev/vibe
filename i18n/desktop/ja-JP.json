@@ -279,7 +279,7 @@
 	"speakerRecognition": "話者認識",
 	"speakers": "話者",
 	"start": "開始",
-	"startRecord": "録音して文字起こし",
+	"startRecord": "録音",
 	"stop": "停止",
 	"stopAndTranscribe": "録音停止",
 	"stopRecording": "録音を停止",
