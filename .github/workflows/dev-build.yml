@@ -1,5 +1,7 @@
 # Dev builds for the fork: every push to main produces unsigned bundles for all
-# five release platforms and replaces the assets of the rolling `dev` prerelease.
+# five release platforms and publishes them to one prerelease per run, tagged
+# `dev.<run-number>`; the release name carries the application version with a
+# `-dev.<short-commit>` suffix and the body names the full commit SHA.
 #
 # This is deliberately a separate file from release.yml, which belongs to the
 # upstream release flow and stays untouched. The sidecars are built from the
@@ -110,8 +112,12 @@ jobs:
                   short=${GITHUB_SHA:0:7}
                   version="$base-dev.$short"
                   # One release per commit: a shared release accumulated assets
-                  # from several builds whenever a run failed to finish.
-                  tag="dev.$short"
+                  # from several builds whenever a run failed to finish. The
+                  # run number, not the commit, orders the releases page: a
+                  # hash in the tag compares randomly and shuffles the page.
+                  # A re-run keeps its run number, so its matrix jobs still
+                  # share one release.
+                  tag="dev.${{ github.run_number }}"
                   # One no-space JSON: tauri-action splits args on whitespace.
                   config=$(jq -cn --arg v "$version" '{
                       version: $v,
