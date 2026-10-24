@@ -8,6 +8,8 @@ members = [
     "crates/ggml-rs-sys",
     "crates/gigaam-rs",
     "crates/whisper-rs",
+    "crates/transcribe-cpp-sys",
+    "crates/transcribe-cpp",
 ]
 resolver = "2"
 
