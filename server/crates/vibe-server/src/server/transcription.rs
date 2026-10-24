@@ -185,10 +185,13 @@ impl From<StoredSegment> for whisper_rs::Segment {
     }
 }
 
+/// Deepest a chunk is halved before the run gives up.
+const MAX_SPLIT_DEPTH: usize = 6;
+
 /// Transcribe the plan chunk by chunk, reusing every chunk a previous run
 /// already finished. A chunk that runs out of memory is split in half and the
-/// halves are tried; the split is not persisted as a separate plan, so a resumed
-/// run reuses the finished result under the same index.
+/// halves are tried; the split itself is persisted, so a resumed run starts
+/// from the halves instead of failing on the full size again.
 pub(crate) fn transcribe_cached(
     ctx: &mut Engine,
     model_path: &str,
@@ -222,58 +225,122 @@ pub(crate) fn transcribe_cached(
         entry.write_plan(plan).map_err(anyhow::Error::from)?;
     }
 
+    let mut splits = entry.splits().unwrap_or_default();
     let mut segments = Vec::new();
     for (index, chunk) in plan.chunks.iter().enumerate() {
-        if let Some(stored) = entry.part::<Vec<StoredSegment>>(index) {
-            tracing::debug!(chunk = index, segments = stored.len(), "reusing cached chunk");
-            segments.extend(stored.into_iter().map(whisper_rs::Segment::from));
-            continue;
-        }
-        let finished = transcribe_chunk(ctx, samples, chunk, plan.max_input_seconds, options, 0)?;
-        entry
-            .write_part(index, &finished.iter().map(StoredSegment::from).collect::<Vec<_>>())
-            .map_err(anyhow::Error::from)?;
+        let mut run = |chunk: &crate::plan::Chunk| {
+            let single = Plan {
+                chunks: vec![chunk.clone()],
+                max_input_seconds: plan.max_input_seconds,
+            };
+            ctx.transcribe_chunks(samples, &single, options.clone())
+                .map(|result| result.segments)
+        };
+        let finished = resolve_chunk(&entry, &mut splits, index, chunk, &mut Vec::new(), 0, &mut run)?;
         segments.extend(finished);
     }
     Ok(whisper_rs::TranscribeResult { segments })
 }
 
-/// Transcribe one chunk, halving it on an out-of-memory failure until the
-/// engine copes or the chunk reaches the minimum useful length.
-fn transcribe_chunk(
-    ctx: &mut Engine,
-    samples: &[f32],
+/// One chunk's segments: a stored result, a stored split, or a fresh run.
+///
+/// The split tree is walked before anything is attempted, so a resumed run
+/// never retries a size the engine already failed on. Each leaf stores its own
+/// result, so a run interrupted mid-split keeps the halves that did finish.
+fn resolve_chunk<F>(
+    entry: &cache::Entry,
+    splits: &mut Vec<cache::Split>,
+    index: usize,
     chunk: &crate::plan::Chunk,
-    max_input_seconds: f64,
-    options: &whisper_rs::TranscribeOptions,
+    slot: &mut Vec<usize>,
     depth: usize,
-) -> anyhow::Result<Vec<whisper_rs::Segment>> {
-    let single = Plan {
-        chunks: vec![chunk.clone()],
-        max_input_seconds,
-    };
-    match ctx.transcribe_chunks(samples, &single, options.clone()) {
-        Ok(result) => Ok(result.segments),
-        Err(err) if is_out_of_memory(&err) && depth < 6 => {
-            let middle = (chunk.core_start + chunk.core_end) / 2.0;
-            if middle - chunk.core_start < 1.0 || chunk.core_end - middle < 1.0 {
+    run: &mut F,
+) -> anyhow::Result<Vec<whisper_rs::Segment>>
+where
+    F: FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<whisper_rs::Segment>>,
+{
+    let tag = slot_tag(slot);
+    if let Some(stored) = entry.part_at::<Vec<StoredSegment>>(index, &tag) {
+        tracing::debug!(chunk = index, part = %tag, segments = stored.len(), "reusing cached chunk");
+        return Ok(stored.into_iter().map(whisper_rs::Segment::from).collect());
+    }
+
+    if let Some(halves) = splits
+        .iter()
+        .find(|split| split.core_start == chunk.core_start && split.core_end == chunk.core_end)
+        .map(|split| split.halves.clone())
+    {
+        tracing::debug!(chunk = index, part = %tag, "resuming a split chunk");
+        return run_halves(entry, splits, index, chunk, &halves, slot, depth, run);
+    }
+
+    match run(chunk) {
+        Ok(finished) => {
+            entry
+                .write_part_at(index, &tag, &finished.iter().map(StoredSegment::from).collect::<Vec<_>>())
+                .map_err(anyhow::Error::from)?;
+            Ok(finished)
+        }
+        Err(err) if is_out_of_memory(&err) && depth < MAX_SPLIT_DEPTH => {
+            let Some(halves) = halve(chunk) else {
                 return Err(err);
-            }
-            let mut segments = Vec::new();
-            for (start, end) in [(chunk.core_start, middle), (middle, chunk.core_end)] {
-                let half = crate::plan::Chunk {
-                    input_start: start,
-                    input_end: end,
-                    core_start: start,
-                    core_end: end,
-                    speakers: chunk.speakers.clone(),
-                };
-                segments.extend(transcribe_chunk(ctx, samples, &half, max_input_seconds, options, depth + 1)?);
-            }
-            Ok(segments)
+            };
+            tracing::warn!(chunk = index, part = %tag, "out of memory; splitting the chunk in half");
+            splits.push(cache::Split {
+                core_start: chunk.core_start,
+                core_end: chunk.core_end,
+                halves: halves.clone(),
+            });
+            entry.write_splits(splits).map_err(anyhow::Error::from)?;
+            run_halves(entry, splits, index, chunk, &halves, slot, depth, run)
         }
         Err(err) => Err(err),
     }
+}
+
+fn run_halves<F>(
+    entry: &cache::Entry,
+    splits: &mut Vec<cache::Split>,
+    index: usize,
+    chunk: &crate::plan::Chunk,
+    halves: &[(f64, f64)],
+    slot: &mut Vec<usize>,
+    depth: usize,
+    run: &mut F,
+) -> anyhow::Result<Vec<whisper_rs::Segment>>
+where
+    F: FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<whisper_rs::Segment>>,
+{
+    let mut segments = Vec::new();
+    for (half_index, (start, end)) in halves.iter().enumerate() {
+        let half = crate::plan::Chunk {
+            input_start: *start,
+            input_end: *end,
+            core_start: *start,
+            core_end: *end,
+            speakers: chunk.speakers.clone(),
+        };
+        slot.push(half_index);
+        segments.extend(resolve_chunk(entry, splits, index, &half, slot, depth + 1, run)?);
+        slot.pop();
+    }
+    Ok(segments)
+}
+
+/// The two halves of a chunk, or `None` when either would fall below the
+/// shortest chunk worth producing.
+fn halve(chunk: &crate::plan::Chunk) -> Option<Vec<(f64, f64)>> {
+    let middle = (chunk.core_start + chunk.core_end) / 2.0;
+    if middle - chunk.core_start < 1.0 || chunk.core_end - middle < 1.0 {
+        return None;
+    }
+    Some(vec![(chunk.core_start, middle), (middle, chunk.core_end)])
+}
+
+/// Names one leaf among the parts of a chunk: empty for the whole chunk, then
+/// one `-h<n>` per level of halving.
+fn slot_tag(slot: &[usize]) -> String {
+    slot.iter().map(|half| format!("-h{half}")).collect()
 }
 
 fn is_out_of_memory(error: &anyhow::Error) -> bool {
@@ -532,6 +599,97 @@ mod tests {
         )
         .expect("resumed run");
         assert_eq!(result.segments[0].text, "cached marker");
+    }
+
+    fn chunk(start: f64, end: f64) -> crate::plan::Chunk {
+        crate::plan::Chunk {
+            input_start: start,
+            input_end: end,
+            core_start: start,
+            core_end: end,
+            speakers: vec![1],
+        }
+    }
+
+    /// Fails the way a CUDA allocation does for anything longer than `limit`.
+    fn run_failing_above(
+        limit: f64,
+        calls: &mut Vec<(f64, f64)>,
+    ) -> impl FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<whisper_rs::Segment>> + '_ {
+        move |chunk: &crate::plan::Chunk| {
+            calls.push((chunk.core_start, chunk.core_end));
+            if chunk.core_end - chunk.core_start > limit {
+                anyhow::bail!("ggml_backend_cuda_buffer_type_alloc_buffer: CUDA error: out of memory");
+            }
+            Ok(vec![whisper_rs::Segment {
+                start: (chunk.core_start * 100.0) as i64,
+                end: (chunk.core_end * 100.0) as i64,
+                text: format!("{:.1}-{:.1}", chunk.core_start, chunk.core_end),
+                no_speech_prob: 0.0,
+            }])
+        }
+    }
+
+    #[test]
+    fn a_split_chunk_is_remembered_and_never_retried_whole() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = cache::Cache::new(dir.path());
+        let whole = chunk(0.0, 30.0);
+        let mut calls = Vec::new();
+
+        {
+            let entry = store.open("key").unwrap();
+            let mut splits = Vec::new();
+            let segments = {
+                let mut run = run_failing_above(10.0, &mut calls);
+                resolve_chunk(&entry, &mut splits, 0, &whole, &mut Vec::new(), 0, &mut run).expect("split run")
+            };
+            // 30s splits into 15s halves, each of which splits again into 7.5s leaves.
+            assert_eq!(
+                calls,
+                vec![
+                    (0.0, 30.0),
+                    (0.0, 15.0),
+                    (0.0, 7.5),
+                    (7.5, 15.0),
+                    (15.0, 30.0),
+                    (15.0, 22.5),
+                    (22.5, 30.0)
+                ]
+            );
+            assert!(!segments.is_empty());
+        }
+
+        // A second run finds the split tree and every leaf already on disk.
+        let entry = store.open("key").unwrap();
+        let mut splits = entry.splits().expect("the split is persisted");
+        assert_eq!(splits.len(), 3, "one split per chunk that ran out of memory");
+        let mut retried = Vec::new();
+        let segments = {
+            let mut run = run_failing_above(10.0, &mut retried);
+            resolve_chunk(&entry, &mut splits, 0, &whole, &mut Vec::new(), 0, &mut run).expect("resumed run")
+        };
+        assert!(retried.is_empty(), "no size is tried twice: {retried:?}");
+        assert_eq!(segments.len(), 4);
+    }
+
+    #[test]
+    fn splitting_stops_at_the_minimum_length() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = cache::Cache::new(dir.path());
+        let entry = store.open("key").unwrap();
+        let mut splits = Vec::new();
+        let mut calls = Vec::new();
+        let mut run = |chunk: &crate::plan::Chunk| -> anyhow::Result<Vec<whisper_rs::Segment>> {
+            calls.push((chunk.core_start, chunk.core_end));
+            anyhow::bail!("failed to allocate")
+        };
+        let error = resolve_chunk(&entry, &mut splits, 0, &chunk(0.0, 2.0), &mut Vec::new(), 0, &mut run)
+            .expect_err("a 2 second chunk cannot be halved below the minimum");
+        assert!(format!("{error:#}").contains("allocate"));
+        // The 1-second half is the smallest that may still be tried; failing there
+        // ends the run instead of halving it into 0.5-second slivers.
+        assert_eq!(calls, vec![(0.0, 2.0), (0.0, 1.0)]);
     }
 
     #[test]

@@ -155,10 +155,6 @@ impl Cache {
         Self { root: root.into() }
     }
 
-    pub fn root(&self) -> &Path {
-        &self.root
-    }
-
     /// Create the entry for `key` and take its exclusive lock. A second run on
     /// the same entry waits briefly and then reports [`Error::Busy`].
     pub fn open(&self, key: &str) -> Result<Entry> {
@@ -204,6 +200,7 @@ pub struct Entry {
 }
 
 impl Entry {
+    #[cfg(test)]
     pub fn dir(&self) -> &Path {
         &self.dir
     }
@@ -216,21 +213,30 @@ impl Entry {
         write_json(&self.dir.join("manifest.json"), manifest)
     }
 
-    pub fn plan(&self) -> Option<crate::plan::Plan> {
-        read_json(&self.dir.join("plan.json"))
-    }
-
     pub fn write_plan(&self, plan: &crate::plan::Plan) -> Result<()> {
         write_json(&self.dir.join("plan.json"), plan)
     }
 
     /// A finished chunk, if one was stored.
+    #[cfg(test)]
     pub fn part<T: DeserializeOwned + Serialize>(&self, index: usize) -> Option<T> {
-        read_json(&self.part_path(index))
+        self.part_at(index, "")
     }
 
+    #[cfg(test)]
     pub fn write_part<T: Serialize>(&self, index: usize, part: &T) -> Result<()> {
-        write_json(&self.part_path(index), part)
+        self.write_part_at(index, "", part)
+    }
+
+    /// A finished chunk or one leaf of a split chunk. `tag` is empty for a chunk
+    /// the engine handled whole and names the half for a leaf, so a resumed run
+    /// keeps whatever halves a previous run finished.
+    pub fn part_at<T: DeserializeOwned>(&self, index: usize, tag: &str) -> Option<T> {
+        read_json(&self.part_path(index, tag))
+    }
+
+    pub fn write_part_at<T: Serialize>(&self, index: usize, tag: &str, part: &T) -> Result<()> {
+        write_json(&self.part_path(index, tag), part)
     }
 
     pub fn splits(&self) -> Option<Vec<Split>> {
@@ -241,8 +247,8 @@ impl Entry {
         write_json(&self.dir.join("splits.json"), splits)
     }
 
-    fn part_path(&self, index: usize) -> PathBuf {
-        self.dir.join("parts").join(format!("part-{index:06}.json"))
+    fn part_path(&self, index: usize, tag: &str) -> PathBuf {
+        self.dir.join("parts").join(format!("part-{index:06}{tag}.json"))
     }
 }
 

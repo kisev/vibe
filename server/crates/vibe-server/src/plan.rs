@@ -100,7 +100,10 @@ pub fn plan(duration: f64, diarization: &[DiarSegment], speech: &[(f64, f64)], s
     let duration = snap(duration);
     let mut chunks = Vec::new();
     if duration > 0.0 {
-        let turns = turns(diarization, duration, settings);
+        let mut turns = turns(diarization, duration, settings);
+        turns.extend(unattributed(speech, &turns, duration));
+        turns.sort_by(|a, b| a.start.total_cmp(&b.start));
+        turns = absorb_slivers(&mut turns, duration, settings.sliver_seconds);
         let pauses = pauses(speech, duration);
         for (index, turn) in turns.iter().enumerate() {
             let left_limit = if index == 0 {
@@ -172,6 +175,52 @@ pub fn turns(diarization: &[DiarSegment], duration: f64, settings: Settings) -> 
     }
 
     absorb_slivers(&mut merged, duration, settings.sliver_seconds)
+}
+
+/// Speech VAD found that no diarization turn covers.
+///
+/// Diarization misses speech — a speaker past the model's limit, noise it does
+/// not classify — and dropping those ranges would silently lose words. They
+/// keep their own chunk with no speaker set, so their segments fall back to
+/// overlap matching instead of being attributed to a neighbour.
+fn unattributed(speech: &[(f64, f64)], turns: &[Turn], duration: f64) -> Vec<Turn> {
+    let mut ranges: Vec<(f64, f64)> = speech
+        .iter()
+        .map(|(start, end)| (snap(start.max(0.0)), snap(end.min(duration))))
+        .filter(|(start, end)| end > start)
+        .collect();
+    ranges.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+    let mut free = Vec::new();
+    for (start, end) in ranges {
+        let mut cursor = start;
+        for turn in turns {
+            if turn.end <= cursor {
+                continue;
+            }
+            if turn.start >= end {
+                break;
+            }
+            if turn.start > cursor {
+                free.push((cursor, turn.start.min(end)));
+            }
+            cursor = cursor.max(turn.end);
+            if cursor >= end {
+                break;
+            }
+        }
+        if cursor < end {
+            free.push((cursor, end));
+        }
+    }
+
+    free.into_iter()
+        .map(|(start, end)| Turn {
+            start,
+            end,
+            speakers: Vec::new(),
+        })
+        .collect()
 }
 
 /// Fold every turn shorter than `sliver_seconds` into the nearest neighbour.
@@ -268,6 +317,11 @@ fn search_cut(position: f64, desired: f64, max_core: f64, pauses: &[(f64, f64)],
         }
         let cut = target.clamp(low, high);
         let distance = (cut - target).abs();
+        // A pause too far from the preferred length is not worth cutting in: the
+        // bound is a better fallback than a chunk far shorter or longer than asked.
+        if distance > settings.search_seconds {
+            continue;
+        }
         if best.is_none_or(|(best_distance, _)| distance < best_distance) {
             best = Some((distance, cut));
         }
@@ -338,6 +392,31 @@ mod tests {
         assert_eq!(chunk.core_end, 5.0);
         assert!(chunk.input_start <= 1.0 && chunk.input_end >= 5.0);
         assert!(chunk.input_end - chunk.input_start <= 30.0);
+    }
+
+    #[test]
+    fn speech_diarization_missed_becomes_a_chunk_without_speakers() {
+        let diarization = [
+            DiarSegment {
+                start: 0.0,
+                end: 4.0,
+                speaker: 1,
+            },
+            DiarSegment {
+                start: 10.0,
+                end: 14.0,
+                speaker: 2,
+            },
+        ];
+        // VAD hears speech between the two turns that diarization did not label.
+        let speech = [speech(0.0, 4.0), speech(5.0, 9.0), speech(10.0, 14.0)];
+        let plan = plan(14.0, &diarization, &speech, settings(30.0));
+
+        assert_eq!(plan.chunks.len(), 3, "every speech range keeps a chunk");
+        assert_eq!(plan.chunks[0].speakers, vec![1]);
+        assert!(plan.chunks[1].speakers.is_empty(), "the missed range stays unattributed");
+        assert_eq!((plan.chunks[1].core_start, plan.chunks[1].core_end), (5.0, 9.0));
+        assert_eq!(plan.chunks[2].speakers, vec![2]);
     }
 
     #[test]
