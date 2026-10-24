@@ -101,7 +101,9 @@ See the full API reference here:
 Long files are split into model inputs before inference. With a diarization
 model the split follows speaker turns, so one input never mixes two speakers
 except at an explicitly marked boundary; without one, the engine's own VAD
-splitting is used as before.
+splitting is used as before. Segments from a planned chunk carry the chunk's
+`speakers` array: one id, or several on a boundary line, which `speaker` pins
+to the first of them.
 
 - `--chunk-seconds <n>` sets the planned input length. It defaults to the
   engine maximum (25 s for GigaAM, 30 s for Parakeet and Nemotron) and cannot
@@ -110,9 +112,15 @@ splitting is used as before.
   every finished chunk, so a run killed half-way resumes instead of starting
   over. The key covers the decoded audio, the model, the engine, the options
   and the plan, so changing any of them starts a fresh entry.
+- A chunk the engine cannot fit in memory is split in half and the halves are
+  tried, down to a one-second minimum. The split is stored with the entry, so a
+  resumed run starts from the halves instead of failing on the full size again,
+  and every half that finished is reused.
 - The cache is opt-in: without a directory nothing is written. Cached files
-  contain transcript text and live only on the local disk; delete the directory
-  at any time.
+  hold transcript text, the plan and the model stamp — never the audio — and
+  live only on the local disk. Delete the directory at any time; the desktop
+  app keeps its own under the app's local data directory and removes entries
+  untouched for 30 days at startup.
 
 ---
 

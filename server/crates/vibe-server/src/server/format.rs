@@ -83,8 +83,14 @@ pub fn format_markdown(segments: &[Segment], diar_segments: &[diarization::Segme
     out
 }
 
-pub fn format_json(result: &TranscribeResult, diar_segments: &[diarization::Segment]) -> String {
-    serde_json::to_string_pretty(&build_verbose_json(result, diar_segments, None)).unwrap_or_else(|_| "{}".into())
+/// The JSON document, carrying the chunk speaker sets when a plan produced them.
+pub fn format_json(
+    result: &TranscribeResult,
+    diar_segments: &[diarization::Segment],
+    plan: Option<&crate::plan::Plan>,
+) -> String {
+    let sets = plan.map(|plan| planned_speakers(result, plan));
+    serde_json::to_string_pretty(&build_verbose_json(result, diar_segments, sets.as_deref())).unwrap_or_else(|_| "{}".into())
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -255,7 +261,7 @@ mod tests {
 
     #[test]
     fn json_has_text_segments_and_timestamps_without_diarization() {
-        let json = format_json(&result(vec![segment(100, 250, "привет")]), &[]);
+        let json = format_json(&result(vec![segment(100, 250, "привет")]), &[], None);
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["text"], "привет");
         let segments = value["segments"].as_array().unwrap();
@@ -271,7 +277,7 @@ mod tests {
     fn json_carries_synthetic_speaker_labels() {
         let segments = [segment(100, 250, "привет"), segment(300, 400, "пока")];
         let turns = [turn(1.0, 2.5, 1), turn(3.0, 4.0, 0)];
-        let json = format_json(&result(segments.to_vec()), &turns);
+        let json = format_json(&result(segments.to_vec()), &turns, None);
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         let segments = value["segments"].as_array().unwrap();
         assert_eq!(segments[0]["speaker"], 1);
@@ -280,7 +286,7 @@ mod tests {
 
     #[test]
     fn json_with_empty_segments_is_an_empty_document() {
-        let json = format_json(&result(vec![]), &[]);
+        let json = format_json(&result(vec![]), &[], None);
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["text"], "");
         assert_eq!(value["segments"].as_array().unwrap().len(), 0);
@@ -401,6 +407,16 @@ mod planner_tests {
         assert_eq!(json.segments[0].speakers, Some(vec![1]));
         assert_eq!(json.segments[1].speaker, Some(1));
         assert_eq!(json.segments[1].speakers, Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn the_cli_json_carries_the_same_speaker_sets_as_the_api() {
+        let result = result();
+        let json = format_json(&result, &[], Some(&plan()));
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let segments = value["segments"].as_array().unwrap();
+        assert_eq!(segments[0]["speakers"], serde_json::json!([1]));
+        assert_eq!(segments[1]["speakers"], serde_json::json!([1, 2]));
     }
 
     #[test]

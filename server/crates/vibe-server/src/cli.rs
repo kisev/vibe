@@ -168,7 +168,6 @@ pub async fn run() -> anyhow::Result<()> {
                     audio,
                     vad_model,
                     diarize_model,
-                    cache_dir: cache_dir.clone(),
                     chunk_seconds,
                     format,
                     output,
@@ -280,15 +279,9 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
         "vad_model": options.vad_model_path,
     });
     let result = match (plan.as_ref(), config.cache_dir()) {
-        (Some(plan), Some(root)) => crate::server::transcription::transcribe_cached(
-            &mut ctx,
-            &args.model,
-            &samples,
-            plan,
-            &options,
-            root,
-            options_json,
-        ),
+        (Some(plan), Some(root)) => {
+            crate::server::transcription::transcribe_cached(&mut ctx, &args.model, &samples, plan, &options, root, options_json)
+        }
         (Some(plan), None) => ctx.transcribe_chunks(&samples, plan, options),
         (None, _) => ctx.transcribe(&samples, options),
     }
@@ -312,7 +305,7 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
         match args.format {
             OutputFormat::Txt => format!("{}\n", result.text()),
             OutputFormat::Markdown => format::format_markdown(&result.segments, &diar_segments),
-            OutputFormat::Json => format::format_json(&result, &diar_segments),
+            OutputFormat::Json => format::format_json(&result, &diar_segments, plan.as_ref()),
             OutputFormat::Srt => format::format_srt(&result.segments),
             OutputFormat::Vtt => format::format_vtt(&result.segments),
         }
@@ -462,7 +455,6 @@ struct TranscribeArgs {
     audio: String,
     vad_model: Option<String>,
     diarize_model: Option<String>,
-    cache_dir: Option<String>,
     chunk_seconds: Option<f64>,
     format: OutputFormat,
     output: Option<String>,
