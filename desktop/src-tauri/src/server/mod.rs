@@ -291,6 +291,9 @@ impl ServerProcess {
                 form = form.text("vad_model", model.clone());
             }
         }
+        if let Some(chunk_seconds) = options.chunk_seconds {
+            form = form.text("chunk_seconds", chunk_seconds.to_string());
+        }
 
         Ok(form)
     }

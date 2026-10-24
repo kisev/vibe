@@ -98,12 +98,15 @@ See the full API reference here:
 
 ### Long recordings and the chunk cache
 
-Long files are split into model inputs before inference. With a diarization
-model the split follows speaker turns, so one input never mixes two speakers
-except at an explicitly marked boundary. Speech the diarization model missed —
-a speaker past its limit, a noisy passage — is still transcribed, in its own
-input without a speaker. Without a diarization model the engine's own VAD
-splitting is used as before. Segments from a planned chunk carry the chunk's
+Long files are split into model inputs before inference. Every engine with an
+input bound is planned, with or without a diarization model. With one, the
+split follows speaker turns, so one input never mixes two speakers except at
+an explicitly marked boundary, and speech the diarization model missed — a
+speaker past its limit, a noisy passage — is still transcribed, in its own
+input without a speaker. Without one, the split follows detected speech
+pauses, the chunks carry no speakers, and speakers stay attributed by overlap.
+Whisper is never planned: its internal long-form decoding owns the whole file.
+Segments from a planned chunk carry the chunk's
 `speakers` array: one id, or several on a boundary line, whose `speaker` names
 the one covering most of it.
 

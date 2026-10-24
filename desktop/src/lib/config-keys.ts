@@ -50,6 +50,8 @@ export const CONFIG_KEYS = {
 	outputDeviceName: 'recording.outputDeviceName',
 	hiddenInputDevices: 'recording.hiddenInputDevices',
 	hiddenOutputDevices: 'recording.hiddenOutputDevices',
+	/** Upper bound per model input for long recordings; null = the engine maximum. */
+	chunkSeconds: 'transcription.chunkSeconds',
 	recordingShortcutEnabled: 'recording.shortcutEnabled',
 	recordingShortcut: 'recording.shortcut',
 	meetingDetectionEnabled: 'recording.meetingDetectionEnabled',

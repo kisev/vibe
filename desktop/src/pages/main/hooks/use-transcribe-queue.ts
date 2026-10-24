@@ -153,10 +153,16 @@ export async function buildSharedOptions(preference: Preference) {
 	const requiresVad = capabilities?.requires_vad ?? false
 	const needsFolder = preference.diarizeEnabled || stableTimestamps || requiresVad
 	const modelsFolder = needsFolder ? await invoke<string>('get_models_folder') : null
+	// Only a bounded engine takes an explicit chunk bound; the server validates it too.
+	const chunkSeconds =
+		preference.chunkSeconds != null && capabilities?.max_input_seconds != null
+			? Math.min(preference.chunkSeconds, capabilities.max_input_seconds)
+			: null
 	return {
 		...(preference.diarizeEnabled ? { diarize_model: `${modelsFolder}/${config.diarizeModelFilename}` } : {}),
 		...(stableTimestamps || requiresVad ? { vad_model: `${modelsFolder}/${config.vadModelFilename}` } : {}),
 		...(stableTimestamps ? { stable_timestamps: true } : {}),
+		...(chunkSeconds != null ? { chunk_seconds: chunkSeconds } : {}),
 	}
 }
 

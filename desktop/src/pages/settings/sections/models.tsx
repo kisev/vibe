@@ -9,7 +9,7 @@ import { Input } from '~/components/ui/input'
 import { Switch } from '~/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { ActionRow, IconAction, SettingsGroup, SettingsNote, SettingsRow, rowControlClass, type SettingsViewModel } from './shared'
-import { getFriendlyModelName } from '~/lib/model'
+import { getFriendlyModelName, modelLimitations } from '~/lib/model'
 import { ModelGlyph } from '~/components/brand-glyph'
 
 export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
@@ -91,9 +91,24 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 				</SettingsRow>
 			</SettingsGroup>
 
-			{vm.preference.modelMetadata?.capabilities.engine === 'gigaam' && (
+			{modelLimitations(vm.preference.modelMetadata?.capabilities).length > 0 && (
 				<SettingsGroup title={m.modelLimitations()}>
-					<SettingsNote>{m.gigaamLimitations()}</SettingsNote>
+					<SettingsNote>
+						{modelLimitations(vm.preference.modelMetadata?.capabilities)
+							.map((limitation) => {
+								switch (limitation.kind) {
+									case 'language':
+										return m.modelLimitationLanguage({ language: limitation.language })
+									case 'streaming':
+										return m.modelLimitationStreaming()
+									case 'translation':
+										return m.modelLimitationTranslation()
+									case 'prompts':
+										return m.modelLimitationPrompts()
+								}
+							})
+							.join(' ')}
+					</SettingsNote>
 				</SettingsGroup>
 			)}
 

@@ -220,6 +220,47 @@ fn gigaam_cli_caches_finished_chunks() {
     assert_eq!(before, after, "cached chunks are not rewritten");
 }
 
+/// Planning is not diarization-only: a plain run with a VAD model still plans
+/// chunks from detected speech, so its finished chunks are cached and reused.
+#[test]
+fn gigaam_cli_caches_finished_chunks_without_diarization() {
+    let (Some(model), Some(audio), Some(vad)) = (
+        gated_path("GIGAAM_MODEL"),
+        gated_path("GIGAAM_AUDIO"),
+        gated_path("GIGAAM_VAD"),
+    ) else {
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let cache = dir.path().to_str().unwrap();
+
+    let first = run_transcribe(&[&model, &audio, "--vad-model", &vad, "--cache-dir", cache]);
+    assert!(first.status.success(), "first run failed: {}", text(&first.stderr));
+
+    let parts: Vec<_> = walk(dir.path())
+        .into_iter()
+        .filter(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with("part-"))
+        })
+        .collect();
+    assert!(!parts.is_empty(), "the cache holds at least one finished chunk");
+    let before: Vec<_> = parts
+        .iter()
+        .map(|path| std::fs::metadata(path).unwrap().modified().unwrap())
+        .collect();
+
+    let second = run_transcribe(&[&model, &audio, "--vad-model", &vad, "--cache-dir", cache]);
+    assert!(second.status.success(), "second run failed: {}", text(&second.stderr));
+    assert_eq!(text(&first.stdout), text(&second.stdout), "the transcript is unchanged");
+
+    let after: Vec<_> = parts
+        .iter()
+        .map(|path| std::fs::metadata(path).unwrap().modified().unwrap())
+        .collect();
+    assert_eq!(before, after, "cached chunks are not rewritten");
+}
+
 /// The cache is an optimization, not part of the result: the same inputs must
 /// produce the same transcript whether or not a directory is configured.
 #[test]

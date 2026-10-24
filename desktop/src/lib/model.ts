@@ -163,11 +163,35 @@ export interface ModelCapabilities {
 	translation: boolean
 	timestamps: boolean
 	text_prompts: boolean
+	/** Upper bound per model input for long recordings; null means the engine owns its own long-form path. */
+	max_input_seconds?: number | null
 }
 
 /** Only Whisper exposes stable timestamps, word timestamps, sentence splitting, and decoding knobs. */
 export function isWhisperEngine(capabilities: ModelCapabilities | null | undefined) {
 	return capabilities?.engine === 'whisper'
+}
+
+export type ModelLimitation =
+	| { kind: 'language'; language: string }
+	| { kind: 'streaming' }
+	| { kind: 'translation' }
+	| { kind: 'prompts' }
+
+/**
+ * Which limitations of a model are worth naming in the UI. Derived from capability flags
+ * alone — never from the engine name — so two models with equal capabilities read alike.
+ */
+export function modelLimitations(capabilities: ModelCapabilities | null | undefined): ModelLimitation[] {
+	if (!capabilities) return []
+	const limitations: ModelLimitation[] = []
+	if (capabilities.languages.length === 1 && !capabilities.language_detection) {
+		limitations.push({ kind: 'language', language: capabilities.languages[0] })
+	}
+	if (!capabilities.streaming) limitations.push({ kind: 'streaming' })
+	if (!capabilities.translation) limitations.push({ kind: 'translation' })
+	if (!capabilities.text_prompts) limitations.push({ kind: 'prompts' })
+	return limitations
 }
 
 /**

@@ -16,6 +16,7 @@ const gigaam: ModelCapabilities = {
 	translation: false,
 	timestamps: true,
 	text_prompts: false,
+	max_input_seconds: 25,
 }
 
 const whisper: ModelCapabilities = {
@@ -29,11 +30,15 @@ const whisper: ModelCapabilities = {
 	text_prompts: true,
 }
 
-function preferenceWith(capabilities: ModelCapabilities, overrides: { diarizeEnabled?: boolean; stableTimestampsEnabled?: boolean } = {}) {
+function preferenceWith(
+	capabilities: ModelCapabilities,
+	overrides: { diarizeEnabled?: boolean; stableTimestampsEnabled?: boolean; chunkSeconds?: number | null } = {},
+) {
 	return {
 		modelMetadata: { format: 'gguf', capabilities },
 		diarizeEnabled: false,
 		stableTimestampsEnabled: false,
+		chunkSeconds: null,
 		...overrides,
 	} as unknown as Preference
 }
@@ -61,6 +66,25 @@ describe('shared transcription options', () => {
 			vad_model: '/models/ggml-silero-v6.2.0.bin',
 			stable_timestamps: true,
 		})
+	})
+
+	it('sends a custom chunk length to a bounded engine', async () => {
+		expect(await buildSharedOptions(preferenceWith(gigaam, { chunkSeconds: 10 }))).toEqual({
+			vad_model: '/models/ggml-silero-v6.2.0.bin',
+			chunk_seconds: 10,
+		})
+	})
+
+	it('clamps a custom chunk length to the engine maximum', async () => {
+		expect(await buildSharedOptions(preferenceWith(gigaam, { chunkSeconds: 999 }))).toEqual({
+			vad_model: '/models/ggml-silero-v6.2.0.bin',
+			chunk_seconds: 25,
+		})
+	})
+
+	it('never sends a chunk length to Whisper or when it is unset', async () => {
+		expect(await buildSharedOptions(preferenceWith(whisper, { chunkSeconds: 10 }))).not.toHaveProperty('chunk_seconds')
+		expect(await buildSharedOptions(preferenceWith(gigaam))).not.toHaveProperty('chunk_seconds')
 	})
 })
 

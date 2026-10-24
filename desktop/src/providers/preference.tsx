@@ -106,6 +106,9 @@ export interface Preference {
 	setDiarizeEnabled: ModifyState<boolean>
 	stableTimestampsEnabled: boolean
 	setStableTimestampsEnabled: ModifyState<boolean>
+	/** Upper bound per model input for long recordings; null = the engine maximum. */
+	chunkSeconds: number | null
+	setChunkSeconds: ModifyState<number | null>
 
 	/** Everything the export dialog remembers, kept together under one config key. */
 	exportOptions: ExportOptions
@@ -253,6 +256,7 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 	const [recentLanguages, setRecentLanguages] = usePersisted<{ code: string; ts: number }[]>(CONFIG_KEYS.recentLanguages, [])
 	const [diarizeEnabled, setDiarizeEnabled] = usePersisted<boolean>(CONFIG_KEYS.diarizeEnabled, false)
 	const [stableTimestampsEnabled, setStableTimestampsEnabled] = usePersisted<boolean>(CONFIG_KEYS.stableTimestampsEnabled, false)
+	const [chunkSeconds, setChunkSeconds] = usePersisted<number | null>(CONFIG_KEYS.chunkSeconds, null)
 	const [storedExportOptions, setStoredExportOptions] = usePersisted<Partial<ExportOptions>>(CONFIG_KEYS.exportOptions, DEFAULT_EXPORT_OPTIONS)
 	// One key holding several settings can be half-written by an older build or a hand-edited
 	// config, and a missing field would reach the exporter as `undefined`. Defaults fill the gaps,
@@ -460,6 +464,8 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 		setDiarizeEnabled,
 		stableTimestampsEnabled,
 		setStableTimestampsEnabled,
+		chunkSeconds,
+		setChunkSeconds,
 		exportOptions,
 		setExportOptions,
 		gpuDevice,

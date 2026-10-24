@@ -279,6 +279,8 @@ fn whisper_is_never_planned() {
     }];
     // Even with diarization present, Whisper keeps its internal long-form path.
     assert!(crate::server::transcription::plan_for(&mut engine, &samples, &diar, None, None).is_none());
+    // And without diarization there is nothing to plan for it either.
+    assert!(crate::server::transcription::plan_for(&mut engine, &samples, &[], None, None).is_none());
     assert!(engine
         .transcribe_chunks(
             &samples,
@@ -289,6 +291,23 @@ fn whisper_is_never_planned() {
             transcription_options(None)
         )
         .is_err());
+}
+
+/// Planning is not diarization-only: a bounded engine plans from detected
+/// speech alone, so caching and resume apply to plain runs too.
+#[test]
+fn gigaam_plans_without_diarization() {
+    let (Some(mut engine), Some(vad), Some(samples)) = (gigaam_engine(), vad_model(), audio()) else {
+        return;
+    };
+    let bound = engine.max_input_seconds().expect("GigaAM is bounded");
+    let plan = crate::server::transcription::plan_for(&mut engine, &samples, &[], Some(&vad), None)
+        .expect("a plan without diarization");
+    assert!(!plan.chunks.is_empty(), "speech is planned");
+    for chunk in &plan.chunks {
+        assert!(chunk.core_end - chunk.core_start <= bound + f64::EPSILON, "chunk over the bound: {chunk:?}");
+        assert!(chunk.speakers.is_empty(), "no speakers without diarization: {chunk:?}");
+    }
 }
 
 #[test]

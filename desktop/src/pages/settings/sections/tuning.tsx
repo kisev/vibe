@@ -2,8 +2,18 @@ import { ChevronRight, SlidersHorizontal, AudioLines } from 'lucide-react'
 import { DEFAULT_MODEL_OPTIONS } from '~/providers/preference'
 import { hidesWhisperOnlyOptions } from '~/lib/model'
 import { m } from '~/paraglide/messages.js'
+import { Input } from '~/components/ui/input'
 import { Switch } from '~/components/ui/switch'
 import { ActionRow, SettingsGroup, SettingsNote, SettingsRow, type SettingsViewModel } from './shared'
+
+/** '' means the engine default; anything finite is clamped into [1, max]. The UI clamps for
+ * friendliness while the server stays the source of truth. */
+export function parseChunkSeconds(raw: string, max: number): number | null {
+	if (raw === '') return null
+	const parsed = Number(raw)
+	if (!Number.isFinite(parsed)) return null
+	return Math.max(1, Math.min(parsed, max))
+}
 
 export function TuningSection({ vm, onOpenWhisper, onOpenAudio }: { vm: SettingsViewModel; onOpenWhisper: () => void; onOpenAudio: () => void }) {
 	const options = vm.preference.modelOptions
@@ -31,6 +41,27 @@ export function TuningSection({ vm, onOpenWhisper, onOpenAudio }: { vm: Settings
 				)}
 				{whisperOnlyHidden && <SettingsNote>{m.whisperOnlyOptionsNote()}</SettingsNote>}
 			</SettingsGroup>
+			{vm.preference.modelMetadata?.capabilities.max_input_seconds != null && (
+				<SettingsGroup title={m.longRecordings()}>
+					<SettingsRow
+						label={m.chunkLength()}
+						description={m.chunkLengthInfo({ max: vm.preference.modelMetadata.capabilities.max_input_seconds })}>
+						<Input
+							type="number"
+							min={1}
+							max={vm.preference.modelMetadata.capabilities.max_input_seconds}
+							step={1}
+							aria-label={m.chunkLength()}
+							className="w-24"
+							value={vm.preference.chunkSeconds ?? ''}
+							onChange={(event) => {
+								const parsed = parseChunkSeconds(event.target.value, vm.preference.modelMetadata!.capabilities.max_input_seconds!)
+								vm.preference.setChunkSeconds(parsed)
+							}}
+						/>
+					</SettingsRow>
+				</SettingsGroup>
+			)}
 			<SettingsGroup>
 				{!whisperOnlyHidden && (
 					<ActionRow

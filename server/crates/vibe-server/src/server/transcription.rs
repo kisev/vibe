@@ -147,9 +147,11 @@ fn chunk_seconds_error(requested: Option<f64>, maximum: Option<f64>) -> Option<S
     }
 }
 
-/// Build the chunk plan when the engine accepts explicit chunks and a
-/// diarization model supplied the turns. Without either, the engine keeps its
-/// own VAD chunking and speakers stay attributed by overlap.
+/// Build the chunk plan when the engine accepts explicit chunks. A plan exists
+/// for every bounded engine with or without diarization turns: without turns,
+/// each detected speech range becomes its own chunk with an empty speaker set
+/// and speakers stay attributed by overlap. Engines without a bound (whisper)
+/// keep their own internal long-form path and are never planned.
 pub(crate) fn plan_for(
     ctx: &mut Engine,
     samples: &[f32],
@@ -158,9 +160,6 @@ pub(crate) fn plan_for(
     chunk_seconds: Option<f64>,
 ) -> Option<Plan> {
     let maximum = ctx.max_input_seconds()?;
-    if diar_segments.is_empty() {
-        return None;
-    }
     let speech = match ctx.speech_ranges(samples, vad_model_path) {
         Ok(ranges) => ranges,
         Err(err) => {
@@ -168,6 +167,17 @@ pub(crate) fn plan_for(
             return None;
         }
     };
+    let duration = samples.len() as f64 / plan::SAMPLE_RATE;
+    Some(build_plan(duration, diar_segments, &speech, chunk_seconds, maximum))
+}
+
+fn build_plan(
+    duration: f64,
+    diar_segments: &[diarization::Segment],
+    speech: &[(f64, f64)],
+    chunk_seconds: Option<f64>,
+    maximum: f64,
+) -> Plan {
     let max_input_seconds = chunk_seconds.map_or(maximum, |value| value.min(maximum));
     let settings = Settings {
         max_input_seconds,
@@ -182,8 +192,7 @@ pub(crate) fn plan_for(
             speaker: u16::try_from(segment.speaker_id).unwrap_or(u16::MAX),
         })
         .collect();
-    let duration = samples.len() as f64 / plan::SAMPLE_RATE;
-    Some(plan::plan(duration, &turns, &speech, settings))
+    plan::plan(duration, &turns, speech, settings)
 }
 
 pub(super) fn build_options(
@@ -269,5 +278,25 @@ mod tests {
         assert!(options.stable_timestamps);
         assert!(options.language.is_none());
         assert!(!options.translate);
+    }
+
+    #[test]
+    fn a_bounded_engine_plans_from_speech_without_diarization() {
+        let speech = vec![(0.0, 9.9), (10.5, 19.4), (25.0, 40.0)];
+        let plan = build_plan(60.0, &[], &speech, None, 25.0);
+        assert!(!plan.chunks.is_empty(), "speech is planned, not dropped");
+        for chunk in &plan.chunks {
+            assert!(chunk.core_end - chunk.core_start <= 25.0 + f64::EPSILON, "chunk over the bound: {chunk:?}");
+            assert!(chunk.speakers.is_empty(), "unattributed chunk carries no speakers: {chunk:?}");
+        }
+    }
+
+    #[test]
+    fn a_custom_bound_still_plans_without_diarization() {
+        let speech = vec![(0.0, 30.0)];
+        let plan = build_plan(30.0, &[], &speech, Some(10.0), 25.0);
+        for chunk in &plan.chunks {
+            assert!(chunk.core_end - chunk.core_start <= 10.0 + f64::EPSILON, "custom bound ignored: {chunk:?}");
+        }
     }
 }

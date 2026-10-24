@@ -49,6 +49,8 @@ pub struct TranscribeOptions {
     pub diarize_model: Option<String>,
     pub stable_timestamps: Option<bool>,
     pub vad_model: Option<String>,
+    /// Upper bound per model input for long recordings; None uses the engine maximum.
+    pub chunk_seconds: Option<f64>,
 }
 
 pub(crate) const SERVER_DIED: &str = "vibe-server process died during transcription";
