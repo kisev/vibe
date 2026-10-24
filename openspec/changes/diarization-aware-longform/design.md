@@ -52,6 +52,10 @@ Alternatives: planning inside each model crate (duplicates diarization handling 
 
 Diarization segments are swept into turns: intervals are merged when a gap is below a small threshold, and sub-threshold boundary slivers are absorbed into a neighbor while preserving the union of speaker ids. This is the same semantics the external script used, and it is why a boundary chunk carries `[1, 2]` rather than picking one speaker.
 
+### Speech diarization missed still reaches the model
+
+Diarization does not cover every speech range: a speaker past the model's limit, or a noisy passage, stays unlabeled. The planner keeps those speech ranges — the ones VAD found and no turn covers — as their own chunks with an empty speaker set, because dropping them would silently lose words. Their segments carry no planned speaker and fall back to overlap matching, exactly as they do without a plan.
+
 ### Cut selection
 
 For each turn: left and right limits are the midpoints to neighboring turns; the preferred length is the engine target (about 20 seconds for GigaAM, the existing default elsewhere); when a cut is required, the planner searches pauses within the allowed window, stays inside the pause by a small inset, and picks the pause nearest the preferred length. If no pause fits, the cut lands on the bound. Cut boundaries are rounded to samples to keep the plan deterministic.

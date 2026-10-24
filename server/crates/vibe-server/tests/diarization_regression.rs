@@ -177,10 +177,10 @@ fn diarization_bounds_change_where_the_cuts_fall_not_the_words() {
             };
             let sets: Vec<u64> = serde_json::from_value(sets.clone()).expect("speaker ids");
             assert!(!sets.is_empty(), "{}: an empty speaker set was reported", engine.name);
-            assert_eq!(
-                segment["speaker"].as_u64(),
-                Some(sets[0]),
-                "{}: `speaker` must be the first planned id",
+            let reported = segment["speaker"].as_u64().expect("speaker");
+            assert!(
+                sets.contains(&reported),
+                "{}: `speaker` {reported} is not one of the planned ids {sets:?}",
                 engine.name
             );
             planned_sets += 1;

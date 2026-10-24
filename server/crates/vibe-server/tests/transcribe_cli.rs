@@ -220,6 +220,53 @@ fn gigaam_cli_caches_finished_chunks() {
     assert_eq!(before, after, "cached chunks are not rewritten");
 }
 
+/// The cache is an optimization, not part of the result: the same inputs must
+/// produce the same transcript whether or not a directory is configured.
+#[test]
+fn gigaam_cli_output_does_not_depend_on_the_cache() {
+    let (Some(model), Some(audio), Some(vad), Some(diar)) = (
+        gated_path("GIGAAM_MODEL"),
+        gated_path("GIGAAM_AUDIO"),
+        gated_path("GIGAAM_VAD"),
+        gated_path("GIGAAM_DIARIZE"),
+    ) else {
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let cache = dir.path().to_str().unwrap();
+
+    let plain = run_transcribe(&[
+        &model,
+        &audio,
+        "--vad-model",
+        &vad,
+        "--diarize-model",
+        &diar,
+        "--format",
+        "json",
+    ]);
+    assert!(plain.status.success(), "uncached run failed: {}", text(&plain.stderr));
+    let cached = run_transcribe(&[
+        &model,
+        &audio,
+        "--vad-model",
+        &vad,
+        "--diarize-model",
+        &diar,
+        "--format",
+        "json",
+        "--cache-dir",
+        cache,
+    ]);
+    assert!(cached.status.success(), "cached run failed: {}", text(&cached.stderr));
+
+    assert_eq!(
+        text(&plain.stdout),
+        text(&cached.stdout),
+        "the cache must not change the transcript"
+    );
+}
+
 fn walk(root: &std::path::Path) -> Vec<std::path::PathBuf> {
     let mut files = Vec::new();
     let Ok(entries) = std::fs::read_dir(root) else {

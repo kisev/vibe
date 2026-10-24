@@ -14,6 +14,41 @@ use crate::server::transcription::build_options;
 use crate::server::unload_timeout::ModelLease;
 use crate::server::{error, format};
 
+/// The NDJSON event for one segment. A planned chunk supplies the speaker set
+/// and names its dominant speaker; without one, speakers come from overlap.
+fn segment_event(
+    segment: &whisper_rs::Segment,
+    plan: Option<&crate::plan::Plan>,
+    diarization: &[diarization::Segment],
+) -> serde_json::Value {
+    let start = format::cs_to_seconds(segment.start);
+    let end = format::cs_to_seconds(segment.end);
+    let mut event = serde_json::json!({
+        "type": "segment",
+        "start": start,
+        "end": end,
+        "text": segment.text,
+        "no_speech_prob": segment.no_speech_prob,
+    });
+    let planned = plan
+        .and_then(|plan| format::planned_chunk(plan, start, end))
+        .filter(|chunk| !chunk.speakers.is_empty());
+    match planned {
+        Some(chunk) => {
+            if let Some(speaker) = format::dominant_speaker(chunk, diarization) {
+                event["speaker"] = serde_json::json!(speaker);
+            }
+            event["speakers"] = serde_json::json!(chunk.speakers);
+        }
+        None => {
+            if let Some(speaker) = format::match_speaker(start, end, diarization) {
+                event["speaker"] = serde_json::json!(speaker);
+            }
+        }
+    }
+    event
+}
+
 pub(super) fn stream_transcription(
     config: AppConfig,
     mut model: ModelLease,
@@ -78,33 +113,7 @@ pub(super) fn stream_transcription(
                 }
             })),
             on_segment: Some(Box::new(move |segment| {
-                let start = format::cs_to_seconds(segment.start);
-                let end = format::cs_to_seconds(segment.end);
-                let mut event = serde_json::json!({
-                    "type": "segment",
-                    "start": start,
-                    "end": end,
-                    "text": segment.text,
-                    "no_speech_prob": segment.no_speech_prob,
-                });
-                let planned = segment_plan.as_ref().map(|plan| {
-                    let middle = (start + end) / 2.0;
-                    plan.chunks
-                        .iter()
-                        .find(|chunk| middle >= chunk.core_start && middle <= chunk.core_end)
-                        .map_or_else(Vec::new, |chunk| chunk.speakers.clone())
-                });
-                match planned.filter(|set| !set.is_empty()) {
-                    Some(set) => {
-                        event["speaker"] = serde_json::json!(set[0]);
-                        event["speakers"] = serde_json::json!(set);
-                    }
-                    None => {
-                        if let Some(speaker) = format::match_speaker(start, end, &segment_diar_segments) {
-                            event["speaker"] = serde_json::json!(speaker);
-                        }
-                    }
-                }
+                let event = segment_event(&segment, segment_plan.as_ref(), &segment_diar_segments);
                 if send_event(&segment_tx, event).is_err() {
                     abort_for_segment.store(true, Ordering::SeqCst);
                 }
@@ -168,4 +177,75 @@ fn send_event(
     let mut line = serde_json::to_vec(&value).map_err(|_| ())?;
     line.push(b'\n');
     tx.send(Ok(bytes::Bytes::from(line))).map_err(|_| ())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::plan::{Chunk, Plan};
+
+    fn segment(start: i64, end: i64) -> whisper_rs::Segment {
+        whisper_rs::Segment {
+            start,
+            end,
+            text: "hello".to_string(),
+            no_speech_prob: 0.0,
+        }
+    }
+
+    fn turn(start: f64, end: f64, speaker_id: usize) -> diarization::Segment {
+        diarization::Segment { start, end, speaker_id }
+    }
+
+    fn plan(speakers: Vec<u16>) -> Plan {
+        Plan {
+            chunks: vec![Chunk {
+                input_start: 10.0,
+                input_end: 20.0,
+                core_start: 10.0,
+                core_end: 20.0,
+                speakers,
+            }],
+            max_input_seconds: 30.0,
+        }
+    }
+
+    #[test]
+    fn a_boundary_event_names_the_dominant_speaker_and_the_whole_set() {
+        let plan = plan(vec![1, 2]);
+        let diarization = [turn(10.0, 11.0, 1), turn(14.0, 19.0, 2)];
+        let event = segment_event(&segment(1500, 1900), Some(&plan), &diarization);
+
+        assert_eq!(event["speaker"], 2);
+        assert_eq!(event["speakers"], serde_json::json!([1, 2]));
+    }
+
+    #[test]
+    fn a_single_speaker_event_is_unchanged() {
+        let plan = plan(vec![1]);
+        let diarization = [turn(10.0, 11.0, 1)];
+        let event = segment_event(&segment(1500, 1900), Some(&plan), &diarization);
+
+        assert_eq!(event["speaker"], 1);
+        assert_eq!(event["speakers"], serde_json::json!([1]));
+    }
+
+    #[test]
+    fn without_a_plan_the_event_keeps_overlap_attribution() {
+        let diarization = [turn(15.0, 19.0, 3)];
+        let event = segment_event(&segment(1500, 1900), None, &diarization);
+
+        assert_eq!(event["speaker"], 3);
+        assert!(event.get("speakers").is_none());
+    }
+
+    #[test]
+    fn an_unattributed_chunk_leaves_the_event_unplanned() {
+        let plan = plan(Vec::new());
+        let diarization = [turn(15.0, 19.0, 3)];
+        let event = segment_event(&segment(1500, 1900), Some(&plan), &diarization);
+
+        assert_eq!(event["speaker"], 3);
+        assert!(event.get("speakers").is_none());
+    }
 }

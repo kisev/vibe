@@ -100,14 +100,17 @@ See the full API reference here:
 
 Long files are split into model inputs before inference. With a diarization
 model the split follows speaker turns, so one input never mixes two speakers
-except at an explicitly marked boundary; without one, the engine's own VAD
+except at an explicitly marked boundary. Speech the diarization model missed —
+a speaker past its limit, a noisy passage — is still transcribed, in its own
+input without a speaker. Without a diarization model the engine's own VAD
 splitting is used as before. Segments from a planned chunk carry the chunk's
-`speakers` array: one id, or several on a boundary line, which `speaker` pins
-to the first of them.
+`speakers` array: one id, or several on a boundary line, whose `speaker` names
+the one covering most of it.
 
-- `--chunk-seconds <n>` sets the planned input length. It defaults to the
-  engine maximum (25 s for GigaAM, 30 s for Parakeet and Nemotron) and cannot
-  exceed it.
+- The planner aims at about 20 seconds per input, never exceeds the engine
+  maximum, and prefers cutting in a pause near that target.
+- `--chunk-seconds <n>` lowers that ceiling. It defaults to the engine maximum
+  (25 s for GigaAM, 30 s for Parakeet and Nemotron) and cannot exceed it.
 - `--cache-dir <path>` (or `VIBE_SERVER_CACHE_DIR`) stores the chunk plan and
   every finished chunk, so a run killed half-way resumes instead of starting
   over. The key covers the decoded audio, the model, the engine, the options

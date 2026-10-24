@@ -208,8 +208,12 @@ pub async fn get_gpu_devices(app_handle: tauri::AppHandle) -> Result<Vec<crate::
 /// app and never mixes with user files.
 pub(crate) fn transcription_cache_dir(app_handle: &tauri::AppHandle) -> Option<std::path::PathBuf> {
     use tauri::Manager as _;
-    let root = app_handle.path().app_local_data_dir().ok()?;
-    Some(root.join("transcribe-cache"))
+    Some(cache_dir_under(app_handle.path().app_local_data_dir().ok()?))
+}
+
+/// Where the cache sits inside the app's local data directory.
+fn cache_dir_under(root: std::path::PathBuf) -> std::path::PathBuf {
+    root.join("transcribe-cache")
 }
 
 #[tauri::command]
@@ -285,4 +289,15 @@ pub async fn stop_api_server(app_handle: tauri::AppHandle, server_state: State<'
         return Ok(true);
     }
     Ok(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cache_dir_under;
+
+    #[test]
+    fn the_cache_sits_under_the_app_local_data_directory() {
+        let dir = cache_dir_under(std::path::PathBuf::from("/data/app"));
+        assert_eq!(dir, std::path::Path::new("/data/app/transcribe-cache"));
+    }
 }

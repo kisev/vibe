@@ -89,8 +89,7 @@ pub fn format_json(
     diar_segments: &[diarization::Segment],
     plan: Option<&crate::plan::Plan>,
 ) -> String {
-    let sets = plan.map(|plan| planned_speakers(result, plan));
-    serde_json::to_string_pretty(&build_verbose_json(result, diar_segments, sets.as_deref())).unwrap_or_else(|_| "{}".into())
+    serde_json::to_string_pretty(&build_verbose_json(result, diar_segments, plan)).unwrap_or_else(|_| "{}".into())
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -116,25 +115,28 @@ pub struct VerboseSegment {
 pub fn build_verbose_json(
     result: &TranscribeResult,
     diar_segments: &[diarization::Segment],
-    speaker_sets: Option<&[Vec<u16>]>,
+    plan: Option<&crate::plan::Plan>,
 ) -> VerboseJson {
     VerboseJson {
         text: result.text(),
         segments: result
             .segments
             .iter()
-            .enumerate()
-            .map(|(index, segment)| {
-                let planned = speaker_sets.and_then(|sets| sets.get(index)).filter(|set| !set.is_empty());
+            .map(|segment| {
+                let start = cs_to_seconds(segment.start);
+                let end = cs_to_seconds(segment.end);
+                let planned = plan
+                    .and_then(|plan| planned_chunk(plan, start, end))
+                    .filter(|chunk| !chunk.speakers.is_empty());
                 VerboseSegment {
-                    start: cs_to_seconds(segment.start),
-                    end: cs_to_seconds(segment.end),
+                    start,
+                    end,
                     text: segment.text.clone(),
                     speaker: planned.map_or_else(
-                        || match_speaker(cs_to_seconds(segment.start), cs_to_seconds(segment.end), diar_segments),
-                        |set| Some(usize::from(set[0])),
+                        || match_speaker(start, end, diar_segments),
+                        |chunk| dominant_speaker(chunk, diar_segments).map(usize::from),
                     ),
-                    speakers: planned.cloned(),
+                    speakers: planned.map(|chunk| chunk.speakers.clone()),
                     no_speech_prob: segment.no_speech_prob,
                 }
             })
@@ -142,24 +144,46 @@ pub fn build_verbose_json(
     }
 }
 
-/// The speaker set of the planned chunk each segment's middle falls into.
-pub fn planned_speakers(result: &TranscribeResult, plan: &crate::plan::Plan) -> Vec<Vec<u16>> {
-    result
-        .segments
+/// The planned chunk a segment belongs to: the one whose core holds its middle,
+/// else the nearest one, so a segment that overhangs a boundary still reports
+/// the speakers of the input it came from.
+pub fn planned_chunk(plan: &crate::plan::Plan, start: f64, end: f64) -> Option<&crate::plan::Chunk> {
+    let middle = (start + end) / 2.0;
+    plan.chunks
         .iter()
-        .map(|segment| {
-            let middle = (cs_to_seconds(segment.start) + cs_to_seconds(segment.end)) / 2.0;
+        .find(|chunk| middle >= chunk.core_start && middle <= chunk.core_end)
+        .or_else(|| {
             plan.chunks
                 .iter()
-                .find(|chunk| middle >= chunk.core_start && middle <= chunk.core_end)
-                .or_else(|| {
-                    plan.chunks
-                        .iter()
-                        .min_by(|a, b| distance(a, middle).total_cmp(&distance(b, middle)))
-                })
-                .map_or_else(Vec::new, |chunk| chunk.speakers.clone())
+                .min_by(|a, b| distance(a, middle).total_cmp(&distance(b, middle)))
         })
-        .collect()
+}
+
+/// The chunk's most likely speaker: the id whose diarization turns cover the
+/// most of its core. Ties and chunks with nothing to measure fall back to the
+/// lowest id, so the singular field is always one of the reported set.
+pub fn dominant_speaker(chunk: &crate::plan::Chunk, diarization: &[diarization::Segment]) -> Option<u16> {
+    let mut covered: Vec<(u16, f64)> = Vec::new();
+    for segment in diarization {
+        let Ok(speaker) = u16::try_from(segment.speaker_id) else {
+            continue;
+        };
+        if !chunk.speakers.contains(&speaker) {
+            continue;
+        }
+        let overlap = segment.end.min(chunk.core_end) - segment.start.max(chunk.core_start);
+        if overlap <= 0.0 {
+            continue;
+        }
+        match covered.iter_mut().find(|(id, _)| *id == speaker) {
+            Some((_, total)) => *total += overlap,
+            None => covered.push((speaker, overlap)),
+        }
+    }
+    let best = covered
+        .into_iter()
+        .max_by(|(left_id, left), (right_id, right)| left.total_cmp(right).then(right_id.cmp(left_id)));
+    best.map_or_else(|| chunk.speakers.iter().copied().min(), |(id, _)| Some(id))
 }
 
 fn distance(chunk: &crate::plan::Chunk, point: f64) -> f64 {
@@ -363,6 +387,10 @@ mod planner_tests {
         }
     }
 
+    fn turn(start: f64, end: f64, speaker_id: usize) -> diarization::Segment {
+        diarization::Segment { start, end, speaker_id }
+    }
+
     fn plan() -> Plan {
         Plan {
             chunks: vec![
@@ -394,19 +422,69 @@ mod planner_tests {
 
     #[test]
     fn each_segment_carries_its_chunk_speakers() {
-        let sets = planned_speakers(&result(), &plan());
+        let plan = plan();
+        let result = result();
+        let sets: Vec<_> = result
+            .segments
+            .iter()
+            .map(|segment| {
+                planned_chunk(&plan, cs_to_seconds(segment.start), cs_to_seconds(segment.end))
+                    .map_or_else(Vec::new, |chunk| chunk.speakers.clone())
+            })
+            .collect();
         assert_eq!(sets, vec![vec![1], vec![1, 2]]);
     }
 
     #[test]
     fn verbose_json_reports_the_union_for_a_boundary_chunk() {
         let result = result();
-        let sets = planned_speakers(&result, &plan());
-        let json = build_verbose_json(&result, &[], Some(&sets));
+        let json = build_verbose_json(&result, &[], Some(&plan()));
         assert_eq!(json.segments[0].speaker, Some(1));
         assert_eq!(json.segments[0].speakers, Some(vec![1]));
         assert_eq!(json.segments[1].speaker, Some(1));
         assert_eq!(json.segments[1].speakers, Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn a_boundary_chunk_names_the_speaker_who_covers_most_of_it() {
+        let result = result();
+        // Inside the 10-20 s chunk speaker 2 talks for four seconds, speaker 1 for one.
+        let diar = [turn(10.0, 11.0, 1), turn(14.0, 19.0, 2)];
+        let json = build_verbose_json(&result, &diar, Some(&plan()));
+        assert_eq!(json.segments[1].speaker, Some(2));
+        assert_eq!(json.segments[1].speakers, Some(vec![1, 2]));
+        // The single-speaker chunk is unaffected.
+        assert_eq!(json.segments[0].speaker, Some(1));
+    }
+
+    #[test]
+    fn equal_coverage_reports_the_lower_id() {
+        let result = result();
+        let diar = [turn(10.0, 12.0, 2), turn(12.0, 14.0, 1)];
+        let json = build_verbose_json(&result, &diar, Some(&plan()));
+        assert_eq!(json.segments[1].speaker, Some(1));
+        assert_eq!(json.segments[1].speakers, Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn a_chunk_without_ranking_data_keeps_the_lowest_id() {
+        let result = result();
+        // Diarization reports a speaker outside the chunk, so nothing covers it.
+        let diar = [turn(0.0, 1.0, 2)];
+        let json = build_verbose_json(&result, &diar, Some(&plan()));
+        assert_eq!(json.segments[1].speaker, Some(1));
+        assert_eq!(json.segments[1].speakers, Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn an_unattributed_chunk_falls_back_to_overlap() {
+        let mut plan = plan();
+        plan.chunks[1].speakers = Vec::new();
+        let result = result();
+        let diar = [turn(15.0, 19.0, 3)];
+        let json = build_verbose_json(&result, &diar, Some(&plan));
+        assert_eq!(json.segments[1].speakers, None);
+        assert_eq!(json.segments[1].speaker, Some(3));
     }
 
     #[test]
@@ -416,6 +494,20 @@ mod planner_tests {
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         let segments = value["segments"].as_array().unwrap();
         assert_eq!(segments[0]["speakers"], serde_json::json!([1]));
+        assert_eq!(segments[0]["speaker"], 1);
+        assert_eq!(segments[1]["speakers"], serde_json::json!([1, 2]));
+        assert_eq!(segments[1]["speaker"], 1);
+    }
+
+    #[test]
+    fn the_cli_json_names_the_dominant_speaker_on_a_boundary_chunk() {
+        let result = result();
+        let diar = [turn(10.0, 11.0, 1), turn(14.0, 19.0, 2)];
+        let json = format_json(&result, &diar, Some(&plan()));
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let segments = value["segments"].as_array().unwrap();
+        assert_eq!(segments[0]["speaker"], 1);
+        assert_eq!(segments[1]["speaker"], 2);
         assert_eq!(segments[1]["speakers"], serde_json::json!([1, 2]));
     }
 

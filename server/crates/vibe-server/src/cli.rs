@@ -104,6 +104,17 @@ pub struct AppConfig {
     cache_dir: Option<&'static str>,
 }
 
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            verbose: false,
+            version: VERSION,
+            commit: COMMIT,
+            cache_dir: None,
+        }
+    }
+}
+
 impl AppConfig {
     pub fn verbose(&self) -> bool {
         self.verbose
@@ -280,7 +291,7 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
     });
     let result = match (plan.as_ref(), config.cache_dir()) {
         (Some(plan), Some(root)) => {
-            crate::server::transcription::transcribe_cached(&mut ctx, &args.model, &samples, plan, &options, root, options_json)
+            crate::server::chunk_cache::transcribe_cached(&mut ctx, &args.model, &samples, plan, &options, root, options_json)
         }
         (Some(plan), None) => ctx.transcribe_chunks(&samples, plan, options),
         (None, _) => ctx.transcribe(&samples, options),

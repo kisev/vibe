@@ -420,6 +420,29 @@ mod tests {
     }
 
     #[test]
+    fn a_gap_without_speech_produces_no_chunk() {
+        let diarization = [
+            DiarSegment {
+                start: 0.0,
+                end: 4.0,
+                speaker: 1,
+            },
+            DiarSegment {
+                start: 10.0,
+                end: 14.0,
+                speaker: 2,
+            },
+        ];
+        // VAD hears nothing between the turns, so the silence is not planned.
+        let speech = [speech(0.0, 4.0), speech(10.0, 14.0)];
+        let plan = plan(14.0, &diarization, &speech, settings(30.0));
+
+        assert_eq!(plan.chunks.len(), 2);
+        assert_eq!(plan.chunks[0].speakers, vec![1]);
+        assert_eq!(plan.chunks[1].speakers, vec![2]);
+    }
+
+    #[test]
     fn a_turn_exactly_at_the_bound_is_not_split() {
         let diarization = [DiarSegment {
             start: 0.0,

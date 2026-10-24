@@ -1,3 +1,4 @@
+pub(crate) mod chunk_cache;
 pub(crate) mod diarization;
 mod form;
 pub(crate) mod format;
@@ -355,5 +356,64 @@ mod tests {
         let err = anyhow::anyhow!("boom");
         assert_eq!(engine_error_code(&err), "internal_error");
         assert_eq!(engine_error_status(&err), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    use axum::body::{to_bytes, Body};
+    use axum::extract::{FromRequest, Multipart, Request, State};
+    use axum::http::StatusCode;
+
+    fn state_with(model: &str) -> AppState {
+        let mut state = ServerState::new();
+        state.load_model(model, -1, Some(true)).expect("load model");
+        let inner = Arc::new(Mutex::new(state));
+        AppState {
+            unload_timeout: unload_timeout::UnloadTimeoutRuntime::start("0".parse().expect("timeout"), inner.clone()),
+            inner,
+            config: AppConfig::default(),
+        }
+    }
+
+    /// A multipart body with `fields` plus a `file` field whose content is `text`.
+    fn multipart_request(fields: &[(&str, &str)], file: &str) -> Request {
+        let boundary = "vibe-test-boundary";
+        let mut body = String::new();
+        for (name, value) in fields {
+            body.push_str(&format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n"
+            ));
+        }
+        body.push_str(&format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"junk.wav\"\r\nContent-Type: audio/wav\r\n\r\n{file}\r\n--{boundary}--\r\n"
+        ));
+        Request::builder()
+            .method("POST")
+            .uri("/v1/audio/transcriptions")
+            .header("content-type", format!("multipart/form-data; boundary={boundary}"))
+            .body(Body::from(body))
+            .expect("request")
+    }
+
+    /// The bound is known before any audio is decoded, so a request that can
+    /// never succeed fails as an invalid form value, not as invalid audio.
+    #[tokio::test]
+    async fn an_oversized_chunk_seconds_is_rejected_before_the_audio_is_read() {
+        let Some(model) = std::env::var("GIGAAM_MODEL").ok().filter(|path| Path::new(path).exists()) else {
+            eprintln!("skipping: GIGAAM_MODEL is not set");
+            return;
+        };
+        let request = multipart_request(&[("chunk_seconds", "100")], "not audio");
+        let multipart = Multipart::from_request(request, &()).await.expect("multipart");
+        let response = routes::transcriptions::transcriptions(State(state_with(&model)), multipart).await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = to_bytes(response.into_body(), usize::MAX).await.expect("body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json");
+        assert_eq!(json["error"]["code"], "invalid_request", "{json}");
+        assert!(
+            json["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("25")),
+            "the message names the allowed maximum: {json}"
+        );
     }
 }
