@@ -1,8 +1,14 @@
-<!-- source: 674c5e6aa04b -->
+<!-- source: 2b80fd9e5daa -->
 
 # 🌟 Modele Vibe 🌟
 
 Witamy na stronie modeli Vibe! Znajdziesz tu wyselekcjonowaną listę modeli polecanych do użycia z Vibe. Aby zainstalować model, użyj linku „Magiczna konfiguracja”, aby otworzyć go w Vibe, lub skopiuj i wklej bezpośredni link do pobrania w ustawieniach Vibe.
+
+## Długie nagrania
+
+Nagranie dłuższe niż okno wejściowe modelu jest dzielone na fragmenty przed rozpoznawaniem. Gdy rozpoznawanie mówców jest włączone, podział przebiega wzdłuż wykrytych wypowiedzi, więc jeden fragment nigdy nie miesza dwóch mówców — poza miejscem, w którym ich wypowiedzi się stykają. Te linie pokazują obu mówców ze znakiem „?” i można przypisać je jednemu z nich. GigaAM (25 s), Parakeet (30 s) i Nemotron (30 s) dzielą w ten sposób; Whisper zachowuje własną obsługę długich nagrań.
+
+Gotowe fragmenty są przechowywane na Twoim komputerze, więc ponowne uruchomienie długiego pliku z tymi samymi ustawieniami wznawia pracę od miejsca zatrzymania. Pamięć podręczna zawiera tekst transkrypcji, plan fragmentów i znacznik modelu — nigdy dźwięk — i nie opuszcza Twojego urządzenia. Aplikacja usuwa przy starcie wpisy nietknięte przez 30 dni. W wierszu poleceń włącz ją za pomocą `--cache-dir <folder>` i usuń ten folder, aby ją wyczyścić; `--chunk-seconds <n>` ustawia planowaną długość i nie może przekroczyć okna modelu.
 
 ## Dostępne modele
 

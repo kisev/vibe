@@ -1,8 +1,14 @@
-<!-- source: 674c5e6aa04b -->
+<!-- source: 2b80fd9e5daa -->
 
 # 🌟 Modèles Vibe 🌟
 
 Bienvenue sur la page des modèles Vibe ! Vous trouverez ici une liste organisée de modèles suggérés à utiliser avec Vibe. Pour installer un modèle, utilisez le lien « Configuration magique » pour l'ouvrir dans Vibe, ou copiez-collez le lien de téléchargement direct dans les paramètres de Vibe.
+
+## Enregistrements longs
+
+Un enregistrement plus long que la fenêtre d'entrée d'un modèle est découpé en segments avant l'inférence. Lorsque la reconnaissance du locuteur est activée, le découpage suit les tours de parole détectés, de sorte qu'un segment ne mélange jamais deux locuteurs, sauf là où leurs tours se rencontrent — ces lignes affichent les deux locuteurs avec un « ? » et peuvent être attribuées à l'un d'eux. GigaAM (25 s), Parakeet (30 s) et Nemotron (30 s) effectuent ce découpage ; Whisper conserve sa propre gestion des enregistrements longs.
+
+Les segments terminés sont conservés sur votre ordinateur, de sorte que relancer un fichier long avec les mêmes paramètres reprend là où il s'est arrêté. Le cache contient le texte de la transcription, le plan des segments et une empreinte du modèle — jamais l'audio — et ne quitte jamais votre appareil. L'application supprime au démarrage les entrées non modifiées depuis 30 jours. En ligne de commande, activez le cache avec `--cache-dir <dossier>` et supprimez ce dossier pour le vider ; `--chunk-seconds <n>` définit la longueur planifiée et ne peut pas dépasser la fenêtre du modèle.
 
 ## Modèles disponibles
 

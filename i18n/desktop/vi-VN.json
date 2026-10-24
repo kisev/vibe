@@ -577,6 +577,7 @@
 	"assignSpeaker": "Gán người nói",
 	"newSpeaker": "Người nói mới",
 	"speakerOfThisLine": "Dòng này",
+	"speakerUncertain": "Có thể thuộc một trong hai người nói — dòng này nằm ở chỗ hai lượt nói gặp nhau",
 	"linkOfTotal": "{current} / {total}",
 	"linksSkipped": "Không tải được {count} trong {total} liên kết",
 	"pasteAnotherLink": "Dán một liên kết khác",

@@ -577,6 +577,7 @@
 	"assignSpeaker": "Assigna un parlant",
 	"newSpeaker": "Parlant nou",
 	"speakerOfThisLine": "Aquesta línia",
+	"speakerUncertain": "Pot ser qualsevol dels dos parlants — aquesta línia és on es troben dos torns",
 	"linkOfTotal": "{current} de {total}",
 	"linksSkipped": "No s'han pogut baixar {count} de {total} enllaços",
 	"pasteAnotherLink": "Enganxa un altre enllaç",

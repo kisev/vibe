@@ -577,6 +577,7 @@
 	"assignSpeaker": "वक्ता निर्धारित करें",
 	"newSpeaker": "नया वक्ता",
 	"speakerOfThisLine": "यह पंक्ति",
+	"speakerUncertain": "दोनों में से कोई भी वक्ता हो सकता है — यह पंक्ति दो बारियों के मिलन-स्थल पर है",
 	"linkOfTotal": "{total} में से {current}",
 	"linksSkipped": "{total} में से {count} लिंक डाउनलोड नहीं हो सके",
 	"pasteAnotherLink": "एक और लिंक चिपकाएँ",

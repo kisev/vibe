@@ -577,6 +577,7 @@
 	"assignSpeaker": "Attribuer un locuteur",
 	"newSpeaker": "Nouveau locuteur",
 	"speakerOfThisLine": "Cette ligne",
+	"speakerUncertain": "Peut être l'un ou l'autre locuteur — cette ligne se situe à la jonction de deux tours de parole",
 	"linkOfTotal": "{current} sur {total}",
 	"linksSkipped": "{count} liens sur {total} n'ont pas pu être téléchargés",
 	"pasteAnotherLink": "Collez un autre lien",

@@ -577,6 +577,7 @@
 	"assignSpeaker": "Přiřadit mluvčího",
 	"newSpeaker": "Nový mluvčí",
 	"speakerOfThisLine": "Tento řádek",
+	"speakerUncertain": "Může jít o kteréhokoli z mluvčích — řádek leží na přechodu dvou promluv",
 	"linkOfTotal": "{current} z {total}",
 	"linksSkipped": "{count} z {total} odkazů se nepodařilo stáhnout",
 	"pasteAnotherLink": "Vložte další odkaz",

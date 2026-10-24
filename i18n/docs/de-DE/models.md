@@ -1,8 +1,14 @@
-<!-- source: 674c5e6aa04b -->
+<!-- source: 2b80fd9e5daa -->
 
 # 🌟 Vibe-Modelle 🌟
 
 Willkommen auf der Vibe-Modelle-Seite! Hier finden Sie eine kuratierte Liste empfohlener Modelle für die Verwendung mit Vibe. Um ein Modell zu installieren, verwenden Sie den Link „Magic Setup“, um es in Vibe zu öffnen, oder kopieren Sie den Direktdownload-Link in die Vibe-Einstellungen.
+
+## Lange Aufnahmen
+
+Eine Aufnahme, die länger ist als das Eingabefenster eines Modells, wird vor der Inferenz in Abschnitte aufgeteilt. Bei aktivierter Sprechererkennung folgt die Aufteilung den erkannten Redebeiträgen, sodass ein Abschnitt nie zwei Sprecher vermischt — außer dort, wo ihre Redebeiträge aneinandergrenzen. Diese Zeilen zeigen beide Sprecher mit einem „?“ und können einem der beiden zugewiesen werden. GigaAM (25 s), Parakeet (30 s) und Nemotron (30 s) teilen auf diese Weise auf; Whisper behält seine eigene Behandlung langer Aufnahmen.
+
+Fertige Abschnitte bleiben auf Ihrem Computer, sodass ein erneuter Lauf einer langen Datei mit denselben Einstellungen an der Stelle fortsetzt, an der er aufgehört hat. Der Cache enthält Transkripttext, den Abschnittsplan und einen Modellstempel — nie die Audiodaten — und verlässt niemals Ihr Gerät. Die App löscht beim Start Einträge, die 30 Tage lang unberührt blieben. In der Befehlszeile aktivieren Sie ihn mit `--cache-dir <folder>` und löschen diesen Ordner, um ihn zu leeren; `--chunk-seconds <n>` legt die geplante Länge fest und darf das Fenster des Modells nicht überschreiten.
 
 ## Verfügbare Modelle
 

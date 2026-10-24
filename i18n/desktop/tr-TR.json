@@ -577,6 +577,7 @@
 	"assignSpeaker": "Konuşmacı ata",
 	"newSpeaker": "Yeni konuşmacı",
 	"speakerOfThisLine": "Bu satır",
+	"speakerUncertain": "İki konuşmacıdan herhangi biri olabilir — bu satır iki konuşma sırasının birleştiği yerde",
 	"linkOfTotal": "{current} / {total}",
 	"linksSkipped": "{total} bağlantıdan {count} tanesi indirilemedi",
 	"pasteAnotherLink": "Başka bir bağlantı yapıştırın",

@@ -577,6 +577,7 @@
 	"assignSpeaker": "Назначить говорящего",
 	"newSpeaker": "Новый говорящий",
 	"speakerOfThisLine": "Эта строка",
+	"speakerUncertain": "Может принадлежать любому из двух говорящих — эта строка на стыке реплик",
 	"linkOfTotal": "{current} из {total}",
 	"linksSkipped": "Не удалось скачать {count} из {total} ссылок",
 	"pasteAnotherLink": "Вставьте ещё одну ссылку",

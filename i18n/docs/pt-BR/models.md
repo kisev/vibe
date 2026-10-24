@@ -1,8 +1,14 @@
-<!-- source: 674c5e6aa04b -->
+<!-- source: 2b80fd9e5daa -->
 
 # 🌟 Modelos do Vibe 🌟
 
 Bem-vindo à página de Modelos do Vibe! Aqui você encontra uma lista selecionada de modelos sugeridos para usar com o Vibe. Para instalar um modelo, use o link "Configuração Mágica" para abri-lo no Vibe, ou copie e cole o link de download direto nas configurações do Vibe.
+
+## Gravações longas
+
+Uma gravação mais longa que a janela de entrada de um modelo é dividida em blocos antes da inferência. Com o reconhecimento de falantes ativado, a divisão segue os turnos detectados, então um bloco nunca mistura dois falantes, exceto onde os turnos deles se encontram — essas linhas mostram os dois falantes com um "?" e podem ser atribuídas a um deles. O GigaAM (25 s), o Parakeet (30 s) e o Nemotron (30 s) dividem dessa forma; o Whisper mantém seu próprio tratamento de formato longo.
+
+Os blocos concluídos ficam no seu computador, então executar novamente um arquivo longo com as mesmas configurações retoma de onde parou. O cache guarda o texto da transcrição, o plano de blocos e um carimbo do modelo — nunca o áudio — e nunca sai do seu dispositivo. O aplicativo exclui entradas sem alterações há 30 dias quando é iniciado. Na linha de comando, ative com `--cache-dir <folder>` e exclua essa pasta para limpar; `--chunk-seconds <n>` define o comprimento planejado e não pode exceder a janela do modelo.
 
 ## Modelos disponíveis
 

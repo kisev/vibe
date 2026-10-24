@@ -577,6 +577,7 @@
 	"assignSpeaker": "Tilldela talare",
 	"newSpeaker": "Ny talare",
 	"speakerOfThisLine": "Den här raden",
+	"speakerUncertain": "Kan tillhöra endera talaren — raden ligger där två turer möts",
 	"linkOfTotal": "{current} av {total}",
 	"linksSkipped": "{count} av {total} länkar kunde inte laddas ner",
 	"pasteAnotherLink": "Klistra in en länk till",

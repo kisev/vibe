@@ -588,6 +588,7 @@
 	"assignSpeaker": "שיוך דובר",
 	"newSpeaker": "דובר חדש",
 	"speakerOfThisLine": "שורה זו",
+	"speakerUncertain": "ייתכן שהשורה שייכת לאחד משני הדוברים — היא נמצאת במקום שבו נפגשים שני תורי דיבור",
 	"linkOfTotal": "{current} מתוך {total}",
 	"linksSkipped": "{count} מתוך {total} קישורים לא ניתנים להורדה",
 	"pasteAnotherLink": "הדביקו קישור נוסף",

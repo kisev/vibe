@@ -1,8 +1,14 @@
-<!-- source: 674c5e6aa04b -->
+<!-- source: 2b80fd9e5daa -->
 
 # 🌟 Modely Vibe 🌟
 
 Vítejte na stránce Modely Vibe! Najdete zde pečlivě vybraný seznam doporučených modelů pro použití s Vibe. Model nainstalujete pomocí odkazu „Magic Setup“, který jej otevře přímo ve Vibe, nebo zkopírováním a vložením přímého odkazu ke stažení do nastavení Vibe.
+
+## Dlouhé nahrávky
+
+Nahrávka delší než vstupní okno modelu se před inferencí rozdělí na části. Při zapnutém rozpoznávání mluvčích rozdělení sleduje rozpoznané promluvy, takže jedna část nikdy nespojuje dva mluvčí kromě míst, kde se jejich promluvy stýkají — tyto řádky zobrazují oba mluvčí s „?“ a lze je přiřadit jednomu z nich. GigaAM (25 s), Parakeet (30 s) a Nemotron (30 s) rozdělují tímto způsobem; Whisper si ponechává vlastní zpracování dlouhých nahrávek.
+
+Dokončené části zůstávají ve vašem počítači, takže opakované spuštění dlouhého souboru se stejným nastavením pokračuje od místa, kde se zastavilo. Mezipaměť uchovává text přepisu, plán částí a označení modelu — nikdy ne zvuk — a nikdy neopustí vaše zařízení. Aplikace při spuštění odstraní položky, kterých se 30 dní nikdo nedotkl. V příkazovém řádku je zapnete pomocí `--cache-dir <folder>` a mezipaměť vymažete smazáním této složky; `--chunk-seconds <n>` nastavuje plánovanou délku a nesmí překročit okno modelu.
 
 ## Dostupné modely
 

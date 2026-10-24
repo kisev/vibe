@@ -577,6 +577,7 @@
 	"assignSpeaker": "Задаване на говорещ",
 	"newSpeaker": "Нов говорещ",
 	"speakerOfThisLine": "Този ред",
+	"speakerUncertain": "Може да е всеки от двамата говорещи — редът е на границата между две реплики",
 	"linkOfTotal": "{current} от {total}",
 	"linksSkipped": "{count} от {total} връзки не можаха да бъдат изтеглени",
 	"pasteAnotherLink": "Поставете още една връзка",

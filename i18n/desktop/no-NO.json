@@ -577,6 +577,7 @@
 	"assignSpeaker": "Tilordne taler",
 	"newSpeaker": "Ny taler",
 	"speakerOfThisLine": "Denne linjen",
+	"speakerUncertain": "Kan være en av talerne — denne linjen ligger der to taleturer møtes",
 	"linkOfTotal": "{current} av {total}",
 	"linksSkipped": "{count} av {total} lenker kunne ikke lastes ned",
 	"pasteAnotherLink": "Lim inn en lenke til",

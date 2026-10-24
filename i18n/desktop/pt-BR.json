@@ -577,6 +577,7 @@
 	"assignSpeaker": "Atribuir falante",
 	"newSpeaker": "Novo falante",
 	"speakerOfThisLine": "Esta linha",
+	"speakerUncertain": "Pode ser qualquer um dos falantes — esta linha fica onde dois turnos se encontram",
 	"linkOfTotal": "{current} de {total}",
 	"linksSkipped": "{count} de {total} links não puderam ser baixados",
 	"pasteAnotherLink": "Cole outro link",

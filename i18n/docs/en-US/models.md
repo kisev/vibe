@@ -2,6 +2,12 @@
 
 Welcome to the Vibe Models page! Here you can find a curated list of suggested models to use with Vibe. To install a model, use the "Magic Setup" link to open it in Vibe, or copy and paste the direct download link in Vibe settings.
 
+## Long recordings
+
+A recording longer than a model's input window is split into chunks before inference. With speaker recognition enabled, the split follows the detected turns, so one chunk never mixes two speakers except where their turns meet — those lines show both speakers with a "?" and can be given to one of them. GigaAM (25 s), Parakeet (30 s), and Nemotron (30 s) split this way; Whisper keeps its own long-form handling.
+
+Finished chunks are kept on your computer, so re-running a long file with the same settings resumes from where it stopped. The cache holds transcript text, the chunk plan, and a model stamp — never the audio — and never leaves your device. The app deletes entries untouched for 30 days when it starts. On the command line, opt in with `--cache-dir <folder>` and delete that folder to clear it; `--chunk-seconds <n>` sets the planned length and cannot exceed the model's window.
+
 ## Available Models
 
 ### 🌱 Tiny Model

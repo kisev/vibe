@@ -577,6 +577,7 @@
 	"assignSpeaker": "指定说话人",
 	"newSpeaker": "新说话人",
 	"speakerOfThisLine": "此行",
+	"speakerUncertain": "可能属于两位发言者之一——此行位于两段发言的交界处",
 	"linkOfTotal": "第 {current} 个，共 {total} 个",
 	"linksSkipped": "{total} 个链接中有 {count} 个无法下载",
 	"pasteAnotherLink": "再粘贴一个链接",

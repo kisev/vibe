@@ -577,6 +577,7 @@
 	"assignSpeaker": "화자 지정",
 	"newSpeaker": "새 화자",
 	"speakerOfThisLine": "이 줄",
+	"speakerUncertain": "두 화자 중 어느 쪽일 수도 있습니다 — 두 발언이 만나는 지점의 줄입니다",
 	"linkOfTotal": "{total}개 중 {current}",
 	"linksSkipped": "링크 {total}개 중 {count}개를 다운로드하지 못했습니다",
 	"pasteAnotherLink": "다른 링크 붙여넣기",

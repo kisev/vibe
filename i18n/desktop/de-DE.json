@@ -577,6 +577,7 @@
 	"assignSpeaker": "Sprecher zuweisen",
 	"newSpeaker": "Neuer Sprecher",
 	"speakerOfThisLine": "Diese Zeile",
+	"speakerUncertain": "Gehört möglicherweise zu einem der beiden Sprecher — diese Zeile liegt an der Grenze zweier Redebeiträge",
 	"linkOfTotal": "{current} von {total}",
 	"linksSkipped": "{count} von {total} Links konnten nicht heruntergeladen werden",
 	"pasteAnotherLink": "Noch einen Link einfügen",

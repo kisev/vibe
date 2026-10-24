@@ -588,6 +588,7 @@
 	"assignSpeaker": "Assign speaker",
 	"newSpeaker": "New speaker",
 	"speakerOfThisLine": "This line",
+	"speakerUncertain": "May be either speaker — this line sits where two turns meet",
 	"linkOfTotal": "{current} of {total}",
 	"linksSkipped": "{count} of {total} links could not be downloaded",
 	"pasteAnotherLink": "Paste another link",

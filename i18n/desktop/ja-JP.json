@@ -577,6 +577,7 @@
 	"assignSpeaker": "話者を割り当て",
 	"newSpeaker": "新しい話者",
 	"speakerOfThisLine": "この行",
+	"speakerUncertain": "どちらの話者の可能性もあります — 2 つの発話の切り替わり目にある行です",
 	"linkOfTotal": "{total} 件中 {current} 件目",
 	"linksSkipped": "{total} 件中 {count} 件のリンクをダウンロードできませんでした",
 	"pasteAnotherLink": "別のリンクを貼り付け",

@@ -577,6 +577,7 @@
 	"assignSpeaker": "Assegna parlante",
 	"newSpeaker": "Nuovo parlante",
 	"speakerOfThisLine": "Questa riga",
+	"speakerUncertain": "Può essere di uno dei due parlanti — questa riga si trova dove si incontrano due turni",
 	"linkOfTotal": "{current} di {total}",
 	"linksSkipped": "Impossibile scaricare {count} link su {total}",
 	"pasteAnotherLink": "Incolla un altro link",

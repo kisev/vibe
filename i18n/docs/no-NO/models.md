@@ -1,8 +1,14 @@
-<!-- source: 674c5e6aa04b -->
+<!-- source: 2b80fd9e5daa -->
 
 # 🌟 Vibe-modeller 🌟
 
 Velkommen til Vibe-modeller-siden! Her finner du en utvalgt liste over anbefalte modeller til bruk med Vibe. For å installere en modell, bruk «Magic Setup»-lenken for å åpne den i Vibe, eller kopier og lim inn den direkte nedlastingslenken i Vibe-innstillingene.
+
+## Lange opptak
+
+Et opptak som er lengre enn modellens inndatavindu, deles i biter før inferens. Med taleridentifikasjon slått på følger delingen de oppdagede taleturene, slik at én bit aldri blander to talere — bortsett fra der turene deres møtes. Disse linjene viser begge talere med et «?» og kan tilordnes til en av dem. GigaAM (25 s), Parakeet (30 s) og Nemotron (30 s) deler på denne måten; Whisper beholder sin egen håndtering av lange opptak.
+
+Ferdige biter beholdes på datamaskinen din, slik at en ny kjøring av en lang fil med de samme innstillingene fortsetter der den slapp. Hurtiglageret inneholder transkripttekst, inndelingen i biter og et modellstempel — aldri lyden — og forlater aldri enheten din. Appen sletter oppføringer som ikke har vært berørt på 30 dager, når den starter. På kommandolinjen aktiverer du det med `--cache-dir <folder>` og sletter den mappen for å tømme det; `--chunk-seconds <n>` angir den planlagte lengden og kan ikke overstige modellens vindu.
 
 ## Tilgjengelige modeller
 

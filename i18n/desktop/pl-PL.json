@@ -577,6 +577,7 @@
 	"assignSpeaker": "Przypisz mówcę",
 	"newSpeaker": "Nowy mówca",
 	"speakerOfThisLine": "Ta linia",
+	"speakerUncertain": "Może należeć do obu mówców — ta linia wypada na styku dwóch wypowiedzi",
 	"linkOfTotal": "{current} z {total}",
 	"linksSkipped": "Nie udało się pobrać {count} z {total} linków",
 	"pasteAnotherLink": "Wklej kolejny link",
