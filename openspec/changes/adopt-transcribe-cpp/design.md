@@ -15,7 +15,7 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
 
 **Non-Goals:**
 
-- Replacing the diarization (sortformer) and Silero VAD Rust adapters in this change — they are transcribe.cpp roles too, but swapping them changes speaker segmentation behavior; that gets its own change after ASR lands.
+- ~~Replacing the diarization (sortformer) and Silero VAD Rust adapters in this change~~ — superseded by the user-approved VAD/diarization pivot below (both adapters sat on `ggml-rs-sys`, which the unified engine cannot link).
 - Shipping a bundled model catalog (next change: `model-catalog`).
 - Porting transcribe.cpp features beyond what the server's contract needs.
 
@@ -58,6 +58,25 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
   `sampling_strategy`) and `max_segment_len`/`n_threads` are accepted for API compatibility and
   ignored with a one-time warning; decoding is greedy with the temperature fallback, which the
   task 3.1 parity fixtures must account for by comparing greedy on both sides.
+
+## Phase 3 findings (new families)
+
+- **New-family windows are long-form or unbounded, not planner windows.** Upstream reports
+  `max_audio_ms = 0` for the legacy families but real bounds for some new ones (canary 400 s).
+  A raw bound is only treated as a planner window when the model lacks long-form support and
+  the bound is utterance-sized (≤ 60 s); canary's 400 s marks long-form support, so no VAD
+  chunking is planned for it.
+- **Text-only new families reject segment timestamps** (`unsupported timestamp granularity`,
+  status 12): their capabilities cap `max_timestamp_kind` below Segment, so the engine maps the
+  request to the highest kind the model supports (None for token/word-capped models) instead of
+  failing the run. Whisper keeps full Word/Segment granularity.
+- **Streaming families without snapshot segments** (text-only like nemotron/parakeet streaming)
+  emit committed-text deltas as segments: each growth of the committed text becomes one segment
+  spanning since the previous commit, so the incremental-events contract holds without upstream
+  segment snapshots.
+- **New-family gated tests** download catalog GGUFs (canary-1b-v2, Qwen3-ASR 0.6B/1.7B,
+  voxtral mini 3B, voxtral realtime 4B; sha256 pinned) and assert load + fixture transcription
+  + the catalog-documented capability flags per family.
 
 ## Risks / Trade-offs
 

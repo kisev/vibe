@@ -164,6 +164,7 @@ pub struct Engine {
     model: Model,
     vad: Option<VadCache>,
     caps: EngineCapabilities,
+    max_timestamp_kind: TimestampKind,
 }
 
 impl Engine {
@@ -198,7 +199,16 @@ impl Engine {
         };
         let model = load_model(path, &model_options)?;
         let caps = model_capabilities(&model)?;
-        Ok(Engine { model, vad: None, caps })
+        let max_timestamp_kind = model
+            .capabilities()
+            .map(|c| c.max_timestamp_kind)
+            .unwrap_or(TimestampKind::None);
+        Ok(Engine {
+            model,
+            vad: None,
+            caps,
+            max_timestamp_kind,
+        })
     }
 
     pub fn transcribe(&mut self, samples: &[f32], options: TranscribeOptions) -> anyhow::Result<TranscribeResult> {
@@ -331,30 +341,98 @@ impl Engine {
         let run = self.run_options(&options);
         let mut seen = 0usize;
         if self.caps.streaming {
-            use transcribe_cpp::StreamOptions;
-            let mut stream = session
-                .stream(&run, &StreamOptions::default())
-                .context("stream init failed")?;
+            use transcribe_cpp::{StreamExtension, StreamOptions};
+            // The parakeet-lineage streaming families take their cache-aware
+            // streaming knobs through the family extension; without it the
+            // engine keeps its default commit policy and emits nothing.
+            let family = matches!(self.caps.engine.as_str(), "parakeet" | "nemotron")
+                .then(|| StreamExtension::ParakeetStream(Default::default()));
+            let stream_options = StreamOptions {
+                family,
+                ..StreamOptions::default()
+            };
+            let mut stream = session.stream(&run, &stream_options).context("stream init failed")?;
             // Feed in roughly one-second windows so segments commit early.
+            // Structured families surface committed segments through the
+            // snapshot; text-only streaming families (the parakeet lineage)
+            // grow `committed` instead, and each growth becomes one segment.
             let window = crate::plan::SAMPLE_RATE as usize;
+            let mut emitted_text = String::new();
+            let mut emitted_ms = 0i64;
+            let mut live: Vec<Segment> = Vec::new();
+            let drain = |stream: &transcribe_cpp::Stream<'_>,
+                         seen: &mut usize,
+                         end_ms: i64,
+                         on_segment: &mut Option<OnSegment<'_>>,
+                         live: &mut Vec<Segment>,
+                         emitted_text: &mut String,
+                         emitted_ms: &mut i64| {
+                let snapshot = stream.snapshot();
+                if !snapshot.segments.is_empty() {
+                    emit_new(seen, &snapshot, on_segment);
+                    return;
+                }
+                let committed = stream.text().committed;
+                if committed.len() > emitted_text.len() && committed.starts_with(&*emitted_text) {
+                    let delta = &committed[emitted_text.len()..];
+                    let text = delta.trim().to_owned();
+                    if !text.is_empty() {
+                        let segment = Segment {
+                            start: *emitted_ms / 10,
+                            end: end_ms / 10,
+                            text,
+                            no_speech_prob: 0.0,
+                        };
+                        if let Some(callback) = on_segment.as_mut() {
+                            callback(&segment);
+                        }
+                        live.push(segment);
+                    }
+                    *emitted_ms = end_ms;
+                    *emitted_text = committed;
+                }
+            };
             for chunk_start in (0..samples.len()).step_by(window) {
                 if should_abort.as_mut().is_some_and(|callback| callback()) {
                     drop(stream);
                     bail!("transcription aborted");
                 }
                 let end = (chunk_start + window).min(samples.len());
-                stream.feed(&samples[chunk_start..end]).context("stream feed failed")?;
-                emit_new(&mut seen, &stream.snapshot(), &mut on_segment);
+                let update = stream.feed(&samples[chunk_start..end]).context("stream feed failed")?;
+                drain(
+                    &stream,
+                    &mut seen,
+                    update.input_received_ms,
+                    &mut on_segment,
+                    &mut live,
+                    &mut emitted_text,
+                    &mut emitted_ms,
+                );
                 if let Some(callback) = on_progress.as_mut() {
                     callback((end / window).max(1));
                 }
             }
-            stream.finalize().context("stream finalize failed")?;
+            let final_update = stream.finalize().context("stream finalize failed")?;
+            drain(
+                &stream,
+                &mut seen,
+                final_update.input_received_ms,
+                &mut on_segment,
+                &mut live,
+                &mut emitted_text,
+                &mut emitted_ms,
+            );
             let transcript = stream.snapshot();
             let language = transcript.language.clone();
-            emit_new(&mut seen, &transcript, &mut on_segment);
-            let segments = segments_for(&transcript, 0, samples.len());
-            Ok(TranscribeResult { segments, language })
+            if !transcript.segments.is_empty() {
+                let segments = segments_for(&transcript, 0, samples.len());
+                Ok(TranscribeResult { segments, language })
+            } else {
+                Ok(TranscribeResult {
+                    segments: live,
+                    language,
+                })
+            }
         } else {
             let transcript = session.run(samples, &run).context("inference failed")?;
             emit_new(&mut seen, &transcript, &mut on_segment);
@@ -402,11 +480,7 @@ impl Engine {
             } else {
                 Task::Transcribe
             },
-            timestamps: if options.word_timestamps {
-                TimestampKind::Word
-            } else {
-                TimestampKind::Segment
-            },
+            timestamps: requested_timestamps(options.word_timestamps, self.max_timestamp_kind),
             ..RunOptions::default()
         };
         if self.caps.decoding_options {
@@ -475,6 +549,23 @@ fn emit_new(seen: &mut usize, transcript: &Transcript, on_segment: &mut Option<O
     }
 }
 
+/// The granularity to request: word-level when asked for and the family can
+/// produce it, segment-level when the family produces alignment at all, and
+/// none for text-only families (canary, Qwen3-ASR, voxtral today).
+fn requested_timestamps(word_timestamps: bool, max_kind: TimestampKind) -> TimestampKind {
+    match max_kind {
+        TimestampKind::Token | TimestampKind::Word => {
+            if word_timestamps {
+                TimestampKind::Word
+            } else {
+                TimestampKind::Segment
+            }
+        }
+        TimestampKind::Segment | TimestampKind::Auto => TimestampKind::Segment,
+        TimestampKind::None => TimestampKind::None,
+    }
+}
+
 fn warn_ignored(options: &TranscribeOptions) {
     static WARNED: OnceLock<()> = OnceLock::new();
     if WARNED.set(()).is_ok() {
@@ -515,7 +606,11 @@ pub fn model_capabilities(model: &Model) -> anyhow::Result<EngineCapabilities> {
     let (engine, window) = match family_window(&arch, &variant) {
         Some((name, bound)) => (name.to_owned(), bound),
         None => {
-            let bound = (caps.max_audio_ms > 0 && !model.supports(Feature::LongForm)).then(|| caps.max_audio_ms as f64 / 1000.0);
+            // A new family owns its own input handling unless it declares an
+            // utterance-scale window (≤ 60 s); multi-minute limits such as
+            // canary's 400 s are long-form behavior, not a planner window.
+            let utterance_bound = caps.max_audio_ms > 0 && caps.max_audio_ms <= 60_000;
+            let bound = (utterance_bound && !model.supports(Feature::LongForm)).then(|| caps.max_audio_ms as f64 / 1000.0);
             (arch.clone(), bound)
         }
     };

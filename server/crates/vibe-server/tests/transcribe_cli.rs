@@ -323,3 +323,26 @@ fn walk(root: &std::path::Path) -> Vec<std::path::PathBuf> {
     }
     files
 }
+
+/// The legacy whisper .bin container is refused with the format named and the
+/// model catalog pointed at, before any audio is read.
+#[test]
+fn legacy_bin_is_refused_with_the_catalog_pointer() {
+    let Ok(model) = std::env::var("WHISPER_BIN_MODEL") else {
+        return;
+    };
+    if !std::path::Path::new(&model).exists() {
+        eprintln!("skipping: WHISPER_BIN_MODEL={model:?} does not exist");
+        return;
+    }
+    let audio = "../../fixtures/short.wav";
+    let result = run_transcribe(&[&model, audio, "--format", "json"]);
+    assert!(!result.status.success(), "the legacy .bin must not load");
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    let combined = format!("{stderr}{}", String::from_utf8_lossy(&result.stdout));
+    assert!(combined.contains(".bin"), "names the format: {combined}");
+    assert!(
+        combined.to_lowercase().contains("catalog"),
+        "points at the catalog: {combined}"
+    );
+}

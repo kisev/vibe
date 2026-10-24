@@ -412,3 +412,151 @@ fn legacy_whisper_bin_files_do_not_load() {
     assert!(detect_model(path.to_str().unwrap()).is_err());
     assert!(Engine::load(path.to_str().unwrap(), ContextOptions::default()).is_err());
 }
+
+fn fixture_audio(path: &str) -> Vec<f32> {
+    let mut reader = hound::WavReader::open(path).expect("fixture wav");
+    reader
+        .samples::<i16>()
+        .map(|sample| sample.expect("audio sample") as f32 / 32768.0)
+        .collect()
+}
+
+/// The new families the model catalog publishes: each loads through the
+/// unified engine, reports the flags its catalog entry documents, and
+/// transcribes the English fixture. Env-gated by the downloaded GGUF.
+#[test]
+fn new_families_load_transcribe_and_report_catalog_flags() {
+    struct NewFamily {
+        env: &'static str,
+        streaming: bool,
+        translation: bool,
+        language_detection: bool,
+        timestamps: bool,
+        language: Option<&'static str>,
+    }
+    let families = [
+        NewFamily {
+            env: "CANARY_MODEL",
+            streaming: false,
+            translation: true,
+            language_detection: false,
+            timestamps: false,
+            language: Some("en"),
+        },
+        NewFamily {
+            env: "QWEN3_06B_MODEL",
+            streaming: false,
+            translation: false,
+            language_detection: true,
+            timestamps: false,
+            language: None,
+        },
+        NewFamily {
+            env: "QWEN3_17B_MODEL",
+            streaming: false,
+            translation: false,
+            language_detection: true,
+            timestamps: false,
+            language: None,
+        },
+        NewFamily {
+            env: "VOXTRAL_MINI_MODEL",
+            streaming: false,
+            translation: true,
+            language_detection: true,
+            timestamps: false,
+            language: None,
+        },
+        NewFamily {
+            env: "VOXTRAL_REALTIME_MODEL",
+            streaming: true,
+            translation: false,
+            language_detection: true,
+            timestamps: false,
+            language: None,
+        },
+    ];
+    let audio_path = std::env::var("NEW_FAMILY_AUDIO").unwrap_or_else(|_| "../../fixtures/short.wav".to_string());
+    for family in families {
+        let Some(path) = env_model(family.env) else { continue };
+        let mut engine = load_engine(&path).unwrap_or_else(|| panic!("{} failed to load", family.env));
+        let caps = engine.capabilities();
+        assert_eq!(caps.streaming, family.streaming, "{} streaming", family.env);
+        assert_eq!(caps.translation, family.translation, "{} translation", family.env);
+        assert_eq!(caps.language_detection, family.language_detection, "{} detection", family.env);
+        assert_eq!(caps.timestamps, family.timestamps, "{} timestamps", family.env);
+        // The new families own their long-form path: no planner window, no VAD.
+        assert_eq!(caps.max_input_seconds, None, "{} window", family.env);
+        assert!(!engine.requires_vad(), "{} VAD", family.env);
+
+        let options = TranscribeOptions {
+            language: family.language.map(str::to_owned),
+            ..TranscribeOptions::default()
+        };
+        let result = engine
+            .transcribe(&fixture_audio(&audio_path), options)
+            .unwrap_or_else(|err| panic!("{} transcribes: {err:#}", family.env));
+        assert!(!result.segments.is_empty(), "{} produced no segments", family.env);
+        assert!(!result.text().is_empty(), "{} produced no text", family.env);
+    }
+}
+
+/// A streaming family emits segments while it runs, not only at the end.
+#[test]
+fn a_streaming_family_emits_segments_incrementally() {
+    let (Some(mut engine), Some(samples)) = (nemotron_engine(), audio()) else {
+        return;
+    };
+    assert!(engine.capabilities().streaming, "the fixture must be a streaming model");
+
+    let finished = std::time::Instant::now();
+    let mut arrivals: Vec<(usize, std::time::Duration)> = Vec::new();
+    {
+        let on_segment: OnSegment = Box::new(|segment: &Segment| {
+            arrivals.push((segment.end as usize, finished.elapsed()));
+        });
+        let callbacks = StreamCallbacks {
+            on_segment: Some(on_segment),
+            ..StreamCallbacks::default()
+        };
+        engine
+            .transcribe_stream(&samples, transcription_options(None), callbacks)
+            .expect("stream run");
+    }
+    assert!(!arrivals.is_empty(), "no segments arrived");
+    // At least one segment must arrive strictly before the whole run returns,
+    // and later segments must not precede earlier ones.
+    let total = finished.elapsed();
+    assert!(
+        arrivals.iter().any(|(_, at)| *at < total),
+        "no segment arrived before completion"
+    );
+    let ends: Vec<usize> = arrivals.iter().map(|(end, _)| *end).collect();
+    let mut sorted = ends.clone();
+    sorted.sort_unstable();
+    assert_eq!(ends, sorted, "segments arrived out of order");
+}
+
+/// A bounded family on a long recording keeps every model input inside its
+/// window even when speech never pauses.
+#[test]
+fn a_long_recording_never_exceeds_the_family_window() {
+    let (Some(mut engine), Some(vad), Some(samples)) = (gigaam_engine(), vad_model(), audio()) else {
+        return;
+    };
+    let bound = engine.max_input_seconds().expect("bounded");
+    let long = samples
+        .iter()
+        .copied()
+        .cycle()
+        .take(crate::plan::SAMPLE_RATE as usize * 90)
+        .collect::<Vec<_>>();
+    let plan = crate::server::transcription::plan_for(&mut engine, &long, &[], Some(&vad), None).expect("plan");
+    assert!(!plan.chunks.is_empty(), "expected chunks");
+    for chunk in &plan.chunks {
+        assert!(
+            chunk.core_end - chunk.core_start <= bound + f64::EPSILON,
+            "chunk over the bound: {chunk:?}"
+        );
+    }
+}

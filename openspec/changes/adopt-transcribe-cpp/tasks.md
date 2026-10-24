@@ -12,10 +12,10 @@
 
 ## 3. Family enablement
 
-- [ ] 3.1 Enable the existing families (whisper, GigaAM v3 all variants, parakeet tdt-0.6b-v3, nemotron) through the wrapper and prove side-by-side transcript parity against the current engines on the regression fixtures (multi.wav and the gated CLI models); verify text and segment timestamps match within tolerance before proceeding
-- [ ] 3.2 Enable the new families (canary incl. 1b-v2, Qwen3-ASR 0.6b/1.7b, voxtral mini 3b, voxtral realtime mini 4b, nemotron 3.5 streaming) with catalog GGUFs downloaded for the gated tests; verify each loads, transcribes its fixture, and reports its documented capabilities
-- [ ] 3.3 Verify streaming for a streaming family through the stream endpoint (incremental segment events) and planner chunking for a bounded family (every input within its window on a long recording)
-- [ ] 3.4 Verify the legacy `.bin` loader error names the format and points at the model catalog, and that existing GGUF files keep loading
+- [x] 3.1 Enable the existing families (whisper, GigaAM v3 all variants, parakeet tdt-0.6b-v3, nemotron) through the wrapper and prove side-by-side transcript parity against the current engines on the regression fixtures (multi.wav and the gated CLI models); verify text and segment timestamps match within tolerance before proceeding
+- [x] 3.2 Enable the new families (canary incl. 1b-v2, Qwen3-ASR 0.6b/1.7b, voxtral mini 3b, voxtral realtime mini 4b, nemotron 3.5 streaming) with catalog GGUFs downloaded for the gated tests; verify each loads, transcribes its fixture, and reports its documented capabilities
+- [x] 3.3 Verify streaming for a streaming family through the stream endpoint (incremental segment events) and planner chunking for a bounded family (every input within its window on a long recording)
+- [x] 3.4 Verify the legacy `.bin` loader error names the format and points at the model catalog, and that existing GGUF files keep loading
 
 ## 4. Platform and variant hardening
 
