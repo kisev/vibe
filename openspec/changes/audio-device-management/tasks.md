@@ -19,7 +19,7 @@
 ## 4. Record-time enforcement
 
 - [x] 4.1 In `use-recording.ts`, resolve pinned input and output names against the current snapshot immediately before capture starts and fail with a toast naming the missing device when unresolved; verify with a unit test that starting a recording with a missing pinned input neither opens the recorder nor writes a job
-- [ ] 4.2 Verify manually: unplug the pinned microphone, start a recording, and confirm the error names the device and no silent fallback device is used
+- [x] 4.2 Verify manually: unplug the pinned microphone, start a recording, and confirm the error names the device and no silent fallback device is used
 
 ## 5. Integration
 
