@@ -55,10 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let token = CancelToken::new();
         session.set_cancel_token(&token);
 
-        let long: Vec<f32> = std::iter::repeat(pcm.iter().copied())
-            .take(12)
-            .flatten()
-            .collect();
+        let long: Vec<f32> = std::iter::repeat(pcm.iter().copied()).take(12).flatten().collect();
 
         let canceller = {
             let token = token.clone();
@@ -69,10 +66,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         match session.run(&long, &RunOptions::default()) {
-            Err(Error::Aborted { partial, .. }) => println!(
-                "run aborted by request; partial transcript preserved: {}",
-                partial.is_some()
-            ),
+            Err(Error::Aborted { partial, .. }) => {
+                println!("run aborted by request; partial transcript preserved: {}", partial.is_some())
+            }
             Ok(_) => println!("run completed before the cancel fired (fast machine)"),
             Err(other) => println!("unexpected run error: {other:?}"),
         }

@@ -1,27 +1,31 @@
-#[cfg(feature = "diarize")]
-pub use diarize_rs::Segment;
+use transcribe_cpp::{DiarizeOptions, Model};
 
-#[cfg(not(feature = "diarize"))]
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 pub struct Segment {
     pub start: f64,
     pub end: f64,
     pub speaker_id: usize,
 }
 
-#[cfg(feature = "diarize")]
 pub fn diarize(model_path: &str, samples: &[f32]) -> Vec<Segment> {
-    match diarize_rs::Diarizer::new(model_path).and_then(|mut diarizer| diarizer.diarize(samples, 16_000, 1)) {
+    let result = (|| -> anyhow::Result<Vec<Segment>> {
+        let model = Model::load(model_path)?;
+        let mut session = model.diarize_session()?;
+        let segments = session.run(samples, &DiarizeOptions::default())?;
+        Ok(segments
+            .into_iter()
+            .map(|segment| Segment {
+                start: segment.t0_ms as f64 / 1000.0,
+                end: segment.t1_ms as f64 / 1000.0,
+                speaker_id: segment.speaker_id.max(1) as usize,
+            })
+            .collect())
+    })();
+    match result {
         Ok(segments) => segments,
         Err(err) => {
-            tracing::warn!("diarization failed, skipping speakers: {err}");
+            tracing::warn!("diarization failed, skipping speakers: {err:#}");
             Vec::new()
         }
     }
-}
-
-#[cfg(not(feature = "diarize"))]
-pub fn diarize(model_path: &str, _samples: &[f32]) -> Vec<Segment> {
-    tracing::warn!("diarization support is not enabled, skipping model: {model_path}");
-    Vec::new()
 }

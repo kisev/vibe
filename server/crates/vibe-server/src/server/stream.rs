@@ -2,11 +2,11 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use crate::engine::StreamCallbacks;
 use axum::body::Body;
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use whisper_rs::StreamCallbacks;
 
 use crate::cli::AppConfig;
 use crate::server::diarization;
@@ -17,7 +17,7 @@ use crate::server::{error, format};
 /// The NDJSON event for one segment. A planned chunk supplies the speaker set
 /// and names its dominant speaker; without one, speakers come from overlap.
 fn segment_event(
-    segment: &whisper_rs::Segment,
+    segment: &crate::engine::Segment,
     plan: Option<&crate::plan::Plan>,
     diarization: &[diarization::Segment],
 ) -> serde_json::Value {
@@ -127,7 +127,7 @@ pub(super) fn stream_transcription(request: StreamRequest) -> Result<Response, B
                 }
             })),
             on_segment: Some(Box::new(move |segment| {
-                let event = segment_event(&segment, segment_plan.as_ref(), &segment_diar_segments);
+                let event = segment_event(segment, segment_plan.as_ref(), &segment_diar_segments);
                 if send_event(&segment_tx, event).is_err() {
                     abort_for_segment.store(true, Ordering::SeqCst);
                 }
@@ -198,8 +198,8 @@ mod tests {
     use super::*;
     use crate::plan::{Chunk, Plan};
 
-    fn segment(start: i64, end: i64) -> whisper_rs::Segment {
-        whisper_rs::Segment {
+    fn segment(start: i64, end: i64) -> crate::engine::Segment {
+        crate::engine::Segment {
             start,
             end,
             text: "hello".to_string(),

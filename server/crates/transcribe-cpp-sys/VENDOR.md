@@ -11,3 +11,4 @@
   only the `[workspace]` section and the packaging `include` list were removed.
 
 Upgrades are deliberate: re-vendor from a new pinned revision, never merge upstream into place.
+- The crates are path dependencies OUTSIDE the vibe workspace members list on purpose: `cargo fmt --all` and workspace clippy leave the vendored trees verbatim.

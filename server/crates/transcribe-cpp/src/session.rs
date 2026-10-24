@@ -19,19 +19,13 @@ use crate::cancel::{abort_trampoline, CancelToken};
 use crate::error::{check, error_for_status, Error, Result};
 use crate::family::{RunExtRaw, RunExtension};
 use crate::model::{Model, ModelInner, SessionLimits, SessionOptions};
-use crate::result::{
-    owned_opt_str, owned_str, Segment, SpeakerSegment, Timings, Token, Transcript, Word,
-};
+use crate::result::{owned_opt_str, owned_str, Segment, SpeakerSegment, Timings, Token, Transcript, Word};
 use crate::streaming::{build_stream_params, StreamOptions, StreamText, StreamUpdate};
 use crate::types::{Diarize, Itn, Pnc, StreamState, Task, TimestampKind};
 
 /// Per-run parameters.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct RunOptions {
     pub task: Task,
     pub timestamps: TimestampKind,
@@ -196,30 +190,20 @@ impl Session {
     /// Returns the whole-batch outcome as an outer `Result`; each utterance's
     /// individual outcome is an inner `Result` in the returned vector (one per
     /// input, in order). A malformed single utterance fails only its own slot.
-    pub fn run_batch(
-        &mut self,
-        pcms: &[&[f32]],
-        options: &RunOptions,
-    ) -> Result<Vec<Result<Transcript>>> {
+    pub fn run_batch(&mut self, pcms: &[&[f32]], options: &RunOptions) -> Result<Vec<Result<Transcript>>> {
         let (params, _lang, _target, _family, _prompting) = build_run_params(options)?;
         let ptrs: Vec<*const f32> = pcms.iter().map(|p| p.as_ptr()).collect();
-        let lens: Vec<i32> = pcms
-            .iter()
-            .map(|p| clamp_len(p.len()))
-            .collect::<Result<_>>()?;
+        let lens: Vec<i32> = pcms.iter().map(|p| clamp_len(p.len())).collect::<Result<_>>()?;
         let n = clamp_len(pcms.len())?;
 
         let status = self.model.with_compute(
             Some("a stream is active on this model; finish or drop it before run_batch()"),
-            |_| unsafe {
-                sys::transcribe_run_batch(self.ptr, ptrs.as_ptr(), lens.as_ptr(), n, &params)
-            },
+            |_| unsafe { sys::transcribe_run_batch(self.ptr, ptrs.as_ptr(), lens.as_ptr(), n, &params) },
         )?;
 
         // OK and ABORTED both populate one per-utterance slot per input; fold
         // the batch-level abort into the per-utterance view (the C contract).
-        let ok = status == sys::transcribe_status::TRANSCRIBE_OK
-            || status == sys::transcribe_status::TRANSCRIBE_ERR_ABORTED;
+        let ok = status == sys::transcribe_status::TRANSCRIBE_OK || status == sys::transcribe_status::TRANSCRIBE_ERR_ABORTED;
         if !ok {
             return Err(error_for_status(status, "run_batch"));
         }
@@ -277,17 +261,15 @@ impl Session {
         // Claim the model's compute lease for the whole stream lifetime: a
         // stream spans begin..drop, so per-call locking alone would let a
         // second stream (or a run) on another session race it.
-        self.model.with_compute(
-            Some("a stream is already active on this model"),
-            |lease| -> Result<()> {
+        self.model
+            .with_compute(Some("a stream is already active on this model"), |lease| -> Result<()> {
                 check(
                     unsafe { sys::transcribe_stream_begin(self.ptr, &run_params, &stream_params) },
                     "stream begin",
                 )?;
                 *lease = true; // released at finalize/reset, or by Stream::drop
                 Ok(())
-            },
-        )??;
+            })??;
         Ok(Stream {
             session: self,
             holds_lease: true,
@@ -306,9 +288,7 @@ impl Session {
             text: owned_str(unsafe { sys::transcribe_full_text(self.ptr) }),
             raw_text: owned_str(unsafe { sys::transcribe_raw_text(self.ptr) }),
             language: owned_opt_str(unsafe { sys::transcribe_detected_language(self.ptr) }),
-            timestamp_kind: TimestampKind::from_raw(unsafe {
-                sys::transcribe_returned_timestamp_kind(self.ptr)
-            }),
+            timestamp_kind: TimestampKind::from_raw(unsafe { sys::transcribe_returned_timestamp_kind(self.ptr) }),
             segments: (0..n_seg).map(|i| self.segment(i)).collect(),
             speaker_segments: (0..n_speaker).map(|i| self.speaker_segment(i)).collect(),
             words: (0..n_word).map(|i| self.word(i)).collect(),
@@ -363,16 +343,10 @@ impl Session {
         Transcript {
             text: owned_str(unsafe { sys::transcribe_batch_full_text(self.ptr, i) }),
             raw_text: owned_str(unsafe { sys::transcribe_batch_raw_text(self.ptr, i) }),
-            language: owned_opt_str(unsafe {
-                sys::transcribe_batch_detected_language(self.ptr, i)
-            }),
-            timestamp_kind: TimestampKind::from_raw(unsafe {
-                sys::transcribe_batch_returned_timestamp_kind(self.ptr, i)
-            }),
+            language: owned_opt_str(unsafe { sys::transcribe_batch_detected_language(self.ptr, i) }),
+            timestamp_kind: TimestampKind::from_raw(unsafe { sys::transcribe_batch_returned_timestamp_kind(self.ptr, i) }),
             segments: (0..n_seg).map(|j| self.batch_segment(i, j)).collect(),
-            speaker_segments: (0..n_speaker)
-                .map(|j| self.batch_speaker_segment(i, j))
-                .collect(),
+            speaker_segments: (0..n_speaker).map(|j| self.batch_speaker_segment(i, j)).collect(),
             words: (0..n_word).map(|j| self.batch_word(i, j)).collect(),
             tokens: (0..n_tok).map(|j| self.batch_token(i, j)).collect(),
             timings: self.batch_timings(i),
@@ -453,11 +427,7 @@ fn build_run_params(o: &RunOptions) -> Result<RunParamsBundle> {
     params.language = lang.as_ref().map_or(std::ptr::null(), |c| c.as_ptr());
     params.target_language = target.as_ref().map_or(std::ptr::null(), |c| c.as_ptr());
 
-    let family = o
-        .family
-        .as_ref()
-        .map(RunExtension::materialize)
-        .transpose()?;
+    let family = o.family.as_ref().map(RunExtension::materialize).transpose()?;
     params.family = family.as_ref().map_or(std::ptr::null(), |f| f.ext_ptr());
 
     let terms = o
@@ -569,8 +539,8 @@ impl Stream<'_> {
         let held = self.holds_lease;
         let (status, ended) = self.session.model.with_compute(None, |lease| {
             let st = unsafe { sys::transcribe_stream_feed(ptr, pcm.as_ptr(), n, &mut update) };
-            let ended = unsafe { sys::transcribe_stream_get_state(ptr) }
-                == sys::transcribe_stream_state::TRANSCRIBE_STREAM_FAILED;
+            let ended =
+                unsafe { sys::transcribe_stream_get_state(ptr) } == sys::transcribe_stream_state::TRANSCRIBE_STREAM_FAILED;
             if held && ended {
                 *lease = false;
             }

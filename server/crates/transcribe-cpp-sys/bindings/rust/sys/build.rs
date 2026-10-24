@@ -221,10 +221,7 @@ fn main() {
     // binaries, so a static consumer link would fail with undefined GOMP_*/omp_*
     // symbols. A self-contained static build is the default; `--features openmp`
     // opts in (and then owns providing the OpenMP runtime).
-    cfg.define(
-        "TRANSCRIBE_USE_OPENMP",
-        if feature("OPENMP") { "ON" } else { "OFF" },
-    );
+    cfg.define("TRANSCRIBE_USE_OPENMP", if feature("OPENMP") { "ON" } else { "OFF" });
     // Windows no longer needs ggml's OpenMP. ggml's native CPU threadpool barrier
     // used to deadlock under MSVC (its spin `relax` compiled to a no-op, starving
     // an un-arrived worker), so OpenMP was the only multi-threaded CPU path there.
@@ -269,8 +266,7 @@ fn main() {
         prefix
     };
 
-    let manifest = find_manifest(&prefix)
-        .unwrap_or_else(|| panic!("transcribe-link.json not found under {}", prefix.display()));
+    let manifest = find_manifest(&prefix).unwrap_or_else(|| panic!("transcribe-link.json not found under {}", prefix.display()));
     emit_link_lines(&prefix, &manifest);
 }
 
@@ -285,10 +281,7 @@ fn windows_short_out_dir() -> Option<PathBuf> {
     }
     // Backslash-normalize: mklink rejects forward slashes (MSYS-style CARGO_TARGET_DIR).
     let out_dir = PathBuf::from(env::var("OUT_DIR").ok()?.replace('/', "\\"));
-    let Some(base) = env::var_os("LOCALAPPDATA")
-        .or_else(|| env::var_os("TEMP"))
-        .map(PathBuf::from)
-    else {
+    let Some(base) = env::var_os("LOCALAPPDATA").or_else(|| env::var_os("TEMP")).map(PathBuf::from) else {
         println!(
             "cargo:warning=transcribe-cpp-sys: neither LOCALAPPDATA nor TEMP is set; \
              building in OUT_DIR (may exceed Windows MAX_PATH in deep checkouts)"
@@ -304,17 +297,10 @@ fn windows_short_out_dir() -> Option<PathBuf> {
     }
     let link = base.join(format!("{hash:016x}"));
 
-    warn_fallback(
-        std::fs::create_dir_all(&out_dir),
-        "create junction target",
-        &out_dir,
-    )?;
+    warn_fallback(std::fs::create_dir_all(&out_dir), "create junction target", &out_dir)?;
     // symlink_metadata (not exists()) so a dangling junction is detected and reclaimed.
     if std::fs::symlink_metadata(&link).is_ok() {
-        match (
-            std::fs::canonicalize(&link),
-            std::fs::canonicalize(&out_dir),
-        ) {
+        match (std::fs::canonicalize(&link), std::fs::canonicalize(&out_dir)) {
             (Ok(a), Ok(b)) if a == b => return Some(link),
             // remove_dir fails if something non-junction squats here (e.g. a
             // backup tool materialized it as a real tree); the warning names
@@ -322,11 +308,7 @@ fn windows_short_out_dir() -> Option<PathBuf> {
             _ => warn_fallback(std::fs::remove_dir(&link), "remove stale junction", &link)?,
         }
     }
-    warn_fallback(
-        std::fs::create_dir_all(&base),
-        "create junction parent",
-        &base,
-    )?;
+    warn_fallback(std::fs::create_dir_all(&base), "create junction parent", &base)?;
 
     // No std API creates junctions; mklink /J needs no extra deps.
     let output = std::process::Command::new("cmd")
@@ -346,13 +328,9 @@ fn windows_short_out_dir() -> Option<PathBuf> {
         // Best-effort: fall back to building in the deep OUT_DIR.
         let detail = output
             .map(|o| {
-                String::from_utf8_lossy(if o.stderr.is_empty() {
-                    &o.stdout
-                } else {
-                    &o.stderr
-                })
-                .trim()
-                .to_string()
+                String::from_utf8_lossy(if o.stderr.is_empty() { &o.stdout } else { &o.stderr })
+                    .trim()
+                    .to_string()
             })
             .unwrap_or_else(|e| e.to_string());
         println!(
@@ -370,11 +348,7 @@ fn windows_short_out_dir() -> Option<PathBuf> {
 /// and bail to the deep-OUT_DIR fallback via `?`. Cargo hides build-script
 /// warnings for registry crates unless the build fails — so this is silent on
 /// success and visible exactly when a deep-path build dies of MAX_PATH.
-fn warn_fallback<T, E: std::fmt::Display>(
-    res: Result<T, E>,
-    action: &str,
-    path: &Path,
-) -> Option<T> {
+fn warn_fallback<T, E: std::fmt::Display>(res: Result<T, E>, action: &str, path: &Path) -> Option<T> {
     match res {
         Ok(v) => Some(v),
         Err(e) => {
@@ -427,11 +401,7 @@ fn emit_link_lines(prefix: &Path, manifest_path: &Path) {
     let strs = |key: &str| -> Vec<String> {
         json[key]
             .as_array()
-            .map(|a| {
-                a.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
-                    .collect()
-            })
+            .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
             .unwrap_or_default()
     };
 
@@ -498,9 +468,7 @@ fn emit_link_lines(prefix: &Path, manifest_path: &Path) {
     // as DEP_TRANSCRIBE_CPP_* for downstream packaging — see its build.rs.
     println!(
         "cargo:include_dir={}",
-        prefix
-            .join(json["include_dir"].as_str().unwrap_or("include"))
-            .display()
+        prefix.join(json["include_dir"].as_str().unwrap_or("include")).display()
     );
     println!("cargo:lib_dir={}", lib_dir.display());
 

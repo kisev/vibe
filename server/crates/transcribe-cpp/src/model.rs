@@ -95,11 +95,7 @@ impl ModelInner {
     /// Run `f` under the model's compute lock; every native compute call goes
     /// through here. With `Some(msg)`, returns `Error::Busy(msg)` instead if a
     /// stream holds the lease. `f` gets the lease flag to take or release it.
-    pub(crate) fn with_compute<R>(
-        &self,
-        refuse_if_streaming: Option<&str>,
-        f: impl FnOnce(&mut bool) -> R,
-    ) -> Result<R> {
+    pub(crate) fn with_compute<R>(&self, refuse_if_streaming: Option<&str>, f: impl FnOnce(&mut bool) -> R) -> Result<R> {
         let mut lease = self.compute_lock.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(msg) = refuse_if_streaming {
             if *lease {
@@ -158,10 +154,7 @@ impl Model {
         let mut params: sys::transcribe_model_load_params = unsafe { std::mem::zeroed() };
         unsafe { sys::transcribe_model_load_params_init(&mut params) };
         params.backend = options.backend.to_raw();
-        params.device = options
-            .device
-            .as_ref()
-            .map_or(std::ptr::null_mut(), |device| device.handle);
+        params.device = options.device.as_ref().map_or(std::ptr::null_mut(), |device| device.handle);
         params.no_mmap = options.no_mmap;
 
         let mut out: *mut sys::transcribe_model = std::ptr::null_mut();
@@ -279,10 +272,7 @@ impl Model {
     pub fn vad_info(&self) -> Result<VadInfo> {
         let mut raw: sys::transcribe_vad_info = unsafe { std::mem::zeroed() };
         unsafe { sys::transcribe_vad_info_init(&mut raw) };
-        check(
-            unsafe { sys::transcribe_vad_get_info(self.inner.ptr, &mut raw) },
-            "vad info",
-        )?;
+        check(unsafe { sys::transcribe_vad_get_info(self.inner.ptr, &mut raw) }, "vad info")?;
         Ok(VadInfo {
             sample_rate: raw.sample_rate,
             frame_samples: raw.frame_samples,
@@ -306,8 +296,7 @@ impl Model {
 
         let mut languages = Vec::new();
         if !caps.languages.is_null() && caps.n_languages > 0 {
-            let slice =
-                unsafe { std::slice::from_raw_parts(caps.languages, caps.n_languages as usize) };
+            let slice = unsafe { std::slice::from_raw_parts(caps.languages, caps.n_languages as usize) };
             for &lang in slice {
                 languages.push(owned_str(lang));
             }
@@ -315,10 +304,7 @@ impl Model {
         let mut translate_target_languages = Vec::new();
         if !caps.translate_target_languages.is_null() && caps.n_translate_target_languages > 0 {
             let slice = unsafe {
-                std::slice::from_raw_parts(
-                    caps.translate_target_languages,
-                    caps.n_translate_target_languages as usize,
-                )
+                std::slice::from_raw_parts(caps.translate_target_languages, caps.n_translate_target_languages as usize)
             };
             for &lang in slice {
                 translate_target_languages.push(owned_str(lang));
@@ -371,9 +357,7 @@ impl Model {
     pub fn device(&self) -> Result<Device> {
         let handle = unsafe { sys::transcribe_model_device(self.inner.ptr) };
         if handle.is_null() {
-            return Err(crate::Error::Backend(
-                "model has no resolved device".to_string(),
-            ));
+            return Err(crate::Error::Backend("model has no resolved device".to_string()));
         }
         let mut raw: sys::transcribe_device_info = unsafe { std::mem::zeroed() };
         unsafe { sys::transcribe_device_info_init(&mut raw) };
@@ -390,14 +374,7 @@ impl Model {
         // Grow-and-retry on the negative-N "buffer too small" signal.
         let mut buf = vec![0i32; text.len().max(16)];
         loop {
-            let n = unsafe {
-                sys::transcribe_tokenize(
-                    self.inner.ptr,
-                    c_text.as_ptr(),
-                    buf.as_mut_ptr(),
-                    buf.len(),
-                )
-            };
+            let n = unsafe { sys::transcribe_tokenize(self.inner.ptr, c_text.as_ptr(), buf.as_mut_ptr(), buf.len()) };
             if n == i32::MIN {
                 return Err(crate::error::Error::NotImplemented(
                     "model tokenizer has no encode path".to_string(),
@@ -416,9 +393,7 @@ impl Model {
 fn check_model_load(status: sys::transcribe_status, context: &str) -> Result<()> {
     #[cfg(feature = "dynamic-backends")]
     {
-        if status == sys::transcribe_status::TRANSCRIBE_ERR_BACKEND
-            && crate::backend::device_count() == 0
-        {
+        if status == sys::transcribe_status::TRANSCRIBE_ERR_BACKEND && crate::backend::device_count() == 0 {
             let code = status.0 as i32;
             let base = crate::error::status_string(code);
             return Err(crate::error::Error::Backend(format!(
@@ -435,11 +410,7 @@ fn check_model_load(status: sys::transcribe_status, context: &str) -> Result<()>
 
 /// Options for creating a session.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct SessionOptions {
     /// CPU threads for ops that run on CPU; 0 = library default.
     pub n_threads: i32,
@@ -485,7 +456,7 @@ pub(crate) fn path_bytes(path: &Path) -> Result<Vec<u8>> {
 #[cfg(not(unix))]
 pub(crate) fn path_bytes(path: &Path) -> Result<Vec<u8>> {
     // The C API takes a UTF-8 `const char *`; require a UTF-8-representable path.
-    path.to_str().map(|s| s.as_bytes().to_vec()).ok_or_else(|| {
-        crate::error::Error::InvalidArgument(format!("non-UTF-8 path: {}", path.display()))
-    })
+    path.to_str()
+        .map(|s| s.as_bytes().to_vec())
+        .ok_or_else(|| crate::error::Error::InvalidArgument(format!("non-UTF-8 path: {}", path.display())))
 }

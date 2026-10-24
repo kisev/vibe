@@ -16,8 +16,8 @@ struct StoredSegment {
     no_speech_prob: f32,
 }
 
-impl From<&whisper_rs::Segment> for StoredSegment {
-    fn from(segment: &whisper_rs::Segment) -> Self {
+impl From<&crate::engine::Segment> for StoredSegment {
+    fn from(segment: &crate::engine::Segment) -> Self {
         Self {
             start: segment.start,
             end: segment.end,
@@ -27,7 +27,7 @@ impl From<&whisper_rs::Segment> for StoredSegment {
     }
 }
 
-impl From<StoredSegment> for whisper_rs::Segment {
+impl From<StoredSegment> for crate::engine::Segment {
     fn from(segment: StoredSegment) -> Self {
         Self {
             start: segment.start,
@@ -50,9 +50,9 @@ pub(crate) fn transcribe_cached(
     model_path: &str,
     samples: &[f32],
     plan: &Plan,
-    options: &whisper_rs::TranscribeOptions,
+    options: &crate::engine::TranscribeOptions,
     root: &str,
-) -> anyhow::Result<whisper_rs::TranscribeResult> {
+) -> anyhow::Result<crate::engine::TranscribeResult> {
     let engine = ctx.capabilities().engine;
     let options_json = options_json(options);
     let identity = cache::Identity {
@@ -97,12 +97,15 @@ pub(crate) fn transcribe_cached(
         .chunk(chunk, &mut Vec::new(), 0, &mut run)?;
         segments.extend(finished);
     }
-    Ok(whisper_rs::TranscribeResult { segments })
+    Ok(crate::engine::TranscribeResult {
+        segments,
+        language: None,
+    })
 }
 
 /// The output-affecting options an entry is keyed by. Built here so the CLI and
 /// the HTTP route cannot drift apart.
-fn options_json(options: &whisper_rs::TranscribeOptions) -> serde_json::Value {
+fn options_json(options: &crate::engine::TranscribeOptions) -> serde_json::Value {
     serde_json::json!({
         "language": options.language,
         "detect_language": options.detect_language,
@@ -136,14 +139,14 @@ impl Resolution<'_> {
         slot: &mut Vec<usize>,
         depth: usize,
         run: &mut F,
-    ) -> anyhow::Result<Vec<whisper_rs::Segment>>
+    ) -> anyhow::Result<Vec<crate::engine::Segment>>
     where
-        F: FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<whisper_rs::Segment>>,
+        F: FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<crate::engine::Segment>>,
     {
         let tag = slot_tag(slot);
         if let Some(stored) = self.entry.part_at::<Vec<StoredSegment>>(self.index, &tag) {
             tracing::debug!(chunk = self.index, part = %tag, segments = stored.len(), "reusing cached chunk");
-            return Ok(stored.into_iter().map(whisper_rs::Segment::from).collect());
+            return Ok(stored.into_iter().map(crate::engine::Segment::from).collect());
         }
 
         if let Some(halves) = self
@@ -193,9 +196,9 @@ impl Resolution<'_> {
         slot: &mut Vec<usize>,
         depth: usize,
         run: &mut F,
-    ) -> anyhow::Result<Vec<whisper_rs::Segment>>
+    ) -> anyhow::Result<Vec<crate::engine::Segment>>
     where
-        F: FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<whisper_rs::Segment>>,
+        F: FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<crate::engine::Segment>>,
     {
         let mut segments = Vec::new();
         for (half_index, (start, end)) in halves.iter().enumerate() {
@@ -267,7 +270,7 @@ mod tests {
             .samples::<i16>()
             .map(|sample| sample.expect("audio sample") as f32 / 32768.0)
             .collect();
-        let engine = Engine::load(&model, whisper_rs::ContextOptions::default()).ok()?;
+        let engine = Engine::load(&model, crate::engine::ContextOptions::default()).ok()?;
         Some((engine, model, samples))
     }
 
@@ -308,13 +311,13 @@ mod tests {
     fn run_failing_above(
         limit: f64,
         calls: &mut Vec<(f64, f64)>,
-    ) -> impl FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<whisper_rs::Segment>> + '_ {
+    ) -> impl FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<crate::engine::Segment>> + '_ {
         move |chunk: &crate::plan::Chunk| {
             calls.push((chunk.core_start, chunk.core_end));
             if chunk.core_end - chunk.core_start > limit {
                 anyhow::bail!("ggml_backend_cuda_buffer_type_alloc_buffer: CUDA error: out of memory");
             }
-            Ok(vec![whisper_rs::Segment {
+            Ok(vec![crate::engine::Segment {
                 start: (chunk.core_start * 100.0) as i64,
                 end: (chunk.core_end * 100.0) as i64,
                 text: format!("{:.1}-{:.1}", chunk.core_start, chunk.core_end),
@@ -444,7 +447,7 @@ mod tests {
         let entry = store.open("key").unwrap();
         let mut splits = Vec::new();
         let mut calls = Vec::new();
-        let mut run = |chunk: &crate::plan::Chunk| -> anyhow::Result<Vec<whisper_rs::Segment>> {
+        let mut run = |chunk: &crate::plan::Chunk| -> anyhow::Result<Vec<crate::engine::Segment>> {
             calls.push((chunk.core_start, chunk.core_end));
             anyhow::bail!("failed to allocate")
         };
@@ -468,7 +471,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = cache::Cache::new(dir.path());
         let whole = chunk(0.0, 30.0);
-        let mut run = |chunk: &crate::plan::Chunk| -> anyhow::Result<Vec<whisper_rs::Segment>> {
+        let mut run = |chunk: &crate::plan::Chunk| -> anyhow::Result<Vec<crate::engine::Segment>> {
             // Every size fails, so the split keeps halving until the leaf is too
             // short to halve again — the only place the run can give up.
             if chunk.core_end - chunk.core_start > 1.0 {
@@ -514,7 +517,7 @@ mod tests {
         let entry = store.open("key").unwrap();
         let mut splits = Vec::new();
         let mut run =
-            |_: &crate::plan::Chunk| -> anyhow::Result<Vec<whisper_rs::Segment>> { anyhow::bail!("failed to allocate") };
+            |_: &crate::plan::Chunk| -> anyhow::Result<Vec<crate::engine::Segment>> { anyhow::bail!("failed to allocate") };
         let chunk = chunk(0.0, 2.0);
 
         let first = Resolution {

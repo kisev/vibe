@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use crate::engine::TranscribeOptions;
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use whisper_rs::TranscribeOptions;
 
 use crate::audio;
 use crate::cli::AppConfig;
@@ -223,7 +223,7 @@ pub(super) fn build_options(
 
 fn format_response(
     response_format: &str,
-    result: &whisper_rs::TranscribeResult,
+    result: &crate::engine::TranscribeResult,
     diar_segments: &[diarization::Segment],
     plan: Option<&Plan>,
 ) -> Response {
@@ -286,7 +286,10 @@ mod tests {
         let plan = build_plan(60.0, &[], &speech, None, 25.0);
         assert!(!plan.chunks.is_empty(), "speech is planned, not dropped");
         for chunk in &plan.chunks {
-            assert!(chunk.core_end - chunk.core_start <= 25.0 + f64::EPSILON, "chunk over the bound: {chunk:?}");
+            assert!(
+                chunk.core_end - chunk.core_start <= 25.0 + f64::EPSILON,
+                "chunk over the bound: {chunk:?}"
+            );
             assert!(chunk.speakers.is_empty(), "unattributed chunk carries no speakers: {chunk:?}");
         }
     }
@@ -296,7 +299,10 @@ mod tests {
         let speech = vec![(0.0, 30.0)];
         let plan = build_plan(30.0, &[], &speech, Some(10.0), 25.0);
         for chunk in &plan.chunks {
-            assert!(chunk.core_end - chunk.core_start <= 10.0 + f64::EPSILON, "custom bound ignored: {chunk:?}");
+            assert!(
+                chunk.core_end - chunk.core_start <= 10.0 + f64::EPSILON,
+                "custom bound ignored: {chunk:?}"
+            );
         }
     }
 }

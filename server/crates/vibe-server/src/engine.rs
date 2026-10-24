@@ -1,13 +1,83 @@
+use std::sync::OnceLock;
+
 use anyhow::{bail, Context as _};
 use serde::Serialize;
-use whisper_rs::{ContextOptions, Segment, StreamCallbacks, TranscribeOptions, TranscribeResult};
+use transcribe_cpp::{Capabilities, Feature, Model, RunOptions, Task, TimestampKind, Transcript};
 
-/// One VAD instance per model path and option set. GigaAM caps chunks below
+/// One VAD model per path and option set. GigaAM caps speech segments below
 /// its 25-second window while the other engines keep the 30-second default.
 pub struct VadCache {
-    path: String,
-    options: vad_rs::Options,
-    vad: vad_rs::Vad,
+    pub path: String,
+    pub options: transcribe_cpp::VadOptions,
+    pub model: transcribe_cpp::Model,
+}
+
+/// A transcript segment with timestamps in centiseconds, matching the units
+/// the formatters and the diarization overlap matcher expect.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct Segment {
+    pub start: i64,
+    pub end: i64,
+    pub text: String,
+    pub no_speech_prob: f32,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct TranscribeResult {
+    pub segments: Vec<Segment>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+}
+
+impl TranscribeResult {
+    pub fn text(&self) -> String {
+        let mut text = String::new();
+        for (index, segment) in self.segments.iter().enumerate() {
+            if index > 0 {
+                text.push(' ');
+            }
+            text.push_str(segment.text.trim());
+        }
+        text
+    }
+}
+
+/// Progress callbacks for a chunked or streaming run. `on_segment` fires as
+/// soon as a segment is final; `should_abort` is polled between chunks.
+pub type OnProgress<'a> = Box<dyn FnMut(usize) + 'a>;
+pub type OnSegment<'a> = Box<dyn FnMut(&Segment) + 'a>;
+pub type ShouldAbort<'a> = Box<dyn FnMut() -> bool + 'a>;
+
+#[derive(Default)]
+pub struct StreamCallbacks<'a> {
+    pub on_progress: Option<OnProgress<'a>>,
+    pub on_segment: Option<OnSegment<'a>>,
+    pub should_abort: Option<ShouldAbort<'a>>,
+}
+
+/// The request options the CLI and the HTTP form build. Every field maps onto
+/// the unified engine where an equivalent exists; the whisper beam-search
+/// knobs are accepted for API compatibility and honored as greedy decoding.
+#[derive(Debug, Clone, Default)]
+pub struct TranscribeOptions {
+    pub language: Option<String>,
+    pub detect_language: bool,
+    pub translate: bool,
+    pub threads: i32,
+    pub prompt: Option<String>,
+    /// Kept for the CLI/HTTP surface; the unified engine's own logging rides
+    /// on `set_verbose` instead of a per-request flag.
+    #[allow(dead_code)]
+    pub verbose: bool,
+    pub temperature: f32,
+    pub max_text_ctx: i32,
+    pub word_timestamps: bool,
+    pub max_segment_len: i32,
+    pub sampling_greedy: bool,
+    pub best_of: i32,
+    pub beam_size: i32,
+    pub stable_timestamps: bool,
+    pub vad_model_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -31,129 +101,152 @@ pub struct EngineCapabilities {
     pub max_input_seconds: Option<f64>,
 }
 
-// One engine lives at a time, so the size gap between variants costs nothing.
-#[allow(clippy::large_enum_variant)]
-pub enum Engine {
-    Whisper(whisper_rs::Context),
-    Nemotron {
-        model: Box<nemotron_rs::Model>,
-        vad: Option<VadCache>,
-    },
-    Parakeet {
-        model: Box<parakeet_rs::Model>,
-        vad: Option<VadCache>,
-    },
-    Gigaam {
-        model: Box<gigaam_rs::Model>,
-        vad: Option<VadCache>,
-    },
+/// Device selection for a model load, mirroring the old whisper context
+/// options: an explicit GPU index or strict CPU.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ContextOptions {
+    pub gpu_device: i32,
+    pub no_gpu: bool,
+}
+
+/// Route native engine diagnostics somewhere useful, or silence them.
+pub fn set_verbose(verbose: bool) {
+    if verbose {
+        transcribe_cpp::init_logging();
+    } else {
+        transcribe_cpp::disable_logging();
+    }
+}
+
+pub struct GpuDevice {
+    pub index: usize,
+    pub name: String,
+    pub description: String,
+    pub device_type: GPUDeviceType,
+}
+
+pub enum GPUDeviceType {
+    Gpu,
+    IntegratedGpu,
+}
+
+/// The GPU devices this build can see, in the CLI's stable order.
+pub fn list_gpu_devices() -> Vec<GpuDevice> {
+    transcribe_cpp::devices()
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, device)| {
+            let device_type = match device.device_type {
+                transcribe_cpp::DeviceType::Gpu => GPUDeviceType::Gpu,
+                transcribe_cpp::DeviceType::Igpu => GPUDeviceType::IntegratedGpu,
+                _ => return None,
+            };
+            Some(GpuDevice {
+                index,
+                name: device.name,
+                description: device.description,
+                device_type,
+            })
+        })
+        .collect()
+}
+
+/// Register backend modules once before the first load; a no-op in the
+/// static-link builds the server ships.
+fn ensure_backends() {
+    static INIT: OnceLock<()> = OnceLock::new();
+    INIT.get_or_init(|| transcribe_cpp::init_backends_default().expect("init_backends_default"));
+}
+
+/// The unified ASR engine: every family loads through the vendored
+/// transcribe.cpp model, and the planner drives bounded families.
+pub struct Engine {
+    model: Model,
+    vad: Option<VadCache>,
+    caps: EngineCapabilities,
 }
 
 impl Engine {
     pub fn requires_vad(&self) -> bool {
-        matches!(self, Self::Nemotron { .. } | Self::Parakeet { .. } | Self::Gigaam { .. })
+        self.caps.requires_vad
     }
 
     pub fn load(path: &str, options: ContextOptions) -> anyhow::Result<Self> {
-        let capabilities = detect_model(path)?;
-        match capabilities.engine.as_str() {
-            "whisper" => Ok(Self::Whisper(whisper_rs::Context::new(path, options)?)),
-            "gigaam" => Ok(Self::Gigaam {
-                model: Box::new(gigaam_rs::Model::load(path).context("GigaAM model failed to load")?),
-                vad: None,
-            }),
-            "parakeet" => Ok(Self::Parakeet {
-                model: Box::new(parakeet_rs::Model::load(path).context("Parakeet model failed to load")?),
-                vad: None,
-            }),
-            _ => Ok(Self::Nemotron {
-                model: Box::new(nemotron_rs::Model::load(path).context("Nemotron model failed to load")?),
-                vad: None,
-            }),
-        }
+        reject_legacy_container(path)?;
+        ensure_backends();
+        // `gpu_device` keeps the old whisper contract: 0 (and negatives) pick the
+        // backend's automatic device, n > 0 selects the (n-1)-th GPU explicitly.
+        let model_options = if options.no_gpu {
+            transcribe_cpp::ModelOptions {
+                backend: transcribe_cpp::Backend::Cpu,
+                ..Default::default()
+            }
+        } else if options.gpu_device > 0 {
+            let gpus = list_gpu_devices();
+            let index = gpus
+                .get(options.gpu_device as usize - 1)
+                .map(|gpu| gpu.index)
+                .with_context(|| format!("GPU device {} is not available", options.gpu_device))?;
+            let device = transcribe_cpp::devices().into_iter().nth(index);
+            transcribe_cpp::ModelOptions {
+                backend: transcribe_cpp::Backend::Auto,
+                device,
+                ..Default::default()
+            }
+        } else {
+            transcribe_cpp::ModelOptions::default()
+        };
+        let model = load_model(path, &model_options)?;
+        let caps = model_capabilities(&model)?;
+        Ok(Engine { model, vad: None, caps })
     }
 
     pub fn transcribe(&mut self, samples: &[f32], options: TranscribeOptions) -> anyhow::Result<TranscribeResult> {
-        match self {
-            Self::Whisper(context) => context.transcribe(samples, options).map_err(Into::into),
-            Self::Nemotron { model, vad } => {
-                if options.translate {
-                    bail!("Nemotron does not support translation");
-                }
-                if options.prompt.is_some() {
-                    bail!("Nemotron does not support text prompts");
-                }
-                let language = if options.detect_language {
-                    "auto"
-                } else {
-                    options.language.as_deref().unwrap_or("en-US")
-                };
-                let vad = engine_vad(vad, options.vad_model_path.as_deref(), vad_rs::Options::default(), "Nemotron")?;
-                let result = model
-                    .transcribe(vad, samples, language)
-                    .context("Nemotron inference failed")?;
-                Ok(TranscribeResult {
-                    segments: result
-                        .segments
-                        .into_iter()
-                        .filter(|segment| !segment.text.is_empty())
-                        .map(|segment| Segment {
-                            start: segment.tokens.first().map_or(0, |token| token.frame as i64 * 8),
-                            end: segment.tokens.last().map_or(0, |token| (token.frame as i64 + 1) * 8),
-                            text: segment.text,
-                            no_speech_prob: 0.0,
-                        })
-                        .collect(),
+        self.validate_request(&options)?;
+        if self.caps.requires_vad {
+            // Bounded families run through VAD-detected speech, exactly as the
+            // hand-written engines did: whole-buffer input is refused by design.
+            let ranges = self.speech_ranges(samples, options.vad_model_path.as_deref())?;
+            let flat: Vec<(usize, usize)> = ranges
+                .iter()
+                .map(|(start, end)| {
+                    (
+                        (*start * crate::plan::SAMPLE_RATE) as usize,
+                        (*end * crate::plan::SAMPLE_RATE) as usize,
+                    )
                 })
-            }
-            Self::Parakeet { model, vad } => {
-                validate_parakeet_options(&options)?;
-                let language = if options.detect_language {
-                    "auto"
-                } else {
-                    options.language.as_deref().unwrap_or("en")
-                };
-                let vad = engine_vad(vad, options.vad_model_path.as_deref(), vad_rs::Options::default(), "Parakeet")?;
-                let result = model
-                    .transcribe(vad, samples, language)
-                    .context("Parakeet inference failed")?;
-                Ok(TranscribeResult {
-                    segments: result.segments.iter().filter_map(parakeet_segment).collect(),
-                })
-            }
-            Self::Gigaam { model, vad } => {
-                validate_gigaam_options(&options)?;
-                let language = if options.detect_language {
-                    "auto"
-                } else {
-                    options.language.as_deref().unwrap_or("ru")
-                };
-                let vad = engine_vad(vad, options.vad_model_path.as_deref(), gigaam_vad_options(), "GigaAM")?;
-                let result = model.transcribe(vad, samples, language).context("GigaAM inference failed")?;
-                Ok(TranscribeResult {
-                    segments: result.segments.iter().filter_map(gigaam_segment).collect(),
-                })
-            }
+                .collect();
+            let callbacks = StreamCallbacks::default();
+            return self.transcribe_chunks_with(samples, &flat, options, callbacks);
         }
+        let mut session = self.model.session().context("session init failed")?;
+        let run = self.run_options(&options);
+        let transcript = session.run(samples, &run).context("inference failed")?;
+        let segments = segments_for(&transcript, 0, samples.len());
+        Ok(TranscribeResult {
+            segments,
+            language: transcript.language,
+        })
     }
 
     /// Longest input the engine accepts from an external plan.
     pub fn max_input_seconds(&self) -> Option<f64> {
-        self.capabilities().max_input_seconds
+        self.caps.max_input_seconds
     }
 
     /// Speech ranges in seconds, from the engine's cached VAD. The planner uses
     /// them as the pauses it may cut in.
     pub fn speech_ranges(&mut self, samples: &[f32], vad_model_path: Option<&str>) -> anyhow::Result<Vec<(f64, f64)>> {
-        let (vad, label, options) = match self {
-            Self::Whisper(_) => bail!("whisper keeps its own long-form path"),
-            Self::Nemotron { vad, .. } => (vad, "Nemotron", vad_rs::Options::default()),
-            Self::Parakeet { vad, .. } => (vad, "Parakeet", vad_rs::Options::default()),
-            Self::Gigaam { vad, .. } => (vad, "GigaAM", gigaam_vad_options()),
-        };
-        let vad = engine_vad(vad, vad_model_path, options, label)?;
-        let ranges = vad.segments(samples).context("VAD segmentation failed")?;
-        Ok(ranges
+        if !self.caps.requires_vad {
+            bail!("{} keeps its own long-form path", self.caps.engine);
+        }
+        let bound_ms = self.caps.max_input_seconds.unwrap_or(30.0) * 1000.0;
+        let options = vad_options_for(bound_ms);
+        let vad = engine_vad(&mut self.vad, vad_model_path, options, &self.caps.engine)?;
+        let mut session = vad.model.vad_session().context("VAD session init failed")?;
+        let result = session.run(samples, &vad.options).context("VAD segmentation failed")?;
+        Ok(result
+            .segments
             .into_iter()
             .map(|range| {
                 (
@@ -168,8 +261,8 @@ impl Engine {
     /// chose, so a chunk that belongs to one speaker is never widened by the
     /// engine's own VAD pass.
     ///
-    /// Whisper is refused: its output depends on its internal segmentation and
-    /// prompt context, so it keeps its own long-form path.
+    /// Long-form families are refused: their output depends on internal
+    /// segmentation and prompt context, so they keep their own long-form path.
     pub fn transcribe_chunks(
         &mut self,
         samples: &[f32],
@@ -188,94 +281,38 @@ impl Engine {
         options: TranscribeOptions,
         callbacks: StreamCallbacks<'_>,
     ) -> anyhow::Result<TranscribeResult> {
+        if self.caps.max_input_seconds.is_none() {
+            bail!("{} does not accept an external chunk plan", self.caps.engine);
+        }
+        self.validate_request(&options)?;
         let StreamCallbacks {
             mut on_progress,
             mut on_segment,
             mut should_abort,
         } = callbacks;
-        match self {
-            Self::Whisper(_) => bail!("whisper does not accept an external chunk plan"),
-            Self::Nemotron { model, .. } => {
-                if options.translate {
-                    bail!("Nemotron does not support translation");
-                }
-                if options.prompt.is_some() {
-                    bail!("Nemotron does not support text prompts");
-                }
-                let language = chunk_language(&options, "en-US");
-                let result = model.transcribe_ranges(
-                    samples,
-                    ranges,
-                    &language,
-                    || should_abort.as_mut().is_some_and(|callback| callback()),
-                    |transcription| {
-                        if let Some(callback) = on_segment.as_mut() {
-                            if let Some(segment) = nemotron_segment(transcription) {
-                                callback(segment);
-                            }
-                        }
-                    },
-                    |progress| {
-                        if let Some(callback) = on_progress.as_mut() {
-                            callback(progress);
-                        }
-                    },
-                )?;
-                Ok(TranscribeResult {
-                    segments: result.segments.iter().filter_map(nemotron_segment).collect(),
-                })
+        let mut session = self.model.session().context("session init failed")?;
+        let run = self.run_options(&options);
+        let mut segments = Vec::new();
+        for (index, (start, end)) in ranges.iter().enumerate() {
+            if should_abort.as_mut().is_some_and(|callback| callback()) {
+                bail!("transcription aborted");
             }
-            Self::Parakeet { model, .. } => {
-                validate_parakeet_options(&options)?;
-                let language = chunk_language(&options, "en");
-                let result = model.transcribe_ranges(
-                    samples,
-                    ranges,
-                    &language,
-                    || should_abort.as_mut().is_some_and(|callback| callback()),
-                    |transcription| {
-                        if let Some(callback) = on_segment.as_mut() {
-                            if let Some(segment) = parakeet_segment(transcription) {
-                                callback(segment);
-                            }
-                        }
-                    },
-                    |progress| {
-                        if let Some(callback) = on_progress.as_mut() {
-                            callback(progress);
-                        }
-                    },
-                )?;
-                Ok(TranscribeResult {
-                    segments: result.segments.iter().filter_map(parakeet_segment).collect(),
-                })
+            let chunk = &samples[*start..*end];
+            let transcript = session.run(chunk, &run).context("inference failed")?;
+            if let Some(callback) = on_progress.as_mut() {
+                callback(index + 1);
             }
-            Self::Gigaam { model, .. } => {
-                validate_gigaam_options(&options)?;
-                let language = chunk_language(&options, "ru");
-                let result = model.transcribe_ranges(
-                    samples,
-                    ranges,
-                    &language,
-                    || should_abort.as_mut().is_some_and(|callback| callback()),
-                    |transcription| {
-                        if let Some(callback) = on_segment.as_mut() {
-                            if let Some(segment) = gigaam_segment(transcription) {
-                                callback(segment);
-                            }
-                        }
-                    },
-                    |progress| {
-                        if let Some(callback) = on_progress.as_mut() {
-                            callback(progress);
-                        }
-                    },
-                )?;
-                Ok(TranscribeResult {
-                    segments: result.segments.iter().filter_map(gigaam_segment).collect(),
-                })
+            for segment in segments_for(&transcript, *start, *end) {
+                if let Some(callback) = on_segment.as_mut() {
+                    callback(&segment);
+                }
+                segments.push(segment);
             }
         }
+        Ok(TranscribeResult {
+            segments,
+            language: None,
+        })
     }
 
     pub fn transcribe_stream(
@@ -284,195 +321,326 @@ impl Engine {
         options: TranscribeOptions,
         callbacks: StreamCallbacks<'_>,
     ) -> anyhow::Result<TranscribeResult> {
-        match self {
-            Self::Whisper(context) => context.transcribe_stream(samples, options, callbacks).map_err(Into::into),
-            Self::Nemotron { model, vad } => {
-                if options.translate {
-                    bail!("Nemotron does not support translation");
+        self.validate_request(&options)?;
+        let StreamCallbacks {
+            mut on_progress,
+            mut on_segment,
+            mut should_abort,
+        } = callbacks;
+        let mut session = self.model.session().context("session init failed")?;
+        let run = self.run_options(&options);
+        let mut seen = 0usize;
+        if self.caps.streaming {
+            use transcribe_cpp::StreamOptions;
+            let mut stream = session
+                .stream(&run, &StreamOptions::default())
+                .context("stream init failed")?;
+            // Feed in roughly one-second windows so segments commit early.
+            let window = crate::plan::SAMPLE_RATE as usize;
+            for chunk_start in (0..samples.len()).step_by(window) {
+                if should_abort.as_mut().is_some_and(|callback| callback()) {
+                    drop(stream);
+                    bail!("transcription aborted");
                 }
-                if options.prompt.is_some() {
-                    bail!("Nemotron does not support text prompts");
+                let end = (chunk_start + window).min(samples.len());
+                stream.feed(&samples[chunk_start..end]).context("stream feed failed")?;
+                emit_new(&mut seen, &stream.snapshot(), &mut on_segment);
+                if let Some(callback) = on_progress.as_mut() {
+                    callback((end / window).max(1));
                 }
-                let language = if options.detect_language {
-                    "auto"
-                } else {
-                    options.language.as_deref().unwrap_or("en-US")
-                };
-                let vad = engine_vad(vad, options.vad_model_path.as_deref(), vad_rs::Options::default(), "Nemotron")?;
-                let StreamCallbacks {
-                    mut on_progress,
-                    mut on_segment,
-                    mut should_abort,
-                } = callbacks;
-                let result = model.transcribe_with(
-                    vad,
-                    samples,
-                    language,
-                    || should_abort.as_mut().is_some_and(|callback| callback()),
-                    |transcription| {
-                        if let Some(callback) = on_segment.as_mut() {
-                            if let Some(segment) = nemotron_segment(transcription) {
-                                callback(segment);
-                            }
-                        }
-                    },
-                    |progress| {
-                        if let Some(callback) = on_progress.as_mut() {
-                            callback(progress);
-                        }
-                    },
-                )?;
-                Ok(TranscribeResult {
-                    segments: result.segments.iter().filter_map(nemotron_segment).collect(),
-                })
             }
-            Self::Parakeet { model, vad } => {
-                validate_parakeet_options(&options)?;
-                let language = if options.detect_language {
-                    "auto"
-                } else {
-                    options.language.as_deref().unwrap_or("en")
-                };
-                let vad = engine_vad(vad, options.vad_model_path.as_deref(), vad_rs::Options::default(), "Parakeet")?;
-                let StreamCallbacks {
-                    mut on_progress,
-                    mut on_segment,
-                    mut should_abort,
-                } = callbacks;
-                let result = model
-                    .transcribe_with(
-                        vad,
-                        samples,
-                        language,
-                        || should_abort.as_mut().is_some_and(|callback| callback()),
-                        |transcription| {
-                            if let (Some(callback), Some(segment)) = (on_segment.as_mut(), parakeet_segment(transcription)) {
-                                callback(segment);
-                            }
-                        },
-                        |progress| {
-                            if let Some(callback) = on_progress.as_mut() {
-                                callback(progress);
-                            }
-                        },
-                    )
-                    .context("Parakeet inference failed")?;
-                Ok(TranscribeResult {
-                    segments: result.segments.iter().filter_map(parakeet_segment).collect(),
-                })
-            }
-            Self::Gigaam { model, vad } => {
-                validate_gigaam_options(&options)?;
-                let language = if options.detect_language {
-                    "auto"
-                } else {
-                    options.language.as_deref().unwrap_or("ru")
-                };
-                let vad = engine_vad(vad, options.vad_model_path.as_deref(), gigaam_vad_options(), "GigaAM")?;
-                let StreamCallbacks {
-                    mut on_progress,
-                    mut on_segment,
-                    mut should_abort,
-                } = callbacks;
-                let result = model
-                    .transcribe_with(
-                        vad,
-                        samples,
-                        language,
-                        || should_abort.as_mut().is_some_and(|callback| callback()),
-                        |transcription| {
-                            if let (Some(callback), Some(segment)) = (on_segment.as_mut(), gigaam_segment(transcription)) {
-                                callback(segment);
-                            }
-                        },
-                        |progress| {
-                            if let Some(callback) = on_progress.as_mut() {
-                                callback(progress);
-                            }
-                        },
-                    )
-                    .context("GigaAM inference failed")?;
-                Ok(TranscribeResult {
-                    segments: result.segments.iter().filter_map(gigaam_segment).collect(),
-                })
-            }
+            stream.finalize().context("stream finalize failed")?;
+            let transcript = stream.snapshot();
+            let language = transcript.language.clone();
+            emit_new(&mut seen, &transcript, &mut on_segment);
+            let segments = segments_for(&transcript, 0, samples.len());
+            Ok(TranscribeResult { segments, language })
+        } else {
+            let transcript = session.run(samples, &run).context("inference failed")?;
+            emit_new(&mut seen, &transcript, &mut on_segment);
+            let segments = segments_for(&transcript, 0, samples.len());
+            Ok(TranscribeResult {
+                segments,
+                language: transcript.language,
+            })
         }
     }
 
     /// Rejects options the loaded engine cannot honor before any audio is
     /// decoded, so CLI and streaming requests fail with a specific reason.
     pub fn validate_request(&self, options: &TranscribeOptions) -> anyhow::Result<()> {
-        match self {
-            Self::Whisper(_) => Ok(()),
-            Self::Gigaam { .. } => {
-                validate_gigaam_options(options)?;
-                let language = if options.detect_language {
-                    "auto"
-                } else {
-                    options.language.as_deref().unwrap_or("ru")
-                };
-                if !language.is_empty() && language != "auto" && language != "ru" {
-                    return Err(gigaam_rs::Error::UnsupportedLanguage(language.to_owned()).into());
-                }
-                Ok(())
-            }
-            Self::Parakeet { .. } => validate_parakeet_options(options),
-            Self::Nemotron { .. } => {
-                if options.translate {
-                    bail!("Nemotron does not support translation");
-                }
-                if options.prompt.is_some() {
-                    bail!("Nemotron does not support text prompts");
-                }
-                Ok(())
+        let engine = self.caps.engine.as_str();
+        if options.translate && !self.caps.translation {
+            bail!("{engine} does not support translation");
+        }
+        if options.prompt.is_some() && !self.caps.text_prompts {
+            bail!("{engine} does not support text prompts");
+        }
+        if options.stable_timestamps && !self.caps.stable_timestamps {
+            bail!("{engine} does not support stable timestamps");
+        }
+        if self.caps.languages.len() == 1 && !self.caps.language_detection {
+            let only = &self.caps.languages[0];
+            let requested = options.language.as_deref().unwrap_or("");
+            if !requested.is_empty() && requested != "auto" && requested != only {
+                bail!("{engine} supports only {only}");
             }
         }
+        Ok(())
     }
 
     pub fn capabilities(&self) -> EngineCapabilities {
-        match self {
-            Self::Whisper(_) => whisper_capabilities(),
-            Self::Nemotron { model, .. } => {
-                nemotron_capabilities(model.info().languages.clone(), model.info().language_detection)
-            }
-            Self::Parakeet { model, .. } => {
-                parakeet_capabilities(model.info().languages.clone(), model.info().language_detection)
-            }
-            Self::Gigaam { model, .. } => gigaam_capabilities(model.info()),
+        self.caps.clone()
+    }
+
+    fn run_options(&self, options: &TranscribeOptions) -> RunOptions {
+        warn_ignored(options);
+        let mut run = RunOptions {
+            language: (!options.detect_language).then(|| options.language.clone()).flatten(),
+            task: if options.translate {
+                Task::Translate
+            } else {
+                Task::Transcribe
+            },
+            timestamps: if options.word_timestamps {
+                TimestampKind::Word
+            } else {
+                TimestampKind::Segment
+            },
+            ..RunOptions::default()
+        };
+        if self.caps.decoding_options {
+            run.family = Some(transcribe_cpp::RunExtension::Whisper(transcribe_cpp::WhisperRunOptions {
+                initial_prompt: options.prompt.clone(),
+                temperature: (options.temperature != 0.0).then_some(options.temperature),
+                condition_on_prev_tokens: Some(options.stable_timestamps),
+                max_prev_context_tokens: (options.max_text_ctx != 0).then_some(options.max_text_ctx),
+                ..Default::default()
+            }));
+        }
+        run
+    }
+}
+
+/// Map a transcript's segments, or synthesize one spanning the input when the
+/// family emits only running text (GigaAM today): every model input still
+/// yields exactly one row the planner and the overlap matcher can place.
+fn segments_for(transcript: &Transcript, start_sample: usize, end_sample: usize) -> Vec<Segment> {
+    let mapped: Vec<Segment> = transcript
+        .segments
+        .iter()
+        .filter(|segment| !segment.text.is_empty())
+        .map(|segment| Segment {
+            start: segment.t0_ms / 10,
+            end: segment.t1_ms / 10,
+            text: segment.text.clone(),
+            no_speech_prob: 0.0,
+        })
+        .collect();
+    if !mapped.is_empty() {
+        return mapped;
+    }
+    let text = transcript.text.trim();
+    if end_sample > start_sample && !text.is_empty() {
+        vec![Segment {
+            start: (start_sample as f64 / crate::plan::SAMPLE_RATE * 100.0) as i64,
+            end: (end_sample as f64 / crate::plan::SAMPLE_RATE * 100.0) as i64,
+            text: text.to_owned(),
+            no_speech_prob: 0.0,
+        }]
+    } else {
+        Vec::new()
+    }
+}
+
+/// Emit the segments of `transcript` past `seen` through `on_segment`.
+fn emit_new(seen: &mut usize, transcript: &Transcript, on_segment: &mut Option<OnSegment<'_>>) {
+    let fresh: Vec<Segment> = transcript
+        .segments
+        .iter()
+        .skip(*seen)
+        .filter(|segment| !segment.text.is_empty())
+        .map(|segment| Segment {
+            start: segment.t0_ms / 10,
+            end: segment.t1_ms / 10,
+            text: segment.text.clone(),
+            no_speech_prob: 0.0,
+        })
+        .collect();
+    *seen += fresh.len();
+    for segment in fresh {
+        if let Some(callback) = on_segment.as_mut() {
+            callback(&segment);
         }
     }
 }
 
-pub fn nemotron_capabilities(languages: Vec<String>, language_detection: bool) -> EngineCapabilities {
-    EngineCapabilities {
-        engine: "nemotron".to_string(),
-        requires_vad: true,
-        languages,
-        language_detection,
-        streaming: false,
-        translation: false,
-        timestamps: true,
-        text_prompts: false,
-        stable_timestamps: false,
-        decoding_options: false,
-        max_input_seconds: Some(30.0),
+fn warn_ignored(options: &TranscribeOptions) {
+    static WARNED: OnceLock<()> = OnceLock::new();
+    if WARNED.set(()).is_ok() {
+        if !options.sampling_greedy || options.beam_size != 0 || options.best_of != 0 {
+            log::warn!(
+                "beam-search decoding is not available in the unified engine; decoding greedily with temperature fallback"
+            );
+        }
+        if options.max_segment_len != 0 || options.threads != 0 {
+            log::warn!("max_segment_len and n_threads are engine-internal in the unified engine and are ignored");
+        }
     }
 }
 
-pub fn parakeet_capabilities(languages: Vec<String>, language_detection: bool) -> EngineCapabilities {
-    EngineCapabilities {
-        engine: "parakeet".to_string(),
-        requires_vad: true,
-        languages,
-        language_detection,
-        streaming: false,
-        translation: false,
-        timestamps: true,
-        text_prompts: false,
-        stable_timestamps: false,
-        decoding_options: false,
-        max_input_seconds: Some(30.0),
+/// The legacy families' documented input windows and names. The unified
+/// engine treats several of them as long-form internally, but the planner and
+/// the cache need the explicit windows the hand-written engines enforced, and
+/// the desktop still keys its engine unions on these names, so vibe owns them.
+/// Returns `(engine name, window seconds)`; a `None` window means unbounded.
+fn family_window(arch: &str, variant: &str) -> Option<(&'static str, Option<f64>)> {
+    match (arch, variant.starts_with("nemotron")) {
+        ("whisper", _) => Some(("whisper", None)),
+        ("gigaam", _) => Some(("gigaam", Some(25.0))),
+        ("parakeet", true) => Some(("nemotron", Some(30.0))),
+        ("parakeet", false) => Some(("parakeet", Some(30.0))),
+        _ => None,
     }
+}
+
+/// The capability view of a loaded model: the unified engine's metadata,
+/// shaped into the server's capability contract.
+pub fn model_capabilities(model: &Model) -> anyhow::Result<EngineCapabilities> {
+    let arch = model.arch();
+    let variant = model.variant();
+    let caps: Capabilities = model.capabilities()?;
+    // Known families keep their legacy name and documented window; a new
+    // family reports its own architecture name and honors any upstream bound.
+    let (engine, window) = match family_window(&arch, &variant) {
+        Some((name, bound)) => (name.to_owned(), bound),
+        None => {
+            let bound = (caps.max_audio_ms > 0 && !model.supports(Feature::LongForm)).then(|| caps.max_audio_ms as f64 / 1000.0);
+            (arch.clone(), bound)
+        }
+    };
+    let is_whisper = engine == "whisper";
+    Ok(EngineCapabilities {
+        engine,
+        // Bounded families are planned externally and need the VAD model for
+        // pause-aware cutting; long-form families handle their own input.
+        requires_vad: window.is_some(),
+        languages: caps.languages,
+        language_detection: caps.supports_language_detect,
+        streaming: caps.supports_streaming,
+        translation: caps.supports_translate,
+        timestamps: !matches!(caps.max_timestamp_kind, TimestampKind::None | TimestampKind::Auto),
+        text_prompts: model.supports(Feature::InitialPrompt) || model.supports(Feature::ContextPrompt),
+        stable_timestamps: is_whisper,
+        decoding_options: is_whisper,
+        max_input_seconds: window,
+    })
+}
+
+/// Reads `general.architecture` straight from the GGUF container, so an
+/// unsupported family is rejected by name even when the engine's own error
+/// only carries a status code.
+fn gguf_architecture(path: &str) -> Option<String> {
+    use std::io::Read;
+
+    let mut bytes = Vec::new();
+    std::fs::File::open(path).ok()?.read_to_end(&mut bytes).ok()?;
+    if bytes.len() < 12 || &bytes[..4] != b"GGUF" {
+        return None;
+    }
+    // Header: magic (4) + version u32 (4), then tensor count and kv count, u64 each.
+    let u64_at = |bytes: &[u8], at: usize| {
+        at.checked_add(8)
+            .and_then(|end| bytes.get(at..end))
+            .map(|v| u64::from_le_bytes(v.try_into().expect("8 bytes")))
+    };
+    let mut cursor = 8usize;
+    let _tensors = u64_at(&bytes, cursor)?;
+    cursor += 8;
+    let kvs = u64_at(&bytes, cursor)? as usize;
+    cursor += 8;
+    for _ in 0..kvs {
+        let key_len = u64_at(&bytes, cursor)? as usize;
+        cursor += 8;
+        let key = bytes.get(cursor..cursor.checked_add(key_len)?)?;
+        cursor += key_len;
+        let value_type = u32::from_le_bytes(bytes.get(cursor..cursor.checked_add(4)?)?.try_into().expect("4 bytes"));
+        cursor += 4;
+        // Walk the value; only the string shape is decoded, everything else
+        // is skipped by its documented GGUF width.
+        let width = match value_type {
+            0..=5 => 1, // u8..f32 except f64
+            6 => 2,     // f64
+            7 => 1,     // bool
+            8 => {
+                return (key == b"general.architecture").then(|| {
+                    let len = u64_at(&bytes, cursor).unwrap_or(0) as usize;
+                    String::from_utf8_lossy(bytes.get(cursor + 8..cursor + 8 + len).unwrap_or_default()).into_owned()
+                })
+            }
+            9 | 10 => 4, // u32 pairs and i32 pairs
+            11 => 16,    // f32 quartet
+            _ => return None,
+        };
+        cursor += width;
+    }
+    None
+}
+
+/// Load a GGUF model through the unified engine, naming the family when the
+/// engine refuses the file.
+fn load_model(path: &str, model_options: &transcribe_cpp::ModelOptions) -> anyhow::Result<Model> {
+    transcribe_cpp::Model::load_with(path, model_options).with_context(|| match gguf_architecture(path) {
+        Some(architecture) => format!("unsupported architecture: {architecture}"),
+        None => "model load failed".to_string(),
+    })
+}
+
+/// Whisper models in the legacy ggml `.bin` container are retired: the error
+/// names the format and points at the catalog that publishes the GGUF files.
+pub fn reject_legacy_container(path: &str) -> anyhow::Result<()> {
+    if is_gguf(path) {
+        return Ok(());
+    }
+    let filename = std::path::Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(path);
+    bail!(
+        "unsupported model format: {filename} is not a GGUF file. The legacy whisper .bin container is \
+         no longer supported — download the GGUF build from the model catalog"
+    )
+}
+
+/// Speech segments longer than the model's input window are split by the VAD
+/// itself (`max_speech_ms`), with half a second of margin below the bound.
+/// GigaAM's 24 s window matches Silero's documented utterance limit.
+fn vad_options_for(bound_ms: f64) -> transcribe_cpp::VadOptions {
+    transcribe_cpp::VadOptions {
+        max_speech_ms: (bound_ms - 500.0) as i32,
+        ..Default::default()
+    }
+}
+
+fn engine_vad<'a>(
+    cached: &'a mut Option<VadCache>,
+    path: Option<&str>,
+    options: transcribe_cpp::VadOptions,
+    engine: &str,
+) -> anyhow::Result<&'a mut VadCache> {
+    let path = path.with_context(|| format!("vad_model_path is required for {engine}"))?;
+    let stale = cached
+        .as_ref()
+        .is_none_or(|cached| cached.path != path || cached.options != options);
+    if stale {
+        let model = transcribe_cpp::Model::load(path).context("VAD model load failed")?;
+        *cached = Some(VadCache {
+            path: path.to_owned(),
+            options,
+            model,
+        });
+    }
+    Ok(cached.as_mut().expect("VAD initialized"))
 }
 
 /// Sample ranges the plan sends to the model, clipped to the decoded audio.
@@ -489,144 +657,8 @@ pub fn chunk_ranges(plan: &crate::plan::Plan, sample_count: usize) -> Vec<(usize
         .collect()
 }
 
-/// The language a chunked run uses: `auto` when detection is on, the requested
-/// language otherwise, and the engine's default when neither is given.
-fn chunk_language(options: &TranscribeOptions, default: &str) -> String {
-    if options.detect_language {
-        return "auto".to_string();
-    }
-    match options.language.as_deref() {
-        Some(language) if !language.is_empty() => language.to_string(),
-        _ => default.to_string(),
-    }
-}
-
-pub fn whisper_capabilities() -> EngineCapabilities {
-    EngineCapabilities {
-        engine: "whisper".to_string(),
-        requires_vad: false,
-        languages: whisper_rs::supported_languages(),
-        language_detection: true,
-        streaming: true,
-        translation: true,
-        timestamps: true,
-        text_prompts: true,
-        stable_timestamps: true,
-        decoding_options: true,
-        max_input_seconds: None,
-    }
-}
-
-fn nemotron_segment(transcription: &nemotron_rs::Transcription) -> Option<Segment> {
-    (!transcription.text.is_empty()).then(|| Segment {
-        start: transcription.tokens.first().map_or(0, |token| token.frame as i64 * 8),
-        end: transcription.tokens.last().map_or(0, |token| (token.frame as i64 + 1) * 8),
-        text: transcription.text.clone(),
-        no_speech_prob: 0.0,
-    })
-}
-
-fn validate_parakeet_options(options: &TranscribeOptions) -> anyhow::Result<()> {
-    if options.translate {
-        bail!("Parakeet does not support translation");
-    }
-    if options.prompt.is_some() {
-        bail!("Parakeet does not support text prompts");
-    }
-    Ok(())
-}
-
-fn engine_vad<'a>(
-    cached: &'a mut Option<VadCache>,
-    path: Option<&str>,
-    options: vad_rs::Options,
-    engine: &str,
-) -> anyhow::Result<&'a mut vad_rs::Vad> {
-    let path = path.with_context(|| format!("vad_model_path is required for {engine}"))?;
-    let stale = cached
-        .as_ref()
-        .is_none_or(|cached| cached.path != path || cached.options != options);
-    if stale {
-        *cached = Some(VadCache {
-            path: path.to_owned(),
-            options,
-            vad: vad_rs::Vad::new(path, options)?,
-        });
-    }
-    Ok(&mut cached.as_mut().expect("VAD initialized").vad)
-}
-
-fn parakeet_segment(transcription: &parakeet_rs::Transcription) -> Option<Segment> {
-    (!transcription.text.is_empty()).then(|| Segment {
-        start: transcription.tokens.first().map_or(0, |token| token.frame as i64 * 8),
-        end: transcription
-            .tokens
-            .last()
-            .map_or(0, |token| (token.frame + token.duration_frames.max(1)) as i64 * 8),
-        text: transcription.text.clone(),
-        no_speech_prob: 0.0,
-    })
-}
-
-pub fn gigaam_capabilities(info: &gigaam_rs::ModelInfo) -> EngineCapabilities {
-    EngineCapabilities {
-        engine: "gigaam".to_string(),
-        requires_vad: true,
-        languages: info.languages.clone(),
-        language_detection: false,
-        streaming: false,
-        translation: false,
-        timestamps: true,
-        text_prompts: false,
-        stable_timestamps: false,
-        decoding_options: false,
-        max_input_seconds: Some(25.0),
-    }
-}
-
-/// GigaAM is trained for utterances up to about 25 seconds, so its VAD chunks
-/// stay below that bound with no cross-chunk overlap.
-fn gigaam_vad_options() -> vad_rs::Options {
-    vad_rs::Options {
-        max_chunk_ms: 24_000,
-        overlap_ms: 0,
-        ..vad_rs::Options::default()
-    }
-}
-
-fn validate_gigaam_options(options: &TranscribeOptions) -> anyhow::Result<()> {
-    if options.translate {
-        bail!("GigaAM does not support translation");
-    }
-    if options.prompt.is_some() {
-        bail!("GigaAM does not support text prompts");
-    }
-    if options.stable_timestamps {
-        bail!("GigaAM does not support stable timestamps");
-    }
-    Ok(())
-}
-
-/// GigaAM reports token timestamps at the 40 ms encoder frame rate.
-const GIGAAM_CENTISECONDS_PER_FRAME: i64 = 4;
-
-fn gigaam_segment(transcription: &gigaam_rs::Transcription) -> Option<Segment> {
-    (!transcription.text.is_empty()).then(|| Segment {
-        start: transcription
-            .tokens
-            .first()
-            .map_or(0, |token| token.frame as i64 * GIGAAM_CENTISECONDS_PER_FRAME),
-        end: transcription
-            .tokens
-            .last()
-            .map_or(0, |token| (token.frame as i64 + 1) * GIGAAM_CENTISECONDS_PER_FRAME),
-        text: transcription.text.clone(),
-        no_speech_prob: 0.0,
-    })
-}
-
-/// Whether the file starts with the GGUF magic. Whisper models use the older
-/// GGML container and are handled by whisper.cpp instead.
+/// Whether the file starts with the GGUF magic. Anything else is a legacy or
+/// foreign container and never reaches the unified loader.
 pub fn is_gguf(path: &str) -> bool {
     use std::io::Read;
 
@@ -634,76 +666,15 @@ pub fn is_gguf(path: &str) -> bool {
     std::fs::File::open(path).is_ok_and(|mut file| file.read_exact(&mut magic).is_ok()) && &magic == b"GGUF"
 }
 
-/// Reads model metadata once and reports the engine the server would load.
+/// Loads the model metadata once and reports the engine the server would run.
 /// `Engine::load` and the metadata route share this function so a model cannot
-/// be listed as supported and then rejected, or the other way round.
+/// be listed as supported and then rejected, or the other way round. The load
+/// is memory-mapped, so the probe costs the metadata read, not the weights.
 pub fn detect_model(path: &str) -> anyhow::Result<EngineCapabilities> {
-    if !is_gguf(path) {
-        whisper_rs::validate_model_file(path)?;
-        return Ok(whisper_capabilities());
-    }
-    // Read `general.architecture` once so an unsupported file is rejected by
-    // name instead of by whichever key the last engine reader happened to miss.
-    let architecture = gguf_architecture(path);
-    if let Ok(info) = gigaam_rs::Model::metadata(path) {
-        if info.architecture == "gigaam" {
-            return Ok(gigaam_capabilities(&info));
-        }
-    }
-    if let Ok(info) = parakeet_rs::Model::metadata(path) {
-        if info.architecture == "parakeet" && info.head_kind == "tdt" && info.variant.contains("v3") {
-            return Ok(parakeet_capabilities(info.languages, info.language_detection));
-        }
-    }
-    match nemotron_rs::Model::metadata(path) {
-        Ok(info) if info.architecture == "parakeet" && info.head_kind == "rnnt" => {
-            Ok(nemotron_capabilities(info.languages, info.language_detection))
-        }
-        Ok(info) => bail!(
-            "unsupported GGUF architecture '{}' with head '{}'",
-            info.architecture,
-            info.head_kind
-        ),
-        Err(err) => {
-            tracing::error!(model = path, "failed to read GGUF metadata: {err}");
-            match architecture {
-                Some(architecture) => bail!("unsupported GGUF architecture '{architecture}'"),
-                None => bail!("failed to read GGUF metadata: {err}"),
-            }
-        }
-    }
-}
-
-/// Reads `general.architecture` from a GGUF without materializing tensors.
-fn gguf_architecture(path: &str) -> Option<String> {
-    use gigaam_rs::sys;
-    use std::ffi::{CStr, CString};
-
-    let path = CString::new(path).ok()?;
-    let key = CString::new("general.architecture").ok()?;
-    unsafe {
-        let mut tensors = std::ptr::null_mut();
-        let gguf = sys::gguf_init_from_file(
-            path.as_ptr(),
-            sys::gguf_init_params {
-                no_alloc: true,
-                ctx: &mut tensors,
-            },
-        );
-        if gguf.is_null() {
-            return None;
-        }
-        let id = sys::gguf_find_key(gguf, key.as_ptr());
-        let architecture = (id >= 0)
-            .then(|| sys::gguf_get_val_str(gguf, id))
-            .filter(|value| !value.is_null())
-            .map(|value| CStr::from_ptr(value).to_string_lossy().into_owned());
-        if !tensors.is_null() {
-            sys::ggml_free(tensors);
-        }
-        sys::gguf_free(gguf);
-        architecture
-    }
+    reject_legacy_container(path)?;
+    ensure_backends();
+    let model = load_model(path, &transcribe_cpp::ModelOptions::default())?;
+    model_capabilities(&model)
 }
 
 #[cfg(test)]

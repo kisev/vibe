@@ -37,6 +37,28 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
 - **ggml coexistence:** transcribe's ggml objects carry GLOBAL HIDDEN visibility, so a transition binary linking both `ggml-rs-sys` and the vendored engine does not collide; final proof is the 1.2 CI spike linking both into one binary.
 - **Build:** ~44 s cold for the whole C++ tree on the WSL host; the wrapper's test suite runs green with one local patch (test `repo_root` resolution — see the crates' VENDOR.md). A canonical jfk.wav run through whisper-tiny Q5_K_M reproduces the reference transcript ("...my fellow Americans...") with segment timestamps and auto-detected `en`.
 
+## Phase 2 findings and the VAD/diarization pivot (user-approved)
+
+- **VAD and diarization move onto transcribe.cpp in this change.** The original plan kept the
+  vad-rs and diarize-rs Rust adapters, but both depend on `ggml-rs-sys`, and the spike proved two
+  ggmls cannot share a binary — so any server build with the unified engine would fail to link.
+  Silero VAD now runs through the vendored `VadSession` (the legacy `ggml-silero-v6.2.0.bin`
+  container still loads), and diarization through `SortformerDiarizeSession`; the `diarize`
+  cargo feature is gone because the engine is one library now.
+- **vibe owns the input windows and engine names.** Upstream reports `max_audio_ms = 0` for every
+  legacy family (it treats even GigaAM as long-form internally), so the capability mapping keeps
+  the documented windows in a vibe-side table: gigaam 25 s, parakeet/nemotron 30 s, whisper
+  unbounded. Nemotron models share the `parakeet` GGUF architecture; the `variant` string
+  (`nemotron-*`) discriminates the engine name the metadata contract has always reported.
+- **GigaAM emits text without segment rows** through the unified engine; when a model input
+  yields no segments, the server synthesizes one row spanning that input, so the planner and the
+  overlap matcher always place every chunk.
+- **Whisper does not stream upstream** (catalog and engine agree): the streaming endpoint serves
+  it as a single end-of-run batch. The whisper-only beam knobs (`beam_size`, `best_of`,
+  `sampling_strategy`) and `max_segment_len`/`n_threads` are accepted for API compatibility and
+  ignored with a one-time warning; decoding is greedy with the temperature fallback, which the
+  task 3.1 parity fixtures must account for by comparing greedy on both sides.
+
 ## Risks / Trade-offs
 
 - [C++ toolchain friction on one of the five platforms] → Spike covers WSL + a Windows runner first; MSVC/gcc/clang all support the required C++ standard, and dev-build already compiles C (ggml) everywhere.

@@ -51,9 +51,7 @@ pub fn abi_struct_align(which: AbiStruct) -> usize {
 
 /// Leading dotted-numeric release segment ("0.0.1.post1" -> "0.0.1").
 fn base(v: &str) -> &str {
-    let end = v
-        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
-        .unwrap_or(v.len());
+    let end = v.find(|c: char| !(c.is_ascii_digit() || c == '.')).unwrap_or(v.len());
     v[..end].trim_end_matches('.')
 }
 

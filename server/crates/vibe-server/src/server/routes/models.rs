@@ -155,7 +155,7 @@ mod tests {
 
     #[tokio::test]
     async fn metadata_rejects_an_unsupported_gguf_architecture() {
-        let file = gguf_with_architecture("whisper");
+        let file = gguf_with_architecture("llama");
         let path = file.path().to_string_lossy().into_owned();
         let response = model_metadata(Json(ModelMetadataRequest { path })).await;
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -164,7 +164,7 @@ mod tests {
         assert_eq!(value["error"]["code"], "unsupported_model");
         let message = value["error"]["message"].as_str().unwrap();
         assert!(
-            message.contains("whisper"),
+            message.contains("llama"),
             "message should name the architecture, got {message}"
         );
     }

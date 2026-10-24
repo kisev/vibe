@@ -1,6 +1,6 @@
 use crate::engine::Engine;
+use crate::engine::{ContextOptions, TranscribeOptions};
 use clap::{Parser, Subcommand, ValueEnum};
-use whisper_rs::{ContextOptions, TranscribeOptions};
 
 use crate::server::format;
 use crate::{audio, pull, server};
@@ -220,7 +220,7 @@ pub async fn run() -> anyhow::Result<()> {
 }
 
 async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::Result<()> {
-    whisper_rs::set_verbose(config.verbose());
+    crate::engine::set_verbose(config.verbose());
     let samples = audio::read_file_with_options(
         &args.audio,
         audio::ReadOptions {
@@ -318,12 +318,15 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
     Ok(())
 }
 
-/// Replace a rejected GigaAM language with the marker the CLI contract documents.
+/// Replace a rejected single-language model's language with the marker the CLI
+/// contract documents. The unified engine reports "{engine} supports only {lang}".
 fn unsupported_language_marker(err: anyhow::Error) -> anyhow::Error {
-    match err.downcast_ref::<gigaam_rs::Error>() {
-        Some(gigaam_rs::Error::UnsupportedLanguage(language)) => anyhow::anyhow!("unsupported_language: {language:?}"),
-        _ => err,
+    let text = format!("{err:#}");
+    if text.contains("supports only") {
+        let language = text.rsplit(' ').next().unwrap_or_default().to_owned();
+        return anyhow::anyhow!("unsupported_language: {language:?}");
     }
+    err
 }
 
 /// Write the rendered transcript to a new file. `create_new` refuses an existing
@@ -340,8 +343,8 @@ fn write_output(rendered: &str, path: &str) -> anyhow::Result<()> {
 }
 
 fn devices_command(config: AppConfig) -> anyhow::Result<()> {
-    whisper_rs::set_verbose(config.verbose());
-    let devices: Vec<_> = whisper_rs::list_gpu_devices()
+    crate::engine::set_verbose(config.verbose());
+    let devices: Vec<_> = crate::engine::list_gpu_devices()
         .into_iter()
         .map(|device| {
             serde_json::json!({
@@ -349,8 +352,8 @@ fn devices_command(config: AppConfig) -> anyhow::Result<()> {
                 "name": device.name,
                 "description": device.description,
                 "type": match device.device_type {
-                    whisper_rs::GPUDeviceType::Gpu => "gpu",
-                    whisper_rs::GPUDeviceType::IntegratedGpu => "igpu",
+                    crate::engine::GPUDeviceType::Gpu => "gpu",
+                    crate::engine::GPUDeviceType::IntegratedGpu => "igpu",
                 },
             })
         })

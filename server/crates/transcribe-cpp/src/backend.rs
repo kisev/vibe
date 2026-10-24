@@ -98,11 +98,7 @@ impl Device {
     /// Build a [`Device`] from the raw FFI struct filled by the library.
     /// `index` is the registry index when the device came from enumeration,
     /// or `None` when it came from a loaded model.
-    pub(crate) fn from_raw(
-        raw: &sys::transcribe_device_info,
-        handle: sys::transcribe_device_t,
-        index: Option<usize>,
-    ) -> Device {
+    pub(crate) fn from_raw(raw: &sys::transcribe_device_info, handle: sys::transcribe_device_t, index: Option<usize>) -> Device {
         Device {
             name: owned_str(raw.name),
             description: owned_str(raw.description),

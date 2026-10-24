@@ -63,10 +63,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(stream.state(), StreamState::Finished);
 
     let text = stream.text();
-    println!(
-        "\nfinal (revision {}): {}",
-        stream.revision(),
-        text.full.trim()
-    );
+    println!("\nfinal (revision {}): {}", stream.revision(), text.full.trim());
     Ok(())
 }

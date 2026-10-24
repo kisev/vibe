@@ -22,11 +22,7 @@ fn transcribes_jfk_with_segments() {
 
     let text = result.text.trim().to_lowercase();
     assert!(!text.is_empty(), "empty transcription");
-    assert!(
-        text.contains("country"),
-        "unexpected transcription: {:?}",
-        result.text
-    );
+    assert!(text.contains("country"), "unexpected transcription: {:?}", result.text);
     assert!(!result.segments.is_empty(), "no segments materialized");
 }
 
@@ -151,8 +147,7 @@ fn session_limits_are_sane() {
 #[test]
 fn spec_decode_default_equals_disabled() {
     // -1 (family default) and 0 (disabled) must agree for a non-spec family.
-    let Some((model_path, pcm)) = common::smoke_fixtures("spec_decode_default_equals_disabled")
-    else {
+    let Some((model_path, pcm)) = common::smoke_fixtures("spec_decode_default_equals_disabled") else {
         return;
     };
     let mut session = Model::load(&model_path).unwrap().session().unwrap();
@@ -191,8 +186,7 @@ fn empty_pcm_is_invalid_argument() {
 
 #[test]
 fn requested_timestamps_populate_rows() {
-    let Some((model_path, pcm)) = common::smoke_fixtures("requested_timestamps_populate_rows")
-    else {
+    let Some((model_path, pcm)) = common::smoke_fixtures("requested_timestamps_populate_rows") else {
         return;
     };
     let model = Model::load(&model_path).unwrap();
@@ -222,9 +216,7 @@ fn requested_timestamps_populate_rows() {
 fn timestamps_finer_than_supported_is_unsupported() {
     // Validates the Unsupported (status 12) mapping: requesting Token on a
     // model whose max is coarser must error, not silently downgrade.
-    let Some((model_path, pcm)) =
-        common::smoke_fixtures("timestamps_finer_than_supported_is_unsupported")
-    else {
+    let Some((model_path, pcm)) = common::smoke_fixtures("timestamps_finer_than_supported_is_unsupported") else {
         return;
     };
     let model = Model::load(&model_path).unwrap();
@@ -250,9 +242,7 @@ fn close_ordering_drop_model_before_session() {
     // Rust ownership makes the C "model must outlive its sessions" contract
     // automatic: the session holds an Arc to the model, so dropping the Model
     // handle first is safe and the session keeps working.
-    let Some((model_path, pcm)) =
-        common::smoke_fixtures("close_ordering_drop_model_before_session")
-    else {
+    let Some((model_path, pcm)) = common::smoke_fixtures("close_ordering_drop_model_before_session") else {
         return;
     };
     let model = Model::load(&model_path).unwrap();
@@ -268,8 +258,7 @@ fn shared_model_across_threads_serializes() {
     // Model is Send+Sync; the per-model mutex serializes the compute path. Two
     // threads each run (one as a batch) on their own session of one shared
     // model — they queue rather than race (never Busy), and both succeed.
-    let Some((model_path, pcm)) = common::smoke_fixtures("shared_model_across_threads_serializes")
-    else {
+    let Some((model_path, pcm)) = common::smoke_fixtures("shared_model_across_threads_serializes") else {
         return;
     };
     let model = Arc::new(Model::load(&model_path).unwrap());

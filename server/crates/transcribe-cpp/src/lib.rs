@@ -64,43 +64,33 @@ mod vad;
 mod version;
 
 pub use backend::{
-    allowed_backends, backend_available, device_count, devices, init_backends,
-    init_backends_default, init_backends_with, BackendMask, Device, DeviceType,
+    allowed_backends, backend_available, device_count, devices, init_backends, init_backends_default, init_backends_with,
+    BackendMask, Device, DeviceType,
 };
 pub use cancel::CancelToken;
 pub use diarize::{DiarizeInfo, DiarizeOptions, DiarizeSession, DiarizeSessionOptions};
 pub use error::{Error, ErrorKind, ErrorReport, Result};
 pub use family::{
-    DiarizeExtension, MoonshineStreamingOptions, ParakeetBufferedStreamOptions,
-    ParakeetStreamOptions, RunExtension, SortformerDiarizeOptions, SortformerPreset,
-    StreamExtension, VoxtralRealtimeStreamOptions, WhisperRunOptions,
+    DiarizeExtension, MoonshineStreamingOptions, ParakeetBufferedStreamOptions, ParakeetStreamOptions, RunExtension,
+    SortformerDiarizeOptions, SortformerPreset, StreamExtension, VoxtralRealtimeStreamOptions, WhisperRunOptions,
 };
-pub use langid::{
-    LangIdCandidate, LangIdInfo, LangIdOptions, LangIdResult, LangIdSession, LangIdSessionOptions,
-};
+pub use langid::{LangIdCandidate, LangIdInfo, LangIdOptions, LangIdResult, LangIdSession, LangIdSessionOptions};
 pub use logging::{disable_logging, init_logging};
 pub use model::{Capabilities, Model, ModelOptions, SessionLimits, SessionOptions};
 pub use result::{Segment, SpeakerSegment, Timings, Token, Transcript, Word};
 pub use session::{RunOptions, Session, Stream};
 pub use streaming::{StreamOptions, StreamText, StreamUpdate};
 pub use types::{
-    AbiStruct, Backend, CommitPolicy, Diarize, ExtSlot, Feature, Itn, KvType, Pnc, Role, Roles,
-    StreamState, Task, TimestampKind,
+    AbiStruct, Backend, CommitPolicy, Diarize, ExtSlot, Feature, Itn, KvType, Pnc, Role, Roles, StreamState, Task, TimestampKind,
 };
 pub use vad::{VadInfo, VadOptions, VadResult, VadSegment, VadSession, VadSessionOptions};
-pub use version::{
-    abi_struct_align, abi_struct_size, compiled_version, header_hash, version, version_commit,
-};
+pub use version::{abi_struct_align, abi_struct_size, compiled_version, header_hash, version, version_commit};
 
 /// Convenience: load a model, transcribe one PCM buffer, and return the result.
 ///
 /// For repeated transcription, hold a [`Session`] instead of paying model load
 /// on every call.
-pub fn transcribe(
-    model_path: impl AsRef<std::path::Path>,
-    pcm: &[f32],
-    options: &RunOptions,
-) -> Result<Transcript> {
+pub fn transcribe(model_path: impl AsRef<std::path::Path>, pcm: &[f32], options: &RunOptions) -> Result<Transcript> {
     let mut session = Model::load(model_path)?.session()?;
     session.run(pcm, options)
 }

@@ -30,11 +30,7 @@ pub struct VadInfo {
 
 /// Options for creating a VAD session.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct VadSessionOptions {
     /// CPU threads for ops that run on CPU; 0 = library default.
     pub n_threads: i32,
@@ -43,11 +39,7 @@ pub struct VadSessionOptions {
 /// Probabilities -> speech segments ([`VadSession::run`] only). Fields and
 /// defaults are those of Silero's `get_speech_timestamps`.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct VadOptions {
     /// A frame with `p >= threshold` is speech (default 0.5). `[0, 1]`.
     pub threshold: f64,
@@ -82,11 +74,7 @@ impl Default for VadOptions {
 /// One speech segment, in samples of the run's input: `[start, end)`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct VadSegment {
     /// First sample of speech.
     pub start_sample: i64,
@@ -98,11 +86,7 @@ pub struct VadSegment {
 /// [`VadSession::stream_flush`].
 #[derive(Debug, Clone, Default, PartialEq)]
 #[non_exhaustive]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct VadResult {
     /// Speech probability per frame produced by the call.
     pub probs: Vec<f32>,
@@ -139,19 +123,14 @@ impl Drop for VadSession {
 }
 
 const BUSY_RUN: &str = "a stream is active on this model; finish or drop it before vad run()";
-const BUSY_FEED: &str =
-    "a stream is active on this model; finish or drop it before vad stream_feed()";
-const BUSY_FLUSH: &str =
-    "a stream is active on this model; finish or drop it before vad stream_flush()";
+const BUSY_FEED: &str = "a stream is active on this model; finish or drop it before vad stream_feed()";
+const BUSY_FLUSH: &str = "a stream is active on this model; finish or drop it before vad stream_flush()";
 
 /// Copy the last call's result out; called under the compute lock.
 fn copy_result(ptr: *mut sys::transcribe_vad_session) -> Result<VadResult> {
     let mut res: sys::transcribe_vad_result = unsafe { std::mem::zeroed() };
     unsafe { sys::transcribe_vad_result_init(&mut res) };
-    check(
-        unsafe { sys::transcribe_vad_get_result(ptr, &mut res) },
-        "vad result",
-    )?;
+    check(unsafe { sys::transcribe_vad_get_result(ptr, &mut res) }, "vad result")?;
     let p = unsafe { sys::transcribe_vad_probs(ptr) };
     let probs = if p.is_null() || res.n_probs <= 0 {
         Vec::new()
@@ -183,8 +162,7 @@ impl VadSession {
         params.n_threads = options.n_threads;
 
         let mut out: *mut sys::transcribe_vad_session = std::ptr::null_mut();
-        let status =
-            unsafe { sys::transcribe_vad_session_init(model.inner.ptr, &params, &mut out) };
+        let status = unsafe { sys::transcribe_vad_session_init(model.inner.ptr, &params, &mut out) };
         check(status, "vad session init")?;
         debug_assert!(!out.is_null());
 
@@ -201,9 +179,7 @@ impl VadSession {
     pub fn set_cancel_token(&mut self, token: &CancelToken) {
         let flag = Arc::clone(&token.flag);
         let userdata = Arc::as_ptr(&flag) as *mut c_void;
-        unsafe {
-            sys::transcribe_vad_set_abort_callback(self.ptr, Some(abort_trampoline), userdata)
-        };
+        unsafe { sys::transcribe_vad_set_abort_callback(self.ptr, Some(abort_trampoline), userdata) };
         self.cancel = Some(flag);
     }
 
@@ -229,14 +205,10 @@ impl VadSession {
         // Results are copied out under the compute lock, like every other
         // binding, so a concurrent call on the same model cannot interleave.
         let ptr = self.ptr;
-        self.model
-            .with_compute(Some(BUSY_RUN), |_| -> Result<VadResult> {
-                check(
-                    unsafe { sys::transcribe_vad_run(ptr, pcm.as_ptr(), n, &params) },
-                    "vad run",
-                )?;
-                copy_result(ptr)
-            })?
+        self.model.with_compute(Some(BUSY_RUN), |_| -> Result<VadResult> {
+            check(unsafe { sys::transcribe_vad_run(ptr, pcm.as_ptr(), n, &params) }, "vad run")?;
+            copy_result(ptr)
+        })?
     }
 
     /// Append audio to the stream and return the probabilities of the frames
@@ -247,14 +219,13 @@ impl VadSession {
     pub fn stream_feed(&mut self, pcm: &[f32]) -> Result<VadResult> {
         let n = clamp_len(pcm.len())?;
         let ptr = self.ptr;
-        self.model
-            .with_compute(Some(BUSY_FEED), |_| -> Result<VadResult> {
-                check(
-                    unsafe { sys::transcribe_vad_stream_feed(ptr, pcm.as_ptr(), n) },
-                    "vad stream feed",
-                )?;
-                copy_result(ptr)
-            })?
+        self.model.with_compute(Some(BUSY_FEED), |_| -> Result<VadResult> {
+            check(
+                unsafe { sys::transcribe_vad_stream_feed(ptr, pcm.as_ptr(), n) },
+                "vad stream feed",
+            )?;
+            copy_result(ptr)
+        })?
     }
 
     /// End the stream: score the buffered partial frame, zero padded (one
@@ -262,14 +233,10 @@ impl VadSession {
     /// processing error also resets the stream.
     pub fn stream_flush(&mut self) -> Result<VadResult> {
         let ptr = self.ptr;
-        self.model
-            .with_compute(Some(BUSY_FLUSH), |_| -> Result<VadResult> {
-                check(
-                    unsafe { sys::transcribe_vad_stream_flush(ptr) },
-                    "vad stream flush",
-                )?;
-                copy_result(ptr)
-            })?
+        self.model.with_compute(Some(BUSY_FLUSH), |_| -> Result<VadResult> {
+            check(unsafe { sys::transcribe_vad_stream_flush(ptr) }, "vad stream flush")?;
+            copy_result(ptr)
+        })?
     }
 
     /// Drop the stream without scoring; the next feed starts at frame 0.

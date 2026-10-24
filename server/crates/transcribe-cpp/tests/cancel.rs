@@ -27,8 +27,7 @@ fn cross_thread_cancel_of_in_flight_run() {
     // Cancelling an in-flight whisper run aborts with a partial transcript on
     // every platform (the Rust layer maps the abort to Error::Aborted) — or
     // completes first on a fast machine. Both outcomes are asserted below.
-    let Some((model_path, pcm)) = common::smoke_fixtures("cross_thread_cancel_of_in_flight_run")
-    else {
+    let Some((model_path, pcm)) = common::smoke_fixtures("cross_thread_cancel_of_in_flight_run") else {
         return;
     };
     let model = Model::load(&model_path).unwrap();
@@ -37,10 +36,7 @@ fn cross_thread_cancel_of_in_flight_run() {
         return;
     }
     // Tile the clip enough to be reliably mid-flight when we cancel.
-    let long: Vec<f32> = std::iter::repeat(pcm.iter().copied())
-        .take(4)
-        .flatten()
-        .collect();
+    let long: Vec<f32> = std::iter::repeat(pcm.iter().copied()).take(4).flatten().collect();
 
     let mut session = model.session().unwrap();
     let token = CancelToken::new();

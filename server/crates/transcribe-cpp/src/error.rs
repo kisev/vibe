@@ -182,9 +182,9 @@ impl From<Error> for ErrorReport {
     fn from(err: Error) -> Self {
         let (kind, message, status) = (err.kind(), err.to_string(), err.raw_status());
         let partial = match err {
-            Error::Aborted { partial, .. }
-            | Error::OutputTruncated { partial, .. }
-            | Error::OutputRepetition { partial, .. } => partial.map(|p| *p),
+            Error::Aborted { partial, .. } | Error::OutputTruncated { partial, .. } | Error::OutputRepetition { partial, .. } => {
+                partial.map(|p| *p)
+            }
             _ => None,
         };
         ErrorReport {
@@ -273,9 +273,9 @@ impl Error {
     /// for every other variant.
     pub fn partial(&self) -> Option<&Transcript> {
         match self {
-            Error::Aborted { partial, .. }
-            | Error::OutputTruncated { partial, .. }
-            | Error::OutputRepetition { partial, .. } => partial.as_deref(),
+            Error::Aborted { partial, .. } | Error::OutputTruncated { partial, .. } | Error::OutputRepetition { partial, .. } => {
+                partial.as_deref()
+            }
             _ => None,
         }
     }
@@ -288,9 +288,7 @@ pub(crate) fn status_string(status: i32) -> String {
     if ptr.is_null() {
         return format!("status {status}");
     }
-    unsafe { std::ffi::CStr::from_ptr(ptr) }
-        .to_string_lossy()
-        .into_owned()
+    unsafe { std::ffi::CStr::from_ptr(ptr) }.to_string_lossy().into_owned()
 }
 
 /// Build the mapped error for a non-OK status (without a partial transcript).
@@ -307,14 +305,12 @@ pub(crate) fn error_for_status(status: sys::transcribe_status, context: &str) ->
         }
     };
     match status {
-        S::TRANSCRIBE_ERR_INVALID_ARG | S::TRANSCRIBE_ERR_SAMPLE_RATE => {
-            Error::InvalidArgument(msg)
-        }
+        S::TRANSCRIBE_ERR_INVALID_ARG | S::TRANSCRIBE_ERR_SAMPLE_RATE => Error::InvalidArgument(msg),
         S::TRANSCRIBE_ERR_NOT_IMPLEMENTED => Error::NotImplemented(msg),
         S::TRANSCRIBE_ERR_FILE_NOT_FOUND => Error::ModelFileNotFound(msg),
-        S::TRANSCRIBE_ERR_GGUF
-        | S::TRANSCRIBE_ERR_UNSUPPORTED_ARCH
-        | S::TRANSCRIBE_ERR_UNSUPPORTED_VARIANT => Error::ModelLoad(msg),
+        S::TRANSCRIBE_ERR_GGUF | S::TRANSCRIBE_ERR_UNSUPPORTED_ARCH | S::TRANSCRIBE_ERR_UNSUPPORTED_VARIANT => {
+            Error::ModelLoad(msg)
+        }
         S::TRANSCRIBE_ERR_OOM => Error::OutOfMemory(msg),
         S::TRANSCRIBE_ERR_BACKEND => Error::Backend(msg),
         S::TRANSCRIBE_ERR_UNSUPPORTED_LANGUAGE

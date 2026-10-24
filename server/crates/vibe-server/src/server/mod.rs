@@ -11,6 +11,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::engine::ContextOptions;
 use crate::engine::Engine;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{delete, get, post};
@@ -20,7 +21,6 @@ use tokio::sync::Mutex;
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use whisper_rs::ContextOptions;
 
 use crate::cli::AppConfig;
 
@@ -122,7 +122,7 @@ pub async fn serve(
     unload_timeout: unload_timeout::UnloadTimeout,
     config: AppConfig,
 ) -> anyhow::Result<()> {
-    whisper_rs::set_verbose(config.verbose());
+    crate::engine::set_verbose(config.verbose());
     let mut server_state = ServerState::new();
     if let Some(model) = initial_model.as_deref() {
         server_state.load_model(model, -1, Some(false))?;
@@ -266,17 +266,20 @@ pub(super) struct ErrorBody {
 /// client can act on, by reloading on the CPU when it was the GPU's, so it is named;
 /// everything else is `internal_error` with the message for a human.
 pub(super) fn engine_error_code(err: &anyhow::Error) -> &'static str {
-    if matches!(
-        err.downcast_ref::<gigaam_rs::Error>(),
-        Some(gigaam_rs::Error::UnsupportedLanguage(_))
-    ) {
+    // The unified engine reports through anyhow messages, so the codes a client
+    // can act on are matched on the text the engine layer emits.
+    let text = format!("{err:#}");
+    if text.contains("supports only") || text.contains("does not support") {
         return "unsupported_language";
     }
-    match err.downcast_ref::<whisper_rs::Error>() {
-        Some(whisper_rs::Error::OutOfMemory { gpu: true, .. }) => "gpu_out_of_memory",
-        Some(whisper_rs::Error::OutOfMemory { gpu: false, .. }) => "out_of_memory",
-        _ => "internal_error",
+    if text.contains("out of memory") {
+        return if text.contains("gpu") {
+            "gpu_out_of_memory"
+        } else {
+            "out_of_memory"
+        };
     }
+    "internal_error"
 }
 
 pub(super) fn engine_error_status(err: &anyhow::Error) -> axum::http::StatusCode {
@@ -345,7 +348,7 @@ mod tests {
 
     #[test]
     fn unsupported_language_maps_to_a_400() {
-        let err = anyhow::Error::new(gigaam_rs::Error::UnsupportedLanguage("en".to_owned()));
+        let err = anyhow::anyhow!("GigaAM supports only ru");
         assert_eq!(engine_error_code(&err), "unsupported_language");
         assert_eq!(engine_error_status(&err), axum::http::StatusCode::BAD_REQUEST);
 

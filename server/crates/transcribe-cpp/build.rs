@@ -32,10 +32,7 @@ fn main() {
     // examples), which the dependency's rustc-link-arg cannot reach.
     if shared && target_os != "windows" {
         if let Some(lib_dir) = env::var_os("DEP_TRANSCRIBE_LIB_DIR") {
-            println!(
-                "cargo:rustc-link-arg=-Wl,-rpath,{}",
-                Path::new(&lib_dir).display()
-            );
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", Path::new(&lib_dir).display());
         }
     }
 
@@ -43,13 +40,7 @@ fn main() {
     // Each key is present only when the build produced it: `runtime_dir`/`bin_dir`
     // need `shared`, `module_dir` needs `dynamic-backends`; `include_dir`/`lib_dir`
     // are always set. The lowercase key becomes DEP_TRANSCRIBE_CPP_<KEY> upstack.
-    for key in [
-        "include_dir",
-        "lib_dir",
-        "runtime_dir",
-        "bin_dir",
-        "module_dir",
-    ] {
+    for key in ["include_dir", "lib_dir", "runtime_dir", "bin_dir", "module_dir"] {
         let dep_var = format!("DEP_TRANSCRIBE_{}", key.to_uppercase());
         println!("cargo:rerun-if-env-changed={dep_var}");
         if let Some(val) = env::var_os(&dep_var) {

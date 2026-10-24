@@ -7,8 +7,8 @@
 
 ## 2. Wrapper and engine registry
 
-- [ ] 2.1 Create the FFI wrapper crate (model load, metadata, transcribe, stream, free) with safe Rust types and verify unit tests over a tiny model cover load/transcribe/free without leaks (run under the existing test harness)
-- [ ] 2.2 Route family detection through GGUF metadata into the new engine arm in the server's registry, mapping each family to its capability table (languages, detection, translation, prompts, timestamps, streaming, VAD requirement, `max_input_seconds`); verify with tests that metadata for a GigaAM, parakeet, and nemotron GGUF reports the same flags as today's engines do
+- [x] 2.1 Create the FFI wrapper crate (model load, metadata, transcribe, stream, free) with safe Rust types and verify unit tests over a tiny model cover load/transcribe/free without leaks (run under the existing test harness)
+- [x] 2.2 Route family detection through GGUF metadata into the new engine arm in the server's registry, mapping each family to its capability table (languages, detection, translation, prompts, timestamps, streaming, VAD requirement, `max_input_seconds`); verify with tests that metadata for a GigaAM, parakeet, and nemotron GGUF reports the same flags as today's engines do
 
 ## 3. Family enablement
 

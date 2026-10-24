@@ -35,11 +35,7 @@ fn whisper_run_with_initial_prompt() {
         ..Default::default()
     };
     let result = session.run(&pcm, &options).unwrap();
-    assert!(
-        result.text.to_lowercase().contains("country"),
-        "{:?}",
-        result.text
-    );
+    assert!(result.text.to_lowercase().contains("country"), "{:?}", result.text);
 }
 
 #[test]
@@ -49,9 +45,7 @@ fn tokenize_round_trips_nonempty() {
     };
     let model = Model::load(&model_path).unwrap();
     // Whisper uses GPT-2 byte-level BPE; encode is plumbed.
-    let tokens = model
-        .tokenize("ask not what your country can do for you")
-        .unwrap();
+    let tokens = model.tokenize("ask not what your country can do for you").unwrap();
     assert!(!tokens.is_empty(), "no tokens produced");
     // A longer string should not produce fewer tokens than a short prefix.
     let short = model.tokenize("ask").unwrap();

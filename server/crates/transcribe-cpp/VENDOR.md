@@ -8,3 +8,4 @@
      workspace instead of at the repo root.
 - Manifest changes: the `transcribe-cpp-sys` dependency points at the sibling
   vendored crate instead of the upstream repo root.
+- This crate stays outside the workspace members list so `cargo fmt --all` leaves the vendored tree verbatim.

@@ -32,11 +32,7 @@ pub struct LangIdInfo {
 
 /// Options for creating a language ID session.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct LangIdSessionOptions {
     /// CPU threads for ops that run on CPU; 0 = library default.
     pub n_threads: i32,
@@ -44,11 +40,7 @@ pub struct LangIdSessionOptions {
 
 /// Per-run language ID parameters.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct LangIdOptions {
     /// Restrict the decision to these codes or aliases. `None` means every
     /// label; `Some` of an empty list is [`Error::InvalidArgument`]. An
@@ -59,11 +51,7 @@ pub struct LangIdOptions {
 /// One ranked label. `code` is the model's own label (`"en"`, `"iw"`).
 #[derive(Debug, Clone, Default, PartialEq)]
 #[non_exhaustive]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct LangIdCandidate {
     /// Label index.
     pub index: i32,
@@ -77,11 +65,7 @@ pub struct LangIdCandidate {
 /// The result of one [`LangIdSession::run`].
 #[derive(Debug, Clone, Default, PartialEq)]
 #[non_exhaustive]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct LangIdResult {
     /// Every allowed label (duplicates once; all labels when unrestricted),
     /// ranked by `p`, descending; ties keep label order.
@@ -130,8 +114,7 @@ impl LangIdSession {
         params.n_threads = options.n_threads;
 
         let mut out: *mut sys::transcribe_langid_session = std::ptr::null_mut();
-        let status =
-            unsafe { sys::transcribe_langid_session_init(model.inner.ptr, &params, &mut out) };
+        let status = unsafe { sys::transcribe_langid_session_init(model.inner.ptr, &params, &mut out) };
         check(status, "langid session init")?;
         debug_assert!(!out.is_null());
 
@@ -148,9 +131,7 @@ impl LangIdSession {
     pub fn set_cancel_token(&mut self, token: &CancelToken) {
         let flag = Arc::clone(&token.flag);
         let userdata = Arc::as_ptr(&flag) as *mut c_void;
-        unsafe {
-            sys::transcribe_langid_set_abort_callback(self.ptr, Some(abort_trampoline), userdata)
-        };
+        unsafe { sys::transcribe_langid_set_abort_callback(self.ptr, Some(abort_trampoline), userdata) };
         self.cancel = Some(flag);
     }
 
@@ -170,9 +151,7 @@ impl LangIdSession {
             None => None,
             Some(list) if list.is_empty() => {
                 // NULL would mean "every label", the opposite of an empty list.
-                return Err(Error::InvalidArgument(
-                    "allowed is empty; pass None for every label".into(),
-                ));
+                return Err(Error::InvalidArgument("allowed is empty; pass None for every label".into()));
             }
             Some(list) => Some(
                 list.iter()
@@ -180,15 +159,12 @@ impl LangIdSession {
                     .collect::<std::result::Result<_, _>>()?,
             ),
         };
-        let ptrs: Option<Vec<*const c_char>> = codes
-            .as_ref()
-            .map(|cs| cs.iter().map(|c| c.as_ptr()).collect());
+        let ptrs: Option<Vec<*const c_char>> = codes.as_ref().map(|cs| cs.iter().map(|c| c.as_ptr()).collect());
         let mut params: sys::transcribe_langid_params = unsafe { std::mem::zeroed() };
         unsafe { sys::transcribe_langid_params_init(&mut params) };
         if let Some(p) = &ptrs {
             params.allowed = p.as_ptr();
-            params.n_allowed = i32::try_from(p.len())
-                .map_err(|_| Error::InvalidArgument("allowed list too long".into()))?;
+            params.n_allowed = i32::try_from(p.len()).map_err(|_| Error::InvalidArgument("allowed list too long".into()))?;
         }
 
         // Results are copied out under the compute lock, like every other
@@ -203,14 +179,10 @@ impl LangIdSession {
                 )?;
                 let mut res: sys::transcribe_langid_result = unsafe { std::mem::zeroed() };
                 unsafe { sys::transcribe_langid_result_init(&mut res) };
-                check(
-                    unsafe { sys::transcribe_langid_get_result(ptr, &mut res) },
-                    "langid result",
-                )?;
+                check(unsafe { sys::transcribe_langid_get_result(ptr, &mut res) }, "langid result")?;
                 let candidates = (0..res.n_candidates)
                     .map(|i| {
-                        let mut raw: sys::transcribe_langid_candidate =
-                            unsafe { std::mem::zeroed() };
+                        let mut raw: sys::transcribe_langid_candidate = unsafe { std::mem::zeroed() };
                         unsafe { sys::transcribe_langid_candidate_init(&mut raw) };
                         let _ = unsafe { sys::transcribe_langid_get_candidate(ptr, i, &mut raw) };
                         LangIdCandidate {
@@ -259,23 +231,16 @@ mod tests {
 
     #[test]
     fn run_is_busy_while_a_stream_holds_the_lease() {
-        let err = null_session(true)
-            .run(&[0.0; 160], &LangIdOptions::default())
-            .unwrap_err();
+        let err = null_session(true).run(&[0.0; 160], &LangIdOptions::default()).unwrap_err();
         let Error::Busy(msg) = err else {
             panic!("expected Busy, got {err:?}");
         };
-        assert_eq!(
-            msg,
-            "a stream is active on this model; finish or drop it before langid run()"
-        );
+        assert_eq!(msg, "a stream is active on this model; finish or drop it before langid run()");
     }
 
     #[test]
     fn empty_allowed_is_rejected_not_all() {
-        let opts = LangIdOptions {
-            allowed: Some(vec![]),
-        };
+        let opts = LangIdOptions { allowed: Some(vec![]) };
         let err = null_session(false).run(&[0.0; 160], &opts).unwrap_err();
         assert!(matches!(err, Error::InvalidArgument(_)), "{err:?}");
     }

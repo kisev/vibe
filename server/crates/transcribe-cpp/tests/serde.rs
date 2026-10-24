@@ -4,14 +4,12 @@
 #![cfg(feature = "serde")]
 
 use transcribe_cpp::{
-    Backend, Capabilities, CommitPolicy, DeviceType, Diarize, DiarizeExtension, DiarizeInfo,
-    DiarizeOptions, DiarizeSessionOptions, ExtSlot, Feature, Itn, KvType, LangIdCandidate,
-    LangIdInfo, LangIdOptions, LangIdResult, LangIdSessionOptions, MoonshineStreamingOptions,
-    ParakeetBufferedStreamOptions, ParakeetStreamOptions, Pnc, Role, Roles, RunExtension,
-    RunOptions, Segment, SessionLimits, SessionOptions, SortformerDiarizeOptions, SortformerPreset,
-    SpeakerSegment, StreamExtension, StreamOptions, StreamState, StreamText, StreamUpdate, Task,
-    TimestampKind, Timings, Token, Transcript, VadInfo, VadOptions, VadResult, VadSegment,
-    VadSessionOptions, VoxtralRealtimeStreamOptions, WhisperRunOptions, Word,
+    Backend, Capabilities, CommitPolicy, DeviceType, Diarize, DiarizeExtension, DiarizeInfo, DiarizeOptions,
+    DiarizeSessionOptions, ExtSlot, Feature, Itn, KvType, LangIdCandidate, LangIdInfo, LangIdOptions, LangIdResult,
+    LangIdSessionOptions, MoonshineStreamingOptions, ParakeetBufferedStreamOptions, ParakeetStreamOptions, Pnc, Role, Roles,
+    RunExtension, RunOptions, Segment, SessionLimits, SessionOptions, SortformerDiarizeOptions, SortformerPreset, SpeakerSegment,
+    StreamExtension, StreamOptions, StreamState, StreamText, StreamUpdate, Task, TimestampKind, Timings, Token, Transcript,
+    VadInfo, VadOptions, VadResult, VadSegment, VadSessionOptions, VoxtralRealtimeStreamOptions, WhisperRunOptions, Word,
 };
 
 fn assert_serde<T: serde::Serialize + serde::de::DeserializeOwned>() {}
@@ -111,10 +109,7 @@ fn nan_confidence_round_trips() {
     let original = nan_transcript();
 
     let json = serde_json::to_string(&original).unwrap();
-    assert!(
-        json.contains("\"p\":null"),
-        "NaN should encode as null: {json}"
-    );
+    assert!(json.contains("\"p\":null"), "NaN should encode as null: {json}");
     let from_json: Transcript = serde_json::from_str(&json).unwrap();
     assert!(from_json.tokens[0].p.is_nan());
     assert!(from_json.speaker_segments[0].p.is_nan());
@@ -212,16 +207,12 @@ mod errors {
         assert_eq!(report.status, err.raw_status());
         assert_eq!(report.partial.as_ref(), Some(&partial));
         // Serializing the Error and its report produce the same document.
-        assert_eq!(
-            serde_json::to_string(&ErrorReport::from(&err)).unwrap(),
-            wire
-        );
+        assert_eq!(serde_json::to_string(&ErrorReport::from(&err)).unwrap(), wire);
     }
 
     #[test]
     fn unknown_kind_deserializes_as_other() {
-        let report: ErrorReport =
-            serde_json::from_str(r#"{"kind":"from_the_future","message":"m"}"#).unwrap();
+        let report: ErrorReport = serde_json::from_str(r#"{"kind":"from_the_future","message":"m"}"#).unwrap();
         assert_eq!(report.kind, ErrorKind::Other);
         assert_eq!(report.status, 0);
         assert!(report.partial.is_none());
@@ -253,9 +244,7 @@ mod errors {
         for kind in kinds {
             let s = serde_json::to_string(&kind).unwrap();
             assert!(
-                s.trim_matches('"')
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c == '_'),
+                s.trim_matches('"').chars().all(|c| c.is_ascii_lowercase() || c == '_'),
                 "{kind:?} -> {s}"
             );
             assert_eq!(serde_json::from_str::<ErrorKind>(&s).unwrap(), kind);

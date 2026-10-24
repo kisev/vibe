@@ -12,11 +12,7 @@ use crate::types::CommitPolicy;
 
 /// Options for beginning a stream.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct StreamOptions {
     /// When committed text grows. Default [`CommitPolicy::Auto`].
     pub commit_policy: CommitPolicy,
@@ -29,11 +25,7 @@ pub struct StreamOptions {
 
 /// Per-call change metadata from `feed`/`finalize`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct StreamUpdate {
     /// Any observable property of the snapshot changed this call.
     pub result_changed: bool,
@@ -70,11 +62,7 @@ impl StreamUpdate {
 
 /// A UI-facing snapshot of the stream's text, fully owned.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct StreamText {
     /// The raw current model hypothesis (authoritative; may rewrite anywhere).
     pub full: String,
@@ -101,9 +89,7 @@ impl StreamText {
 
 /// Build `transcribe_stream_params`, returning the family-ext keepalive so its
 /// backing struct outlives the `transcribe_stream_begin` call.
-pub(crate) fn build_stream_params(
-    o: &StreamOptions,
-) -> (sys::transcribe_stream_params, Option<StreamExtRaw>) {
+pub(crate) fn build_stream_params(o: &StreamOptions) -> (sys::transcribe_stream_params, Option<StreamExtRaw>) {
     let mut params: sys::transcribe_stream_params = unsafe { std::mem::zeroed() };
     unsafe { sys::transcribe_stream_params_init(&mut params) };
     params.commit_policy = o.commit_policy.to_raw();

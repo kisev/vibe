@@ -63,9 +63,7 @@ pub fn smoke_streaming_model() -> Option<PathBuf> {
     ensure_backends();
     let path = std::env::var_os("TRANSCRIBE_SMOKE_STREAMING_MODEL")
         .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            repo_root().join("models/moonshine-streaming-tiny/moonshine-streaming-tiny-Q8_0.gguf")
-        });
+        .unwrap_or_else(|| repo_root().join("models/moonshine-streaming-tiny/moonshine-streaming-tiny-Q8_0.gguf"));
     path.is_file().then_some(path)
 }
 
@@ -156,10 +154,7 @@ pub fn langid_toy_model(test: &str) -> Option<PathBuf> {
     ensure_backends();
     let path = repo_root().join("tests/fixtures/arch_ecapa_tdnn_minimal.gguf");
     if !path.is_file() {
-        eprintln!(
-            "skip {test}: {} absent (build the C++ `fixtures` target)",
-            path.display()
-        );
+        eprintln!("skip {test}: {} absent (build the C++ `fixtures` target)", path.display());
         return None;
     }
     Some(path)
@@ -172,10 +167,7 @@ pub fn vad_toy_model(test: &str) -> Option<PathBuf> {
     ensure_backends();
     let path = repo_root().join("tests/fixtures/arch_silero_vad.gguf");
     if !path.is_file() {
-        eprintln!(
-            "skip {test}: {} absent (build the C++ `fixtures` target)",
-            path.display()
-        );
+        eprintln!("skip {test}: {} absent (build the C++ `fixtures` target)", path.display());
         return None;
     }
     Some(path)
@@ -187,9 +179,7 @@ pub fn smoke_fixtures(test: &str) -> Option<(PathBuf, Vec<f32>)> {
     match (smoke_model(), smoke_audio()) {
         (Some(m), Some(a)) => Some((m, a)),
         _ => {
-            eprintln!(
-                "skip {test}: smoke model/audio not present (set TRANSCRIBE_SMOKE_MODEL / _AUDIO)"
-            );
+            eprintln!("skip {test}: smoke model/audio not present (set TRANSCRIBE_SMOKE_MODEL / _AUDIO)");
             None
         }
     }

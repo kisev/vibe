@@ -11,8 +11,7 @@ fn terms() -> Vec<String> {
 
 #[test]
 fn nul_in_prompting_text_is_an_error() {
-    let Some((model_path, pcm)) = common::smoke_fixtures("nul_in_prompting_text_is_an_error")
-    else {
+    let Some((model_path, pcm)) = common::smoke_fixtures("nul_in_prompting_text_is_an_error") else {
         return;
     };
     let mut session = Model::load(&model_path).unwrap().session().unwrap();
@@ -25,9 +24,7 @@ fn nul_in_prompting_text_is_an_error() {
 
 #[test]
 fn vocabulary_and_prompt_reach_run_and_batch() {
-    let Some((model_path, pcm)) =
-        common::smoke_fixtures("vocabulary_and_prompt_reach_run_and_batch")
-    else {
+    let Some((model_path, pcm)) = common::smoke_fixtures("vocabulary_and_prompt_reach_run_and_batch") else {
         return;
     };
     let model = Model::load(&model_path).unwrap();
@@ -46,18 +43,12 @@ fn vocabulary_and_prompt_reach_run_and_batch() {
         prompt: Some("hi <|endoftext|>".into()),
         ..Default::default()
     };
-    assert!(matches!(
-        session.run(&pcm, &control),
-        Err(Error::InvalidArgument(_))
-    ));
+    assert!(matches!(session.run(&pcm, &control), Err(Error::InvalidArgument(_))));
     let prefix = RunOptions {
         prefix: Some("And so".into()),
         ..Default::default()
     };
-    assert!(matches!(
-        session.run_batch(&[&pcm], &prefix),
-        Err(Error::InvalidArgument(_))
-    ));
+    assert!(matches!(session.run_batch(&[&pcm], &prefix), Err(Error::InvalidArgument(_))));
 }
 
 #[test]
@@ -77,10 +68,7 @@ fn prefix_text_is_the_continuation() {
         ..Default::default()
     };
     let result = session.run(&pcm, &options).unwrap();
-    assert!(result
-        .raw_text
-        .trim_start()
-        .starts_with("And so my fellow Americans"));
+    assert!(result.raw_text.trim_start().starts_with("And so my fellow Americans"));
     assert!(!result.text.contains("fellow Americans"));
     assert!(result.text.to_lowercase().contains("ask not"));
 }

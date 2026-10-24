@@ -27,11 +27,7 @@ pub struct DiarizeInfo {
 
 /// Options for creating a diarization session.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct DiarizeSessionOptions {
     /// CPU threads for ops that run on CPU; 0 = library default.
     pub n_threads: i32,
@@ -39,11 +35,7 @@ pub struct DiarizeSessionOptions {
 
 /// Per-run diarization parameters.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct DiarizeOptions {
     /// Optional family-specific extension (e.g. the Sortformer preset).
     pub family: Option<DiarizeExtension>,
@@ -81,8 +73,7 @@ impl DiarizeSession {
         params.n_threads = options.n_threads;
 
         let mut out: *mut sys::transcribe_diarize_session = std::ptr::null_mut();
-        let status =
-            unsafe { sys::transcribe_diarize_session_init(model.inner.ptr, &params, &mut out) };
+        let status = unsafe { sys::transcribe_diarize_session_init(model.inner.ptr, &params, &mut out) };
         check(status, "diarize session init")?;
         debug_assert!(!out.is_null());
 
@@ -99,9 +90,7 @@ impl DiarizeSession {
     pub fn set_cancel_token(&mut self, token: &CancelToken) {
         let flag = Arc::clone(&token.flag);
         let userdata = Arc::as_ptr(&flag) as *mut c_void;
-        unsafe {
-            sys::transcribe_diarize_set_abort_callback(self.ptr, Some(abort_trampoline), userdata)
-        };
+        unsafe { sys::transcribe_diarize_set_abort_callback(self.ptr, Some(abort_trampoline), userdata) };
         self.cancel = Some(flag);
     }
 
@@ -165,9 +154,7 @@ mod tests {
             }),
             cancel: None,
         };
-        let err = session
-            .run(&[0.0; 160], &DiarizeOptions::default())
-            .unwrap_err();
+        let err = session.run(&[0.0; 160], &DiarizeOptions::default()).unwrap_err();
         let Error::Busy(msg) = err else {
             panic!("expected Busy, got {err:?}");
         };

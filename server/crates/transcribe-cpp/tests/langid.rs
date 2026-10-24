@@ -36,24 +36,13 @@ fn toy_roles_info_labels() {
     assert!(roles.contains(Role::LangId) && !roles.contains(Role::Asr));
     let info = model.langid_info().unwrap();
     assert_eq!(
-        (
-            info.sample_rate,
-            info.n_labels,
-            info.min_audio_ms,
-            info.max_audio_ms
-        ),
+        (info.sample_rate, info.n_labels, info.min_audio_ms, info.max_audio_ms),
         (16000, 5, 500, 30000)
     );
-    assert_eq!(
-        model.langid_labels().unwrap()[2],
-        ("cc".into(), "Charlie".into())
-    );
+    assert_eq!(model.langid_labels().unwrap()[2], ("cc".into(), "Charlie".into()));
     assert_eq!(model.langid_label_index("xx"), Some(0));
     assert_eq!(model.langid_label_index("zz"), None);
-    assert!(matches!(
-        model.capabilities(),
-        Err(Error::UnsupportedRole(_))
-    ));
+    assert!(matches!(model.capabilities(), Err(Error::UnsupportedRole(_))));
     assert!(matches!(model.session(), Err(Error::UnsupportedRole(_))));
 }
 
@@ -79,10 +68,7 @@ fn toy_run_contract() {
     };
     let r = lid.run(&pcm, &opts).unwrap();
     assert_eq!(r.candidates.len(), 2);
-    assert!(r
-        .candidates
-        .iter()
-        .all(|c| c.code == "bb" || c.code == "dd"));
+    assert!(r.candidates.iter().all(|c| c.code == "bb" || c.code == "dd"));
     assert!(r.allowed_mass > 0.0 && r.allowed_mass < 1.0);
 
     let opts = LangIdOptions {
@@ -122,10 +108,7 @@ fn real_fleurs_top1() {
     let model = load_cpu(&path);
     let info = model.langid_info().unwrap();
     assert_eq!((info.n_labels, info.max_audio_ms), (107, 30000));
-    assert_eq!(
-        model.langid_label_index("he"),
-        model.langid_label_index("iw")
-    );
+    assert_eq!(model.langid_label_index("he"), model.langid_label_index("iw"));
     let mut lid = model.langid_session().unwrap();
     for code in ["en", "de", "fr", "es", "ja", "zh", "ru", "id"] {
         let pcm = common::load_wav(&common::repo_root().join(format!("samples/fleurs-{code}.wav")));

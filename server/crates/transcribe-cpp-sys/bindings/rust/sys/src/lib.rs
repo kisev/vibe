@@ -44,8 +44,7 @@ mod smoke {
     #[test]
     fn abi_struct_size_is_live() {
         // A real call into the native lib that returns a runtime value.
-        let size =
-            unsafe { transcribe_abi_struct_size(transcribe_abi_struct::TRANSCRIBE_ABI_RUN_PARAMS) };
+        let size = unsafe { transcribe_abi_struct_size(transcribe_abi_struct::TRANSCRIBE_ABI_RUN_PARAMS) };
         assert!(size > 0);
     }
 }

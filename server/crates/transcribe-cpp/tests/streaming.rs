@@ -44,8 +44,7 @@ fn wrong_family_stream() -> StreamOptions {
 
 #[test]
 fn streams_jfk_committed_text() {
-    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio())
-    else {
+    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio()) else {
         eprintln!("skip streams_jfk_committed_text: streaming model/audio absent");
         return;
     };
@@ -56,9 +55,7 @@ fn streams_jfk_committed_text() {
     );
 
     let mut session = model.session().unwrap();
-    let mut stream = session
-        .stream(&RunOptions::default(), &StreamOptions::default())
-        .unwrap();
+    let mut stream = session.stream(&RunOptions::default(), &StreamOptions::default()).unwrap();
     assert_eq!(stream.state(), StreamState::Active);
 
     feed_in_chunks(&mut stream, &pcm, 1600); // 100 ms chunks
@@ -75,21 +72,14 @@ fn streams_jfk_committed_text() {
     // `full` is the authoritative raw hypothesis. (committed_text is a
     // best-effort append-only prefix that can diverge for re-attending models
     // like moonshine_streaming, so we assert on `full` here.)
-    assert!(
-        text.full.to_lowercase().contains("country"),
-        "stream text: {:?}",
-        text.full
-    );
+    assert!(text.full.to_lowercase().contains("country"), "stream text: {:?}", text.full);
 
     let snapshot = stream.snapshot();
     assert!(!snapshot.text.is_empty(), "structured snapshot is empty");
     if let Some(language) = &snapshot.language {
         assert!(!language.is_empty(), "detected language must not be empty");
     }
-    assert!(
-        !snapshot.segments.is_empty(),
-        "structured segments are empty"
-    );
+    assert!(!snapshot.segments.is_empty(), "structured segments are empty");
     let _ = (&snapshot.words, &snapshot.tokens);
 }
 
@@ -97,18 +87,15 @@ fn streams_jfk_committed_text() {
 fn on_finalize_policy_commits_full_text() {
     // Under ON_FINALIZE, committed_text is empty during feed and becomes the
     // final full text at finalize — so display == full reliably.
-    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio())
-    else {
+    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio()) else {
         return;
     };
     let mut session = Model::load(&model_path).unwrap().session().unwrap();
     let opts = StreamOptions {
         commit_policy: transcribe_cpp::CommitPolicy::OnFinalize,
-        family: Some(StreamExtension::MoonshineStreaming(
-            MoonshineStreamingOptions {
-                min_decode_interval_ms: Some(COARSE_DECODE_INTERVAL_MS),
-            },
-        )),
+        family: Some(StreamExtension::MoonshineStreaming(MoonshineStreamingOptions {
+            min_decode_interval_ms: Some(COARSE_DECODE_INTERVAL_MS),
+        })),
         ..Default::default()
     };
     let mut stream = session.stream(&RunOptions::default(), &opts).unwrap();
@@ -124,17 +111,14 @@ fn on_finalize_policy_commits_full_text() {
 
 #[test]
 fn stream_revision_advances() {
-    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio())
-    else {
+    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio()) else {
         return;
     };
     let mut session = Model::load(&model_path).unwrap().session().unwrap();
     let opts = StreamOptions {
-        family: Some(StreamExtension::MoonshineStreaming(
-            MoonshineStreamingOptions {
-                min_decode_interval_ms: Some(COARSE_DECODE_INTERVAL_MS),
-            },
-        )),
+        family: Some(StreamExtension::MoonshineStreaming(MoonshineStreamingOptions {
+            min_decode_interval_ms: Some(COARSE_DECODE_INTERVAL_MS),
+        })),
         ..Default::default()
     };
     let mut stream = session.stream(&RunOptions::default(), &opts).unwrap();
@@ -146,23 +130,18 @@ fn stream_revision_advances() {
 
 #[test]
 fn stream_reset_returns_to_idle() {
-    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio())
-    else {
+    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio()) else {
         return;
     };
     let mut session = Model::load(&model_path).unwrap().session().unwrap();
     {
-        let mut stream = session
-            .stream(&RunOptions::default(), &StreamOptions::default())
-            .unwrap();
+        let mut stream = session.stream(&RunOptions::default(), &StreamOptions::default()).unwrap();
         stream.feed(&pcm[..pcm.len().min(1600)]).unwrap();
         stream.reset();
         assert_eq!(stream.state(), StreamState::Idle);
     }
     // The session is usable again for a fresh stream after the borrow ends.
-    let stream = session
-        .stream(&RunOptions::default(), &StreamOptions::default())
-        .unwrap();
+    let stream = session.stream(&RunOptions::default(), &StreamOptions::default()).unwrap();
     assert_eq!(stream.state(), StreamState::Active);
 }
 
@@ -172,8 +151,7 @@ fn concurrent_compute_on_one_model_is_refused() {
     // limitation, include/transcribe.h). An active stream spans begin..drop, so
     // a second stream — or an offline run — on ANOTHER session of the same model
     // must be refused with Error::Busy rather than race into the documented UB.
-    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio())
-    else {
+    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio()) else {
         return;
     };
     let model = Model::load(&model_path).unwrap();
@@ -182,26 +160,16 @@ fn concurrent_compute_on_one_model_is_refused() {
     let chunk = &pcm[..pcm.len().min(1600)];
 
     // A failed begin does not take the lease.
-    assert!(s1
-        .stream(&RunOptions::default(), &wrong_family_stream())
-        .is_err());
-    let mut stream1 = s1
-        .stream(&RunOptions::default(), &StreamOptions::default())
-        .unwrap();
+    assert!(s1.stream(&RunOptions::default(), &wrong_family_stream()).is_err());
+    let mut stream1 = s1.stream(&RunOptions::default(), &StreamOptions::default()).unwrap();
     stream1.feed(chunk).unwrap();
 
     // Each refusal names the refused call; the busy check precedes native
     // validation of a (wrong-family) stream begin.
     expect_busy(s2.run(&pcm, &RunOptions::default()), RUN_BUSY);
     expect_busy(s2.run_batch(&[&pcm], &RunOptions::default()), BATCH_BUSY);
-    expect_busy(
-        s2.stream(&RunOptions::default(), &StreamOptions::default()),
-        STREAM_BUSY,
-    );
-    expect_busy(
-        s2.stream(&RunOptions::default(), &wrong_family_stream()),
-        STREAM_BUSY,
-    );
+    expect_busy(s2.stream(&RunOptions::default(), &StreamOptions::default()), STREAM_BUSY);
+    expect_busy(s2.stream(&RunOptions::default(), &wrong_family_stream()), STREAM_BUSY);
     // The refusals did not disturb the live stream.
     stream1.feed(chunk).unwrap();
     assert_eq!(stream1.state(), StreamState::Active);
@@ -209,9 +177,7 @@ fn concurrent_compute_on_one_model_is_refused() {
     // Dropping the first stream releases the model's compute lease; now s2 can
     // begin its own stream.
     drop(stream1);
-    let stream2 = s2
-        .stream(&RunOptions::default(), &StreamOptions::default())
-        .unwrap();
+    let stream2 = s2.stream(&RunOptions::default(), &StreamOptions::default()).unwrap();
     assert_eq!(stream2.state(), StreamState::Active);
 }
 
@@ -220,8 +186,7 @@ fn compute_lease_frees_at_finalize_and_reset() {
     // The lease tracks "stream is ACTIVE", not "Stream handle exists": after
     // finalize() or reset() the stream is no longer active, so another session
     // may proceed WITHOUT waiting for the first Stream to drop.
-    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio())
-    else {
+    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio()) else {
         return;
     };
     let model = Model::load(&model_path).unwrap();
@@ -230,30 +195,20 @@ fn compute_lease_frees_at_finalize_and_reset() {
     let chunk = &pcm[..pcm.len().min(1600)];
 
     {
-        let mut stream1 = s1
-            .stream(&RunOptions::default(), &StreamOptions::default())
-            .unwrap();
+        let mut stream1 = s1.stream(&RunOptions::default(), &StreamOptions::default()).unwrap();
         stream1.feed(chunk).unwrap();
         stream1.finalize().unwrap();
         // stream1 is finalized but STILL IN SCOPE (not dropped); the lease must
         // already be free for s2.
         let stream2 = s2.stream(&RunOptions::default(), &StreamOptions::default());
-        assert!(
-            stream2.is_ok(),
-            "finalize() must release the lease before drop: {stream2:?}"
-        );
+        assert!(stream2.is_ok(), "finalize() must release the lease before drop: {stream2:?}");
     }
     {
-        let mut stream1 = s1
-            .stream(&RunOptions::default(), &StreamOptions::default())
-            .unwrap();
+        let mut stream1 = s1.stream(&RunOptions::default(), &StreamOptions::default()).unwrap();
         stream1.feed(chunk).unwrap();
         stream1.reset();
         let stream2 = s2.stream(&RunOptions::default(), &StreamOptions::default());
-        assert!(
-            stream2.is_ok(),
-            "reset() must release the lease before drop: {stream2:?}"
-        );
+        assert!(stream2.is_ok(), "reset() must release the lease before drop: {stream2:?}");
     }
 }
 
@@ -268,11 +223,9 @@ fn stream_family_extension_accepted_or_rejected() {
     let mut session = model.session().unwrap();
 
     let opts = StreamOptions {
-        family: Some(StreamExtension::MoonshineStreaming(
-            MoonshineStreamingOptions {
-                min_decode_interval_ms: Some(200),
-            },
-        )),
+        family: Some(StreamExtension::MoonshineStreaming(MoonshineStreamingOptions {
+            min_decode_interval_ms: Some(200),
+        })),
         ..Default::default()
     };
     let ok = session.stream(&RunOptions::default(), &opts);
@@ -288,8 +241,7 @@ fn stream_family_extension_accepted_or_rejected() {
 fn ended_stream_never_releases_another_sessions_lease() {
     // After finalize() the lease belongs to whoever takes it next; a later
     // reset() or drop of the ended stream must not free that other lease.
-    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio())
-    else {
+    let (Some(model_path), Some(pcm)) = (common::smoke_streaming_model(), common::smoke_audio()) else {
         return;
     };
     let model = Model::load(&model_path).unwrap();
@@ -297,29 +249,17 @@ fn ended_stream_never_releases_another_sessions_lease() {
     let mut s2 = model.session().unwrap();
     let mut s3 = model.session().unwrap();
 
-    let mut stream1 = s1
-        .stream(&RunOptions::default(), &StreamOptions::default())
-        .unwrap();
+    let mut stream1 = s1.stream(&RunOptions::default(), &StreamOptions::default()).unwrap();
     stream1.feed(&pcm[..pcm.len().min(1600)]).unwrap();
     stream1.finalize().unwrap();
-    let stream2 = s2
-        .stream(&RunOptions::default(), &StreamOptions::default())
-        .unwrap();
+    let stream2 = s2.stream(&RunOptions::default(), &StreamOptions::default()).unwrap();
     stream1.reset();
-    expect_busy(
-        s3.stream(&RunOptions::default(), &StreamOptions::default()),
-        STREAM_BUSY,
-    );
+    expect_busy(s3.stream(&RunOptions::default(), &StreamOptions::default()), STREAM_BUSY);
     drop(stream1);
-    expect_busy(
-        s3.stream(&RunOptions::default(), &StreamOptions::default()),
-        STREAM_BUSY,
-    );
+    expect_busy(s3.stream(&RunOptions::default(), &StreamOptions::default()), STREAM_BUSY);
 
     // Releasing the real holder frees the model.
     drop(stream2);
-    let stream3 = s3
-        .stream(&RunOptions::default(), &StreamOptions::default())
-        .unwrap();
+    let stream3 = s3.stream(&RunOptions::default(), &StreamOptions::default()).unwrap();
     assert_eq!(stream3.state(), StreamState::Active);
 }

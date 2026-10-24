@@ -1,5 +1,5 @@
+use crate::engine::{Segment, TranscribeResult};
 use serde::Serialize;
-use whisper_rs::{Segment, TranscribeResult};
 
 use crate::server::diarization;
 
@@ -257,7 +257,10 @@ mod tests {
     }
 
     fn result(segments: Vec<Segment>) -> TranscribeResult {
-        TranscribeResult { segments }
+        TranscribeResult {
+            segments,
+            language: None,
+        }
     }
 
     #[test]
@@ -416,6 +419,7 @@ mod planner_tests {
     fn result() -> TranscribeResult {
         TranscribeResult {
             segments: vec![segment(100, 200), segment(1500, 1900)],
+            language: None,
         }
     }
 
@@ -514,6 +518,7 @@ mod planner_tests {
     fn without_a_plan_the_overlap_speaker_is_used() {
         let result = TranscribeResult {
             segments: vec![segment(0, 100)],
+            language: None,
         };
         let diar = [diarization::Segment {
             start: 0.0,

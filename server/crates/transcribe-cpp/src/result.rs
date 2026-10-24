@@ -14,11 +14,7 @@ use crate::types::TimestampKind;
 
 /// A fully-materialized transcription result.
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct Transcript {
     /// The full transcript text.
     pub text: String,
@@ -46,11 +42,7 @@ pub struct Transcript {
 
 /// One segment row. Times are milliseconds relative to the original audio.
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct Segment {
     pub t0_ms: i64,
     pub t1_ms: i64,
@@ -66,29 +58,18 @@ pub struct Segment {
 /// One diarized speaker turn. Zero times mean the model attributed text but
 /// did not provide turn timing; `p` is NaN when unavailable.
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct SpeakerSegment {
     pub t0_ms: i64,
     pub t1_ms: i64,
     pub speaker_id: i32,
-    #[cfg_attr(
-        feature = "serde",
-        serde(default = "nan", deserialize_with = "nan_from_null")
-    )]
+    #[cfg_attr(feature = "serde", serde(default = "nan", deserialize_with = "nan_from_null"))]
     pub p: f32,
 }
 
 /// One word row.
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct Word {
     pub t0_ms: i64,
     pub t1_ms: i64,
@@ -101,17 +82,10 @@ pub struct Word {
 /// One token row. `p` is a per-token confidence hint (NaN when the family
 /// produces none); its exact meaning is family-specific.
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct Token {
     pub id: i32,
-    #[cfg_attr(
-        feature = "serde",
-        serde(default = "nan", deserialize_with = "nan_from_null")
-    )]
+    #[cfg_attr(feature = "serde", serde(default = "nan", deserialize_with = "nan_from_null"))]
     pub p: f32,
     pub t0_ms: i64,
     pub t1_ms: i64,
@@ -122,11 +96,7 @@ pub struct Token {
 
 /// Per-run stage timings, in milliseconds. Zero means "unknown / not measured".
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct Timings {
     pub load_ms: f32,
     pub mel_ms: f32,
@@ -157,9 +127,7 @@ pub(crate) fn owned_str(ptr: *const c_char) -> String {
     if ptr.is_null() {
         return String::new();
     }
-    unsafe { CStr::from_ptr(ptr) }
-        .to_string_lossy()
-        .into_owned()
+    unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned()
 }
 
 /// Copy a borrowed C string into `Some(String)`, or `None` for NULL/empty.
@@ -167,9 +135,7 @@ pub(crate) fn owned_opt_str(ptr: *const c_char) -> Option<String> {
     if ptr.is_null() {
         return None;
     }
-    let s = unsafe { CStr::from_ptr(ptr) }
-        .to_string_lossy()
-        .into_owned();
+    let s = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
     if s.is_empty() {
         None
     } else {

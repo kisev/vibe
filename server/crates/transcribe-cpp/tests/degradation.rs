@@ -21,9 +21,7 @@
 //! asserts the floor first calls [`init_backends_default`], which loads the
 //! build's module directory in that posture and is a harmless no-op otherwise.
 
-use transcribe_cpp::{
-    backend_available, device_count, devices, init_backends, init_backends_default, Backend,
-};
+use transcribe_cpp::{backend_available, device_count, devices, init_backends, init_backends_default, Backend};
 
 #[test]
 fn cpu_is_the_floor() {

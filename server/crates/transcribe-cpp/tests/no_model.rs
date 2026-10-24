@@ -4,9 +4,8 @@
 mod common;
 
 use transcribe_cpp::{
-    abi_struct_size, backend_available, compiled_version, device_count, devices, header_hash,
-    init_backends_default, version, AbiStruct, Backend, DeviceType, Error, Itn, Model, Pnc,
-    RunOptions,
+    abi_struct_size, backend_available, compiled_version, device_count, devices, header_hash, init_backends_default, version,
+    AbiStruct, Backend, DeviceType, Error, Itn, Model, Pnc, RunOptions,
 };
 
 #[test]

@@ -22,11 +22,7 @@ use crate::error::Result;
 /// fallback, and decode thresholds. `None` keeps the family default.
 /// `initial_prompt` cannot be combined with `RunOptions::vocabulary` / `prompt`.
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct WhisperRunOptions {
     pub initial_prompt: Option<String>,
     pub condition_on_prev_tokens: Option<bool>,
@@ -42,33 +38,21 @@ pub struct WhisperRunOptions {
 
 /// Moonshine-streaming stream-extension knobs (stream slot).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct MoonshineStreamingOptions {
     pub min_decode_interval_ms: Option<i32>,
 }
 
 /// Parakeet cache-aware streaming knobs (stream slot).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct ParakeetStreamOptions {
     pub att_context_right: Option<i32>,
 }
 
 /// Parakeet chunked-attention buffered streaming knobs (stream slot).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct ParakeetBufferedStreamOptions {
     pub left_ms: Option<i32>,
     pub chunk_ms: Option<i32>,
@@ -77,11 +61,7 @@ pub struct ParakeetBufferedStreamOptions {
 
 /// Voxtral-realtime streaming knobs (stream slot).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct VoxtralRealtimeStreamOptions {
     pub num_delay_tokens: Option<i32>,
     pub min_decode_interval_ms: Option<i32>,
@@ -107,18 +87,12 @@ pub enum SortformerPreset {
 impl SortformerPreset {
     fn to_sys(self) -> sys::transcribe_sortformer_preset {
         match self {
-            SortformerPreset::Default => {
-                sys::transcribe_sortformer_preset::TRANSCRIBE_SORTFORMER_PRESET_DEFAULT
-            }
+            SortformerPreset::Default => sys::transcribe_sortformer_preset::TRANSCRIBE_SORTFORMER_PRESET_DEFAULT,
             SortformerPreset::VeryHighLatency => {
                 sys::transcribe_sortformer_preset::TRANSCRIBE_SORTFORMER_PRESET_VERY_HIGH_LATENCY
             }
-            SortformerPreset::HighLatency => {
-                sys::transcribe_sortformer_preset::TRANSCRIBE_SORTFORMER_PRESET_HIGH_LATENCY
-            }
-            SortformerPreset::LowLatency => {
-                sys::transcribe_sortformer_preset::TRANSCRIBE_SORTFORMER_PRESET_LOW_LATENCY
-            }
+            SortformerPreset::HighLatency => sys::transcribe_sortformer_preset::TRANSCRIBE_SORTFORMER_PRESET_HIGH_LATENCY,
+            SortformerPreset::LowLatency => sys::transcribe_sortformer_preset::TRANSCRIBE_SORTFORMER_PRESET_LOW_LATENCY,
         }
     }
 }
@@ -126,11 +100,7 @@ impl SortformerPreset {
 /// Sortformer diarize-extension knobs (diarize-run slot). `None` keeps the
 /// family default (the GGUF-shipped cfg).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(default)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 pub struct SortformerDiarizeOptions {
     pub preset: Option<SortformerPreset>,
 }
@@ -152,10 +122,7 @@ pub(crate) enum DiarizeExtRaw {
 impl DiarizeExtRaw {
     pub(crate) fn ext_ptr(&self) -> *const sys::transcribe_ext {
         match self {
-            DiarizeExtRaw::Sortformer(e) => {
-                (&**e) as *const sys::transcribe_sortformer_diarize_ext
-                    as *const sys::transcribe_ext
-            }
+            DiarizeExtRaw::Sortformer(e) => (&**e) as *const sys::transcribe_sortformer_diarize_ext as *const sys::transcribe_ext,
         }
     }
 }
@@ -207,9 +174,7 @@ impl RunExtRaw {
     pub(crate) fn ext_ptr(&self) -> *const sys::transcribe_ext {
         match self {
             // `ext` is field 0, so &ext == &the family struct.
-            RunExtRaw::Whisper { ext, .. } => {
-                (&**ext) as *const sys::transcribe_whisper_run_ext as *const sys::transcribe_ext
-            }
+            RunExtRaw::Whisper { ext, .. } => (&**ext) as *const sys::transcribe_whisper_run_ext as *const sys::transcribe_ext,
         }
     }
 }
@@ -226,10 +191,7 @@ impl RunExtension {
                 if let Some(c) = prompt.as_ref() {
                     ext.initial_prompt = c.as_ptr();
                 }
-                set(
-                    &mut ext.condition_on_prev_tokens,
-                    o.condition_on_prev_tokens,
-                );
+                set(&mut ext.condition_on_prev_tokens, o.condition_on_prev_tokens);
                 set(&mut ext.temperature, o.temperature);
                 set(&mut ext.temperature_inc, o.temperature_inc);
                 set(&mut ext.compression_ratio_thold, o.compression_ratio_thold);
@@ -258,20 +220,15 @@ pub(crate) enum StreamExtRaw {
 impl StreamExtRaw {
     pub(crate) fn ext_ptr(&self) -> *const sys::transcribe_ext {
         match self {
-            StreamExtRaw::ParakeetStream(e) => {
-                (&**e) as *const sys::transcribe_parakeet_stream_ext as *const sys::transcribe_ext
-            }
+            StreamExtRaw::ParakeetStream(e) => (&**e) as *const sys::transcribe_parakeet_stream_ext as *const sys::transcribe_ext,
             StreamExtRaw::ParakeetBuffered(e) => {
-                (&**e) as *const sys::transcribe_parakeet_buffered_stream_ext
-                    as *const sys::transcribe_ext
+                (&**e) as *const sys::transcribe_parakeet_buffered_stream_ext as *const sys::transcribe_ext
             }
             StreamExtRaw::MoonshineStreaming(e) => {
-                (&**e) as *const sys::transcribe_moonshine_streaming_stream_ext
-                    as *const sys::transcribe_ext
+                (&**e) as *const sys::transcribe_moonshine_streaming_stream_ext as *const sys::transcribe_ext
             }
             StreamExtRaw::VoxtralRealtime(e) => {
-                (&**e) as *const sys::transcribe_voxtral_realtime_stream_ext
-                    as *const sys::transcribe_ext
+                (&**e) as *const sys::transcribe_voxtral_realtime_stream_ext as *const sys::transcribe_ext
             }
         }
     }
@@ -287,8 +244,7 @@ impl StreamExtension {
                 StreamExtRaw::ParakeetStream(Box::new(e))
             }
             StreamExtension::ParakeetBuffered(o) => {
-                let mut e: sys::transcribe_parakeet_buffered_stream_ext =
-                    unsafe { std::mem::zeroed() };
+                let mut e: sys::transcribe_parakeet_buffered_stream_ext = unsafe { std::mem::zeroed() };
                 unsafe { sys::transcribe_parakeet_buffered_stream_ext_init(&mut e) };
                 set(&mut e.left_ms, o.left_ms);
                 set(&mut e.chunk_ms, o.chunk_ms);
@@ -296,15 +252,13 @@ impl StreamExtension {
                 StreamExtRaw::ParakeetBuffered(Box::new(e))
             }
             StreamExtension::MoonshineStreaming(o) => {
-                let mut e: sys::transcribe_moonshine_streaming_stream_ext =
-                    unsafe { std::mem::zeroed() };
+                let mut e: sys::transcribe_moonshine_streaming_stream_ext = unsafe { std::mem::zeroed() };
                 unsafe { sys::transcribe_moonshine_streaming_stream_ext_init(&mut e) };
                 set(&mut e.min_decode_interval_ms, o.min_decode_interval_ms);
                 StreamExtRaw::MoonshineStreaming(Box::new(e))
             }
             StreamExtension::VoxtralRealtime(o) => {
-                let mut e: sys::transcribe_voxtral_realtime_stream_ext =
-                    unsafe { std::mem::zeroed() };
+                let mut e: sys::transcribe_voxtral_realtime_stream_ext = unsafe { std::mem::zeroed() };
                 unsafe { sys::transcribe_voxtral_realtime_stream_ext_init(&mut e) };
                 set(&mut e.num_delay_tokens, o.num_delay_tokens);
                 set(&mut e.min_decode_interval_ms, o.min_decode_interval_ms);

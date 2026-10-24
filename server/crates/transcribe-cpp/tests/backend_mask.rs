@@ -2,19 +2,13 @@
 //! that touches the native registry lives in ONE test function in this file
 //! (its own test binary, hence its own process).
 
-use transcribe_cpp::{
-    allowed_backends, backend_available, devices, init_backends_with, Backend, BackendMask,
-    DeviceType, Error,
-};
+use transcribe_cpp::{allowed_backends, backend_available, devices, init_backends_with, Backend, BackendMask, DeviceType, Error};
 
 #[test]
 fn for_backend_is_minimal() {
     assert_eq!(BackendMask::for_backend(Backend::Auto), BackendMask::ALL);
     assert_eq!(BackendMask::for_backend(Backend::Cpu), BackendMask::CPU);
-    assert_eq!(
-        BackendMask::for_backend(Backend::CpuAccel),
-        BackendMask::CPU
-    );
+    assert_eq!(BackendMask::for_backend(Backend::CpuAccel), BackendMask::CPU);
     assert_eq!(
         BackendMask::for_backend(Backend::Vulkan),
         BackendMask::VULKAN | BackendMask::CPU
