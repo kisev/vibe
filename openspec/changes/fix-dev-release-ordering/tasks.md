@@ -8,4 +8,4 @@
 
 ## 2. End-to-end ordering check
 
-- [ ] 2.1 Push a commit to `main`, wait for the dev build, and verify on the fork's releases page that the new `dev.<run-number>` release appears above all earlier `dev.<sha>` releases and its name shows the `-dev.<short-commit>` version with the full SHA in the body
+- [x] 2.1 Push a commit to `main`, wait for the dev build, and verify on the fork's releases page that the new `dev.<run-number>` release appears above all earlier `dev.<sha>` releases and its name shows the `-dev.<short-commit>` version with the full SHA in the body
