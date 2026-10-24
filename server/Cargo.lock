@@ -2125,6 +2125,7 @@ dependencies = [
 name = "transcribe-cpp"
 version = "0.4.1"
 dependencies = [
+ "ggml-rs-sys",
  "hound",
  "log",
  "postcard",
