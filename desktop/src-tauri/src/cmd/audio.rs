@@ -357,7 +357,7 @@ fn build_input_stream(
         cpal::SampleFormat::I16 => build_input_stream_typed::<i16>(device, config, writer, meter),
         cpal::SampleFormat::I32 => build_input_stream_typed::<i32>(device, config, writer, meter),
         cpal::SampleFormat::F32 => build_input_stream_typed::<f32>(device, config, writer, meter),
-        sample_format => bail!("Unsupported sample format '{}'", sample_format),
+        sample_format => return Err(eyre!("Unsupported sample format '{}'", sample_format)),
     }
 }
 

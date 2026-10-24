@@ -28,41 +28,42 @@ pub(in crate::server) async fn transcriptions(State(state): State<AppState>, mul
             );
         }
     };
-    match parse_multipart(multipart).await {
-        Ok(request) => match crate::server::transcription::transcribe(state.config, model, request).await {
-            Ok(response) => response,
-            Err(response) => response,
-        },
-        Err(response) => response,
+    let response = match parse_multipart(multipart).await {
+        Ok(request) => crate::server::transcription::transcribe(state.config, model, request).await,
+        Err(response) => Err(response),
+    };
+    match response {
+        Ok(response) => response,
+        Err(response) => *response,
     }
 }
 
-async fn parse_multipart(mut multipart: Multipart) -> Result<TranscriptionRequest, Response> {
+async fn parse_multipart(mut multipart: Multipart) -> Result<TranscriptionRequest, Box<Response>> {
     let mut file = None;
     let mut form = HashMap::new();
 
     while let Some(field) = multipart.next_field().await.map_err(|err| {
-        error(
+        Box::new(error(
             StatusCode::BAD_REQUEST,
             "invalid_request",
             &format!("invalid multipart form: {err}"),
-        )
+        ))
     })? {
         let name = field.name().unwrap_or_default().to_string();
         if name == "file" {
             let bytes = field.bytes().await.map_err(|err| {
-                error(
+                Box::new(error(
                     StatusCode::BAD_REQUEST,
                     "invalid_request",
                     &format!("missing or invalid 'file' field: {err}"),
-                )
+                ))
             })?;
             if bytes.len() > MAX_UPLOAD_SIZE {
-                return Err(error(
+                return Err(Box::new(error(
                     StatusCode::BAD_REQUEST,
                     "invalid_request",
                     "uploaded file is too large",
-                ));
+                )));
             }
             file = Some(bytes.to_vec());
         } else {

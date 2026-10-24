@@ -73,7 +73,7 @@ pub fn format_markdown(segments: &[Segment], diar_segments: &[diarization::Segme
         out.push_str(&cs_to_vtt_time(segment.end));
         out.push(']');
         if let Some(speaker) = speaker {
-            out.push_str(" ");
+            out.push(' ');
             out.push_str(&speaker_label(speaker));
         }
         out.push_str("**\n\n");
@@ -416,7 +416,6 @@ mod planner_tests {
     fn result() -> TranscribeResult {
         TranscribeResult {
             segments: vec![segment(100, 200), segment(1500, 1900)],
-            ..Default::default()
         }
     }
 
@@ -515,7 +514,6 @@ mod planner_tests {
     fn without_a_plan_the_overlap_speaker_is_used() {
         let result = TranscribeResult {
             segments: vec![segment(0, 100)],
-            ..Default::default()
         };
         let diar = [diarization::Segment {
             start: 0.0,

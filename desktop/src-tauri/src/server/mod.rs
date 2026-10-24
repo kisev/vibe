@@ -316,7 +316,7 @@ impl ServerProcess {
                 Err(error) if attempt == 0 && is_connection_failure(&error) => {
                     tracing::warn!("retrying transcribe request after connection failure: {error}");
                 }
-                Err(error) => bail!("failed to send transcribe request to server: {error}"),
+                Err(error) => return Err(eyre::eyre!("failed to send transcribe request to server: {error}")),
             }
         }
         let Some(response) = response else {

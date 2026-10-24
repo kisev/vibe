@@ -9,7 +9,7 @@ use crate::audio;
 use crate::cli::AppConfig;
 use crate::server::diarization;
 use crate::server::form::FormValues;
-use crate::server::stream::stream_transcription;
+use crate::server::stream::{stream_transcription, StreamRequest};
 use crate::server::unload_timeout::ModelLease;
 use crate::server::{error, format, TextResponse};
 use crate::{
@@ -26,7 +26,7 @@ pub(super) async fn transcribe(
     config: AppConfig,
     mut model: ModelLease,
     request: TranscriptionRequest,
-) -> Result<Response, Response> {
+) -> Result<Response, Box<Response>> {
     let TranscriptionRequest { file, form } = request;
     let (diarize_model, enhance_audio, stable_timestamps, vad_model_path, stream, response_format, chunk_seconds) = {
         let values = FormValues::new(&form);
@@ -46,7 +46,7 @@ pub(super) async fn transcribe(
     // never succeed is refused here.
     if let Some(ctx) = model.ctx.as_ref() {
         if let Some(message) = chunk_seconds_error(chunk_seconds, ctx.max_input_seconds()) {
-            return Err(error(StatusCode::BAD_REQUEST, "invalid_request", &message));
+            return Err(Box::new(error(StatusCode::BAD_REQUEST, "invalid_request", &message)));
         }
     }
     let audio_options = audio::ReadOptions {
@@ -54,11 +54,11 @@ pub(super) async fn transcribe(
         verbose: config.verbose(),
     };
     let samples = audio::read_bytes_with_options(file, audio_options).map_err(|err| {
-        error(
+        Box::new(error(
             StatusCode::BAD_REQUEST,
             "invalid_audio",
             &format!("invalid audio file: {err}"),
-        )
+        ))
     })?;
 
     let diar_segments = diarize_model
@@ -66,21 +66,21 @@ pub(super) async fn transcribe(
         .map_or_else(Vec::new, |model_path| diarization::diarize(model_path, &samples));
 
     if stable_timestamps && vad_model_path.is_none() {
-        return Err(error(
+        return Err(Box::new(error(
             StatusCode::BAD_REQUEST,
             "invalid_request",
             "'vad_model' is required when 'stable_timestamps' is true",
-        ));
+        )));
     }
 
     if let Some(ctx) = model.ctx.as_ref() {
         let options = build_options(&form, config.verbose(), stable_timestamps, vad_model_path.clone());
         if let Err(err) = ctx.validate_request(&options) {
-            return Err(error(
+            return Err(Box::new(error(
                 super::engine_error_status(&err),
                 super::engine_error_code(&err),
                 &err.to_string(),
-            ));
+            )));
         }
     }
 
@@ -89,7 +89,7 @@ pub(super) async fn transcribe(
             .ctx
             .as_mut()
             .and_then(|ctx| plan_for(ctx, &samples, &diar_segments, vad_model_path.as_deref(), chunk_seconds));
-        return stream_transcription(
+        let request = StreamRequest {
             config,
             model,
             samples,
@@ -98,8 +98,8 @@ pub(super) async fn transcribe(
             vad_model_path,
             diar_segments,
             plan,
-        )
-        .map_err(|err| *err);
+        };
+        return stream_transcription(request);
     }
 
     let verbose = config.verbose();
@@ -107,43 +107,30 @@ pub(super) async fn transcribe(
     let ctx = model
         .ctx
         .as_mut()
-        .ok_or_else(|| error(StatusCode::SERVICE_UNAVAILABLE, "no_model", "no model loaded"))?;
+        .ok_or_else(|| Box::new(error(StatusCode::SERVICE_UNAVAILABLE, "no_model", "no model loaded")))?;
 
     if ctx.requires_vad() && vad_model_path.is_none() {
-        return Err(error(
+        return Err(Box::new(error(
             StatusCode::BAD_REQUEST,
             "invalid_request",
             "'vad_model' is required for this transcription engine",
-        ));
+        )));
     }
 
     let opts = build_options(&form, verbose, stable_timestamps, vad_model_path.clone());
     let plan = plan_for(ctx, &samples, &diar_segments, vad_model_path.as_deref(), chunk_seconds);
-    let options_json = serde_json::json!({
-        "language": opts.language,
-        "detect_language": opts.detect_language,
-        "translate": opts.translate,
-        "prompt": opts.prompt,
-        "temperature": opts.temperature,
-        "word_timestamps": opts.word_timestamps,
-        "max_segment_len": opts.max_segment_len,
-        "stable_timestamps": opts.stable_timestamps,
-        "vad_model": opts.vad_model_path,
-    });
     let result = match (plan.as_ref(), config.cache_dir()) {
-        (Some(plan), Some(root)) => {
-            super::chunk_cache::transcribe_cached(ctx, &model_path, &samples, plan, &opts, root, options_json)
-        }
+        (Some(plan), Some(root)) => super::chunk_cache::transcribe_cached(ctx, &model_path, &samples, plan, &opts, root),
         (Some(plan), None) => ctx.transcribe_chunks(&samples, plan, opts),
         (None, _) => ctx.transcribe(&samples, opts),
     }
     .map_err(|err| {
         tracing::error!(samples = samples.len(), "transcription failed: {err:#}");
-        error(
+        Box::new(error(
             super::engine_error_status(&err),
             super::engine_error_code(&err),
             &format!("transcription failed: {err}"),
-        )
+        ))
     })?;
 
     Ok(format_response(&response_format, &result, &diar_segments, plan.as_ref()))

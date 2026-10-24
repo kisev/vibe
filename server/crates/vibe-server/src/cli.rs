@@ -278,20 +278,9 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
         options.vad_model_path.as_deref(),
         args.chunk_seconds,
     );
-    let options_json = serde_json::json!({
-        "language": options.language,
-        "detect_language": options.detect_language,
-        "translate": options.translate,
-        "prompt": options.prompt,
-        "temperature": options.temperature,
-        "word_timestamps": options.word_timestamps,
-        "max_segment_len": options.max_segment_len,
-        "stable_timestamps": options.stable_timestamps,
-        "vad_model": options.vad_model_path,
-    });
     let result = match (plan.as_ref(), config.cache_dir()) {
         (Some(plan), Some(root)) => {
-            crate::server::chunk_cache::transcribe_cached(&mut ctx, &args.model, &samples, plan, &options, root, options_json)
+            crate::server::chunk_cache::transcribe_cached(&mut ctx, &args.model, &samples, plan, &options, root)
         }
         (Some(plan), None) => ctx.transcribe_chunks(&samples, plan, options),
         (None, _) => ctx.transcribe(&samples, options),
@@ -385,6 +374,29 @@ enum OutputFormat {
     Vtt,
 }
 
+struct TranscribeArgs {
+    model: String,
+    audio: String,
+    vad_model: Option<String>,
+    diarize_model: Option<String>,
+    chunk_seconds: Option<f64>,
+    format: OutputFormat,
+    output: Option<String>,
+    language: Option<String>,
+    detect_language: bool,
+    enhance_audio: bool,
+    translate: bool,
+    threads: i32,
+    prompt: Option<String>,
+    temperature: f32,
+    max_text_ctx: i32,
+    word_timestamps: bool,
+    max_segment_len: i32,
+    best_of: i32,
+    beam_size: i32,
+    gpu_device: i32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -459,27 +471,4 @@ mod tests {
         assert!(write_output("new", path.to_str().unwrap()).is_err());
         assert!(!path.exists());
     }
-}
-
-struct TranscribeArgs {
-    model: String,
-    audio: String,
-    vad_model: Option<String>,
-    diarize_model: Option<String>,
-    chunk_seconds: Option<f64>,
-    format: OutputFormat,
-    output: Option<String>,
-    language: Option<String>,
-    detect_language: bool,
-    enhance_audio: bool,
-    translate: bool,
-    threads: i32,
-    prompt: Option<String>,
-    temperature: f32,
-    max_text_ctx: i32,
-    word_timestamps: bool,
-    max_segment_len: i32,
-    best_of: i32,
-    beam_size: i32,
-    gpu_device: i32,
 }

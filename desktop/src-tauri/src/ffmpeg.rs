@@ -106,7 +106,7 @@ pub fn normalize(input: PathBuf, output: PathBuf, additional_ffmpeg_args: Option
     }
 
     if !output.exists() {
-        bail!("seems like ffmpeg failed for some reason. output not exists")
+        return Err(eyre::eyre!("seems like ffmpeg failed for some reason. output not exists"));
     }
     Ok(())
 }

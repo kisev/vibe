@@ -384,7 +384,7 @@ impl ServerProcess {
                     tracing::debug!("vibe-server model loaded: {path}");
                     return Ok(());
                 }
-                Ok(response) => bail!("vibe-server load_model failed: {}", response.text().await.unwrap_or_default()),
+                Ok(response) => return Err(eyre::eyre!("vibe-server load_model failed: {}", response.text().await.unwrap_or_default())),
                 Err(error) => last_error = Some(error),
             }
         }

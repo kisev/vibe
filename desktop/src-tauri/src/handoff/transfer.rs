@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use eyre::{bail, Result};
+use eyre::Result;
 use iroh::endpoint::Connection;
 use iroh::protocol::{AcceptError, ProtocolHandler};
 use tauri::{Emitter, Manager};
@@ -365,10 +365,10 @@ fn reserve_recording_file_in(folder: &std::path::Path, stem: &str, extension: &s
         match std::fs::OpenOptions::new().write(true).create_new(true).open(&candidate) {
             Ok(file) => return Ok((candidate, file)),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(error) => bail!("failed to reserve {}: {error}", candidate.display()),
+            Err(error) => return Err(eyre::eyre!("failed to reserve {}: {error}", candidate.display())),
         }
     }
-    bail!("could not reserve a free phone recording filename in {}", folder.display())
+    return Err(eyre::eyre!("could not reserve a free phone recording filename in {}", folder.display()));
 }
 
 #[cfg(test)]

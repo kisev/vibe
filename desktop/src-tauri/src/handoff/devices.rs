@@ -383,7 +383,7 @@ mod tests {
                 |value| *cache.borrow_mut() = value,
                 || {
                     assert_eq!(*cache.borrow(), Some(next.clone()));
-                    bail!("disk full")
+                    Err(eyre::eyre!("disk full"))
                 },
                 || panic!("failed saves must preserve the legacy invitation"),
             );

@@ -119,13 +119,8 @@ impl Model {
             mel,
             device: None,
         };
-        if let Err(error) = model.validate_tensor_catalog() {
-            return Err(error);
-        }
-        model.head = match model.load_head() {
-            Ok(head) => head,
-            Err(error) => return Err(error),
-        };
+        model.validate_tensor_catalog()?;
+        model.head = model.load_head()?;
         model.device = unsafe { DeviceWeights::load(model.weights)? };
         eprintln!(
             "[gigaam][load] done elapsed_ms={} variant={} head={} tensors={} backend={}",
@@ -261,7 +256,7 @@ impl Model {
                         message: "predictor or joint tensor shapes do not match the metadata".into(),
                     });
                 }
-                Ok(HeadWeights::Rnnt(head))
+                Ok(HeadWeights::Rnnt(Box::new(head)))
             }
             "ctc" => {
                 let dimension = self.info.encoder_dimension;

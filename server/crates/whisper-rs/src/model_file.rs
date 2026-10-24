@@ -38,10 +38,8 @@ pub(crate) fn validate(path: &Path) -> Result<u64> {
     }
 
     let buffer = read_header(path)?;
-    let header: Vec<i32> = buffer
-        .chunks_exact(4)
-        .map(|word| i32::from_le_bytes([word[0], word[1], word[2], word[3]]))
-        .collect();
+    let (words, _) = buffer.as_chunks::<4>();
+    let header: Vec<i32> = words.iter().map(|word| i32::from_le_bytes(*word)).collect();
     let magic = header[0] as u32;
     if magic != GGML_FILE_MAGIC {
         return Err(corrupt(path, size, &format!("bad magic 0x{magic:08x}")));

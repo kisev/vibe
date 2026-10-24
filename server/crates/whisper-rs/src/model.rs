@@ -153,10 +153,8 @@ impl<R: Read> Reader<R> {
 
     fn read_f32_vec(&mut self, count: usize) -> Result<Vec<f32>, Error> {
         let bytes = self.read_bytes(count * 4)?;
-        Ok(bytes
-            .chunks_exact(4)
-            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
-            .collect())
+        let (words, _) = bytes.as_chunks::<4>();
+        Ok(words.iter().map(|c| f32::from_le_bytes(*c)).collect())
     }
 }
 

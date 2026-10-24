@@ -1,5 +1,5 @@
 use crate::model::Model;
-use crate::ops::{attention, conv_module, feed_forward, layer_norm, Context, Tensor};
+use crate::ops::{attention, conv_module, feed_forward, layer_norm, Context, Linear, Tensor};
 use crate::sys;
 
 unsafe fn weight(model: &Model, name: &str) -> Tensor {
@@ -28,8 +28,8 @@ pub(crate) unsafe fn build_pre_encode(ctx: Context, model: &Model, mel: Tensor) 
 /// Output length after the two stride-2 convolutions.
 #[cfg(test)]
 pub(crate) fn subsampled_frames(frames: usize) -> usize {
-    let first = (frames + 1) / 2;
-    (first + 1) / 2
+    let first = frames.div_ceil(2);
+    first.div_ceil(2)
 }
 
 unsafe fn block(ctx: Context, model: &Model, x: Tensor, cos: Tensor, sin: Tensor, layer: i32) -> Tensor {
@@ -42,10 +42,14 @@ unsafe fn block(ctx: Context, model: &Model, x: Tensor, cos: Tensor, sin: Tensor
         x,
         w("norm_ff1.weight"),
         w("norm_ff1.bias"),
-        w("ff1.linear1.weight"),
-        w("ff1.linear1.bias"),
-        w("ff1.linear2.weight"),
-        w("ff1.linear2.bias"),
+        Linear {
+            weight: w("ff1.linear1.weight"),
+            bias: w("ff1.linear1.bias"),
+        },
+        Linear {
+            weight: w("ff1.linear2.weight"),
+            bias: w("ff1.linear2.bias"),
+        },
     );
     let mut residual = sys::ggml_add(ctx, x, sys::ggml_scale(ctx, ffn, 0.5));
 
@@ -89,10 +93,14 @@ unsafe fn block(ctx: Context, model: &Model, x: Tensor, cos: Tensor, sin: Tensor
         residual,
         w("norm_ff2.weight"),
         w("norm_ff2.bias"),
-        w("ff2.linear1.weight"),
-        w("ff2.linear1.bias"),
-        w("ff2.linear2.weight"),
-        w("ff2.linear2.bias"),
+        Linear {
+            weight: w("ff2.linear1.weight"),
+            bias: w("ff2.linear1.bias"),
+        },
+        Linear {
+            weight: w("ff2.linear2.weight"),
+            bias: w("ff2.linear2.bias"),
+        },
     );
     residual = sys::ggml_add(ctx, residual, sys::ggml_scale(ctx, ffn, 0.5));
     layer_norm(ctx, residual, w("norm_out.weight"), w("norm_out.bias"))

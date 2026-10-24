@@ -31,7 +31,7 @@ The formatter takes the plan rather than precomputed sets, so `speakers` and `sp
 
 ### The split failure carries its range through anyhow context
 
-When halving stops — the halves would fall below the minimum, or the depth cap is reached — the original error is wrapped with the chunk's core range. `anyhow` keeps the source chain, so the out-of-memory classifier still recognizes a wrapped error and a resumed run classifies a leaf exactly as before.
+When halving stops — the halves would fall below the minimum, or the depth cap is reached — the error becomes one message naming the chunk's core range with the cause inline, because the HTTP layer prints `{err}` without the alternate chain formatting. The message text keeps the out-of-memory markers, so the classifier still recognizes it and a resumed run classifies a leaf exactly as before.
 
 Alternative: a dedicated error type — more ceremony for one message, and it would need its own classification path.
 

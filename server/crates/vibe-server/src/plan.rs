@@ -292,7 +292,7 @@ fn cores(turn: &Turn, pauses: &[(f64, f64)], settings: Settings) -> Vec<(f64, f6
     let mut position = turn.start;
     while turn.end - position > max_core {
         let desired = settings.preferred_seconds.min(max_core);
-        let cut = search_cut(position, desired, max_core, pauses, settings).unwrap_or_else(|| position + max_core);
+        let cut = search_cut(position, desired, max_core, pauses, settings).unwrap_or(position + max_core);
         cores.push((snap(position), snap(cut)));
         position = cut;
     }
@@ -356,8 +356,6 @@ fn snap(seconds: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const MINUTE: f64 = 60.0;
 
     fn settings(max_input: f64) -> Settings {
         Settings {

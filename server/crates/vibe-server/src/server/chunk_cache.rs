@@ -52,9 +52,9 @@ pub(crate) fn transcribe_cached(
     plan: &Plan,
     options: &whisper_rs::TranscribeOptions,
     root: &str,
-    options_json: serde_json::Value,
 ) -> anyhow::Result<whisper_rs::TranscribeResult> {
     let engine = ctx.capabilities().engine;
+    let options_json = options_json(options);
     let identity = cache::Identity {
         audio: samples,
         model: cache::ModelStamp::of(model_path),
@@ -89,97 +89,129 @@ pub(crate) fn transcribe_cached(
             ctx.transcribe_chunks(samples, &single, options.clone())
                 .map(|result| result.segments)
         };
-        let finished = resolve_chunk(&entry, &mut splits, index, chunk, &mut Vec::new(), 0, &mut run)?;
+        let finished = Resolution {
+            entry: &entry,
+            splits: &mut splits,
+            index,
+        }
+        .chunk(chunk, &mut Vec::new(), 0, &mut run)?;
         segments.extend(finished);
     }
     Ok(whisper_rs::TranscribeResult { segments })
 }
 
-/// One chunk's segments: a stored result, a stored split, or a fresh run.
-///
-/// The split tree is walked before anything is attempted, so a resumed run
-/// never retries a size the engine already failed on. Each leaf stores its own
-/// result, so a run interrupted mid-split keeps the halves that did finish.
-fn resolve_chunk<F>(
-    entry: &cache::Entry,
-    splits: &mut Vec<cache::Split>,
-    index: usize,
-    chunk: &crate::plan::Chunk,
-    slot: &mut Vec<usize>,
-    depth: usize,
-    run: &mut F,
-) -> anyhow::Result<Vec<whisper_rs::Segment>>
-where
-    F: FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<whisper_rs::Segment>>,
-{
-    let tag = slot_tag(slot);
-    if let Some(stored) = entry.part_at::<Vec<StoredSegment>>(index, &tag) {
-        tracing::debug!(chunk = index, part = %tag, segments = stored.len(), "reusing cached chunk");
-        return Ok(stored.into_iter().map(whisper_rs::Segment::from).collect());
-    }
-
-    if let Some(halves) = splits
-        .iter()
-        .find(|split| split.core_start == chunk.core_start && split.core_end == chunk.core_end)
-        .map(|split| split.halves.clone())
-    {
-        tracing::debug!(chunk = index, part = %tag, "resuming a split chunk");
-        return run_halves(entry, splits, index, chunk, &halves, slot, depth, run);
-    }
-
-    match run(chunk) {
-        Ok(finished) => {
-            entry
-                .write_part_at(index, &tag, &finished.iter().map(StoredSegment::from).collect::<Vec<_>>())
-                .map_err(anyhow::Error::from)?;
-            Ok(finished)
-        }
-        Err(err) if is_out_of_memory(&err) && depth < MAX_SPLIT_DEPTH => {
-            let Some(halves) = halve(chunk) else {
-                return Err(with_range(err, chunk));
-            };
-            tracing::warn!(chunk = index, part = %tag, "out of memory; splitting the chunk in half");
-            splits.push(cache::Split {
-                core_start: chunk.core_start,
-                core_end: chunk.core_end,
-                halves: halves.clone(),
-            });
-            entry.write_splits(splits).map_err(anyhow::Error::from)?;
-            run_halves(entry, splits, index, chunk, &halves, slot, depth, run)
-        }
-        // The depth cap is reached: this size cannot be made to fit either.
-        Err(err) if is_out_of_memory(&err) => Err(with_range(err, chunk)),
-        Err(err) => Err(err),
-    }
+/// The output-affecting options an entry is keyed by. Built here so the CLI and
+/// the HTTP route cannot drift apart.
+fn options_json(options: &whisper_rs::TranscribeOptions) -> serde_json::Value {
+    serde_json::json!({
+        "language": options.language,
+        "detect_language": options.detect_language,
+        "translate": options.translate,
+        "prompt": options.prompt,
+        "temperature": options.temperature,
+        "word_timestamps": options.word_timestamps,
+        "max_segment_len": options.max_segment_len,
+        "stable_timestamps": options.stable_timestamps,
+        "vad_model": options.vad_model_path,
+    })
 }
 
-fn run_halves<F>(
-    entry: &cache::Entry,
-    splits: &mut Vec<cache::Split>,
+/// What one chunk's resolution shares across its split tree: the opened cache
+/// entry, the split tree being built, and the chunk's index in the plan.
+struct Resolution<'a> {
+    entry: &'a cache::Entry,
+    splits: &'a mut Vec<cache::Split>,
     index: usize,
-    chunk: &crate::plan::Chunk,
-    halves: &[(f64, f64)],
-    slot: &mut Vec<usize>,
-    depth: usize,
-    run: &mut F,
-) -> anyhow::Result<Vec<whisper_rs::Segment>>
-where
-    F: FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<whisper_rs::Segment>>,
-{
-    let mut segments = Vec::new();
-    for (half_index, (start, end)) in halves.iter().enumerate() {
-        let half = crate::plan::Chunk {
-            input_start: *start,
-            input_end: *end,
-            core_start: *start,
-            core_end: *end,
-            speakers: chunk.speakers.clone(),
-        };
-        slot.push(half_index);
-        segments.extend(resolve_chunk(entry, splits, index, &half, slot, depth + 1, run)?);
-        slot.pop();
+}
+
+impl Resolution<'_> {
+    /// One chunk's segments: a stored result, a stored split, or a fresh run.
+    ///
+    /// The split tree is walked before anything is attempted, so a resumed run
+    /// never retries a size the engine already failed on. Each leaf stores its
+    /// own result, so a run interrupted mid-split keeps the halves that finish.
+    fn chunk<F>(
+        &mut self,
+        chunk: &crate::plan::Chunk,
+        slot: &mut Vec<usize>,
+        depth: usize,
+        run: &mut F,
+    ) -> anyhow::Result<Vec<whisper_rs::Segment>>
+    where
+        F: FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<whisper_rs::Segment>>,
+    {
+        let tag = slot_tag(slot);
+        if let Some(stored) = self.entry.part_at::<Vec<StoredSegment>>(self.index, &tag) {
+            tracing::debug!(chunk = self.index, part = %tag, segments = stored.len(), "reusing cached chunk");
+            return Ok(stored.into_iter().map(whisper_rs::Segment::from).collect());
+        }
+
+        if let Some(halves) = self
+            .splits
+            .iter()
+            .find(|split| split.core_start == chunk.core_start && split.core_end == chunk.core_end)
+            .map(|split| split.halves.clone())
+        {
+            tracing::debug!(chunk = self.index, part = %tag, "resuming a split chunk");
+            return self.halves(&chunk.speakers, &halves, slot, depth, run);
+        }
+
+        match run(chunk) {
+            Ok(finished) => {
+                self.entry
+                    .write_part_at(
+                        self.index,
+                        &tag,
+                        &finished.iter().map(StoredSegment::from).collect::<Vec<_>>(),
+                    )
+                    .map_err(anyhow::Error::from)?;
+                Ok(finished)
+            }
+            Err(err) if is_out_of_memory(&err) && depth < MAX_SPLIT_DEPTH => {
+                let Some(halves) = halve(chunk) else {
+                    return Err(with_range(err, chunk));
+                };
+                tracing::warn!(chunk = self.index, part = %tag, "out of memory; splitting the chunk in half");
+                self.splits.push(cache::Split {
+                    core_start: chunk.core_start,
+                    core_end: chunk.core_end,
+                    halves: halves.clone(),
+                });
+                self.entry.write_splits(self.splits).map_err(anyhow::Error::from)?;
+                self.halves(&chunk.speakers, &halves, slot, depth, run)
+            }
+            // The depth cap is reached: this size cannot be made to fit either.
+            Err(err) if is_out_of_memory(&err) => Err(with_range(err, chunk)),
+            Err(err) => Err(err),
+        }
     }
-    Ok(segments)
+
+    fn halves<F>(
+        &mut self,
+        speakers: &[u16],
+        halves: &[(f64, f64)],
+        slot: &mut Vec<usize>,
+        depth: usize,
+        run: &mut F,
+    ) -> anyhow::Result<Vec<whisper_rs::Segment>>
+    where
+        F: FnMut(&crate::plan::Chunk) -> anyhow::Result<Vec<whisper_rs::Segment>>,
+    {
+        let mut segments = Vec::new();
+        for (half_index, (start, end)) in halves.iter().enumerate() {
+            let half = crate::plan::Chunk {
+                input_start: *start,
+                input_end: *end,
+                core_start: *start,
+                core_end: *end,
+                speakers: speakers.to_vec(),
+            };
+            slot.push(half_index);
+            segments.extend(self.chunk(&half, slot, depth + 1, run)?);
+            slot.pop();
+        }
+        Ok(segments)
+    }
 }
 
 /// Name the span the engine could not process. The message keeps the engine's
@@ -301,26 +333,8 @@ mod tests {
         let options = build_options(&HashMap::new(), false, false, std::env::var("GIGAAM_VAD_MODEL").ok());
         let root = dir.path().to_str().unwrap();
 
-        let first = transcribe_cached(
-            &mut engine,
-            &model_path,
-            &samples,
-            &plan,
-            &options,
-            root,
-            serde_json::json!({"test": 1}),
-        )
-        .expect("first run");
-        let second = transcribe_cached(
-            &mut engine,
-            &model_path,
-            &samples,
-            &plan,
-            &options,
-            root,
-            serde_json::json!({"test": 1}),
-        )
-        .expect("second run");
+        let first = transcribe_cached(&mut engine, &model_path, &samples, &plan, &options, root).expect("first run");
+        let second = transcribe_cached(&mut engine, &model_path, &samples, &plan, &options, root).expect("second run");
         assert_eq!(first.text(), second.text());
         assert!(!first.segments.is_empty());
         let parts = std::fs::read_dir(dir.path().join(shortest_dir(dir.path())))
@@ -350,16 +364,7 @@ mod tests {
         let root = dir.path().to_str().unwrap();
 
         // A previous run finished both chunks; overwrite the first with a marker.
-        transcribe_cached(
-            &mut engine,
-            &model_path,
-            &samples,
-            &plan,
-            &options,
-            root,
-            serde_json::json!({}),
-        )
-        .expect("warm the cache");
+        transcribe_cached(&mut engine, &model_path, &samples, &plan, &options, root).expect("warm the cache");
         let entry = dir.path().join(shortest_dir(dir.path()));
         let marker = vec![StoredSegment {
             start: 0,
@@ -373,16 +378,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = transcribe_cached(
-            &mut engine,
-            &model_path,
-            &samples,
-            &plan,
-            &options,
-            root,
-            serde_json::json!({}),
-        )
-        .expect("resumed run");
+        let result = transcribe_cached(&mut engine, &model_path, &samples, &plan, &options, root).expect("resumed run");
         assert_eq!(result.segments[0].text, "cached marker");
     }
 
@@ -398,7 +394,13 @@ mod tests {
             let mut splits = Vec::new();
             let segments = {
                 let mut run = run_failing_above(10.0, &mut calls);
-                resolve_chunk(&entry, &mut splits, 0, &whole, &mut Vec::new(), 0, &mut run).expect("split run")
+                Resolution {
+                    entry: &entry,
+                    splits: &mut splits,
+                    index: 0,
+                }
+                .chunk(&whole, &mut Vec::new(), 0, &mut run)
+                .expect("split run")
             };
             // 30s splits into 15s halves, each of which splits again into 7.5s leaves.
             assert_eq!(
@@ -423,7 +425,13 @@ mod tests {
         let mut retried = Vec::new();
         let segments = {
             let mut run = run_failing_above(10.0, &mut retried);
-            resolve_chunk(&entry, &mut splits, 0, &whole, &mut Vec::new(), 0, &mut run).expect("resumed run")
+            Resolution {
+                entry: &entry,
+                splits: &mut splits,
+                index: 0,
+            }
+            .chunk(&whole, &mut Vec::new(), 0, &mut run)
+            .expect("resumed run")
         };
         assert!(retried.is_empty(), "no size is tried twice: {retried:?}");
         assert_eq!(segments.len(), 4);
@@ -440,8 +448,13 @@ mod tests {
             calls.push((chunk.core_start, chunk.core_end));
             anyhow::bail!("failed to allocate")
         };
-        let error = resolve_chunk(&entry, &mut splits, 0, &chunk(0.0, 2.0), &mut Vec::new(), 0, &mut run)
-            .expect_err("a 2 second chunk cannot be halved below the minimum");
+        let error = Resolution {
+            entry: &entry,
+            splits: &mut splits,
+            index: 0,
+        }
+        .chunk(&chunk(0.0, 2.0), &mut Vec::new(), 0, &mut run)
+        .expect_err("a 2 second chunk cannot be halved below the minimum");
         let message = format!("{error:#}");
         assert!(message.contains("allocate"), "{message}");
         assert!(message.contains("0.0s..1.0s"), "the failing span is named: {message}");
@@ -467,8 +480,13 @@ mod tests {
         {
             let entry = store.open("key").unwrap();
             let mut splits = Vec::new();
-            let error = resolve_chunk(&entry, &mut splits, 0, &whole, &mut Vec::new(), 0, &mut run)
-                .expect_err("the leaf cannot be halved");
+            let error = Resolution {
+                entry: &entry,
+                splits: &mut splits,
+                index: 0,
+            }
+            .chunk(&whole, &mut Vec::new(), 0, &mut run)
+            .expect_err("the leaf cannot be halved");
             let message = format!("{error:#}");
             assert!(message.contains("0.0s..1.9s"), "{message}");
         }
@@ -477,8 +495,13 @@ mod tests {
         // failed before fails again — naming itself, not the chunk it came from.
         let entry = store.open("key").unwrap();
         let mut splits = entry.splits().expect("the split is persisted");
-        let error = resolve_chunk(&entry, &mut splits, 0, &whole, &mut Vec::new(), 0, &mut run)
-            .expect_err("the leaf still cannot be halved");
+        let error = Resolution {
+            entry: &entry,
+            splits: &mut splits,
+            index: 0,
+        }
+        .chunk(&whole, &mut Vec::new(), 0, &mut run)
+        .expect_err("the leaf still cannot be halved");
         let message = format!("{error:#}");
         assert!(message.contains("0.0s..1.9s"), "{message}");
         assert!(!message.contains("0.0s..30.0s"), "the whole chunk is not blamed: {message}");
@@ -494,15 +517,25 @@ mod tests {
             |_: &crate::plan::Chunk| -> anyhow::Result<Vec<whisper_rs::Segment>> { anyhow::bail!("failed to allocate") };
         let chunk = chunk(0.0, 2.0);
 
-        let first =
-            resolve_chunk(&entry, &mut splits, 0, &chunk, &mut Vec::new(), 0, &mut run).expect_err("the first attempt fails");
+        let first = Resolution {
+            entry: &entry,
+            splits: &mut splits,
+            index: 0,
+        }
+        .chunk(&chunk, &mut Vec::new(), 0, &mut run)
+        .expect_err("the first attempt fails");
         assert!(
             entry.part_at::<Vec<StoredSegment>>(0, "").is_none(),
             "a failed chunk stores nothing"
         );
 
-        let second = resolve_chunk(&entry, &mut splits, 0, &chunk, &mut Vec::new(), 0, &mut run)
-            .expect_err("the retry fails the same way");
+        let second = Resolution {
+            entry: &entry,
+            splits: &mut splits,
+            index: 0,
+        }
+        .chunk(&chunk, &mut Vec::new(), 0, &mut run)
+        .expect_err("the retry fails the same way");
         assert_eq!(format!("{first:#}"), format!("{second:#}"));
         assert!(
             entry.part_at::<Vec<StoredSegment>>(0, "").is_none(),

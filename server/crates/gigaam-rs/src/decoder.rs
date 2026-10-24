@@ -38,7 +38,8 @@ pub(crate) struct CtcHead {
 }
 
 pub(crate) enum HeadWeights {
-    Rnnt(RnntHead),
+    /// Boxed because an Rnnt head dwarfs a Ctc one; `clippy::large_enum_variant`.
+    Rnnt(Box<RnntHead>),
     Ctc(CtcHead),
 }
 
@@ -78,10 +79,13 @@ impl RnntHead {
         let hidden = self.hidden;
         let gates = 4 * hidden;
         let mut pre = vec![0.0f32; gates];
-        for index in 0..gates {
-            let from_input = dot(&self.wx[index * hidden..(index + 1) * hidden], input);
-            let from_state = dot(&self.wh[index * hidden..(index + 1) * hidden], h);
-            pre[index] = from_input + from_state + self.bias[index];
+        for (((gate, wx), wh), bias) in pre
+            .iter_mut()
+            .zip(self.wx.chunks(hidden))
+            .zip(self.wh.chunks(hidden))
+            .zip(&self.bias)
+        {
+            *gate = dot(wx, input) + dot(wh, h) + bias;
         }
         let mut next_c = vec![0.0f32; hidden];
         let mut next_h = vec![0.0f32; hidden];
@@ -98,13 +102,11 @@ impl RnntHead {
 
     fn joint(&self, encoder: &[f32], prediction: &[f32], logits: &mut [f32]) -> usize {
         let mut combined = vec![0.0f32; self.joint_hidden];
-        for index in 0..self.joint_hidden {
-            let value = encoder[index] + prediction[index];
-            combined[index] = value.max(0.0);
+        for ((gate, encoder), prediction) in combined.iter_mut().zip(encoder).zip(prediction) {
+            *gate = (encoder + prediction).max(0.0);
         }
-        for class in 0..self.classes {
-            let row = &self.out_w[class * self.joint_hidden..(class + 1) * self.joint_hidden];
-            logits[class] = dot(row, &combined) + self.out_b[class];
+        for ((logit, row), bias) in logits.iter_mut().zip(self.out_w.chunks(self.joint_hidden)).zip(&self.out_b) {
+            *logit = dot(row, &combined) + *bias;
         }
         argmax(logits)
     }
@@ -129,9 +131,8 @@ impl RnntHead {
                 };
                 let (next_h, next_c) = self.lstm_step(input, &state_h, &state_c);
                 let mut prediction = vec![0.0f32; self.joint_hidden];
-                for index in 0..self.joint_hidden {
-                    let row = &self.pred_w[index * hidden..(index + 1) * hidden];
-                    prediction[index] = dot(row, &next_h) + self.pred_b[index];
+                for ((projection, row), bias) in prediction.iter_mut().zip(self.pred_w.chunks(hidden)).zip(&self.pred_b) {
+                    *projection = dot(row, &next_h) + bias;
                 }
                 let class = self.joint(encoder, &prediction, &mut logits);
                 if class as u32 == self.blank {

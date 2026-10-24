@@ -49,16 +49,30 @@ fn segment_event(
     event
 }
 
-pub(super) fn stream_transcription(
-    config: AppConfig,
-    mut model: ModelLease,
-    samples: Vec<f32>,
-    form: HashMap<String, String>,
-    stable_timestamps: bool,
-    vad_model_path: Option<String>,
-    diar_segments: Vec<diarization::Segment>,
-    plan: Option<crate::plan::Plan>,
-) -> Result<Response, Box<Response>> {
+/// Everything a streaming transcription needs, assembled by the route that
+/// decided to stream.
+pub(super) struct StreamRequest {
+    pub(super) config: AppConfig,
+    pub(super) model: ModelLease,
+    pub(super) samples: Vec<f32>,
+    pub(super) form: HashMap<String, String>,
+    pub(super) stable_timestamps: bool,
+    pub(super) vad_model_path: Option<String>,
+    pub(super) diar_segments: Vec<diarization::Segment>,
+    pub(super) plan: Option<crate::plan::Plan>,
+}
+
+pub(super) fn stream_transcription(request: StreamRequest) -> Result<Response, Box<Response>> {
+    let StreamRequest {
+        config,
+        mut model,
+        samples,
+        form,
+        stable_timestamps,
+        vad_model_path,
+        diar_segments,
+        plan,
+    } = request;
     if model.ctx.is_none() {
         return Err(Box::new(error(
             StatusCode::SERVICE_UNAVAILABLE,
