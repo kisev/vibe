@@ -40,8 +40,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # x86_64 distribution builds pin the portable AVX floor (the legacy
+          # baseline CPU tier); local builds stay native-tuned.
           - runner: ubuntu-24.04
             binary: vibe-server-linux-amd64
+            cmake_args: -DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF
           - runner: ubuntu-24.04-arm
             binary: vibe-server-linux-arm64
           - runner: macos-14
@@ -57,6 +60,7 @@ jobs:
             archive: vibe-server-darwin-amd64-with-ffmpeg.tar.gz
           - runner: windows-latest
             binary: vibe-server-windows-amd64.exe
+            cmake_args: -DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF
             package_os: windows
             package_arch: amd64
             archive: vibe-server-windows-amd64-with-ffmpeg.zip
@@ -73,6 +77,9 @@ jobs:
         shell: bash
         env:
           VIBE_SERVER_COMMIT: ${{ github.sha }}
+          # Empty on the arm64 and macOS cells; the sys crate pins its own
+          # portable floors there. An empty value is a no-op.
+          TRANSCRIBE_CMAKE_ARGS: ${{ matrix.cmake_args }}
         run: |
           export VIBE_SERVER_VERSION="${VERSION#server-}"
           cargo build -p vibe-server --release ${{ matrix.cargo_flags }}

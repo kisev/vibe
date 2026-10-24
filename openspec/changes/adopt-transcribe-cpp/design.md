@@ -78,6 +78,52 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
   voxtral mini 3B, voxtral realtime 4B; sha256 pinned) and assert load + fixture transcription
   + the catalog-documented capability flags per family.
 
+## Phase 4 findings: CPU dispatch, five-platform builds, and the cache bump
+
+- **The old two-backends-in-one-binary mechanism does not carry over, and is not
+  needed.** The legacy build baked `ggml-cpu` twice (`_hsw` AVX2 + `_x64` AVX
+  baseline, symbols suffixed by `chore build-libs`) and a Rust forwarder picked
+  one at runtime. The vendored ggml has no static multi-variant mode; its
+  runtime-dispatch alternative (`TRANSCRIBE_GGML_BACKEND_DL` + per-ISA modules)
+  forces a shared libtranscribe plus module files next to the sidecar — a
+  packaging overhaul across all five platforms that this change does not buy.
+- **Distribution builds pin the portable AVX floor instead.** The x86_64 Linux
+  and Windows cells of `dev-build.yml` and `server-release.yml` pass
+  `TRANSCRIBE_CMAKE_ARGS` with `GGML_NATIVE=OFF` + `GGML_SSE42/AVX/F16C=ON` +
+  `GGML_AVX2/FMA/BMI2=OFF` — byte-for-byte the legacy `_x64` baseline tier, so
+  one self-contained binary runs on every x86-64 CPU since 2011 (verified
+  locally: the floored `libggml-cpu.a` disassembles to 0 AVX2/FMA/AVX512
+  opcodes, 6172 AVX1, 282 SSE4.2; the native default has 1517). Local builds
+  stay native-tuned.
+- **The speed cost is small because tinyBLAS dispatches at runtime.** ggml's
+  llamafile sgemm (`GGML_LLAMAFILE`, forced ON) selects AVX2/FMA/AVX512- class
+  kernels per CPU at runtime for the matmul hot path, so the floored ggml
+  kernels lose little on modern machines.
+- **The desktop illegal-instruction fallback stays as a safety net and can no
+  longer fire from our code** (the shipped binary needs no AVX2);
+  `VIBE_SERVER_CPU_VARIANT` stays accepted and is simply inert. macOS floors are
+  unchanged: the sys crate pins SSE4.2+AVX+F16C on x86_64 and a portable arm64
+  build (native tuning is slower there anyway), so macOS needs no workflow flag.
+- **Five-platform release builds proven in CI already.** The `Dev Build` run on
+  `0bb3dddb` built `vibe-server --release` green on all five platforms
+  (arm64+cross-x86_64 macOS, amd64+arm64 Linux, Windows MSVC), and the spike
+  matrix (Linux + Windows) is green — cmake ≥ 3.16 is the only build-time
+  requirement and every hosted runner has it; libclang is never needed
+  (bindings are committed upstream).
+- **GPU on Linux/Windows regresses to CPU-only in this change.** The legacy
+  build linked a prebuilt `libggml-vulkan` and dlopened the Vulkan loader at
+  runtime; the unified engine builds CPU-only there by default. Metal on macOS
+  is unchanged (the sys crate's default feature). Restoring Vulkan is a
+  follow-up wiring job, not a fork: the `vulkan` cargo feature exists in
+  `transcribe-cpp-sys` (`TRANSCRIBE_VULKAN=ON`); what is missing is SDK/glslc
+  provisioning in CI and runtime-loader packaging.
+- **Cache schema bumped 1 → 2.** The key hashes the schema version, so every
+  entry written by the hand-written engines lands at a directory the unified
+  engine never opens: nothing is reused, nothing is corrupted, old entries
+  simply orphan until the desktop's age cleanup removes them. A regression test
+  pins the bump (same inputs, different key at version 1 vs 2) and one proves a
+  schema-1 directory with stored output is left untouched by a fresh run.
+
 ## Risks / Trade-offs
 
 - [C++ toolchain friction on one of the five platforms] → Spike covers WSL + a Windows runner first; MSVC/gcc/clang all support the required C++ standard, and dev-build already compiles C (ggml) everywhere.

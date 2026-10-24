@@ -43,7 +43,8 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
       ARCHIVE: ${{ matrix.archive }}
       BINARY: ${{ matrix.binary }}
-      MODEL_URL: https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+      MODEL_URL: https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf
+      MODEL_SHA256: 72cfa8ee436a635a5b6fb373cc056a828b9efe96d32d6eb8769ed3cc5b429719
       SAMPLE_URL: https://github.com/ggml-org/whisper.cpp/raw/master/samples/jfk.wav
     steps:
       - uses: actions/checkout@v4
@@ -70,8 +71,9 @@ jobs:
           else
             tar -xzf "${ARCHIVE}"
           fi
-          wget -O models/ggml-tiny.bin "${MODEL_URL}"
+          wget -O models/whisper-tiny-Q5_K_M.gguf "${MODEL_URL}"
           wget -O samples/jfk.wav "${SAMPLE_URL}"
+          echo "${MODEL_SHA256}  models/whisper-tiny-Q5_K_M.gguf" | sha256sum -c -
           chmod +x "${BINARY}"
           chmod +x ffmpeg || true
 
@@ -79,7 +81,7 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          "./${BINARY}" transcribe models/ggml-tiny.bin samples/jfk.wav
+          "./${BINARY}" transcribe models/whisper-tiny-Q5_K_M.gguf samples/jfk.wav
 
       - name: Download release bundle and test assets (Windows)
         if: runner.os == 'Windows'
@@ -89,11 +91,11 @@ jobs:
           New-Item -ItemType Directory -Force -Path samples | Out-Null
           C:\msys64\usr\bin\wget.exe --progress=bar:force:noscroll "https://github.com/${{ github.repository }}/releases/download/$env:TAG/$env:ARCHIVE" -O "$env:ARCHIVE"
           Expand-Archive -Path "$env:ARCHIVE" -DestinationPath "." -Force
-          C:\msys64\usr\bin\wget.exe --progress=bar:force:noscroll "$env:MODEL_URL" -O "models/ggml-tiny.bin"
+          C:\msys64\usr\bin\wget.exe --progress=bar:force:noscroll "$env:MODEL_URL" -O "models/whisper-tiny-Q5_K_M.gguf"
           C:\msys64\usr\bin\wget.exe --progress=bar:force:noscroll "$env:SAMPLE_URL" -O "samples/jfk.wav"
 
       - name: Run binary (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          .\${{ matrix.binary }} transcribe models\ggml-tiny.bin samples\jfk.wav
+          .\${{ matrix.binary }} transcribe models\whisper-tiny-Q5_K_M.gguf samples\jfk.wav

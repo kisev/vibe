@@ -54,25 +54,25 @@ jobs:
       - name: Download tiny whisper model
         if: runner.os != 'Windows'
         shell: bash
-        run: wget -q https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+        run: wget -q https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf
 
       - name: Download tiny whisper model (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: C:\msys64\usr\bin\wget.exe --progress=bar:force:noscroll https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin -O ggml-tiny.bin
+        run: C:\msys64\usr\bin\wget.exe --progress=bar:force:noscroll https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf -O whisper-tiny-Q5_K_M.gguf
 
       - name: Extract and test (macOS)
         if: runner.os == 'macOS'
         run: |
           tar xzf ${{ matrix.pattern }}
-          ./vibe.app/Contents/MacOS/vibe transcribe ggml-tiny.bin server/fixtures/short.mp4
+          ./vibe.app/Contents/MacOS/vibe transcribe whisper-tiny-Q5_K_M.gguf server/fixtures/short.mp4
 
       - name: Install and test (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb ./${{ matrix.pattern }}
-          xvfb-run -a vibe transcribe ggml-tiny.bin server/fixtures/short.mp4
+          xvfb-run -a vibe transcribe whisper-tiny-Q5_K_M.gguf server/fixtures/short.mp4
 
       - name: Install and test (Windows)
         if: runner.os == 'Windows'
@@ -80,4 +80,4 @@ jobs:
         run: |
           $installer = (Get-Item vibe_*_x64-setup.exe).FullName
           Start-Process -FilePath $installer -ArgumentList "/S" -Wait
-          & "$env:LOCALAPPDATA\vibe\vibe.exe" transcribe ggml-tiny.bin server\fixtures\short.mp4
+          & "$env:LOCALAPPDATA\vibe\vibe.exe" transcribe whisper-tiny-Q5_K_M.gguf server\fixtures\short.mp4

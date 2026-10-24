@@ -47,10 +47,16 @@ jobs:
                       libs: darwin-x86_64
                       exe: ""
                       ffmpeg: https://www.osxexperts.net/ffmpeg80intel.zip
+                    # x86_64 distribution builds pin the portable AVX floor
+                    # (SSE4.2 + AVX + F16C): the legacy baseline CPU tier, so one
+                    # binary runs on every x86-64 CPU since 2011. Local builds
+                    # stay native-tuned; tinyBLAS still runtime-dispatches AVX2
+                    # kernels for the matmul hot path.
                     - runner: ubuntu-22.04
                       triple: x86_64-unknown-linux-gnu
                       libs: linux-x86_64
                       exe: ""
+                      cmake_args: -DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF
                     # The aarch64 ggml libraries come from server-libs.yml, which
                     # builds them on 24.04; linking them from 22.04 fails on the
                     # glibc 2.38 string symbols.
@@ -62,6 +68,7 @@ jobs:
                       triple: x86_64-pc-windows-msvc
                       libs: windows-amd64-msvc
                       exe: .exe
+                      cmake_args: -DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF
                       ffmpeg: https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
         runs-on: ${{ matrix.runner }}
         steps:
@@ -152,6 +159,9 @@ jobs:
               env:
                   VIBE_SERVER_VERSION: ${{ steps.dev-version.outputs.version }}
                   VIBE_SERVER_COMMIT: ${{ github.sha }}
+                  # Empty on the arm64 and macOS cells; the sys crate pins its
+                  # own portable floors there. An empty value is a no-op.
+                  TRANSCRIBE_CMAKE_ARGS: ${{ matrix.cmake_args }}
               run: |
                   exe="${{ matrix.exe }}"
                   cd server

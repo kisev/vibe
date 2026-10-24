@@ -17,8 +17,10 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-/// Bumped whenever the on-disk meaning of any file changes.
-pub const SCHEMA_VERSION: u32 = 1;
+/// Bumped whenever the on-disk meaning of any file changes. Version 2 is the
+/// unified transcribe.cpp engine: transcripts can differ from the hand-written
+/// engines, so entries written by version 1 must never be reused.
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// How long a second process waits for a busy entry before giving up.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
@@ -101,8 +103,15 @@ impl Identity<'_> {
     /// Decoded samples are hashed rather than the uploaded bytes so the same
     /// recording in two containers shares an entry.
     pub fn key(&self) -> String {
+        self.key_with_version(SCHEMA_VERSION)
+    }
+
+    /// The same digest under a historical schema version. Used to prove a bump
+    /// moves every key: an entry written before the bump sits at a different
+    /// directory and is never opened again.
+    pub fn key_with_version(&self, version: u32) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(SCHEMA_VERSION.to_le_bytes());
+        hasher.update(version.to_le_bytes());
         let mut samples = Hasher(&mut hasher);
         for sample in self.audio {
             samples.update(&sample.to_bits().to_le_bytes());
@@ -353,6 +362,19 @@ mod tests {
             identity(&audio, "gigaam", &plan).key(),
             identity(&audio, "gigaam", &plan).key()
         );
+    }
+
+    #[test]
+    fn a_schema_bump_moves_every_key() {
+        // Version 1 is the hand-written-engine era; version 2 the unified
+        // engine. Same inputs, different key: an entry written before the bump
+        // sits at a directory the current code never opens, so it can neither
+        // be reused nor corrupted.
+        assert_eq!(SCHEMA_VERSION, 2);
+        let audio = vec![0.1_f32; 32];
+        let plan = plan();
+        let one = identity(&audio, "gigaam", &plan).key_with_version(1);
+        assert_ne!(one, identity(&audio, "gigaam", &plan).key());
     }
 
     #[test]

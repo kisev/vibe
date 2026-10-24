@@ -386,6 +386,66 @@ mod tests {
     }
 
     #[test]
+    fn a_pre_bump_cache_entry_is_ignored_not_reused() {
+        // A directory written by schema 1 (the hand-written engines) still sits
+        // in the user's cache root. The current run computes a schema-2 key, so
+        // it transcribes fresh and leaves the old directory untouched.
+        let dir = tempfile::tempdir().unwrap();
+        let store = cache::Cache::new(dir.path());
+        let audio = vec![0.0_f32; 16];
+        let plan = two_chunk_plan(audio.len() as f64 / crate::plan::SAMPLE_RATE);
+        let identity = cache::Identity {
+            audio: &audio,
+            model: cache::ModelStamp::of("model.gguf"),
+            engine: "whisper",
+            options: serde_json::json!({}),
+            plan: &plan,
+        };
+
+        let legacy = store.open(&identity.key_with_version(1)).unwrap();
+        legacy
+            .write_manifest(&cache::Manifest {
+                schema: 1,
+                audio_hash: cache::audio_hash(&audio),
+                model: cache::ModelStamp::of("model.gguf"),
+                engine: "whisper".to_string(),
+                options: serde_json::json!({}),
+                plan: plan.clone(),
+            })
+            .unwrap();
+        let marker = vec![StoredSegment {
+            start: 0,
+            end: 100,
+            text: "schema-1 marker".to_string(),
+            no_speech_prob: 0.0,
+        }];
+        legacy.write_part(0, &marker).unwrap();
+        drop(legacy);
+
+        let entry = store.open(&identity.key()).unwrap();
+        let fresh = vec![crate::engine::Segment {
+            start: 0,
+            end: 100,
+            text: "schema-2 fresh".to_string(),
+            no_speech_prob: 0.0,
+        }];
+        let mut run = move |_: &crate::plan::Chunk| Ok(fresh.clone());
+        let segments = Resolution {
+            entry: &entry,
+            splits: &mut Vec::new(),
+            index: 0,
+        }
+        .chunk(&plan.chunks[0], &mut Vec::new(), 0, &mut run)
+        .expect("fresh run");
+        assert_eq!(segments[0].text, "schema-2 fresh");
+
+        let legacy_dir = dir.path().join(identity.key_with_version(1));
+        let stored: Vec<StoredSegment> =
+            serde_json::from_slice(&std::fs::read(legacy_dir.join("parts").join("part-000000.json")).unwrap()).unwrap();
+        assert_eq!(stored[0].text, "schema-1 marker");
+    }
+
+    #[test]
     fn a_split_chunk_is_remembered_and_never_retried_whole() {
         let dir = tempfile::tempdir().unwrap();
         let store = cache::Cache::new(dir.path());
