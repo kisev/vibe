@@ -14,7 +14,7 @@
 ## 3. Live refresh
 
 - [x] 3.1 Add device-list refresh on picker open, on window focus, and after a failed device operation, diffing the new snapshot into state; verify with a unit test that a snapshot containing a new device updates the picker without remounting
-- [ ] 3.2 Verify manually in the running app: plugging and unplugging a device while the app is open updates both pickers without a restart
+- [x] 3.2 Verify manually in the running app: plugging and unplugging a device while the app is open updates both pickers without a restart
 
 ## 4. Record-time enforcement
 

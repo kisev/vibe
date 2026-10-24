@@ -75,9 +75,13 @@ export default function AudioDeviceInput({
 										<button
 											type="button"
 											aria-label={m.hideDevice({ name: entry.label })}
-											// Stop the pointer events before the item sees them, or picking
-											// "hide" would also select the device being hidden.
-											onPointerDown={(event) => event.stopPropagation()}
+											// The SelectItem claims pointer events across its whole row, so a plain
+											// stopPropagation on click is too late: by then the item has already
+											// selected the device and closed the dropdown. Stop the events in the
+											// capture phase, where the button still precedes the item's handlers.
+											onPointerDownCapture={(event) => event.stopPropagation()}
+											onPointerUpCapture={(event) => event.stopPropagation()}
+											onClickCapture={(event) => event.stopPropagation()}
 											onClick={(event) => {
 												event.stopPropagation()
 												if (entry.device) onHide(entry.device)
