@@ -36,7 +36,7 @@
 
 - [x] 5.1 Reuse finished chunks during a run and across runs; verify a repeated run performs no inference for cached chunks and produces a byte-identical transcript
 - [x] 5.2 Implement resume after interruption; verify a run killed mid-file continues from finished chunks on the next attempt
-- [ ] 5.3 Implement out-of-memory split detection, persistence, and reuse; verify a resumed run does not retry the failing chunk size and stops splitting at the minimum length
+- [x] 5.3 Implement out-of-memory split detection, persistence, and reuse; verify a resumed run does not retry the failing chunk size and stops splitting at the minimum length
 - [x] 5.4 Verify cache identity invalidation end-to-end: changing language, chunk duration, or model forces recomputation and produces the expected transcript
 
 ## 6. CLI and server startup
@@ -49,14 +49,14 @@
 
 - [x] 7.1 Pass an app-owned cache directory when spawning the server; verify the server receives it and writes entries there
 - [x] 7.2 Add age-based cache cleanup next to the existing log and temp cleanup; verify stale entries are removed and fresh ones survive
-- [ ] 7.3 Extend the desktop transcript model and view with the optional speaker set; verify a union label renders with an ambiguity note and single-speaker lines are unchanged
-- [ ] 7.4 Verify batch and retranscription flows with diarization enabled: chunks are speaker-consistent and a retranscription reuses finished chunks
+- [x] 7.3 Extend the desktop transcript model and view with the optional speaker set; verify a union label renders with an ambiguity note and single-speaker lines are unchanged
+- [x] 7.4 Verify batch and retranscription flows with diarization enabled: chunks are speaker-consistent and a retranscription reuses finished chunks
 
 ## 8. Documentation, validation, and release
 
-- [ ] 8.1 Update long-recording behavior, cache privacy, and cleanup documentation; verify the docs match the implemented flags and defaults
-- [ ] 8.2 Add regression tests comparing transcripts with and without diarization to capture the intended boundary changes for Parakeet, Nemotron, and GigaAM
-- [ ] 8.3 Bump the `vibe-server` version and the app's server pin; verify the release build and that the cache is never required for a successful run
+- [x] 8.1 Update long-recording behavior, cache privacy, and cleanup documentation; verify the docs match the implemented flags and defaults
+- [x] 8.2 Add regression tests comparing transcripts with and without diarization to capture the intended boundary changes for Parakeet, Nemotron, and GigaAM
+- [x] 8.3 Bump the `vibe-server` version and the app's server pin; verify the release build and that the cache is never required for a successful run
 
 ## Workflow follow-up
 
