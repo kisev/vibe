@@ -38,7 +38,7 @@ pub const CONFIG_KEY_HANDOFF_ENABLED: &str = "handoff.enabled";
 ///   3. This constant.
 pub const DEFAULT_PWA_ORIGIN: &str = match option_env!("VIBE_PWA_ORIGIN") {
     Some(value) => value,
-    None => "https://thewh1teagle.github.io/vibe/phone",
+    None => "https://kisev.github.io/vibe/phone",
 };
 
 /// A running handoff endpoint. Dropping this aborts the accept loop; prefer

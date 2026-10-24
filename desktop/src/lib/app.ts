@@ -83,7 +83,7 @@ export async function getIssueUrl(logs: string) {
 		'what-happened': issueTitleFrom(logs),
 		logs,
 	})
-	return `https://github.com/thewh1teagle/vibe/issues/new?${params.toString()}`
+	return `https://github.com/kisev/vibe/issues/new?${params.toString()}`
 }
 
 export async function openPath(path: NamedPath) {

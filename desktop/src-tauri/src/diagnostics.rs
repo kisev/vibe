@@ -32,5 +32,16 @@ pub fn get_app_info() -> String {
 
 pub fn get_issue_url(logs: String) -> String {
     let extra_info = get_app_info();
-    format!("https://github.com/thewh1teagle/vibe/issues/new?assignees=octocat&labels=bug&projects=&template=bug_report.yaml&title=App+reports+bug&logs={}", urlencoding::encode(&format!("{}\n\n{}", extra_info, logs)))
+    format!("https://github.com/kisev/vibe/issues/new?assignees=octocat&labels=bug&projects=&template=bug_report.yaml&title=App+reports+bug&logs={}", urlencoding::encode(&format!("{}\n\n{}", extra_info, logs)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn issue_url_points_at_the_fork() {
+        let url = get_issue_url("transcript failed".to_string());
+        assert!(url.starts_with("https://github.com/kisev/vibe/issues/new?"), "wrong repo in {url}");
+    }
 }

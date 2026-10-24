@@ -34,8 +34,8 @@
 	},
 	"plugins": {
 		"updater": {
-			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZFNTJENkIxNTM4NTQxODgKUldTSVFZVlRzZFpTL21VWTBzak1IMTA1ZjdNVHA0MXQ3Y20wa2F2U24zVGl6WUUvTGVoQi8wN1kK",
-			"endpoints": ["https://github.com/thewh1teagle/vibe/releases/latest/download/latest.json"]
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg0RkQ5QkQyRjYzQUY2MEUKUldRTzlqcjIwcHY5aEl2MEZIR0pQUUMxVXhTb2FLNWlEdWZ5RHlDYlI1dWYvMHRzd2N6dmlKUk4K",
+			"endpoints": ["https://github.com/kisev/vibe/releases/latest/download/latest.json"]
 		},
 		"deep-link": {
 			"mobile": [],

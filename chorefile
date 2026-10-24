@@ -79,7 +79,7 @@ task setup target=$TRIPLE {
         # Linux ships the bare binary, with no ffmpeg alongside it. This is
         # keyed on the target, not the host, so a cross-compile picks the same
         # branch CI's Linux runners do.
-        download gh://thewh1teagle/vibe/server-$server/$asset $bin/vibe-server-$1
+        download gh://kisev/vibe/server-$server/$asset $bin/vibe-server-$1
         chmod 755 $bin/vibe-server-$1
         echo "installed vibe-server-$1"
         return
@@ -89,7 +89,7 @@ task setup target=$TRIPLE {
     # drops whatever directories the archive puts them under, so they land in
     # $bin at a name we know; the moves only rename.
     mkdir target/sidecars
-    download gh://thewh1teagle/vibe/server-$server/$asset target/sidecars/$asset
+    download gh://kisev/vibe/server-$server/$asset target/sidecars/$asset
     extract target/sidecars/$asset $bin --member vibe-server$exe --flatten
     extract target/sidecars/$asset $bin --member ffmpeg$exe --flatten
     move $bin/vibe-server$exe $bin/vibe-server-$1$exe
