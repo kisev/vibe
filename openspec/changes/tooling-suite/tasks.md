@@ -27,4 +27,4 @@
 ## 5. CI parity
 
 - [x] 5.1 Add a lint job to CI that runs `task lint format:check` (and the Rust gates where cargo is available) using mise, so CI and hooks share one definition
-- [ ] 5.2 Confirm the full suite green on a dev build after the reformat commit
+- [x] 5.2 Confirm the full suite green on a dev build after the reformat commit
