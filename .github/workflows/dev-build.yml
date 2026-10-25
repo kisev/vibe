@@ -1,7 +1,9 @@
-# Dev builds for the fork: every push to main produces unsigned bundles for all
-# five release platforms and publishes them to one prerelease per run, tagged
-# `dev.<run-number>`; the release name carries the application version with a
-# `-dev.<short-commit>` suffix and the body names the full commit SHA.
+# Dev builds for the fork: pushing a `dev.<number>` tag produces unsigned
+# bundles for all five release platforms and publishes them to one prerelease
+# per run, reusing the tag that started it; the release name carries the
+# application version with a `-dev.<tag-number>.<short-commit>` suffix and the
+# body names the full commit SHA. A plain push to main builds nothing — the
+# maintainer decides when five platform jobs are worth running.
 #
 # This is deliberately a separate file from release.yml, which belongs to the
 # upstream release flow and stays untouched. The sidecars are built from the
@@ -12,8 +14,8 @@ name: Dev Build
 
 on:
     push:
-        branches:
-            - main
+        tags:
+            - 'dev.*'
     workflow_dispatch:
 
 permissions:
@@ -109,14 +111,18 @@ jobs:
               run: |
                   base=$(jq -r .version desktop/src-tauri/tauri.conf.json)
                   short=${GITHUB_SHA:0:7}
-                  version="$base-dev.$short"
-                  # One release per commit: a shared release accumulated assets
-                  # from several builds whenever a run failed to finish. The
-                  # run number, not the commit, orders the releases page: a
-                  # hash in the tag compares randomly and shuffles the page.
-                  # A re-run keeps its run number, so its matrix jobs still
-                  # share one release.
-                  tag="dev.${{ github.run_number }}"
+                  if [[ "$GITHUB_REF" == refs/tags/dev.* ]]; then
+                      # A pushed tag started this run: reuse it, never mint a
+                      # second one, and let its number order the release.
+                      tag="$GITHUB_REF_NAME"
+                      n="${GITHUB_REF_NAME#dev.}"
+                  else
+                      # Manual dispatch has no tag; the run number keeps the
+                      # scheme and still shares one release across re-runs.
+                      n="${{ github.run_number }}"
+                      tag="dev.$n"
+                  fi
+                  version="$base-dev.$n.$short"
                   # One no-space JSON: tauri-action splits args on whitespace.
                   config=$(jq -cn --arg v "$version" '{
                       version: $v,
