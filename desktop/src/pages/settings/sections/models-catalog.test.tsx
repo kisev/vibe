@@ -155,6 +155,8 @@ describe('models catalog section', () => {
 			size: 731_357_568,
 			sha256: 'hash-q8',
 		})
+		// The card flips to installed right away, not on the next window focus.
+		expect(mocks.loadModels).toHaveBeenCalled()
 
 		await user.click(screen.getByRole('combobox', { name: m.catalogQuantization() }))
 		await user.click(await screen.findByRole('option', { name: 'Q4_K_M · 485 MB' }))

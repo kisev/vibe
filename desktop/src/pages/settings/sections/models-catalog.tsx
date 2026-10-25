@@ -464,7 +464,11 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 	async function startDownload(download: ModelDownload) {
 		try {
 			const path = await downloadModel(download)
-			if (path) toast.success(m.downloadComplete())
+			if (path) {
+				toast.success(m.downloadComplete())
+				// Rescan so the card flips to installed (ring, badge, Use) without waiting for a window refocus.
+				await vm.loadModels()
+			}
 		} catch (error) {
 			console.error('failed to download the catalog model:', error)
 			toast.error(String(error))

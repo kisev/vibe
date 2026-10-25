@@ -48,3 +48,4 @@
 - [x] 8.1 Download progress events carry the URL; a URL-keyed registry drives the shared toast (file name, count when parallel) and the setup progress bar, replacing the single anonymous percentage that jumped between parallel downloads
 - [x] 8.2 The active model is deletable like any other (stale selection clears on refresh); quant delete is one click — verified in real Chromium via the mock-tauri repro
 - [x] 8.3 New keys translated, audit green, tsc/vitest green
+- [x] 8.4 Refresh the installed list the moment a catalog download finishes — the card flips to installed without waiting for a window refocus
