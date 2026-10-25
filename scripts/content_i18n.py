@@ -42,6 +42,10 @@ def website_locales() -> list[str]:
 
 
 def version_key(version: str) -> tuple[int, ...]:
+	# The unreleased entry is the dev line in progress — it sorts above every
+	# released version and is never expected in a locale until a release cuts it.
+	if version == "unreleased":
+		return (10**9,)
 	return tuple(int(part) for part in version.split("."))
 
 
@@ -70,7 +74,7 @@ def changelog_audit() -> tuple[list[str], list[str]]:
 	"""Returns (issues, warnings). A missing translation is only ever a warning."""
 	issues: list[str] = []
 	warnings: list[str] = []
-	recent = english_releases()[:RECENT]
+	recent = [path for path in english_releases() if path.stem != "unreleased"][:RECENT]
 	expected = {path.stem: path for path in recent}
 
 	for locale in website_locales():
