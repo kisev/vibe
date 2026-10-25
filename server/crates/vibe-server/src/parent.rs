@@ -1,9 +1,11 @@
 pub fn watch() {
     #[cfg(unix)]
     {
+        // SAFETY: getppid cannot fail and has no preconditions on unix.
         let parent = unsafe { libc::getppid() };
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(1));
+            // SAFETY: getppid cannot fail and has no preconditions on unix.
             if unsafe { libc::getppid() } != parent {
                 std::process::exit(0);
             }
@@ -34,6 +36,8 @@ mod windows {
             }
         };
 
+        // SAFETY: OpenProcess only wraps a win32 handle open with the PID
+        // captured above; a null return is handled on the next line.
         let parent = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, parent_pid) };
         if parent.is_null() {
             // The parent most likely exited between taking the snapshot and
@@ -43,7 +47,9 @@ mod windows {
             std::process::exit(0);
         }
 
+        // SAFETY: WaitForSingleObject blocks on a valid handle opened above.
         let result = unsafe { WaitForSingleObject(parent, INFINITE) };
+        // SAFETY: the handle is valid and no longer needed after the wait.
         unsafe {
             CloseHandle(parent);
         }

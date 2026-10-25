@@ -6,3 +6,8 @@ members = ["crates/vibe-server"]
 edition = "2021"
 repository = "https://github.com/thewh1teagle/vibe"
 license = "MIT"
+
+[workspace.lints.clippy]
+expect_used = "warn"
+undocumented_unsafe_blocks = "warn"
+unwrap_used = "warn"

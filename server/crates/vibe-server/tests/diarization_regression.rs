@@ -11,6 +11,9 @@
 //! name a diarization model for any of them to run. `GIGAAM_VAD_MODEL` is
 //! required by all three.
 
+// Test harness: a panic with context beats a silent skip.
+#![allow(clippy::expect_used)]
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 

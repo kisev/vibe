@@ -68,3 +68,6 @@ windows-sys = {
     "Win32_System_Threading",
   ]
 }
+
+[lints]
+workspace = true

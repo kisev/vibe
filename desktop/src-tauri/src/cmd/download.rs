@@ -281,7 +281,14 @@ async fn download_to_partial(
                 if let Some(window) = app_handle.get_webview_window("main") {
                     // The url lets the UI attribute progress when several downloads run in parallel.
                     window
-                        .emit("download_progress", DownloadProgress { url, current: downloaded, total: total_size })
+                        .emit(
+                            "download_progress",
+                            DownloadProgress {
+                                url,
+                                current: downloaded,
+                                total: total_size,
+                            },
+                        )
                         .log_error();
                 }
                 callback_offset = downloaded;

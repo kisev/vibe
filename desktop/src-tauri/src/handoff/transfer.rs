@@ -368,7 +368,10 @@ fn reserve_recording_file_in(folder: &std::path::Path, stem: &str, extension: &s
             Err(error) => return Err(eyre::eyre!("failed to reserve {}: {error}", candidate.display())),
         }
     }
-    return Err(eyre::eyre!("could not reserve a free phone recording filename in {}", folder.display()));
+    return Err(eyre::eyre!(
+        "could not reserve a free phone recording filename in {}",
+        folder.display()
+    ));
 }
 
 #[cfg(test)]

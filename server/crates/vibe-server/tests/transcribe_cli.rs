@@ -1,3 +1,6 @@
+// Test harness: a panic with context beats a silent skip.
+#![allow(clippy::expect_used)]
+
 use std::process::Command;
 
 /// The output file is opened only after transcription succeeds, so a run that

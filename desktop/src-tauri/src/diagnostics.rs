@@ -42,6 +42,9 @@ mod tests {
     #[test]
     fn issue_url_points_at_the_fork() {
         let url = get_issue_url("transcript failed".to_string());
-        assert!(url.starts_with("https://github.com/kisev/vibe/issues/new?"), "wrong repo in {url}");
+        assert!(
+            url.starts_with("https://github.com/kisev/vibe/issues/new?"),
+            "wrong repo in {url}"
+        );
     }
 }

@@ -155,7 +155,11 @@ pub fn list_gpu_devices() -> Vec<GpuDevice> {
 /// static-link builds the server ships.
 fn ensure_backends() {
     static INIT: OnceLock<()> = OnceLock::new();
-    INIT.get_or_init(|| transcribe_cpp::init_backends_default().expect("init_backends_default"));
+    INIT.get_or_init(|| {
+        if let Err(err) = transcribe_cpp::init_backends_default() {
+            tracing::error!(?err, "transcribe.cpp backend init failed; dynamic backends are unavailable");
+        }
+    });
 }
 
 /// The unified ASR engine: every family loads through the transcribe.cpp
@@ -647,7 +651,7 @@ fn gguf_architecture(path: &str) -> Option<String> {
     let u64_at = |bytes: &[u8], at: usize| {
         at.checked_add(8)
             .and_then(|end| bytes.get(at..end))
-            .map(|v| u64::from_le_bytes(v.try_into().expect("8 bytes")))
+            .and_then(|v| <[u8; 8]>::try_from(v).ok().map(u64::from_le_bytes))
     };
     let mut cursor = 8usize;
     let _tensors = u64_at(&bytes, cursor)?;
@@ -659,7 +663,11 @@ fn gguf_architecture(path: &str) -> Option<String> {
         cursor += 8;
         let key = bytes.get(cursor..cursor.checked_add(key_len)?)?;
         cursor += key_len;
-        let value_type = u32::from_le_bytes(bytes.get(cursor..cursor.checked_add(4)?)?.try_into().expect("4 bytes"));
+        let value_type = bytes
+            .get(cursor..cursor.checked_add(4)?)?
+            .try_into()
+            .map(u32::from_le_bytes)
+            .ok()?;
         cursor += 4;
         // Walk the value; only the string shape is decoded, everything else
         // is skipped by its documented GGUF width.
@@ -735,7 +743,7 @@ fn engine_vad<'a>(
             model,
         });
     }
-    Ok(cached.as_mut().expect("VAD initialized"))
+    cached.as_mut().ok_or_else(|| anyhow::anyhow!("VAD cache missing after load"))
 }
 
 /// Sample ranges the plan sends to the model, clipped to the decoded audio.

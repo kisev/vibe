@@ -30,3 +30,17 @@ Single PR: `mise.toml`, `Taskfile.yml`, `lefthook.yml`, per-tool configs, worksp
 ## Open Questions
 
 - Should `cargo-semver-checks` gate server releases now or when the `server-v0.9.0` release actually happens? (Cheap to add to the release workflow only.)
+
+## Implementation notes
+
+- **Cast lints are dropped from the workspace set.** The first clippy run
+  against the server produced 56 cast findings, every one of them sample-index
+  or byte-offset math in the audio engine (`seconds * SAMPLE_RATE as usize`,
+  GGUF header u64→usize). Fixing them means either semantics changes or 56
+  allow-attributes with no behavior change. The workspace set keeps
+  `unwrap_used`, `expect_used`, `undocumented_unsafe_blocks` (9 findings, all
+  fixed in server code and test harnesses).
+- **Desktop lints stay on the current CI gate.** desktop/src-tauri and
+  meeting-detect carry 127 unwrap/expect sites; wiring the lints in without a
+  GTK-capable host to compile on would turn lint_rust.yml red on the next push.
+  Elevating the desktop crate is its own follow-up change.
