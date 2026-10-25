@@ -19,7 +19,7 @@
 ## 4. Integration
 
 - [x] 4.1 Run `tsc`, `vitest`, and the i18n audit; verify zero failures
-- [ ] 4.2 Verify manually: download a catalog model end to end (progress, verification, appearance in the model list), and confirm a failed-integrity download is reported and not selectable
+- [x] 4.2 Verify manually: download a catalog model end to end (progress, verification, appearance in the model list), and confirm a failed-integrity download is reported and not selectable
 
 ## 5. Interface consolidation (user feedback after the first cut)
 
