@@ -87,7 +87,7 @@ The server today runs four hand-written Rust engines over one vendored ggml (`gg
   segment snapshots.
 - **New-family gated tests** download catalog GGUFs (canary-1b-v2, Qwen3-ASR 0.6B/1.7B,
   voxtral mini 3B, voxtral realtime 4B; sha256 pinned) and assert load + fixture transcription
-  + the catalog-documented capability flags per family.
+  and the catalog-documented capability flags per family.
 
 ## Phase 4 findings: CPU dispatch, five-platform builds, and the cache bump
 

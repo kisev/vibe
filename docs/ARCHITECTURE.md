@@ -31,9 +31,9 @@ Vibe is a desktop transcription app built with **Tauri** (Rust + TypeScript fron
 ### Build Flow
 
 1. Vibe CI runs `chore setup <target-triple>`
-2. It downloads the prebuilt `vibe-server` from the `server-v*` release in `.server-version`
-3. Binaries placed in `desktop/src-tauri/binaries/`
-4. Tauri bundles `vibe-server` and, where configured, `ffmpeg` into the final app
+1. It downloads the prebuilt `vibe-server` from the `server-v*` release in `.server-version`
+1. Binaries placed in `desktop/src-tauri/binaries/`
+1. Tauri bundles `vibe-server` and, where configured, `ffmpeg` into the final app
 
 ## Key Point for Agents
 

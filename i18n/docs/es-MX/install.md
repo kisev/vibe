@@ -1,4 +1,4 @@
-<!-- source: 664188849caa -->
+<!-- source: be915b3ca44c -->
 
 # Notas de instalación 📝
 
@@ -27,7 +27,7 @@ export WEBKIT_DISABLE_COMPOSITING_MODE=1
 
 Descarga e instala Ollama desde https://ollama.com.
 
-2. Instala un modelo
+1. Instala un modelo
 
 Una vez instalado, configura un modelo para el resumen. Por ejemplo, puedes instalar `llama3.1` ejecutando el siguiente comando en tu terminal:
 
@@ -35,7 +35,7 @@ Una vez instalado, configura un modelo para el resumen. Por ejemplo, puedes inst
 ollama run llama3.1
 ```
 
-3. Activa el resumen
+1. Activa el resumen
 
 Después de instalar el modelo, abre la app de Ollama. Ve a Más Opciones y activa Resumir justo antes del paso de transcripción. Puedes dejar la configuración con sus valores predeterminados.
 
@@ -48,8 +48,8 @@ _Asegúrate de ejecutar la 'Verificación' para comprobar que funciona_
 Vibe incluye un modo de marcas de tiempo estables para ajustar mejor el tiempo de los subtítulos en contenido de larga duración.
 
 1. Abre `Más Opciones`.
-2. Activa `Marcas de tiempo estables`.
-3. Si se solicita, descarga el modelo VAD.
+1. Activa `Marcas de tiempo estables`.
+1. Si se solicita, descarga el modelo VAD.
 
 Notas:
 
@@ -88,9 +88,9 @@ _Todos los modelos están disponibles para instalación manual. Consulta la conf
 
 - por ejemplo, `ggml-medium-encoder.mlmodelc.zip` corresponde a `ggml-medium-encoder.bin`
 
-2. Abre la ruta de modelos desde la configuración de Vibe
-3. Arrastra y suelta el archivo `.mlcmodel.c` en la carpeta de modelos, junto al archivo `.bin`
-4. Transcribe un archivo; la primera vez que uses el modelo tardará más porque se está compilando. Las siguientes veces será más rápido.
+1. Abre la ruta de modelos desde la configuración de Vibe
+1. Arrastra y suelta el archivo `.mlcmodel.c` en la carpeta de modelos, junto al archivo `.bin`
+1. Transcribe un archivo; la primera vez que uses el modelo tardará más porque se está compilando. Las siguientes veces será más rápido.
 
 ## Error de `msvc140.dll` no encontrado ❌
 

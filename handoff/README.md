@@ -4,11 +4,11 @@ Sending audio from a phone to a running Vibe, over a direct
 [iroh](https://iroh.computer) connection. No account, no server in the middle —
 Vibe shows a QR code, the phone opens it, and the two talk peer to peer.
 
-| Directory | What it is                                                                 |
+| Directory | What it is |
 | --------- | -------------------------------------------------------------------------- |
-| `pwa/`    | The phone app. React + Vite, deployed with the website under `/phone/`.      |
-| `wasm/`   | The iroh client the PWA runs, compiled to wasm. `chore phone-wasm` emits the bindings into `pwa/public/wasm/`. |
-| `probe/`  | A CLI that impersonates the phone, for testing the desktop side without one. |
+| `pwa/` | The phone app. React + Vite, deployed with the website under `/phone/`. |
+| `wasm/` | The iroh client the PWA runs, compiled to wasm. `chore phone-wasm` emits the bindings into `pwa/public/wasm/`. |
+| `probe/` | A CLI that impersonates the phone, for testing the desktop side without one. |
 
 The desktop half lives in `desktop/src-tauri`.
 

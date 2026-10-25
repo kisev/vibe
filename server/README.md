@@ -8,7 +8,7 @@ Think of it as a small, fast, local Whisper server you control.
 
 It is the engine of [Vibe](https://github.com/thewh1teagle/vibe) and lives in this repository under `server/`; it also runs on its own.
 
----
+______________________________________________________________________
 
 ## Why vibe-server ✨
 
@@ -19,7 +19,7 @@ It is the engine of [Vibe](https://github.com/thewh1teagle/vibe) and lives in th
 - Designed to be spawned and owned by another process
 - No heavy setup, no long-running system service
 
----
+______________________________________________________________________
 
 ## Platform & GPU Support 🚀
 
@@ -37,19 +37,19 @@ GPU acceleration is enabled by default:
 
 vibe-server automatically uses the best available backend for the platform.
 
----
+______________________________________________________________________
 
 ## How It Works 🧠
 
 1. Your app starts the vibe-server process
-2. vibe-server binds to a local port (optionally chosen by the OS)
-3. Your app talks to vibe-server over HTTP
-4. Models are loaded and unloaded at runtime
-5. Transcription requests go through an OpenAI-compatible endpoint
+1. vibe-server binds to a local port (optionally chosen by the OS)
+1. Your app talks to vibe-server over HTTP
+1. Models are loaded and unloaded at runtime
+1. Transcription requests go through an OpenAI-compatible endpoint
 
 vibe-server is intentionally simple and predictable, so it can be embedded into larger systems.
 
----
+______________________________________________________________________
 
 ## Quick Start ⚡
 
@@ -82,7 +82,7 @@ When ready, vibe-server prints a single machine-readable line to stdout:
 
 This is intended for parent processes to detect readiness and discover the bound port.
 
----
+______________________________________________________________________
 
 ## Using vibe-server 🔌
 
@@ -131,16 +131,16 @@ the one covering most of it.
   app keeps its own under the app's local data directory and removes entries
   untouched for 30 days at startup.
 
----
+______________________________________________________________________
 
 ## Notes & Limitations
 
-- One transcription runs at a time per process  
+- One transcription runs at a time per process\
   concurrent requests return 429
 - Non-WAV audio is automatically converted using ffmpeg
-    - system ffmpeg or a bundled binary next to vibe-server
+  - system ffmpeg or a bundled binary next to vibe-server
 
----
+______________________________________________________________________
 
 ## When to Use vibe-server 🎯
 
@@ -151,7 +151,7 @@ vibe-server is a good fit if you want:
 - Full control over models and hardware
 - An OpenAI-like API without the OpenAI dependency
 
----
+______________________________________________________________________
 
 ## Documentation 📚
 

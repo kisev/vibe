@@ -66,6 +66,6 @@ Whisper models in the legacy ggml `.bin` container SHALL no longer load, and the
 - **WHEN** a GGUF that loaded before the engine switch is loaded again
 - **THEN** it loads and transcribes as before
 
-# Removed Capability: asr-engines/gigaam
+## Removed Capability: asr-engines/gigaam
 
 The GigaAM engine's own requirements are retired together with its crate; the family continues under the unified engine above.

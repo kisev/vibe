@@ -31,13 +31,13 @@ The fork is `kisev/vibe` (SSH remote `git@github.com:kisev/vibe.git`). Every sou
 
 - [Rotating the pubkey orphans any hypothetical hybrid build that trusts the old key] → Acceptable: no fork build has shipped yet; upstream builds keep their own channel by design.
 - [Fork Pages origin drifts from hardcoded URLs] → Keep every URL in `config.ts` and verify all of them in one test pass.
-- [Forgetting to publish `server-v0.8.0` in the fork] → Tracked task with an explicit verification (fetch the exact asset URL); dev builds and CI are unaffected either way.
+- \[Forgetting to publish `server-v0.8.0` in the fork\] → Tracked task with an explicit verification (fetch the exact asset URL); dev builds and CI are unaffected either way.
 
 ## Migration Plan
 
 1. Generate the updater keypair; add the private half to fork secrets.
-2. Land the URL/pubkey changes in one commit; verify with the mock test suite plus a packaging dry run.
-3. Publish `server-v0.8.0` in the fork; verify the sidecar fetch.
-4. The next fork release produces signed `latest.json`; install a prior fork build and update over it end to end.
+1. Land the URL/pubkey changes in one commit; verify with the mock test suite plus a packaging dry run.
+1. Publish `server-v0.8.0` in the fork; verify the sidecar fetch.
+1. The next fork release produces signed `latest.json`; install a prior fork build and update over it end to end.
 
 ## Open Questions

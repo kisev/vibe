@@ -1,4 +1,4 @@
-<!-- source: 664188849caa -->
+<!-- source: be915b3ca44c -->
 
 # Notes d'installation 📝
 
@@ -27,7 +27,7 @@ export WEBKIT_DISABLE_COMPOSITING_MODE=1
 
 Téléchargez et installez Ollama depuis https://ollama.com.
 
-2. Installer un modèle
+1. Installer un modèle
 
 Une fois installé, configurez un modèle pour le résumé. Par exemple, vous pouvez installer `llama3.1` en exécutant la commande suivante dans votre terminal :
 
@@ -35,7 +35,7 @@ Une fois installé, configurez un modèle pour le résumé. Par exemple, vous po
 ollama run llama3.1
 ```
 
-3. Activer le résumé
+1. Activer le résumé
 
 Une fois le modèle installé, ouvrez l'application Ollama. Accédez à `Plus d'options` et activez le résumé juste avant l'étape de transcription. Vous pouvez laisser les paramètres à leurs valeurs par défaut.
 
@@ -48,8 +48,8 @@ C'est tout ! Le résumé sera désormais actif dans Ollama.
 Vibe inclut un mode d'horodatage stable pour un minutage des sous-titres plus précis sur les contenus longs.
 
 1. Ouvrez `Plus d'options`.
-2. Activez `Horodatages stables`.
-3. Si vous y êtes invité, téléchargez le modèle VAD.
+1. Activez `Horodatages stables`.
+1. Si vous y êtes invité, téléchargez le modèle VAD.
 
 Remarques :
 
@@ -88,9 +88,9 @@ _Tous les modèles sont disponibles pour une installation manuelle. Voir les par
 
 - par ex. `ggml-medium-encoder.mlmodelc.zip` correspond à `ggml-medium-encoder.bin`
 
-2. Ouvrez le dossier des modèles depuis les paramètres de Vibe
-3. Faites glisser le fichier `.mlcmodel.c` dans le dossier des modèles pour qu'il se trouve à côté du fichier `.bin`
-4. Transcrivez un fichier ; la première fois que vous utilisez le modèle, cela prendra plus de temps car il compile le modèle. Chaque fois suivante sera plus rapide.
+1. Ouvrez le dossier des modèles depuis les paramètres de Vibe
+1. Faites glisser le fichier `.mlcmodel.c` dans le dossier des modèles pour qu'il se trouve à côté du fichier `.bin`
+1. Transcrivez un fichier ; la première fois que vous utilisez le modèle, cela prendra plus de temps car il compile le modèle. Chaque fois suivante sera plus rapide.
 
 ## Erreur `msvc140.dll` introuvable ❌
 

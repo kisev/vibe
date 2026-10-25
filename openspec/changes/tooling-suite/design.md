@@ -20,7 +20,7 @@ The user's projects converged on one stack; `kisev/skills` is the full reference
 ## Risks / Trade-offs
 
 - [Hook friction on the agent's SSH-signed commits] → pre-commit jobs are format-only staged checks; a failing gate is a real finding, not noise. If seconds add up, drop to formatting the touched files only.
-- [First `cargo-deny` run fails on the existing graph] → run it, record the baseline, allowlist exceptions explicitly in `deny.toml` rather than disabling categories.
+- \[First `cargo-deny` run fails on the existing graph\] → run it, record the baseline, allowlist exceptions explicitly in `deny.toml` rather than disabling categories.
 - [markdownlint vs prettier disagreeing on md] → prettier owns formatting, markdownlint owns structure; disable the overlapping markdownlint rules.
 
 ## Migration Plan

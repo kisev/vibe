@@ -1,4 +1,4 @@
-<!-- source: 664188849caa -->
+<!-- source: be915b3ca44c -->
 
 # Uwagi dotyczące instalacji 📝
 
@@ -27,7 +27,7 @@ export WEBKIT_DISABLE_COMPOSITING_MODE=1
 
 Pobierz i zainstaluj Ollama ze strony https://ollama.com.
 
-2. Zainstaluj model
+1. Zainstaluj model
 
 Po zainstalowaniu skonfiguruj model do tworzenia streszczeń. Możesz na przykład zainstalować `llama3.1`, uruchamiając w terminalu następujące polecenie:
 
@@ -35,7 +35,7 @@ Po zainstalowaniu skonfiguruj model do tworzenia streszczeń. Możesz na przykł
 ollama run llama3.1
 ```
 
-3. Włącz streszczenia
+1. Włącz streszczenia
 
 Po zainstalowaniu modelu otwórz aplikację Ollama. Przejdź do Więcej opcji i włącz opcję Podsumuj tuż przed etapem transkrypcji. Ustawienia możesz pozostawić domyślne.
 
@@ -48,8 +48,8 @@ To wszystko! Streszczenia będą teraz aktywne w Ollama.
 Vibe zawiera tryb stabilnych znaczników czasu, zapewniający dokładniejsze dopasowanie napisów w długich nagraniach.
 
 1. Otwórz `Więcej opcji`.
-2. Włącz `Stabilne znaczniki czasu`.
-3. Jeśli pojawi się monit, pobierz model VAD.
+1. Włącz `Stabilne znaczniki czasu`.
+1. Jeśli pojawi się monit, pobierz model VAD.
 
 Uwagi:
 
@@ -88,9 +88,9 @@ _Wszystkie modele dostępne do instalacji ręcznej. Zobacz ustawienia lub [gotow
 
 - np. `ggml-medium-encoder.mlmodelc.zip` odpowiada plikowi `ggml-medium-encoder.bin`
 
-2. Otwórz ścieżkę modeli z ustawień Vibe
-3. Przeciągnij i upuść plik `.mlcmodel.c` do folderu modeli, tak aby znalazł się obok pliku `.bin`
-4. Przetranskrybuj plik — za pierwszym razem użycie modelu potrwa dłużej, ponieważ jest on kompilowany. Każde kolejne użycie będzie szybsze.
+1. Otwórz ścieżkę modeli z ustawień Vibe
+1. Przeciągnij i upuść plik `.mlcmodel.c` do folderu modeli, tak aby znalazł się obok pliku `.bin`
+1. Przetranskrybuj plik — za pierwszym razem użycie modelu potrwa dłużej, ponieważ jest on kompilowany. Każde kolejne użycie będzie szybsze.
 
 ## Błąd braku pliku `msvc140.dll` ❌
 

@@ -116,7 +116,7 @@ jobs:
             - name: Build
               run: chore website-build
               env:
-                GH_TOKEN: ${{ github.token }}
+                  GH_TOKEN: ${{ github.token }}
 
             - name: Download phone PWA
               uses: actions/download-artifact@v5

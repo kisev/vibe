@@ -1,178 +1,176 @@
 {
-	"schema": 2,
-	"models": [
-		{
-			"id": "vibe-parakeet-tdt-0.6b-v3",
-			"name": "Parakeet TDT 0.6B v3 (Vibe build)",
-			"description": "The original vibe-app build of the multilingual streaming-capable family",
-			"repository": "vibe-app/parakeet-tdt-0.6b-v3-gguf",
-			"revision": "cd084b1be9cc53eea3330a30d3c9e3e4afbe039c",
-			"license": "cc-by-4.0",
-			"family": "parakeet",
-			"parameters": "627M",
-			"languages": [
-				"bg",
-				"hr",
-				"cs",
-				"da",
-				"nl",
-				"en",
-				"et",
-				"fi",
-				"fr",
-				"de",
-				"el",
-				"hu",
-				"it",
-				"lv",
-				"lt",
-				"mt",
-				"pl",
-				"pt",
-				"ro",
-				"ru",
-				"sk",
-				"sl",
-				"es",
-				"sv",
-				"uk"
-			],
-			"capabilities": {
-				"streaming": false,
-				"translate": false,
-				"languageDetection": true,
-				"timestamps": true
-			},
-			"quant": "Q4_K_M",
-			"role": "asr",
-			"curated": false,
-			"minEngine": "0.2.4",
-			"files": {
-				"Q4_K_M": {
-					"filename": "parakeet-tdt-0.6b-v3-Q4_K_M.gguf",
-					"size": 485425536,
-					"sha256": "5c61c041314d87ef1ffc278f5fb1a8ea25cceb8ce6053f8b516bab7ba16d7508"
-				}
-			}
-		},
-		{
-			"id": "vibe-nemotron-3.5-asr-streaming-0.6b",
-			"name": "Nemotron 3.5 ASR Streaming 0.6B (Vibe build)",
-			"description": "The original vibe-app build of the streaming dictation model",
-			"repository": "vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf",
-			"revision": "2e85c0261bb7d0ae27e38c63ffec82c1012b6485",
-			"license": "other",
-			"family": "parakeet",
-			"parameters": "638M",
-			"languages": [
-				"en-US",
-				"en-GB",
-				"es-US",
-				"es-ES",
-				"fr-FR",
-				"fr-CA",
-				"it-IT",
-				"pt-BR",
-				"pt-PT",
-				"nl-NL",
-				"de-DE",
-				"tr-TR",
-				"ru-RU",
-				"ar-AR",
-				"hi-IN",
-				"ja-JP",
-				"ko-KR",
-				"vi-VN",
-				"uk-UA",
-				"pl-PL",
-				"sv-SE",
-				"cs-CZ",
-				"nb-NO",
-				"da-DK",
-				"bg-BG",
-				"fi-FI",
-				"hr-HR",
-				"sk-SK",
-				"zh-CN",
-				"hu-HU",
-				"ro-RO",
-				"et-EE"
-			],
-			"capabilities": {
-				"streaming": true,
-				"translate": false,
-				"languageDetection": true,
-				"timestamps": true
-			},
-			"quant": "Q4_K_M",
-			"role": "asr",
-			"curated": false,
-			"minEngine": "0.2.4",
-			"files": {
-				"Q4_K_M": {
-					"filename": "nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf",
-					"size": 495831520,
-					"sha256": "41c99fa5fb6f3d35f68e79adc3e755eca2232a8d921178bd647b71194792b8fd"
-				}
-			}
-		},
-		{
-			"id": "vibe-parakeet-tdt-0.6b-v3-he",
-			"name": "Parakeet TDT 0.6B v3 Hebrew",
-			"description": "Hebrew fine-tune of Parakeet TDT 0.6B v3, best suited for dictation",
-			"repository": "vibe-app/parakeet-tdt-0.6b-v3-he-gguf",
-			"revision": "740e0ca8957f142803b4a2d534d47eb1b4f75c9d",
-			"license": "cc-by-4.0",
-			"family": "parakeet",
-			"parameters": "627M",
-			"languages": [
-				"he"
-			],
-			"capabilities": {
-				"streaming": false,
-				"translate": false,
-				"languageDetection": false,
-				"timestamps": true
-			},
-			"quant": "Q8_0",
-			"role": "asr",
-			"curated": false,
-			"minEngine": "0.2.4",
-			"files": {
-				"Q8_0": {
-					"filename": "parakeet-tdt-0.6b-v3-he-q8_0.gguf",
-					"size": 758224288,
-					"sha256": "37a6787344617fd7402397cd7ec4dd4f4bda779cb3112ac571e7b3329194e8dd"
-				}
-			}
-		},
-		{
-			"id": "vibe-silero-vad-6.2.0",
-			"name": "Silero VAD v6.2.0",
-			"description": "The voice-activity detector GigaAM and the planner use; still in its original .bin container, which the engine loads for VAD",
-			"repository": "ggml-org/whisper-vad",
-			"revision": "9ffd54a1e1ee413ddf265af9913beaf518d1639b",
-			"license": "mit",
-			"family": "silero_vad",
-			"parameters": "2M",
-			"languages": [],
-			"capabilities": {
-				"streaming": false,
-				"translate": false,
-				"languageDetection": false,
-				"timestamps": false
-			},
-			"quant": "F16",
-			"role": "vad",
-			"curated": false,
-			"minEngine": "0.2.4",
-			"files": {
-				"F16": {
-					"filename": "ggml-silero-v6.2.0.bin",
-					"size": 885098,
-					"sha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987"
-				}
-			}
-		}
-	]
+  "schema": 2,
+  "models": [
+    {
+      "id": "vibe-parakeet-tdt-0.6b-v3",
+      "name": "Parakeet TDT 0.6B v3 (Vibe build)",
+      "description": "The original vibe-app build of the multilingual streaming-capable family",
+      "repository": "vibe-app/parakeet-tdt-0.6b-v3-gguf",
+      "revision": "cd084b1be9cc53eea3330a30d3c9e3e4afbe039c",
+      "license": "cc-by-4.0",
+      "family": "parakeet",
+      "parameters": "627M",
+      "languages": [
+        "bg",
+        "hr",
+        "cs",
+        "da",
+        "nl",
+        "en",
+        "et",
+        "fi",
+        "fr",
+        "de",
+        "el",
+        "hu",
+        "it",
+        "lv",
+        "lt",
+        "mt",
+        "pl",
+        "pt",
+        "ro",
+        "ru",
+        "sk",
+        "sl",
+        "es",
+        "sv",
+        "uk"
+      ],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "languageDetection": true,
+        "timestamps": true
+      },
+      "quant": "Q4_K_M",
+      "role": "asr",
+      "curated": false,
+      "minEngine": "0.2.4",
+      "files": {
+        "Q4_K_M": {
+          "filename": "parakeet-tdt-0.6b-v3-Q4_K_M.gguf",
+          "size": 485425536,
+          "sha256": "5c61c041314d87ef1ffc278f5fb1a8ea25cceb8ce6053f8b516bab7ba16d7508"
+        }
+      }
+    },
+    {
+      "id": "vibe-nemotron-3.5-asr-streaming-0.6b",
+      "name": "Nemotron 3.5 ASR Streaming 0.6B (Vibe build)",
+      "description": "The original vibe-app build of the streaming dictation model",
+      "repository": "vibe-app/nemotron-3.5-asr-streaming-0.6b-gguf",
+      "revision": "2e85c0261bb7d0ae27e38c63ffec82c1012b6485",
+      "license": "other",
+      "family": "parakeet",
+      "parameters": "638M",
+      "languages": [
+        "en-US",
+        "en-GB",
+        "es-US",
+        "es-ES",
+        "fr-FR",
+        "fr-CA",
+        "it-IT",
+        "pt-BR",
+        "pt-PT",
+        "nl-NL",
+        "de-DE",
+        "tr-TR",
+        "ru-RU",
+        "ar-AR",
+        "hi-IN",
+        "ja-JP",
+        "ko-KR",
+        "vi-VN",
+        "uk-UA",
+        "pl-PL",
+        "sv-SE",
+        "cs-CZ",
+        "nb-NO",
+        "da-DK",
+        "bg-BG",
+        "fi-FI",
+        "hr-HR",
+        "sk-SK",
+        "zh-CN",
+        "hu-HU",
+        "ro-RO",
+        "et-EE"
+      ],
+      "capabilities": {
+        "streaming": true,
+        "translate": false,
+        "languageDetection": true,
+        "timestamps": true
+      },
+      "quant": "Q4_K_M",
+      "role": "asr",
+      "curated": false,
+      "minEngine": "0.2.4",
+      "files": {
+        "Q4_K_M": {
+          "filename": "nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf",
+          "size": 495831520,
+          "sha256": "41c99fa5fb6f3d35f68e79adc3e755eca2232a8d921178bd647b71194792b8fd"
+        }
+      }
+    },
+    {
+      "id": "vibe-parakeet-tdt-0.6b-v3-he",
+      "name": "Parakeet TDT 0.6B v3 Hebrew",
+      "description": "Hebrew fine-tune of Parakeet TDT 0.6B v3, best suited for dictation",
+      "repository": "vibe-app/parakeet-tdt-0.6b-v3-he-gguf",
+      "revision": "740e0ca8957f142803b4a2d534d47eb1b4f75c9d",
+      "license": "cc-by-4.0",
+      "family": "parakeet",
+      "parameters": "627M",
+      "languages": ["he"],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "languageDetection": false,
+        "timestamps": true
+      },
+      "quant": "Q8_0",
+      "role": "asr",
+      "curated": false,
+      "minEngine": "0.2.4",
+      "files": {
+        "Q8_0": {
+          "filename": "parakeet-tdt-0.6b-v3-he-q8_0.gguf",
+          "size": 758224288,
+          "sha256": "37a6787344617fd7402397cd7ec4dd4f4bda779cb3112ac571e7b3329194e8dd"
+        }
+      }
+    },
+    {
+      "id": "vibe-silero-vad-6.2.0",
+      "name": "Silero VAD v6.2.0",
+      "description": "The voice-activity detector GigaAM and the planner use; still in its original .bin container, which the engine loads for VAD",
+      "repository": "ggml-org/whisper-vad",
+      "revision": "9ffd54a1e1ee413ddf265af9913beaf518d1639b",
+      "license": "mit",
+      "family": "silero_vad",
+      "parameters": "2M",
+      "languages": [],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "languageDetection": false,
+        "timestamps": false
+      },
+      "quant": "F16",
+      "role": "vad",
+      "curated": false,
+      "minEngine": "0.2.4",
+      "files": {
+        "F16": {
+          "filename": "ggml-silero-v6.2.0.bin",
+          "size": 885098,
+          "sha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987"
+        }
+      }
+    }
+  ]
 }

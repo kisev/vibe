@@ -37,146 +37,146 @@ DOC_STAMP = re.compile(r"^<!--\s*source:\s*([0-9a-f]+)\s*-->\n*")
 
 
 def website_locales() -> list[str]:
-	registry = json.loads((ROOT / "i18n/locales.json").read_text())
-	return [item["code"] for item in registry if item["website"] and item["code"] != "en-US"]
+    registry = json.loads((ROOT / "i18n/locales.json").read_text())
+    return [item["code"] for item in registry if item["website"] and item["code"] != "en-US"]
 
 
 def version_key(version: str) -> tuple[int, ...]:
-	# The unreleased entry is the dev line in progress — it sorts above every
-	# released version and is never expected in a locale until a release cuts it.
-	if version == "unreleased":
-		return (10**9,)
-	return tuple(int(part) for part in version.split("."))
+    # The unreleased entry is the dev line in progress — it sorts above every
+    # released version and is never expected in a locale until a release cuts it.
+    if version == "unreleased":
+        return (10**9,)
+    return tuple(int(part) for part in version.split("."))
 
 
 def english_releases() -> list[Path]:
-	"""Every English entry, newest first."""
-	return sorted(CHANGELOG.glob("*.md"), key=lambda path: version_key(path.stem), reverse=True)
+    """Every English entry, newest first."""
+    return sorted(CHANGELOG.glob("*.md"), key=lambda path: version_key(path.stem), reverse=True)
 
 
 def source_hash(path: Path) -> str:
-	return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
 
 
 def frontmatter(path: Path) -> dict[str, str]:
-	match = re.match(r"^---\n(.*?)\n---\n", path.read_text(), re.DOTALL)
-	if not match:
-		return {}
-	meta = {}
-	for line in match.group(1).split("\n"):
-		key, sep, value = line.partition(":")
-		if sep:
-			meta[key.strip()] = value.strip().strip('"')
-	return meta
+    match = re.match(r"^---\n(.*?)\n---\n", path.read_text(), re.DOTALL)
+    if not match:
+        return {}
+    meta = {}
+    for line in match.group(1).split("\n"):
+        key, sep, value = line.partition(":")
+        if sep:
+            meta[key.strip()] = value.strip().strip('"')
+    return meta
 
 
 def changelog_audit() -> tuple[list[str], list[str]]:
-	"""Returns (issues, warnings). A missing translation is only ever a warning."""
-	issues: list[str] = []
-	warnings: list[str] = []
-	recent = [path for path in english_releases() if path.stem != "unreleased"][:RECENT]
-	expected = {path.stem: path for path in recent}
+    """Returns (issues, warnings). A missing translation is only ever a warning."""
+    issues: list[str] = []
+    warnings: list[str] = []
+    recent = [path for path in english_releases() if path.stem != "unreleased"][:RECENT]
+    expected = {path.stem: path for path in recent}
 
-	for locale in website_locales():
-		directory = CHANGELOG / locale
-		translated = sorted(directory.glob("*.md")) if directory.is_dir() else []
-		stale = []
-		for path in translated:
-			english = CHANGELOG / path.name
-			if not english.exists():
-				issues.append(f"changelog: {locale}/{path.name} translates a release that does not exist")
-				continue
-			meta = frontmatter(path)
-			english_meta = frontmatter(english)
-			if not meta.get("title"):
-				issues.append(f"changelog: {locale}/{path.name} has no title in its frontmatter")
-			for field in ("version", "date"):
-				if meta.get(field) != english_meta.get(field):
-					issues.append(f"changelog: {locale}/{path.name} {field} does not match the English entry")
-			if meta.get("source") != source_hash(english):
-				stale.append(path.stem)
-		missing = [version for version in expected if not (directory / f"{version}.md").exists()]
-		if missing:
-			warnings.append(f"changelog {locale}: {len(expected) - len(missing)} of the {len(expected)} newest releases translated, using fallback")
-		if stale:
-			warnings.append(f"changelog {locale}: {', '.join(sorted(stale, key=version_key))} translated from older English notes")
-	return issues, warnings
+    for locale in website_locales():
+        directory = CHANGELOG / locale
+        translated = sorted(directory.glob("*.md")) if directory.is_dir() else []
+        stale = []
+        for path in translated:
+            english = CHANGELOG / path.name
+            if not english.exists():
+                issues.append(f"changelog: {locale}/{path.name} translates a release that does not exist")
+                continue
+            meta = frontmatter(path)
+            english_meta = frontmatter(english)
+            if not meta.get("title"):
+                issues.append(f"changelog: {locale}/{path.name} has no title in its frontmatter")
+            for field in ("version", "date"):
+                if meta.get(field) != english_meta.get(field):
+                    issues.append(f"changelog: {locale}/{path.name} {field} does not match the English entry")
+            if meta.get("source") != source_hash(english):
+                stale.append(path.stem)
+        missing = [version for version in expected if not (directory / f"{version}.md").exists()]
+        if missing:
+            warnings.append(f"changelog {locale}: {len(expected) - len(missing)} of the {len(expected)} newest releases translated, using fallback")
+        if stale:
+            warnings.append(f"changelog {locale}: {', '.join(sorted(stale, key=version_key))} translated from older English notes")
+    return issues, warnings
 
 
 def docs_audit() -> tuple[list[str], list[str]]:
-	"""Same contract as changelog_audit: only structural breakage is an issue."""
-	issues: list[str] = []
-	warnings: list[str] = []
-	for slug in DOC_SLUGS:
-		if not (DOCS / "en-US" / f"{slug}.md").exists():
-			issues.append(f"docs: i18n/docs/en-US/{slug}.md is missing")
+    """Same contract as changelog_audit: only structural breakage is an issue."""
+    issues: list[str] = []
+    warnings: list[str] = []
+    for slug in DOC_SLUGS:
+        if not (DOCS / "en-US" / f"{slug}.md").exists():
+            issues.append(f"docs: i18n/docs/en-US/{slug}.md is missing")
 
-	for locale in website_locales():
-		directory = DOCS / locale
-		missing = [slug for slug in DOC_SLUGS if not (directory / f"{slug}.md").exists()]
-		stale = []
-		for path in sorted(directory.glob("*.md")) if directory.is_dir() else []:
-			if path.stem not in DOC_SLUGS:
-				issues.append(f"docs: {locale}/{path.name} is not a page the site shows")
-				continue
-			english = DOCS / "en-US" / path.name
-			match = DOC_STAMP.match(path.read_text())
-			if not match or match.group(1) != source_hash(english):
-				stale.append(path.stem)
-		if missing:
-			warnings.append(f"docs {locale}: {', '.join(missing)} not translated, using fallback")
-		if stale:
-			warnings.append(f"docs {locale}: {', '.join(sorted(stale))} translated from an older English page")
-	return issues, warnings
+    for locale in website_locales():
+        directory = DOCS / locale
+        missing = [slug for slug in DOC_SLUGS if not (directory / f"{slug}.md").exists()]
+        stale = []
+        for path in sorted(directory.glob("*.md")) if directory.is_dir() else []:
+            if path.stem not in DOC_SLUGS:
+                issues.append(f"docs: {locale}/{path.name} is not a page the site shows")
+                continue
+            english = DOCS / "en-US" / path.name
+            match = DOC_STAMP.match(path.read_text())
+            if not match or match.group(1) != source_hash(english):
+                stale.append(path.stem)
+        if missing:
+            warnings.append(f"docs {locale}: {', '.join(missing)} not translated, using fallback")
+        if stale:
+            warnings.append(f"docs {locale}: {', '.join(sorted(stale))} translated from an older English page")
+    return issues, warnings
 
 
 def audit() -> tuple[list[str], list[str]]:
-	changelog_issues, changelog_warnings = changelog_audit()
-	docs_issues, docs_warnings = docs_audit()
-	return changelog_issues + docs_issues, changelog_warnings + docs_warnings
+    changelog_issues, changelog_warnings = changelog_audit()
+    docs_issues, docs_warnings = docs_audit()
+    return changelog_issues + docs_issues, changelog_warnings + docs_warnings
 
 
 def stamp() -> int:
-	stamped = 0
-	for locale in website_locales():
-		for path in sorted((CHANGELOG / locale).glob("*.md")) if (CHANGELOG / locale).is_dir() else []:
-			english = CHANGELOG / path.name
-			if not english.exists():
-				continue
-			text = path.read_text()
-			match = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
-			if not match:
-				print(f"  skipped {locale}/{path.name}: no frontmatter")
-				continue
-			body = match.group(1)
-			line = f"source: {source_hash(english)}"
-			body = re.sub(r"^source:.*$", line, body, flags=re.MULTILINE) if re.search(r"^source:", body, re.MULTILINE) else f"{body}\n{line}"
-			updated = f"---\n{body}\n---\n" + text[match.end() :]
-			if updated != text:
-				path.write_text(updated)
-				stamped += 1
-	for locale in website_locales():
-		for path in sorted((DOCS / locale).glob("*.md")) if (DOCS / locale).is_dir() else []:
-			english = DOCS / "en-US" / path.name
-			if not english.exists():
-				continue
-			text = path.read_text()
-			updated = f"<!-- source: {source_hash(english)} -->\n\n{DOC_STAMP.sub('', text).lstrip()}"
-			if updated != text:
-				path.write_text(updated)
-				stamped += 1
-	return stamped
+    stamped = 0
+    for locale in website_locales():
+        for path in sorted((CHANGELOG / locale).glob("*.md")) if (CHANGELOG / locale).is_dir() else []:
+            english = CHANGELOG / path.name
+            if not english.exists():
+                continue
+            text = path.read_text()
+            match = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
+            if not match:
+                print(f"  skipped {locale}/{path.name}: no frontmatter")
+                continue
+            body = match.group(1)
+            line = f"source: {source_hash(english)}"
+            body = re.sub(r"^source:.*$", line, body, flags=re.MULTILINE) if re.search(r"^source:", body, re.MULTILINE) else f"{body}\n{line}"
+            updated = f"---\n{body}\n---\n" + text[match.end() :]
+            if updated != text:
+                path.write_text(updated)
+                stamped += 1
+    for locale in website_locales():
+        for path in sorted((DOCS / locale).glob("*.md")) if (DOCS / locale).is_dir() else []:
+            english = DOCS / "en-US" / path.name
+            if not english.exists():
+                continue
+            text = path.read_text()
+            updated = f"<!-- source: {source_hash(english)} -->\n\n{DOC_STAMP.sub('', text).lstrip()}"
+            if updated != text:
+                path.write_text(updated)
+                stamped += 1
+    return stamped
 
 
 if __name__ == "__main__":
-	if len(sys.argv) > 1 and sys.argv[1] == "stamp":
-		print(f"stamped {stamp()} translated files")
-		raise SystemExit(0)
-	issues, warnings = audit()
-	for warning in warnings:
-		print(warning)
-	if issues:
-		print(f"\ncontent i18n failed with {len(issues)} issue(s):\n")
-		print("\n".join(issues))
-		raise SystemExit(1)
-	print("content i18n passed" if not warnings else "\ncontent i18n passed with fallback warnings")
+    if len(sys.argv) > 1 and sys.argv[1] == "stamp":
+        print(f"stamped {stamp()} translated files")
+        raise SystemExit(0)
+    issues, warnings = audit()
+    for warning in warnings:
+        print(warning)
+    if issues:
+        print(f"\ncontent i18n failed with {len(issues)} issue(s):\n")
+        print("\n".join(issues))
+        raise SystemExit(1)
+    print("content i18n passed" if not warnings else "\ncontent i18n passed with fallback warnings")

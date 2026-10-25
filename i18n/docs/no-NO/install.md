@@ -1,4 +1,4 @@
-<!-- source: 664188849caa -->
+<!-- source: be915b3ca44c -->
 
 # Installasjonsnotater 📝
 
@@ -27,7 +27,7 @@ export WEBKIT_DISABLE_COMPOSITING_MODE=1
 
 Last ned og installer Ollama fra https://ollama.com.
 
-2. Installer en modell
+1. Installer en modell
 
 Når Ollama er installert, sett opp en modell for sammendrag. Du kan for eksempel installere `llama3.1` ved å kjøre følgende kommando i terminalen:
 
@@ -35,7 +35,7 @@ Når Ollama er installert, sett opp en modell for sammendrag. Du kan for eksempe
 ollama run llama3.1
 ```
 
-3. Aktiver sammendrag
+1. Aktiver sammendrag
 
 Når modellen er installert, åpne Ollama-appen. Naviger til Flere alternativer og aktiver Sammendrag rett før transkripsjonssteget. Du kan la innstillingene stå på standardverdiene.
 
@@ -48,8 +48,8 @@ Det er alt! Sammendrag er nå aktivt i Ollama.
 Vibe har en modus for stabile tidsstempler for strammere undertekst-timing på lengre innhold.
 
 1. Åpne `Flere alternativer`.
-2. Aktiver `Stabile tidsstempler`.
-3. Hvis du blir spurt, last ned VAD-modellen.
+1. Aktiver `Stabile tidsstempler`.
+1. Hvis du blir spurt, last ned VAD-modellen.
 
 Merknader:
 
@@ -88,9 +88,9 @@ _Alle modeller er tilgjengelige for manuell installasjon. Se innstillinger eller
 
 - f.eks. `ggml-medium-encoder.mlmodelc.zip` tilsvarer `ggml-medium-encoder.bin`
 
-2. Åpne modellmappen fra Vibe-innstillingene
-3. Dra og slipp `.mlcmodel.c`-filen inn i modellmappen slik at den ligger ved siden av `.bin`-filen
-4. Transkriber en fil. Første gang du bruker modellen tar det lengre tid fordi den kompilerer modellen. Hver gang etter det vil det gå raskere.
+1. Åpne modellmappen fra Vibe-innstillingene
+1. Dra og slipp `.mlcmodel.c`-filen inn i modellmappen slik at den ligger ved siden av `.bin`-filen
+1. Transkriber en fil. Første gang du bruker modellen tar det lengre tid fordi den kompilerer modellen. Hver gang etter det vil det gå raskere.
 
 ## Feilmelding om at `msvc140.dll` ikke ble funnet ❌
 

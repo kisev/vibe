@@ -4,13 +4,13 @@ _Last updated: 2026-02-08_
 
 Thank you for choosing **Vibe**! We are committed to ensuring your privacy and data security. This policy outlines how **Vibe** handles data and user privacy.
 
----
+______________________________________________________________________
 
 ### 1. Offline Operation
 
 **Vibe** operates fully offline. After the initial setup, where the model files are downloaded, all transcription happens entirely on your local device. No data is ever sent outside the app. **Vibe** can also function completely offline, even if you disconnect your internet connection.
 
----
+______________________________________________________________________
 
 ### 2. Data Collection
 
@@ -26,25 +26,25 @@ No personal data, file contents, transcription text, or identifying information 
 
 When using the **Summarize** option in the `More Options` menu (which is off by default), the transcription is sent to the Claude API for summarization. This feature is entirely optional, and users can choose whether or not to enable it. By default, this option is disabled, ensuring that no data is sent to the cloud without explicit user consent.
 
----
+______________________________________________________________________
 
 ### 3. Automatic Updates
 
 **Vibe** supports automatic updates, which come directly from GitHub releases. No other cloud storage or external servers are involved.
 
----
+______________________________________________________________________
 
 ### 4. Third-Party Services
 
 **Vibe** integrates prebuilt ffmpeg from [wang-bin/avbuild](https://github.com/wang-bin/avbuild) and uses Tauri for building the app. None of these services collect or transmit user data.
 
----
+______________________________________________________________________
 
 ### 5. Data Storage and Security
 
 There is no encryption involved in the app. Users have complete control over where and when transcription files are saved on their own computers. You are in full control of your transcription files and can delete them at any time.
 
----
+______________________________________________________________________
 
 ### 6. External Links
 
@@ -55,19 +55,19 @@ There is no encryption involved in the app. Users have complete control over whe
 
 These websites may collect personal data according to their respective privacy policies. Please review those policies before interacting with external sites.
 
----
+______________________________________________________________________
 
 ### 7. Open Source
 
 **Vibe** is an open-source application, and the source code is available at [github.com/thewh1teagle/vibe](https://github.com/thewh1teagle/vibe).
 
----
+______________________________________________________________________
 
 ### 8. Changes to Privacy Policy
 
 We may update this Privacy Policy as needed. Any changes will be communicated through app updates or on GitHub. Please check for updates regularly to stay informed of any changes.
 
----
+______________________________________________________________________
 
 ### 9. Contact Us
 

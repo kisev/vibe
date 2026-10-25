@@ -1,14 +1,14 @@
 # Windows Code Signing (SSL.com + YubiKey FIPS)
 
 Local hardware-based code signing using **SSL.com Code Signing Certificate**
-installed on a **YubiKey FIPS (firmware 5.4.x)**  
+installed on a **YubiKey FIPS (firmware 5.4.x)**\
 Example device: yubikey-5c-nano-fips
 
-No cloud signing  
-No monthly fees  
+No cloud signing\
+No monthly fees\
 Unlimited signings
 
----
+______________________________________________________________________
 
 ## Overview
 
@@ -19,7 +19,7 @@ In this flow:
 - Signing works locally using the YubiKey (PIV / smart card)
 - No eSigner, no remote service, no `.pfx` file
 
----
+______________________________________________________________________
 
 ## Requirements
 
@@ -28,7 +28,7 @@ In this flow:
 - SSL.com **Code Signing Certificate** (Personal / Individual)
 - Administrator access on Windows
 
----
+______________________________________________________________________
 
 ## 1. Install YubiKey tools
 
@@ -45,7 +45,7 @@ Default install path:
 C:\Program Files\Yubico\YubiKey Manager
 ```
 
----
+______________________________________________________________________
 
 ## 2. Open PowerShell and add required tools to PATH (session only)
 
@@ -79,7 +79,7 @@ ls "C:\Program Files\Yubico\Yubico PIV Tool\bin\libykcs11.dll"
 signtool /?
 ```
 
----
+______________________________________________________________________
 
 ## 3. Verify YubiKey connection
 
@@ -100,7 +100,7 @@ Expected output example:
 YubiKey 5C Nano FIPS (5.4.3) [OTP+FIDO+CCID]
 ```
 
----
+______________________________________________________________________
 
 ## 4. Reset PIV application (recommended, destructive)
 
@@ -119,7 +119,7 @@ Defaults after reset:
 - PUK: `12345678`
 - Management Key: default
 
----
+______________________________________________________________________
 
 ## 5. (Optional) Change PIV PIN
 
@@ -129,12 +129,12 @@ PIN must be 6–8 digits.
 ykman piv access change-pin
 ```
 
----
+______________________________________________________________________
 
 ## 6. Generate private key on the YubiKey (ECC, no touch)
 
-Using slot **9c (Digital Signature)**  
-Algorithm: **ECC P-256 (required for SSL.com EV / YubiKey)**  
+Using slot **9c (Digital Signature)**\
+Algorithm: **ECC P-256 (required for SSL.com EV / YubiKey)**\
 Touch policy: never
 
 ```
@@ -149,7 +149,7 @@ When prompted for Management Key:
 
 - Press **Enter** (use default)
 
----
+______________________________________________________________________
 
 ## 7. Generate CSR from the YubiKey
 
@@ -165,7 +165,7 @@ ykman piv certificates request 9c pubkey.pem codesign.csr -s "CN=Yakov Kolani"
 
 Enter PIN when prompted.
 
----
+______________________________________________________________________
 
 ## 8. Generate attestation certificates
 
@@ -181,22 +181,22 @@ ykman piv keys attest 9c attestation.crt
 ykman piv certificates export f9 attestation-intermediate.crt
 ```
 
----
+______________________________________________________________________
 
 ## 9. Submit attestation to SSL.com
 
 1. Login to SSL.com
-2. Go to **Orders**
-3. Open the Code Signing order
-4. **Manage → Attestation**
-5. Paste:
-    - `attestation.crt`
-    - `attestation-intermediate.crt`
-6. Submit
+1. Go to **Orders**
+1. Open the Code Signing order
+1. **Manage → Attestation**
+1. Paste:
+   - `attestation.crt`
+   - `attestation-intermediate.crt`
+1. Submit
 
 You should see **Successful attestation**.
 
----
+______________________________________________________________________
 
 ## 10. Certificate re-issuance (SSL.com)
 
@@ -214,7 +214,7 @@ Important:
 
 - Ensure the issued certificate is **ECC**, not RSA, before importing.
 
----
+______________________________________________________________________
 
 ## 11. Install certificate into YubiKey
 
@@ -222,7 +222,7 @@ Important:
 ykman piv certificates import 9c codesign.der
 ```
 
----
+______________________________________________________________________
 
 ## 12. Verify certificate on the token
 
@@ -232,7 +232,7 @@ ykman piv certificates list
 
 The certificate should appear in slot **9c**, and key + cert must match.
 
----
+______________________________________________________________________
 
 ## 13. Clean existing signatures (recommended)
 
@@ -248,7 +248,7 @@ Expected output:
 Successfully committed changes to the file
 ```
 
----
+______________________________________________________________________
 
 ## 14. Sign binary using YubiKey (jsign)
 
@@ -277,7 +277,7 @@ Successful output ends with:
 Adding Authenticode signature to main.exe
 ```
 
----
+______________________________________________________________________
 
 ## 15. Verify signature (final check)
 
@@ -295,18 +295,18 @@ Expected result:
 - Timestamp present
 - 0 warnings, 0 errors
 
----
+______________________________________________________________________
 
 ## Notes on tooling choice
 
-| Tool       | Role                                                      |
+| Tool | Role |
 | ---------- | --------------------------------------------------------- |
-| `jsign`    | Signing. Most reliable with YubiKey + PKCS#11 on Windows. |
-| `signtool` | Verification, signature removal, and inspection.          |
+| `jsign` | Signing. Most reliable with YubiKey + PKCS#11 on Windows. |
+| `signtool` | Verification, signature removal, and inspection. |
 
 This combination avoids Windows smart card / KSP edge cases and works consistently in local and CI environments.
 
----
+______________________________________________________________________
 
 ## Notes
 
@@ -316,7 +316,7 @@ This combination avoids Windows smart card / KSP edge cases and works consistent
 - Unlimited signings
 - Token reusable on renewal
 
----
+______________________________________________________________________
 
 ## Summary
 

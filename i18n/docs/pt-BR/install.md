@@ -1,4 +1,4 @@
-<!-- source: 664188849caa -->
+<!-- source: be915b3ca44c -->
 
 # Notas de instalação 📝
 
@@ -27,7 +27,7 @@ export WEBKIT_DISABLE_COMPOSITING_MODE=1
 
 Baixe e instale o Ollama em https://ollama.com.
 
-2. Instale um modelo
+1. Instale um modelo
 
 Depois de instalado, configure um modelo para o resumo. Por exemplo, você pode instalar o `llama3.1` executando o seguinte comando no terminal:
 
@@ -35,11 +35,11 @@ Depois de instalado, configure um modelo para o resumo. Por exemplo, você pode 
 ollama run llama3.1
 ```
 
-3. Ative o resumo
+1. Ative o resumo
 
 Depois que o modelo estiver instalado, abra o app do Ollama. Navegue até `Mais opções` e ative `Resumir` logo antes da etapa de transcrição. Você pode deixar as configurações com os valores padrão.
 
-_Certifique-se de executar a 'Executar verificação` para ver se funciona_
+_Certifique-se de executar a 'Executar verificação\` para ver se funciona_
 
 Pronto! O resumo agora estará ativo no Ollama.
 
@@ -48,8 +48,8 @@ Pronto! O resumo agora estará ativo no Ollama.
 O Vibe inclui um modo de marcações de tempo estáveis para uma sincronização de legendas mais precisa em conteúdos longos.
 
 1. Abra `Mais opções`.
-2. Ative `Marcações de tempo estáveis`.
-3. Se solicitado, baixe o modelo VAD.
+1. Ative `Marcações de tempo estáveis`.
+1. Se solicitado, baixe o modelo VAD.
 
 Notas:
 
@@ -88,9 +88,9 @@ _Todos os modelos disponíveis para instalação manual. Veja as configurações
 
 - ex.: `ggml-medium-encoder.mlmodelc.zip` corresponde a `ggml-medium-encoder.bin`
 
-2. Abra o caminho dos modelos nas configurações do Vibe
-3. Arraste e solte o arquivo `.mlcmodel.c` na pasta de modelos, de modo que fique junto do arquivo `.bin`
-4. Transcreva um arquivo; na primeira vez que você usar o modelo, vai demorar mais, pois ele está sendo compilado. Nas vezes seguintes será mais rápido.
+1. Abra o caminho dos modelos nas configurações do Vibe
+1. Arraste e solte o arquivo `.mlcmodel.c` na pasta de modelos, de modo que fique junto do arquivo `.bin`
+1. Transcreva um arquivo; na primeira vez que você usar o modelo, vai demorar mais, pois ele está sendo compilado. Nas vezes seguintes será mais rápido.
 
 ## Erro de `msvc140.dll` não encontrado ❌
 

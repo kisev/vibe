@@ -24,18 +24,18 @@ fi
 # Detect architecture
 ARCH=$(uname -m)
 case "$ARCH" in
-    x86_64)
-        DEB_ARCH="amd64"
-        RPM_ARCH="x86_64"
-        ;;
-    aarch64|arm64)
-        DEB_ARCH="arm64"
-        RPM_ARCH="aarch64"
-        ;;
-    *)
-        echo "Error: Unsupported architecture: $ARCH"
-        exit 1
-        ;;
+x86_64)
+    DEB_ARCH="amd64"
+    RPM_ARCH="x86_64"
+    ;;
+aarch64 | arm64)
+    DEB_ARCH="arm64"
+    RPM_ARCH="aarch64"
+    ;;
+*)
+    echo "Error: Unsupported architecture: $ARCH"
+    exit 1
+    ;;
 esac
 
 # Determine the package type and download the appropriate file
@@ -43,10 +43,10 @@ echo "Downloading Vibe version $TAG for $ARCH..."
 
 RPM_URL="https://github.com/thewh1teagle/vibe/releases/download/${TAG}/vibe-${TAG_WITHOUT_V}-1.${RPM_ARCH}.rpm"
 DEB_URL="https://github.com/thewh1teagle/vibe/releases/download/${TAG}/vibe_${TAG_WITHOUT_V}_${DEB_ARCH}.deb"
-echo $RPM_URL
+echo "$RPM_URL"
 # Create temporary directory for downloading
 TEMP_DIR=$(mktemp -d)
-cd $TEMP_DIR
+cd "$TEMP_DIR"
 
 # Download the correct package based on the distribution
 if [ -f /etc/os-release ]; then
@@ -73,8 +73,7 @@ fi
 
 # Clean up
 cd ..
-rm -rf $TEMP_DIR
+rm -rf "$TEMP_DIR"
 
 echo "Vibe installation complete!"
 echo "Run 'vibe' to open it!"
-

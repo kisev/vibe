@@ -25,7 +25,7 @@ export WEBKIT_DISABLE_COMPOSITING_MODE=1
 
 Download and install Ollama from https://ollama.com.
 
-2. Install a Model
+1. Install a Model
 
 Once installed, set up a model for summarization. For example, you can install `llama3.1` by running the following command in your terminal:
 
@@ -33,7 +33,7 @@ Once installed, set up a model for summarization. For example, you can install `
 ollama run llama3.1
 ```
 
-3. Enable Summarization
+1. Enable Summarization
 
 After the model is installed, open the Ollama app. Navigate to `More Options` and enable `Summarize` just before the transcription step. You can leave the settings at their default values.
 
@@ -46,8 +46,8 @@ That's it! Summarization will now be active in Ollama.
 Vibe includes a stable timestamp mode for tighter subtitle timing on long-form content.
 
 1. Open `More Options`.
-2. Enable `Stable timestamps`.
-3. If prompted, download the VAD model.
+1. Enable `Stable timestamps`.
+1. If prompted, download the VAD model.
 
 Notes:
 
@@ -86,9 +86,9 @@ _All models available for manual install. see settings or [Pre built models](htt
 
 - e.g. `ggml-medium-encoder.mlmodelc.zip` matches `ggml-medium-encoder.bin`
 
-2. Open models path from Vibe settings
-3. Drag and drop the `.mlcmodel.c` file into the models folder so that it is alongside the `.bin` file
-4. Transcribe a file, the first time you use the model it will take longer as it is compiling the model. Every subsequent time it will be faster.
+1. Open models path from Vibe settings
+1. Drag and drop the `.mlcmodel.c` file into the models folder so that it is alongside the `.bin` file
+1. Transcribe a file, the first time you use the model it will take longer as it is compiling the model. Every subsequent time it will be faster.
 
 ## Error of `msvc140.dll` not found ❌
 

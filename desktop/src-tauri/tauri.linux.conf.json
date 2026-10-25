@@ -1,10 +1,10 @@
 {
-	"$schema": "./gen/schemas/linux-schema.json",
-	"bundle": {
-		"linux": {
-			"deb": {
-				"depends": ["ffmpeg", "libxdo-dev"]
-			}
-		}
-	}
+  "$schema": "./gen/schemas/linux-schema.json",
+  "bundle": {
+    "linux": {
+      "deb": {
+        "depends": ["ffmpeg", "libxdo-dev"]
+      }
+    }
+  }
 }

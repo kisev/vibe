@@ -43,8 +43,7 @@ real release path. A sibling file duplicates ~60 lines and stays free to
 diverge. Alternative considered: add a `push` trigger and a tag input to
 `release.yml` — rejected for the conflict and blast-radius cost.
 
-**Build the server from the tree.** `cargo build -p vibe-server --release
---target <triple>` in `server/`, then copy into
+**Build the server from the tree.** `cargo build -p vibe-server --release --target <triple>` in `server/`, then copy into
 `desktop/src-tauri/binaries/vibe-server-<triple>[.exe]`. Alternatives: publish
 `server-v0.7.0` upstream first (out of our control and would make dev builds lag
 behind `main`), or reuse `chore server-build` (still requires `chore`).
@@ -75,8 +74,7 @@ cleanup run even on failure — rejected because it would delete the newest
 platform bundles whenever a runner is declined capacity, leaving a release that
 holds neither version.
 
-**Disable updater artifacts with `--config
-'{"bundle":{"createUpdaterArtifacts":false}}'`.** This is exactly what the
+**Disable updater artifacts with `--config '{"bundle":{"createUpdaterArtifacts":false}}'`.** This is exactly what the
 `upgrade` task does locally; it removes the signing-key requirement.
 
 **Version the build `<base>-dev.<short-sha>`, derived from `tauri.conf.json`.**
@@ -177,8 +175,8 @@ stall is accepted and recorded below rather than worked around.
 ## Migration Plan
 
 1. Add the workflow file and merge it into `main`.
-2. Enable Actions for the fork and disable `Deploy Website`.
-3. Push (or run manually) once; verify the `dev` release appears with all five
+1. Enable Actions for the fork and disable `Deploy Website`.
+1. Push (or run manually) once; verify the `dev` release appears with all five
    platform bundles.
-4. Rollback: disable the workflow or delete the `dev` release; nothing else is
+1. Rollback: disable the workflow or delete the `dev` release; nothing else is
    affected.

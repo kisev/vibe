@@ -28,9 +28,9 @@
 ## Screenshots
 
 <p align="center">
-	<a target="_blank" href="https://thewh1teagle.github.io/vibe/">
-    	<img width=720 src="./design/app-preview-light.png">
-	</a>
+    <a target="_blank" href="https://thewh1teagle.github.io/vibe/">
+        <img width=720 src="./design/app-preview-light.png" alt="Vibe transcription app">
+    </a>
 </p>
 
 # Features 🌟
@@ -73,7 +73,7 @@
 
 ## Developers
 
-Get started with local development [here](docs/BUILDING.md).
+Get started with local development in [the building guide](docs/BUILDING.md).
 
 Ideas, bug reports and translation fixes are welcome — please [open an issue](https://github.com/thewh1teagle/vibe/issues).
 Pull requests are limited to a few collaborators. See [CONTRIBUTE.md](CONTRIBUTE.md).
@@ -94,13 +94,13 @@ See the [translation guide](docs/TRANSLATIONS.md).
 
 see [Vibe Docs](https://github.com/thewh1teagle/vibe/tree/main/docs)
 
-# I want to know more!
+# I want to know more
 
 Medium [post](https://medium.com/@thewh1teagle/creating-vibe-multilingual-audio-transcription-872ab6d9dbb0)
 
 # Issue report
 
-You can open [new issue](https://github.com/thewh1teagle/vibe/issues/new?assignees=octocat&labels=bug&projects=&template=bug_report.yaml&title=[Short+title]) and it's recommend to check [DEBUG.md](docs/DEBUG.md) first.
+You can open [new issue](https://github.com/thewh1teagle/vibe/issues/new?assignees=octocat&labels=bug&projects=&template=bug_report.yaml&title=%5BShort+title%5D) and it's recommend to check [DEBUG.md](docs/DEBUG.md) first.
 
 # Privacy Policy 🔒
 

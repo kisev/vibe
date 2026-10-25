@@ -1,4 +1,4 @@
-<!-- source: 664188849caa -->
+<!-- source: be915b3ca44c -->
 
 # Installationshinweise 📝
 
@@ -27,7 +27,7 @@ export WEBKIT_DISABLE_COMPOSITING_MODE=1
 
 Laden Sie Ollama von https://ollama.com herunter und installieren Sie es.
 
-2. Ein Modell installieren
+1. Ein Modell installieren
 
 Richten Sie nach der Installation ein Modell für die Zusammenfassung ein. Sie können zum Beispiel `llama3.1` installieren, indem Sie den folgenden Befehl in Ihrem Terminal ausführen:
 
@@ -35,7 +35,7 @@ Richten Sie nach der Installation ein Modell für die Zusammenfassung ein. Sie k
 ollama run llama3.1
 ```
 
-3. Zusammenfassung aktivieren
+1. Zusammenfassung aktivieren
 
 Öffnen Sie nach der Installation des Modells die Ollama-App. Gehen Sie zu Weitere Optionen und aktivieren Sie Zusammenfassen kurz vor dem Transkriptionsschritt. Sie können die Einstellungen auf ihren Standardwerten belassen.
 
@@ -48,8 +48,8 @@ Das war's! Die Zusammenfassung ist jetzt in Ollama aktiv.
 Vibe enthält einen Modus für stabile Zeitstempel für präzisere Untertitel-Zeitangaben bei langen Inhalten.
 
 1. Öffnen Sie `Weitere Optionen`.
-2. Aktivieren Sie `Stabile Zeitstempel`.
-3. Laden Sie bei Aufforderung das VAD-Modell herunter.
+1. Aktivieren Sie `Stabile Zeitstempel`.
+1. Laden Sie bei Aufforderung das VAD-Modell herunter.
 
 Hinweise:
 
@@ -88,9 +88,9 @@ _Alle Modelle stehen zur manuellen Installation zur Verfügung. siehe Einstellun
 
 - z. B. passt `ggml-medium-encoder.mlmodelc.zip` zu `ggml-medium-encoder.bin`
 
-2. Öffnen Sie den Modellpfad aus den Vibe-Einstellungen
-3. Ziehen Sie die Datei `.mlcmodel.c` per Drag-and-Drop in den Modellordner, sodass sie neben der `.bin`-Datei liegt
-4. Transkribieren Sie eine Datei. Beim ersten Verwenden des Modells dauert es länger, da das Modell kompiliert wird. Danach wird es jedes Mal schneller.
+1. Öffnen Sie den Modellpfad aus den Vibe-Einstellungen
+1. Ziehen Sie die Datei `.mlcmodel.c` per Drag-and-Drop in den Modellordner, sodass sie neben der `.bin`-Datei liegt
+1. Transkribieren Sie eine Datei. Beim ersten Verwenden des Modells dauert es länger, da das Modell kompiliert wird. Danach wird es jedes Mal schneller.
 
 ## Fehler „`msvc140.dll` nicht gefunden“ ❌
 

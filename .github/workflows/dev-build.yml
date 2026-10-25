@@ -103,7 +103,10 @@ jobs:
               if: runner.os == 'Linux'
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends -o Acquire::Retries=3 pkg-config build-essential libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev clang cmake libssl-dev libasound2-dev libxdo-dev libayatana-appindicator3-dev rpm
+                  sudo apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+                      pkg-config build-essential libglib2.0-dev libgtk-3-dev \
+                      libwebkit2gtk-4.1-dev clang cmake libssl-dev libasound2-dev \
+                      libxdo-dev libayatana-appindicator3-dev rpm
 
             - name: Compute the dev version
               id: dev-version
@@ -163,7 +166,7 @@ jobs:
                   cargo build -p vibe-server --release --target "${{ matrix.triple }}"
                   mkdir -p ../desktop/src-tauri/binaries
                   cp "target/${{ matrix.triple }}/release/vibe-server$exe" \
-                     "../desktop/src-tauri/binaries/vibe-server-${{ matrix.triple }}$exe"
+                      "../desktop/src-tauri/binaries/vibe-server-${{ matrix.triple }}$exe"
 
             # The version proves the build env reached the crate; the commit is
             # printed by `serve` at startup, so check it is embedded instead of

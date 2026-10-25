@@ -4,10 +4,10 @@
 
 - JavaScript/Node.js: `pnpm` (sometimes `pnpx`)
 - Python: `uv`
-    - Add deps to scripts: `uv add --script example.py <packages> --bounds exact`
-    - Run scripts: `uv run example.py`
-    - Create scripts: `uv init --script example.py --python 3.12`
-    - Run inline: `uv run python -c "print('Hello, world!')"`
+  - Add deps to scripts: `uv add --script example.py <packages> --bounds exact`
+  - Run scripts: `uv run example.py`
+  - Create scripts: `uv init --script example.py --python 3.12`
+  - Run inline: `uv run python -c "print('Hello, world!')"`
 
 ## Validation
 

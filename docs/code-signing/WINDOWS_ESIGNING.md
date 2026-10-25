@@ -3,7 +3,7 @@
 Cloud-based code signing via SSL.com eSigner and Jsign.
 No USB token or YubiKey required.
 
----
+______________________________________________________________________
 
 ## 1. Purchase a certificate
 
@@ -35,10 +35,10 @@ Once validation is complete and the certificate is issued, continue to the next 
 After issuance:
 
 1. Go to the SSL.com Dashboard
-2. Open **Orders**
-3. Find your Code Signing order
-4. Click **Download**
-5. Scroll to **SIGNING CREDENTIALS**
+1. Open **Orders**
+1. Find your Code Signing order
+1. Click **Download**
+1. Scroll to **SIGNING CREDENTIALS**
 
 You should see:
 
@@ -56,11 +56,11 @@ SSL_COM_CREDENTIAL_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 In the same Order page, find the eSigner PIN / QR code section.
 
 1. Set a 4-digit PIN
-2. Choose **OTP App**
-3. Generate QR code
-4. Save **both**:
-    - The QR code (for your authenticator app)
-    - The **Base32 secret** shown as text
+1. Choose **OTP App**
+1. Generate QR code
+1. Save **both**:
+   - The QR code (for your authenticator app)
+   - The **Base32 secret** shown as text
 
 The Base32 secret looks like:
 
@@ -128,12 +128,12 @@ In `desktop/src-tauri/tauri.windows.conf.json`:
 
 ```json
 {
-	"windows": {
-		"signCommand": {
-			"cmd": "python",
-			"args": ["scripts/sign.py", "sign", "%1"]
-		}
-	}
+    "windows": {
+        "signCommand": {
+            "cmd": "python",
+            "args": ["scripts/sign.py", "sign", "%1"]
+        }
+    }
 }
 ```
 
@@ -168,18 +168,18 @@ Or with the full path to signtool:
 & "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" verify /pa /v path\to\file.exe
 ```
 
----
+______________________________________________________________________
 
 ## CI/CD setup (GitHub Actions)
 
 ### Set GitHub Actions secrets
 
-| Secret                  | Value                             |
+| Secret | Value |
 | ----------------------- | --------------------------------- |
 | `SSL_COM_CREDENTIAL_ID` | Your eSigner credential ID (UUID) |
-| `SSL_COM_USERNAME`      | Your SSL.com account email        |
-| `SSL_COM_PASSWORD`      | Your SSL.com account password     |
-| `SSL_COM_TOTP_SECRET`   | eSigner TOTP Base32 secret        |
+| `SSL_COM_USERNAME` | Your SSL.com account email |
+| `SSL_COM_PASSWORD` | Your SSL.com account password |
+| `SSL_COM_TOTP_SECRET` | eSigner TOTP Base32 secret |
 
 The workflow sets `SIGN_ENABLED=true` and passes these secrets
 to the signing script.
@@ -193,7 +193,7 @@ gh secret set SSL_COM_PASSWORD -b "your-password"
 gh secret set SSL_COM_TOTP_SECRET -b "BASE32_SECRET"
 ```
 
----
+______________________________________________________________________
 
 ## Troubleshooting
 

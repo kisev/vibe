@@ -1,6 +1,6 @@
 # Building
 
-### Prerequisites
+## Prerequisites
 
 [pnpm](https://pnpm.io/) | [uv](https://docs.astral.sh/uv/) | [Cargo](https://www.rust-lang.org/tools/install)
 
@@ -44,8 +44,7 @@ pnpm install
 pnpm exec tauri dev    # or: pnpm exec tauri build
 ```
 
-`chore setup` takes a target triple for cross-compiles — `chore setup
-x86_64-pc-windows-msvc` — which is how the release workflow uses it. Without one
+`chore setup` takes a target triple for cross-compiles — `chore setup x86_64-pc-windows-msvc` — which is how the release workflow uses it. Without one
 it fetches for this machine.
 
 On macOS, `chore upgrade` builds the app, replaces `/Applications/vibe.app` and
@@ -68,7 +67,8 @@ for the engine on its own.
 ## Test
 
 ```console
-chore test     # frontend tests (vitest)
+task desktop:test   # frontend tests (vitest)
+task test           # desktop, website and server suites
 ```
 
 Rust tests:
@@ -78,20 +78,18 @@ export RUST_LOG=trace
 cargo test -- --nocapture
 ```
 
-# Lint
+## Lint
 
 ```console
-chore ci           # everything below, in one go
-chore lint         # eslint, then cargo fmt and clippy with CI's flags
-chore format       # prettier and cargo fmt, in place
-chore check-types  # tsc over desktop and website
-chore check-i18n   # translation coverage against en-US
+task lint          # the whole-tree gate: yaml, toml, markdown, json, js, shell, editorconfig, workflows, secrets
+task format        # every formatter, in place
+task format:check  # fail when anything is unformatted
 ```
 
-# Create new release
+## Create new release
 
 1. Increment version in `tauri.conf.json` and commit
-2. Run the Release workflow from GitHub Actions (workflow_dispatch)
+1. Run the Release workflow from GitHub Actions (workflow_dispatch)
 
 It will create releases for `Windows`, `Linux`, and `macOS`
 
@@ -101,7 +99,7 @@ When `Release` action finishes, it will run `Deploy landing` action
 
 and update downloads links in landing page.
 
-# Landing
+## Landing
 
 ## Compress images
 

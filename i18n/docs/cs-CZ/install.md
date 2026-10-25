@@ -1,4 +1,4 @@
-<!-- source: 664188849caa -->
+<!-- source: be915b3ca44c -->
 
 # Poznámky k instalaci 📝
 
@@ -27,7 +27,7 @@ export WEBKIT_DISABLE_COMPOSITING_MODE=1
 
 Stáhněte a nainstalujte Ollama z https://ollama.com.
 
-2. Nainstalujte model
+1. Nainstalujte model
 
 Po instalaci nastavte model pro shrnutí. Můžete například nainstalovat `llama3.1` spuštěním následujícího příkazu v terminálu:
 
@@ -35,11 +35,11 @@ Po instalaci nastavte model pro shrnutí. Můžete například nainstalovat `lla
 ollama run llama3.1
 ```
 
-3. Povolte shrnutí
+1. Povolte shrnutí
 
 Po instalaci modelu otevřete aplikaci Ollama. Přejděte do Další možnosti a povolte Shrnout těsně před krokem přepisu. Nastavení můžete ponechat na výchozích hodnotách.
 
-_Ujistěte se, že jste spustili 'Spustit kontrolu` a ověřili, že to funguje_
+_Ujistěte se, že jste spustili 'Spustit kontrolu\` a ověřili, že to funguje_
 
 To je vše! Shrnutí bude nyní v Ollama aktivní.
 
@@ -48,8 +48,8 @@ To je vše! Shrnutí bude nyní v Ollama aktivní.
 Vibe obsahuje režim stabilních časových značek pro přesnější časování titulků u dlouhého obsahu.
 
 1. Otevřete `Další možnosti`.
-2. Povolte `Stabilní časové značky`.
-3. Pokud budete vyzváni, stáhněte model VAD.
+1. Povolte `Stabilní časové značky`.
+1. Pokud budete vyzváni, stáhněte model VAD.
 
 Poznámky:
 
@@ -88,9 +88,9 @@ _Všechny modely jsou dostupné pro ruční instalaci. viz nastavení nebo [Pře
 
 - např. `ggml-medium-encoder.mlmodelc.zip` odpovídá `ggml-medium-encoder.bin`
 
-2. Otevřete cestu k modelům v nastavení Vibe
-3. Přetáhněte soubor `.mlcmodel.c` do složky s modely tak, aby byl vedle souboru `.bin`
-4. Přepište soubor; při prvním použití modelu to bude trvat déle, protože se model kompiluje. Při každém dalším použití to bude rychlejší.
+1. Otevřete cestu k modelům v nastavení Vibe
+1. Přetáhněte soubor `.mlcmodel.c` do složky s modely tak, aby byl vedle souboru `.bin`
+1. Přepište soubor; při prvním použití modelu to bude trvat déle, protože se model kompiluje. Při každém dalším použití to bude rychlejší.
 
 ## Chyba: `msvc140.dll` nebyl nalezen ❌
 

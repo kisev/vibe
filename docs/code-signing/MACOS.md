@@ -5,26 +5,26 @@ outside the App Store using a Developer ID Application certificate.
 
 Prerequisite: an approved Apple Developer Program enrollment ($99/year).
 
----
+______________________________________________________________________
 
 ## 1. Create a Certificate Signing Request (CSR)
 
 1. Open **Keychain Access** on your Mac
-2. Menu: **Keychain Access** > **Certificate Assistant** > **Request a Certificate from a Certificate Authority**
-3. Enter your email address and common name
-4. Select **Saved to disk**
-5. Save the `.certSigningRequest` file
+1. Menu: **Keychain Access** > **Certificate Assistant** > **Request a Certificate from a Certificate Authority**
+1. Enter your email address and common name
+1. Select **Saved to disk**
+1. Save the `.certSigningRequest` file
 
 This creates a key pair (private key) in your **login** keychain automatically.
 
 ## 2. Create the Developer ID Application certificate
 
 1. Go to [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/certificates/list)
-2. Click **Create a Certificate** (+ button)
-3. Select **Developer ID Application**
-4. Select **G2 Sub-CA** (recommended)
-5. Upload the CSR from step 1
-6. Download the resulting `.cer` file
+1. Click **Create a Certificate** (+ button)
+1. Select **Developer ID Application**
+1. Select **G2 Sub-CA** (recommended)
+1. Upload the CSR from step 1
+1. Download the resulting `.cer` file
 
 > **Note:** Only the Apple Developer Account Holder can create
 > Developer ID Application certificates.
@@ -32,8 +32,8 @@ This creates a key pair (private key) in your **login** keychain automatically.
 ## 3. Install the certificate
 
 1. Double-click the downloaded `.cer` file
-2. Install it into the **login** keychain (not iCloud)
-3. Verify in Keychain Access that the certificate appears under **My Certificates**
+1. Install it into the **login** keychain (not iCloud)
+1. Verify in Keychain Access that the certificate appears under **My Certificates**
    with a private key attached (expandable arrow)
 
 ## 4. Install the intermediate certificate (critical)
@@ -53,11 +53,11 @@ This looks like an ACL/permissions issue but is actually a broken certificate ch
 ### Fix
 
 1. Go to [Apple Certificate Authority](https://www.apple.com/certificateauthority/)
-2. Download:
-    - **Developer ID - G2** (Expiring 09/17/2031)
-    - **Apple Root CA - G2** (if not already in System Roots)
-3. Double-click each file to install into the **login** keychain
-4. In Keychain Access, verify trust is set to **Use System Defaults** for each certificate
+1. Download:
+   - **Developer ID - G2** (Expiring 09/17/2031)
+   - **Apple Root CA - G2** (if not already in System Roots)
+1. Double-click each file to install into the **login** keychain
+1. In Keychain Access, verify trust is set to **Use System Defaults** for each certificate
 
 ### Verify the chain
 
@@ -89,11 +89,11 @@ Set the signing identity in `tauri.conf.json`:
 
 ```json
 {
-	"bundle": {
-		"macOS": {
-			"signingIdentity": "Developer ID Application: Your Name (TEAMID)"
-		}
-	}
+    "bundle": {
+        "macOS": {
+            "signingIdentity": "Developer ID Application: Your Name (TEAMID)"
+        }
+    }
 }
 ```
 
@@ -125,8 +125,8 @@ Tauri handles submission, polling, and stapling automatically.
 Apple does not accept your regular Apple ID password for notarization.
 
 1. Go to [appleid.apple.com](https://appleid.apple.com)
-2. Navigate to **Sign-In and Security** > **App-Specific Passwords**
-3. Generate a new password and save it
+1. Navigate to **Sign-In and Security** > **App-Specific Passwords**
+1. Generate a new password and save it
 
 ### Set environment variables
 
@@ -146,8 +146,8 @@ security find-identity -v -p codesigning
 Run `tauri build` again. Tauri will:
 
 1. Submit the app to Apple for notarization
-2. Wait for Apple's response
-3. Staple the notarization ticket to the app
+1. Wait for Apple's response
+1. Staple the notarization ticket to the app
 
 ### Notarization can be slow
 
@@ -196,9 +196,9 @@ Subsequent notarizations should be much faster.
 ### Export the certificate
 
 1. Open **Keychain Access** > **login** keychain > **My Certificates**
-2. Find your Developer ID Application certificate
-3. Right-click the certificate > **Export**
-4. Save as `.p12` format with a strong password
+1. Find your Developer ID Application certificate
+1. Right-click the certificate > **Export**
+1. Save as `.p12` format with a strong password
 
 ### Base64-encode the certificate
 
@@ -208,14 +208,14 @@ openssl base64 -A -in /path/to/certificate.p12 -out certificate-base64.txt
 
 ### Set GitHub Actions secrets
 
-| Secret                       | Value                                              |
+| Secret | Value |
 | ---------------------------- | -------------------------------------------------- |
-| `APPLE_CERTIFICATE`          | Contents of `certificate-base64.txt`               |
-| `APPLE_CERTIFICATE_PASSWORD` | The `.p12` export password                         |
-| `APPLE_SIGNING_IDENTITY`     | `Developer ID Application: Your Name (TEAMID)`     |
-| `APPLE_ID`                   | Your Apple ID email                                |
-| `APPLE_PASSWORD`             | App-specific password (not your Apple ID password) |
-| `APPLE_TEAM_ID`              | Your 10-character team ID                          |
+| `APPLE_CERTIFICATE` | Contents of `certificate-base64.txt` |
+| `APPLE_CERTIFICATE_PASSWORD` | The `.p12` export password |
+| `APPLE_SIGNING_IDENTITY` | `Developer ID Application: Your Name (TEAMID)` |
+| `APPLE_ID` | Your Apple ID email |
+| `APPLE_PASSWORD` | App-specific password (not your Apple ID password) |
+| `APPLE_TEAM_ID` | Your 10-character team ID |
 
 Set them via CLI. `gh secret set` targets the repo in your current directory.
 To verify which repo that is:
@@ -241,7 +241,7 @@ After setting secrets, delete the local files:
 rm certificate.p12 certificate-base64.txt
 ```
 
----
+______________________________________________________________________
 
 ## Troubleshooting
 
