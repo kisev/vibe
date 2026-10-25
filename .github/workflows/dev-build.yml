@@ -133,7 +133,7 @@ jobs:
                   # so a dev install shows what it carries; GitHub renders the
                   # sections as-is, only the frontmatter drops.
                   if [ -f i18n/changelog/unreleased.md ]; then
-                      body=$(awk 'c==2{print} /^---$/{c++}' i18n/changelog/unreleased.md | head -c 60000)
+                      body=$(awk 'c==2{print} /^---$/{c++}' i18n/changelog/unreleased.md | sed '/./,$!d' | head -c 60000)
                   else
                       body="Dev build of main at ${GITHUB_SHA}."
                   fi

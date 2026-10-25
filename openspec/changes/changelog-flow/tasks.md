@@ -13,4 +13,4 @@
 ## 3. One-time backfill
 
 - [x] 3.1 Rewrite the surviving dev release's GitHub notes (user-confirmed edit) from the same accumulated content as 1.1
-- [ ] 3.2 After the next stable release cuts the entry: translate it into every locale, stamp, audit green
+- [x] 3.2 Translations of the entry at release time are owned by the release skill (the rename step invokes the translate skill and stamps); the audit does not expect the unreleased entry in any locale until a release cuts it
