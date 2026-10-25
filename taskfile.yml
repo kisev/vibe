@@ -120,7 +120,7 @@ tasks:
 
   lint:toml:
     cmds:
-      - mise exec -- fd -H -g '*.toml' -E node_modules -E desktop/project.inlang -E website/project.inlang -E Cargo.lock -X tombi lint
+      - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E desktop/project.inlang -E website/project.inlang -X tombi lint
 
   lint:md:
     cmds:
@@ -161,7 +161,7 @@ tasks:
       - task: format:md
       - task: format:json
       - mise exec -- fd -H -g '*.sh' -E node_modules -X shfmt -i 4 -w
-      - mise exec -- tombi format --check >/dev/null 2>&1 || mise exec -- tombi format
+      - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E desktop/project.inlang -E website/project.inlang -X tombi format
       - mise exec -- fd -H -e css -e html -E node_modules -X prettier --write
 
   format:md:
@@ -184,7 +184,7 @@ tasks:
         -E desktop/project.inlang -E website/project.inlang -X
         oxfmt --check
       - mise exec -- fd -H -g '*.sh' -E node_modules -X shfmt -i 4 -d
-      - mise exec -- fd -H -g '*.toml' -E node_modules -E desktop/project.inlang -E website/project.inlang -X tombi format --check
+      - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E desktop/project.inlang -E website/project.inlang -X tombi format --check
       - mise exec -- fd -H -e css -e html -E node_modules -X prettier --check
 
   dev:tag:

@@ -11,10 +11,7 @@ edition = "2021"
 meeting-detect = { path = "../../crates/meeting-detect" }
 tauri = { version = "2", features = ["devtools", "macos-private-api", "protocol-asset", "tray-icon"] }
 
-tauri-plugin-aptabase = {
-  git = "https://github.com/vibe-transcribe/tauri-plugin-aptabase",
-  branch = "deterministic-daily-session"
-}
+tauri-plugin-aptabase = { git = "https://github.com/vibe-transcribe/tauri-plugin-aptabase", branch = "deterministic-daily-session" }
 tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-deep-link = "2"
@@ -91,11 +88,7 @@ openssl = { version = "0.10.75", features = ["vendored"] }
 block2 = "0.6.2"
 objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", features = ["NSApplication", "NSOpenPanel", "NSPanel", "NSSavePanel", "NSWindow"] }
-objc2-av-foundation = {
-  version = "0.3.2",
-  default-features = false,
-  features = ["AVCaptureDevice", "AVMediaFormat", "block2", "std"]
-}
+objc2-av-foundation = { version = "0.3.2", default-features = false, features = ["AVCaptureDevice", "AVMediaFormat", "block2", "std"] }
 objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSString", "NSURL"] }
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel.git", rev = "c9ec2130422200f0863b23dfdad02b133a529b07" }
 window-vibrancy = "0.6"
@@ -106,13 +99,7 @@ window-vibrancy = "0.6"
 libc = "0.2.180"
 libc-stdhandle = "=0.1.0"
 # Used to attach to console
-windows = {
-  version = "0.62.2",
-  features = [
-    "Win32_Foundation",
-    "Win32_System_Console",
-  ]
-}
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Console"] }
 winreg = "0.55.0"
 
 [features]

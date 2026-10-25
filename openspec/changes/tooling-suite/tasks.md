@@ -10,7 +10,7 @@
 
 - [x] 2.1 Add `lefthook.yml`: parallel staged-scoped pre-commit jobs per file type (gitleaks staged, trivy secret scan, prettier, oxfmt, oxlint, yamllint, tombi lint/format-check, markdownlint-cli2, mdformat --check, shfmt -d, shellcheck, editorconfig-checker, actionlint on workflow files), `pre-push: task test`, `commit-msg: commitlint`
 - [x] 2.2 Add `commitlint.config.mjs` (conventional commits, matching the repo's imperative style) and `.gitleaks.toml`/`trivy-secret.yaml` with allowlists for the repo's known-good test tokens
-- [ ] 2.3 Add `task hooks` (installs lefthook once per checkout) and verify the full gate path on a sample staged change
+- [x] 2.3 Add `task hooks` (installs lefthook once per checkout) and verify the full gate path on a sample staged change
 
 ## 3. Lint/format configs
 

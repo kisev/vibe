@@ -18,12 +18,14 @@ pre-commit:
       run: mise exec -- yamllint {staged_files}
     toml-lint:
       glob: "**/*.toml"
-      exclude: "{node_modules,desktop/project.inlang,website/project.inlang}/**"
-      run: mise exec -- tombi lint {staged_files}
+      exclude: "{node_modules,desktop/project.inlang,website/project.inlang}/**,**/Cargo.toml"
+      # Cargo.toml stays out: cargo and tauri own its style, and tombi's
+      # inline-table expansion is TOML 1.1 that tauri's parser rejects
+      run: sh -c 'files=$(printf "%s\n" {staged_files} | grep -v "Cargo\.toml$" || true); [ -z "$files" ] || mise exec -- tombi lint $files'
     toml-format:
       glob: "**/*.toml"
-      exclude: "{node_modules,desktop/project.inlang,website/project.inlang}/**"
-      run: mise exec -- tombi format --check {staged_files}
+      exclude: "{node_modules,desktop/project.inlang,website/project.inlang}/**,**/Cargo.toml"
+      run: sh -c 'files=$(printf "%s\n" {staged_files} | grep -v "Cargo\.toml$" || true); [ -z "$files" ] || mise exec -- tombi format --check $files'
     markdown:
       glob: "**/*.md"
       exclude: "{node_modules,desktop/src/paraglide,.claude,.opencode,.agents,i18n/changelog}/**,i18n/docs/*/models.md"
