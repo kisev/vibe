@@ -47,13 +47,21 @@ Three files, one commit:
 - `.server-version` → the new server tag minus `server-` (only if step 1 released one).
 - `i18n/changelog/<version>.md`. **release.yml fails without it.**
 
-If that file does not exist, write it. Read what actually shipped —
-`git log --oneline <previous tag>..main` and the PR bodies — and write the entry
-the way its neighbours are written: frontmatter (`version`, `date`, `title`), then
-`## New` / `## Improved` / `## Fixed` sections of `- 🎯 **Term** — what changed`
-bullets, keeping the `(#1234)` refs and `@handle` credits. Read the last two
-entries first and match their voice: plain, concrete, user-visible. A refactor
-nobody can see does not get a bullet.
+The notes are not written at release time — they accumulate in
+`i18n/changelog/unreleased.md` (same frontmatter and `## New` / `## Improved` /
+`## Fixed` sections, `- 🎯 **Term** — what changed` bullets) as user-visible
+changes land, and the website renders that entry above every release. At release
+time:
+
+- Copy `unreleased.md` to `i18n/changelog/<version>.md`, set `version:` and
+  `date:` in its frontmatter (the title was written as the entry grew;
+  release.yml fails without the versioned file).
+- Replace `unreleased.md` with a fresh skeleton so the next cycle starts empty.
+
+If an entry is missing bullets, read what actually shipped —
+`git log --oneline <previous tag>..main` and the PR bodies — and match the voice
+of the last two entries: plain, concrete, user-visible. A refactor nobody can see
+does not get a bullet.
 
 Then translate it: invoke the `translate` skill, which fans one cheap subagent per
 locale over the new file and stamps the hashes. Untranslated is not fatal — the
@@ -111,12 +119,14 @@ log. A single failed platform can be re-run with `gh run rerun <id> --failed`.
 ## 6. Promote
 
 ```
-gh release edit vX.Y.Z --prerelease=false --latest
+awk 'c==2{print} /^---$/{c++}' i18n/changelog/<version>.md > /tmp/notes.md
+gh release edit vX.Y.Z --prerelease=false --latest --notes-file /tmp/notes.md
 ```
 
-Do not write release notes — the body is already a link to
-`https://thewh1teagle.github.io/vibe/changelog/<version>`, which is where the notes
-live, in the reader's language.
+The release body carries the same content as the versioned entry, so GitHub and
+the website never disagree; the reader's-language version lives at
+`https://kisev.github.io/vibe/changelog/<version>`. Dev releases pick the body up
+from `unreleased.md` automatically.
 
 ## 7. Deploy the website and stop the sign server
 

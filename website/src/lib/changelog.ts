@@ -55,6 +55,8 @@ function parse(raw: string, locale: string): Release {
 }
 
 function compareVersions(a: string, b: string) {
+	// The unreleased entry always leads, whatever its neighbors.
+	if (a === 'unreleased' || b === 'unreleased') return a === 'unreleased' ? -1 : 1
 	const pa = a.split('.').map(Number)
 	const pb = b.split('.').map(Number)
 	for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return (pb[i] ?? 0) - (pa[i] ?? 0)

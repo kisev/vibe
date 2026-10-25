@@ -129,10 +129,24 @@ jobs:
                       bundle: { createUpdaterArtifacts: false },
                       plugins: { updater: { endpoints: [] } }
                   }')
+                  # The release body is the accumulated unreleased changelog entry,
+                  # so a dev install shows what it carries; GitHub renders the
+                  # sections as-is, only the frontmatter drops.
+                  if [ -f i18n/changelog/unreleased.md ]; then
+                      body=$(awk 'c==2{print} /^---$/{c++}' i18n/changelog/unreleased.md | head -c 60000)
+                  else
+                      body="Dev build of main at ${GITHUB_SHA}."
+                  fi
                   {
                       echo "version=$version"
                       echo "tag=$tag"
                       echo "config=$config"
+                  } >> "$GITHUB_OUTPUT"
+                  # Multiline output; tauri-action publishes it as the release body.
+                  {
+                      echo "body<<CHANGELOG_EOF"
+                      echo "$body"
+                      echo "CHANGELOG_EOF"
                   } >> "$GITHUB_OUTPUT"
 
             - name: Build vibe-server
@@ -213,7 +227,7 @@ jobs:
               with:
                   tagName: ${{ steps.dev-version.outputs.tag }}
                   releaseName: Dev build ${{ steps.dev-version.outputs.version }}
-                  releaseBody: "Dev build of main at ${{ github.sha }}."
+                  releaseBody: ${{ steps.dev-version.outputs.body }}
                   releaseCommitish: ${{ github.sha }}
                   prerelease: true
                   includeUpdaterJson: false

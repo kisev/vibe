@@ -37,7 +37,8 @@ function formatDate(date: string, locale: string) {
 }
 
 function Entry({ release, single }: { release: Release; single: boolean }) {
-	const id = `v${release.version}`
+	// The unreleased entry has no version number yet — it is the dev line in progress.
+	const id = release.version === 'unreleased' ? 'Unreleased' : `v${release.version}`
 	return (
 		<article
 			id={id}
@@ -48,9 +49,11 @@ function Entry({ release, single }: { release: Release; single: boolean }) {
 				<Link to={`/changelog/${release.version}`} className="text-[15px] font-medium text-foreground transition-colors hover:text-primary">
 					{id}
 				</Link>
-				<time dateTime={release.date} className="mt-1 block text-[13px] text-muted-foreground">
-					{formatDate(release.date, release.locale)}
-				</time>
+				{release.date && (
+					<time dateTime={release.date} className="mt-1 block text-[13px] text-muted-foreground">
+						{formatDate(release.date, release.locale)}
+					</time>
+				)}
 				{single && (
 					<Link
 						to="/changelog"
