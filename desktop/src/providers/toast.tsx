@@ -1,21 +1,24 @@
-import { ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react'
+import { ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ModifyState } from '~/lib/types'
 import { m } from '~/paraglide/messages.js'
 
-export interface ToastModalState {
-	open: boolean
+/**
+ * Setters only: consumers (whole pages) must not re-render when the progress
+ * ticks — download progress fires on every ~2 MB chunk, and a state value in
+ * the context would re-render every consumer hundreds of times per download.
+ * The values stay local to this provider; only the toast itself updates.
+ */
+export interface ToastApi {
 	setOpen: ModifyState<boolean>
-	message: string
 	setMessage: ModifyState<string>
-	progress: number | null
 	setProgress: ModifyState<number | null>
 }
 
-export const ToastContext = createContext<ToastModalState | null>(null)
+export const ToastContext = createContext<ToastApi | null>(null)
 
 export function useToastProvider() {
-	return useContext(ToastContext) as ToastModalState
+	return useContext(ToastContext) as ToastApi
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -23,6 +26,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 	const [message, setMessage] = useState('')
 	const [progress, setProgress] = useState<number | null>(null)
 	const toastId = useRef<string | number | null>(null)
+	const api = useMemo(() => ({ setOpen, setMessage, setProgress }), [])
 
 	useEffect(() => {
 		if (open) {
@@ -38,5 +42,5 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 		}
 	}, [open, message, progress])
 
-	return <ToastContext.Provider value={{ message, open, progress, setOpen, setProgress, setMessage }}>{children}</ToastContext.Provider>
+	return <ToastContext.Provider value={api}>{children}</ToastContext.Provider>
 }
