@@ -128,6 +128,11 @@ export async function downloadModel(source: string | ModelDownload, options: Dow
 	return result.status === 'completed' ? result.path : null
 }
 
+/** Remove a downloaded model file from disk; the Rust side refuses anything that is not model weights. */
+export async function deleteModelFile(path: string) {
+	await invoke<void>('delete_model_file', { path })
+}
+
 function toIntegrity(integrity: ModelIntegrity): ModelIntegrity | undefined {
 	return integrity.size === undefined && integrity.sha256 === undefined ? undefined : integrity
 }
@@ -182,11 +187,7 @@ export function hidesDecodingOptions(capabilities: ModelCapabilities | null | un
 	return capabilities?.decoding_options === false
 }
 
-export type ModelLimitation =
-	| { kind: 'language'; language: string }
-	| { kind: 'streaming' }
-	| { kind: 'translation' }
-	| { kind: 'prompts' }
+export type ModelLimitation = { kind: 'language'; language: string } | { kind: 'streaming' } | { kind: 'translation' } | { kind: 'prompts' }
 
 /**
  * Which limitations of a model are worth naming in the UI. Derived from capability flags

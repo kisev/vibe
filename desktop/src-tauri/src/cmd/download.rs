@@ -324,6 +324,20 @@ async fn download_to_partial(
     Ok(DownloadOutcome::Completed)
 }
 
+/// Delete one model file from disk, on request from the models settings. The
+/// path comes from the models folder scan, but the extension guard keeps a
+/// stale or malformed path from removing anything but model weights.
+#[tauri::command]
+pub async fn delete_model_file(path: String) -> Result<()> {
+    let path = PathBuf::from(&path);
+    if !is_model_path(&path) {
+        bail!("refusing to delete a non-model file: {path:?}");
+    }
+    remove_if_exists(&path)?;
+    tracing::info!("deleted model file {}", path.display());
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn download_model(
     app_handle: tauri::AppHandle,

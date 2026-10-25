@@ -1,9 +1,21 @@
-import { useMemo, useState } from 'react'
-import { Check, Download, FolderOpen, Link as LinkIcon, Pencil, X } from 'lucide-react'
+import { useEffect, useMemo, useState, type MouseEvent, type PointerEvent } from 'react'
+import * as SelectPrimitive from '@radix-ui/react-select'
+import { Check, Download, ExternalLink, FolderOpen, Link as LinkIcon, Pencil, Trash2, X } from 'lucide-react'
 import { m } from '~/paraglide/messages.js'
 import { toast } from 'sonner'
-import { asrCatalog, availability, defaultQuant, entryScores, fileUrl, providerName, sizeMb, type CatalogModel } from '~/lib/catalog'
-import { downloadModel, getFriendlyModelName } from '~/lib/model'
+import {
+	asrCatalog,
+	availability,
+	baseLanguage,
+	defaultQuant,
+	entryScores,
+	fileUrl,
+	providerName,
+	sizeMb,
+	type CatalogFileEntry,
+	type CatalogModel,
+} from '~/lib/catalog'
+import { deleteModelFile, downloadModel, getFriendlyModelName } from '~/lib/model'
 import type { ModelDownload } from '~/lib/config'
 import { useToastProvider } from '~/providers/toast'
 import { cn } from '~/lib/style'
@@ -16,9 +28,13 @@ import type { NamedPath } from '~/lib/types'
 import { ReactComponent as FolderIcon } from '~/icons/folder.svg'
 import { ReactComponent as WrenchIcon } from '~/icons/wrench.svg'
 
-/** Compact language list: everything when short, otherwise the first three plus a count. */
+/** Provider filter value for manual downloads that no catalog provider claims. */
+const CUSTOM_PROVIDER = 'custom'
+
+/** Compact language list in short codes: everything when short, otherwise the first three plus a count. */
 export function compactLanguages(languages: string[]): string {
-	return languages.length <= 3 ? languages.join(', ') : `${languages.slice(0, 3).join(', ')} +${languages.length - 3}`
+	const bases = [...new Set(languages.map(baseLanguage))]
+	return bases.length <= 3 ? bases.join(', ') : `${bases.slice(0, 3).join(', ')} +${bases.length - 3}`
 }
 
 /** One relative-score bar; an unbenchmarked score renders nothing rather than a fake bar. */
@@ -54,6 +70,11 @@ function catalogLimitations(model: CatalogModel): string[] {
 	if (!model.capabilities.streaming) notes.push(m.modelLimitationStreaming())
 	if (!model.capabilities.translate) notes.push(m.modelLimitationTranslation())
 	return notes
+}
+
+/** The model's page on Hugging Face, at the exact revision the catalog pins. */
+function repoUrl(model: CatalogModel): string {
+	return `https://huggingface.co/${model.repository}/tree/${model.revision}`
 }
 
 /** Rename controls shared by the installed cards. */
@@ -95,12 +116,116 @@ interface Renaming {
 	cancel: () => void
 }
 
+/** A trash button that asks for a second click before deleting — one icon, no dialog. */
+function DeleteAction({ label, onConfirm, disabled }: { label: string; onConfirm: () => void; disabled?: boolean }) {
+	const [confirming, setConfirming] = useState(false)
+	useEffect(() => {
+		if (!confirming) return
+		const timer = setTimeout(() => setConfirming(false), 3000)
+		return () => clearTimeout(timer)
+	}, [confirming])
+
+	return confirming ? (
+		<IconAction
+			label={m.catalogConfirmDelete()}
+			icon={<Check className="h-4 w-4 text-red-500" />}
+			onClick={() => {
+				setConfirming(false)
+				onConfirm()
+			}}
+		/>
+	) : (
+		<IconAction variant="outline" label={label} icon={<Trash2 className="h-4 w-4" />} disabled={disabled} onClick={() => setConfirming(true)} />
+	)
+}
+
+/** Stops pointer and click events so a button inside a Radix select item acts without selecting the item. */
+function itemButtonProps(action: () => void) {
+	return {
+		onPointerDown: (event: PointerEvent) => event.stopPropagation(),
+		onPointerUp: (event: PointerEvent) => event.stopPropagation(),
+		onClick: (event: MouseEvent) => {
+			event.stopPropagation()
+			event.preventDefault()
+			action()
+		},
+	}
+}
+
+/**
+ * One quantization in the selector: a check when the file is on disk, the size,
+ * and the per-quant action — download it or delete the downloaded copy.
+ */
+function QuantItem({
+	quant,
+	file,
+	installed,
+	downloadDisabled,
+	deleteDisabled,
+	onDownload,
+	onDelete,
+}: {
+	quant: string
+	file: CatalogFileEntry
+	installed: boolean
+	downloadDisabled: boolean
+	deleteDisabled: boolean
+	onDownload: () => void
+	onDelete: () => void
+}) {
+	const [confirming, setConfirming] = useState(false)
+	return (
+		<SelectPrimitive.Item
+			value={quant}
+			className="relative flex h-9 w-full cursor-pointer select-none items-center rounded-sm py-1.5 pe-2 ps-8 text-sm outline-none focus:bg-accent/75 focus:text-accent-foreground">
+			<span className="absolute start-2 flex h-3.5 w-3.5 items-center justify-center text-primary">
+				{installed && <Check className="h-3.5 w-3.5" aria-label={m.catalogInstalled()} />}
+			</span>
+			<SelectPrimitive.ItemText>
+				{quant} · {sizeMb(file.size)} MB
+			</SelectPrimitive.ItemText>
+			{confirming ? (
+				<button
+					type="button"
+					aria-label={m.catalogConfirmDelete()}
+					className="ms-auto flex h-6 w-6 items-center justify-center rounded-md text-red-500 hover:bg-accent"
+					{...itemButtonProps(() => {
+						setConfirming(false)
+						onDelete()
+					})}>
+					<Check className="h-3.5 w-3.5" />
+				</button>
+			) : installed ? (
+				<button
+					type="button"
+					aria-label={m.catalogDelete()}
+					disabled={deleteDisabled}
+					className="ms-auto flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+					{...itemButtonProps(() => setConfirming(true))}>
+					<Trash2 className="h-3.5 w-3.5" />
+				</button>
+			) : (
+				<button
+					type="button"
+					aria-label={m.downloadModel()}
+					disabled={downloadDisabled}
+					className="ms-auto flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+					{...itemButtonProps(onDownload)}>
+					<Download className="h-3.5 w-3.5" />
+				</button>
+			)}
+		</SelectPrimitive.Item>
+	)
+}
+
 function CatalogCard({
 	model,
 	installedEntry,
 	installedNames,
+	pathOf,
 	active,
 	onDownload,
+	onDelete,
 	onSelect,
 	onOpenFolder,
 	renaming,
@@ -110,8 +235,11 @@ function CatalogCard({
 	installedEntry?: NamedPath
 	/** Every installed file name; drives per-quant install state. */
 	installedNames: Set<string>
+	/** Path of an installed file name, for delete actions. */
+	pathOf: (filename: string) => string | undefined
 	active: boolean
 	onDownload: (download: ModelDownload) => void
+	onDelete: (paths: string[]) => void
 	onSelect: (path: string) => void
 	onOpenFolder: (path: string) => void
 	renaming: Renaming | undefined
@@ -122,6 +250,11 @@ function CatalogCard({
 	const scores = entryScores(model)
 	const limitations = catalogLimitations(model)
 	const thisQuantInstalled = Boolean(file && installedNames.has(file.filename))
+	// Every copy of this entry on disk — the model-level delete removes them all.
+	const installedPaths = Object.values(model.files)
+		.filter((candidate) => installedNames.has(candidate.filename))
+		.map((candidate) => pathOf(candidate.filename))
+		.filter((path): path is string => path !== undefined)
 
 	return (
 		<div
@@ -135,24 +268,42 @@ function CatalogCard({
 				<div className="min-w-0">
 					<div className="flex items-center gap-2">
 						<span className="text-sm font-medium text-foreground">{model.name}</span>
+						<a
+							href={repoUrl(model)}
+							target="_blank"
+							rel="noreferrer"
+							aria-label={m.catalogOpenOnHuggingFace()}
+							className="text-muted-foreground hover:text-foreground">
+							<ExternalLink className="h-3.5 w-3.5" />
+						</a>
 						{active ? <Badge>{m.catalogActive()}</Badge> : installedEntry && <Badge variant="outline">{m.catalogInstalled()}</Badge>}
 					</div>
 				</div>
 				<div className="flex shrink-0 items-center gap-1.5">
-					{Object.keys(model.files).length > 1 && (
-						<Select value={quant} onValueChange={setQuant}>
-							<SelectTrigger aria-label={m.catalogQuantization()} className={`w-28 ${rowControlClass}`}>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{Object.keys(model.files).map((candidate) => (
-									<SelectItem key={candidate} value={candidate}>
-										{candidate}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					)}
+					<Select value={quant} onValueChange={setQuant}>
+						<SelectTrigger aria-label={m.catalogQuantization()} className={`w-36 ${rowControlClass}`}>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{Object.entries(model.files).map(([candidate, candidateFile]) => (
+								<QuantItem
+									key={candidate}
+									quant={candidate}
+									file={candidateFile}
+									installed={installedNames.has(candidateFile.filename)}
+									downloadDisabled={!status.ok}
+									deleteDisabled={active && installedNames.has(candidateFile.filename)}
+									onDownload={() =>
+										onDownload({ url: fileUrl(model, candidateFile), size: candidateFile.size, sha256: candidateFile.sha256 })
+									}
+									onDelete={() => {
+										const path = pathOf(candidateFile.filename)
+										if (path) onDelete([path])
+									}}
+								/>
+							))}
+						</SelectContent>
+					</Select>
 					{thisQuantInstalled ? (
 						renaming?.editing ? (
 							<RenameControls value={renaming.name} onChange={renaming.setName} onCommit={renaming.commit} onCancel={renaming.cancel} />
@@ -172,6 +323,7 @@ function CatalogCard({
 									icon={<FolderOpen className="h-4 w-4" />}
 									onClick={() => installedEntry && onOpenFolder(installedEntry.path)}
 								/>
+								<DeleteAction label={m.catalogDeleteModel()} disabled={active} onConfirm={() => onDelete(installedPaths)} />
 							</>
 						)
 					) : (
@@ -210,6 +362,7 @@ function ExtraCard({
 	entry,
 	active,
 	displayName,
+	onDelete,
 	onSelect,
 	onOpenFolder,
 	renaming,
@@ -217,6 +370,7 @@ function ExtraCard({
 	entry: NamedPath
 	active: boolean
 	displayName: string
+	onDelete: (paths: string[]) => void
 	onSelect: (path: string) => void
 	onOpenFolder: (path: string) => void
 	renaming: Renaming
@@ -244,6 +398,7 @@ function ExtraCard({
 								icon={<FolderOpen className="h-4 w-4" />}
 								onClick={() => onOpenFolder(entry.path)}
 							/>
+							<DeleteAction label={m.catalogDeleteModel()} disabled={active} onConfirm={() => onDelete([entry.path])} />
 						</>
 					)}
 				</div>
@@ -287,6 +442,7 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 
 	const installedByName = useMemo(() => new Map(vm.models.map((entry) => [entry.name, entry])), [vm.models])
 	const installedNames = useMemo(() => new Set(installedByName.keys()), [installedByName])
+	const onDiskPathOf = (filename: string): string | undefined => installedByName.get(filename)?.path
 	/** The installed file of a catalog entry, when any quant is already on disk. */
 	const installedFileOf = (model: CatalogModel): NamedPath | undefined => {
 		for (const file of Object.values(model.files)) {
@@ -296,15 +452,15 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 		return undefined
 	}
 
-	const languages = useMemo(() => [...new Set(models.flatMap((model) => model.languages))].sort(), [models])
+	const languages = useMemo(() => [...new Set(models.flatMap((model) => model.languages.map(baseLanguage)))].sort(), [models])
 	const providers = useMemo(() => [...new Set(models.map((model) => providerName(model.repository)))].sort(), [models])
 
 	const visible = useMemo(() => {
 		const filtered = models.filter((model) => {
 			if (streaming && !model.capabilities.streaming) return false
 			if (translation && !model.capabilities.translate) return false
-			if (language !== 'all' && !model.languages.includes(language)) return false
-			if (provider !== 'all' && providerName(model.repository) !== provider) return false
+			if (language !== 'all' && !model.languages.some((tag) => baseLanguage(tag) === language)) return false
+			if (provider !== 'all' && provider !== CUSTOM_PROVIDER && providerName(model.repository) !== provider) return false
 			if (query && !model.name.toLowerCase().includes(query.trim().toLowerCase())) return false
 			return true
 		})
@@ -317,6 +473,8 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 		() => vm.models.filter((entry) => !models.some((model) => Object.values(model.files).some((file) => file.filename === entry.name))),
 		[vm.models, models],
 	)
+	// The Custom provider is exactly those files; other filters do not apply to them.
+	const showCatalog = provider !== CUSTOM_PROVIDER
 
 	/** One-click download with the catalog's integrity metadata, on the shared progress toast. */
 	async function startDownload(download: ModelDownload) {
@@ -332,6 +490,18 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 		} finally {
 			progressToast.setOpen(false)
 			progressToast.setProgress(null)
+		}
+	}
+
+	/** Remove the file(s) from disk and refresh the list; the active model is never deletable from here. */
+	async function removeFiles(paths: string[]) {
+		try {
+			await Promise.all(paths.map((path) => deleteModelFile(path)))
+			toast.success(m.catalogDeleted())
+			await vm.loadModels()
+		} catch (error) {
+			console.error('failed to delete the model file:', error)
+			toast.error(String(error))
 		}
 	}
 
@@ -353,7 +523,7 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 
 	return (
 		<SettingsGroup title={m.catalogModels()}>
-			<SettingsRow label={m.catalogSearch()}>
+			<div className="flex flex-wrap items-center gap-2 px-4 py-3">
 				<Input
 					type="search"
 					value={query}
@@ -382,6 +552,7 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="all">{m.catalogAllProviders()}</SelectItem>
+						<SelectItem value={CUSTOM_PROVIDER}>{m.catalogCustom()}</SelectItem>
 						{providers.map((name) => (
 							<SelectItem key={name} value={name}>
 								{name}
@@ -389,7 +560,7 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 						))}
 					</SelectContent>
 				</Select>
-			</SettingsRow>
+			</div>
 
 			{extras.map((entry) => (
 				<ExtraCard
@@ -397,38 +568,43 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 					entry={entry}
 					active={entry.path === vm.preference.modelPath}
 					displayName={vm.preference.modelDisplayNames[entry.path] ?? getFriendlyModelName(entry.name)}
+					onDelete={removeFiles}
 					onSelect={vm.selectModel}
 					onOpenFolder={vm.openSelectedModel}
 					renaming={renamingFor(entry.path, vm.preference.modelDisplayNames[entry.path] ?? getFriendlyModelName(entry.name))}
 				/>
 			))}
 
-			{visible.length === 0 && extras.length === 0 ? (
+			{showCatalog
+				? visible.map((model) => {
+						const installedEntry = installedFileOf(model)
+						return (
+							<CatalogCard
+								key={model.id}
+								model={model}
+								installedEntry={installedEntry}
+								installedNames={installedNames}
+								pathOf={onDiskPathOf}
+								active={Boolean(installedEntry && installedEntry.path === vm.preference.modelPath)}
+								onDownload={startDownload}
+								onDelete={removeFiles}
+								onSelect={vm.selectModel}
+								onOpenFolder={vm.openSelectedModel}
+								renaming={
+									installedEntry
+										? renamingFor(
+												installedEntry.path,
+												vm.preference.modelDisplayNames[installedEntry.path] ?? getFriendlyModelName(installedEntry.name),
+											)
+										: undefined
+								}
+							/>
+						)
+					})
+				: null}
+
+			{(provider === CUSTOM_PROVIDER ? extras.length === 0 : visible.length === 0 && extras.length === 0) && (
 				<p className="px-4 py-3 text-sm text-muted-foreground">{m.catalogNoMatches()}</p>
-			) : (
-				visible.map((model) => {
-					const installedEntry = installedFileOf(model)
-					return (
-						<CatalogCard
-							key={model.id}
-							model={model}
-							installedEntry={installedEntry}
-							installedNames={installedNames}
-							active={Boolean(installedEntry && installedEntry.path === vm.preference.modelPath)}
-							onDownload={startDownload}
-							onSelect={vm.selectModel}
-							onOpenFolder={vm.openSelectedModel}
-							renaming={
-								installedEntry
-									? renamingFor(
-											installedEntry.path,
-											vm.preference.modelDisplayNames[installedEntry.path] ?? getFriendlyModelName(installedEntry.name),
-										)
-									: undefined
-							}
-						/>
-					)
-				})
 			)}
 
 			<SettingsRow label={m.downloadModel()}>

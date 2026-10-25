@@ -86,6 +86,56 @@ The settings sheet SHALL fill the app window, and the window SHALL open maximize
 - **WHEN** the user closes settings and the window was not maximized before
 - **THEN** the window returns to its previous size
 
+### Requirement: Per-quant state and actions in the selector
+
+The quantization selector SHALL show each quantization's install state and size, and SHALL offer the per-file action inline: a check when the file is on disk, a download button for a quant that is not, and a delete button for one that is. The model-level delete removes every downloaded copy of the entry. Deleting asks for a confirm click and never applies to the active model.
+
+#### Scenario: Acting on a quant in the selector
+
+- **WHEN** the user downloads or deletes from a selector item
+- **THEN** the action runs and the selection does not change
+
+#### Scenario: Deleting a model
+
+- **WHEN** the user confirms a delete on a card or selector item
+- **THEN** the file is removed from disk and the list refreshes
+
+### Requirement: Short language codes
+
+The models settings SHALL show short language codes (`en`, `ru`) and SHALL collapse regional variants (`en-US`) to them in card metadata and the language filter.
+
+#### Scenario: Regional variants
+
+- **WHEN** an entry lists `en-US` and `en-GB`
+- **THEN** the card and the filter show a single `en`
+
+### Requirement: Custom provider filter
+
+The provider filter SHALL include a Custom option that lists the manually downloaded files no catalog provider claims, and nothing else.
+
+#### Scenario: Only custom models
+
+- **WHEN** the user picks the Custom provider
+- **THEN** the manual downloads are shown and the catalog entries are not
+
+### Requirement: Card link to the provider page
+
+Each catalog card SHALL link to the model's page on Hugging Face at the revision the catalog pins.
+
+#### Scenario: Reading about a model
+
+- **WHEN** the user opens a card's link
+- **THEN** it opens the repository tree at the pinned revision
+
+### Requirement: Filters never overlap the controls
+
+The filter row SHALL lay out its controls with wrapping, and SHALL not place a label where the controls render.
+
+#### Scenario: Narrow window
+
+- **WHEN** the filter row has less width than its controls need
+- **THEN** the controls wrap instead of overlapping
+
 ### Requirement: One-click verified downloads
 
 The user SHALL be able to download any catalog model from the models settings, choose the quantization when several exist, and have every download verified against the catalog's size and SHA-256 before the model becomes selectable.

@@ -11,8 +11,19 @@ import type { NamedPath } from '~/lib/types'
 import type { SettingsViewModel } from './shared'
 import { ModelsCatalogSection } from './models-catalog'
 
-const mocks = vi.hoisted(() => ({ downloadModel: vi.fn(), selectModel: vi.fn(), openSelectedModel: vi.fn(), setModelDisplayNames: vi.fn() }))
-vi.mock('~/lib/model', () => ({ downloadModel: mocks.downloadModel, getFriendlyModelName: (name: string) => name }))
+const mocks = vi.hoisted(() => ({
+	downloadModel: vi.fn(),
+	deleteModelFile: vi.fn(),
+	loadModels: vi.fn(),
+	selectModel: vi.fn(),
+	openSelectedModel: vi.fn(),
+	setModelDisplayNames: vi.fn(),
+}))
+vi.mock('~/lib/model', () => ({
+	downloadModel: mocks.downloadModel,
+	deleteModelFile: mocks.deleteModelFile,
+	getFriendlyModelName: (name: string) => name,
+}))
 
 // jsdom has no pointer-capture API; Radix's select calls it on the trigger.
 beforeAll(() => {
@@ -24,10 +35,7 @@ beforeAll(() => {
 
 afterEach(() => {
 	cleanup()
-	mocks.downloadModel.mockReset()
-	mocks.selectModel.mockReset()
-	mocks.openSelectedModel.mockReset()
-	mocks.setModelDisplayNames.mockReset()
+	for (const mock of Object.values(mocks)) mock.mockReset()
 })
 
 function fixture(overrides: Partial<CatalogModel> = {}): CatalogModel {
@@ -66,6 +74,7 @@ function makeVm(models: NamedPath[] = [], modelPath: string | null = null) {
 		changeModelsFolder: vi.fn(),
 		selectModel: mocks.selectModel,
 		openSelectedModel: mocks.openSelectedModel,
+		loadModels: mocks.loadModels,
 		models,
 		preference: { modelPath, modelDisplayNames: {}, setModelDisplayNames: mocks.setModelDisplayNames },
 	} as unknown as SettingsViewModel
@@ -91,8 +100,7 @@ describe('models catalog section', () => {
 			}),
 		])
 
-		expect(screen.getByText(/Handy/)).toBeTruthy()
-		expect(screen.getByText(/731 MB/)).toBeTruthy()
+		expect(screen.getByText(/Handy · 731 MB/)).toBeTruthy()
 		expect(screen.getByText('en')).toBeTruthy()
 		// The filter chip always shows, so a badge means the text appears twice.
 		expect(screen.getAllByText(m.catalogStreaming()).length).toBe(2)
@@ -124,14 +132,14 @@ describe('models catalog section', () => {
 	it('switching quantization updates the displayed size', async () => {
 		const user = userEvent.setup()
 		renderCatalog([fixture()])
-		expect(screen.getByText(/731 MB/)).toBeTruthy()
-		expect(screen.queryByText(/485 MB/)).toBeNull()
+		expect(screen.getByText(/Handy · 731 MB/)).toBeTruthy()
+		expect(screen.queryByText(/Handy · 485 MB/)).toBeNull()
 
 		await user.click(screen.getByRole('combobox', { name: m.catalogQuantization() }))
-		await user.click(await screen.findByRole('option', { name: 'Q4_K_M' }))
+		await user.click(await screen.findByRole('option', { name: 'Q4_K_M · 485 MB' }))
 
-		expect(screen.getByText(/485 MB/)).toBeTruthy()
-		expect(screen.queryByText(/731 MB/)).toBeNull()
+		expect(screen.getByText(/Handy · 485 MB/)).toBeTruthy()
+		expect(screen.queryByText(/Handy · 731 MB/)).toBeNull()
 	})
 
 	it('downloads the selected quantization with the right url, size and sha256', async () => {
@@ -149,7 +157,7 @@ describe('models catalog section', () => {
 		})
 
 		await user.click(screen.getByRole('combobox', { name: m.catalogQuantization() }))
-		await user.click(await screen.findByRole('option', { name: 'Q4_K_M' }))
+		await user.click(await screen.findByRole('option', { name: 'Q4_K_M · 485 MB' }))
 		await user.click(cardDownload())
 		expect(mocks.downloadModel).toHaveBeenLastCalledWith({
 			url: 'https://huggingface.co/handy-computer/fixture-gguf/resolve/abc123/fixture-Q4_K_M.gguf',
@@ -176,8 +184,8 @@ describe('models catalog section', () => {
 
 		expect(screen.getByText(m.catalogRequiresGguf())).toBeTruthy()
 		expect((screen.getAllByRole('button', { name: m.downloadModel() })[0] as HTMLButtonElement).disabled).toBe(true)
-		// A single file ships no quantization selector.
-		expect(screen.queryByRole('combobox', { name: m.catalogQuantization() })).toBeNull()
+		// The selector still renders — it carries the per-quant download/delete affordances.
+		expect(screen.getByRole('combobox', { name: m.catalogQuantization() })).toBeTruthy()
 	})
 })
 
@@ -223,6 +231,99 @@ describe('catalog filters', () => {
 
 		expect(screen.getByText('English Model')).toBeTruthy()
 	})
+
+	it('lists short language codes only — regional variants collapse to the base', async () => {
+		const user = userEvent.setup()
+		renderCatalog([fixture({ languages: ['en-US', 'en-GB', 'ru-RU'] })])
+
+		await user.click(screen.getByRole('combobox', { name: m.language() }))
+		expect(await screen.findByRole('option', { name: 'en' })).toBeTruthy()
+		expect(screen.getByRole('option', { name: 'ru' })).toBeTruthy()
+		expect(screen.queryByRole('option', { name: 'en-US' })).toBeNull()
+
+		await user.click(screen.getByRole('option', { name: 'en' }))
+		expect(screen.getByText('Fixture Model')).toBeTruthy()
+	})
+
+	it('offers a Custom provider that shows only manual downloads', async () => {
+		const user = userEvent.setup()
+		renderCatalog([fixture()], [{ name: 'manual-download-Q4.gguf', path: '/models/manual-download-Q4.gguf' }])
+
+		await user.click(screen.getByRole('combobox', { name: m.catalogProvider() }))
+		await user.click(await screen.findByRole('option', { name: m.catalogCustom() }))
+
+		// Display name plus the file line.
+		expect(screen.getAllByText('manual-download-Q4.gguf').length).toBe(2)
+		expect(screen.queryByText('Fixture Model')).toBeNull()
+
+		await user.click(screen.getByRole('combobox', { name: m.catalogProvider() }))
+		await user.click(await screen.findByRole('option', { name: m.catalogAllProviders() }))
+		expect(screen.getByText('Fixture Model')).toBeTruthy()
+	})
+})
+
+describe('quant selector affordances', () => {
+	it('marks the installed quant and offers download per quant without selecting it', async () => {
+		const user = userEvent.setup()
+		renderCatalog([fixture()], [{ name: 'fixture-Q8_0.gguf', path: '/models/fixture-Q8_0.gguf' }])
+
+		await user.click(screen.getByRole('combobox', { name: m.catalogQuantization() }))
+		// The installed quant offers delete, the other one download.
+		expect(screen.getAllByRole('button', { name: m.catalogDelete() }).length).toBe(1)
+		const downloadButtons = screen.getAllByRole('button', { name: m.downloadModel() })
+		await user.click(downloadButtons[0])
+
+		expect(mocks.downloadModel).toHaveBeenCalledWith({
+			url: 'https://huggingface.co/handy-computer/fixture-gguf/resolve/abc123/fixture-Q4_K_M.gguf',
+			size: 485_425_536,
+			sha256: 'hash-q4',
+		})
+		// Acting on an item must not select it — a selection would close the dropdown.
+		expect(await screen.findByRole('listbox')).toBeTruthy()
+	})
+
+	it('deletes a downloaded quant after a confirm click and refreshes the list', async () => {
+		mocks.deleteModelFile.mockResolvedValue(undefined)
+		mocks.loadModels.mockResolvedValue(undefined)
+		const user = userEvent.setup()
+		renderCatalog([fixture()], [{ name: 'fixture-Q8_0.gguf', path: '/models/fixture-Q8_0.gguf' }])
+
+		await user.click(screen.getByRole('combobox', { name: m.catalogQuantization() }))
+		await user.click(screen.getByRole('button', { name: m.catalogDelete() }))
+		await user.click(await screen.findByRole('button', { name: m.catalogConfirmDelete() }))
+
+		expect(mocks.deleteModelFile).toHaveBeenCalledWith('/models/fixture-Q8_0.gguf')
+		expect(mocks.loadModels).toHaveBeenCalled()
+	})
+
+	it('deletes the model from the card with a confirm click', async () => {
+		mocks.deleteModelFile.mockResolvedValue(undefined)
+		mocks.loadModels.mockResolvedValue(undefined)
+		const user = userEvent.setup()
+		renderCatalog([fixture()], [{ name: 'fixture-Q8_0.gguf', path: '/models/fixture-Q8_0.gguf' }])
+
+		await user.click(screen.getByRole('button', { name: m.catalogDeleteModel() }))
+		await user.click(await screen.findByRole('button', { name: m.catalogConfirmDelete() }))
+
+		expect(mocks.deleteModelFile).toHaveBeenCalledWith('/models/fixture-Q8_0.gguf')
+	})
+
+	it('refuses to delete the active model', () => {
+		const path = '/models/fixture-Q8_0.gguf'
+		renderCatalog([fixture()], [{ name: 'fixture-Q8_0.gguf', path }], path)
+
+		expect((screen.getByRole('button', { name: m.catalogDeleteModel() }) as HTMLButtonElement).disabled).toBe(true)
+	})
+})
+
+describe('card links', () => {
+	it('links to the model page on Hugging Face at the pinned revision', () => {
+		renderCatalog([fixture()])
+
+		const link = screen.getByRole('link', { name: m.catalogOpenOnHuggingFace() }) as HTMLAnchorElement
+		expect(link.getAttribute('href')).toBe('https://huggingface.co/handy-computer/fixture-gguf/tree/abc123')
+		expect(link.getAttribute('target')).toBe('_blank')
+	})
 })
 
 describe('installed models in the catalog', () => {
@@ -231,10 +332,7 @@ describe('installed models in the catalog', () => {
 		const path = '/models/fixture-Q8_0.gguf'
 		// The installed model comes second in the list and must still lead; the other entry ships different files.
 		renderCatalog(
-			[
-				fixture({ id: 'other', name: 'Other Model', files: { Q8_0: { filename: 'other-Q8_0.gguf', size: 100, sha256: 'h' } } }),
-				fixture(),
-			],
+			[fixture({ id: 'other', name: 'Other Model', files: { Q8_0: { filename: 'other-Q8_0.gguf', size: 100, sha256: 'h' } } }), fixture()],
 			[{ name: 'fixture-Q8_0.gguf', path }],
 		)
 

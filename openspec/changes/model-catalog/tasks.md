@@ -33,3 +33,12 @@
 - [x] 6.2 Drop the "Installed models" group: installed entries appear in the catalog list, highlighted with a primary ring and an installed badge, sorted first, with select/rename/reveal instead of download for the installed quantization; files outside the catalog still appear above the cards
 - [x] 6.3 Show each entry's limitations (single language without detection, no streaming, no translation) on its card and remove the separate limitations group
 - [x] 6.4 Update the badge key ("Installed"), drop the unused group-title key, keep the audit green, tsc/vitest green
+
+## 7. Third round of feedback: quant actions, short codes, delete, links, custom provider
+
+- [x] 7.1 Quant selector shows per-quant install state (check), size, and inline download/delete actions; a model-level delete on the card removes every downloaded copy (confirm click, active model protected; new `delete_model_file` command)
+- [x] 7.2 Language display collapses regional tags to short codes (`en-US`/`en-GB` → `en`) in card metadata and the language filter
+- [x] 7.3 Filter row wraps instead of overlapping the "Search models" label; the label is gone (the placeholder carries it)
+- [x] 7.4 Provider filter gains Custom for manually downloaded files outside the handy and vibe layers
+- [x] 7.5 Cards link to the model's Hugging Face page at the pinned revision
+- [x] 7.6 New keys translated into every locale, audit green, tsc/vitest green

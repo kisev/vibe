@@ -119,6 +119,7 @@ async fn main() -> Result<()> {
             cmd::files::glob_files,
             cmd::files::pick_media_paths,
             cmd::download::download_model,
+            cmd::download::delete_model_file,
             cmd::download::check_model_files,
             cmd::download::cleanup_partial_downloads,
             cmd::server_cmd::load_model,

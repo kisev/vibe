@@ -120,10 +120,7 @@ export function asrCatalog(catalog: CatalogData = CATALOG): CatalogModel[] {
 }
 
 /** The catalog entry an installed model file matches, by file name. */
-export function matchInstalled(
-	filename: string,
-	catalog: CatalogData = CATALOG,
-): { model: CatalogModel; quant: string; file: CatalogFileEntry } | undefined {
+export function matchInstalled(filename: string, catalog: CatalogData = CATALOG): { model: CatalogModel; quant: string; file: CatalogFileEntry } | undefined {
 	for (const model of asrCatalog(catalog)) {
 		for (const [quant, file] of Object.entries(model.files)) {
 			if (file.filename === filename) return { model, quant, file }
@@ -171,6 +168,11 @@ export function defaultQuant(model: CatalogModel): string {
 	return QUANT_PREFERENCE.find((quant) => model.files[quant]) ?? Object.keys(model.files)[0] ?? model.quant
 }
 
+/** Short language code from a BCP-47 tag — `en-US` → `en`. The UI shows no regional precision. */
+export function baseLanguage(tag: string): string {
+	return tag.split(/[-_]/)[0] ?? tag
+}
+
 /** File size in whole megabytes (1 MB = 10^6 B, matching how providers label files). */
 export function sizeMb(bytes: number): number {
 	return Math.round(bytes / 1_000_000)
@@ -197,7 +199,6 @@ export type Availability = { ok: true } | { ok: false; reason: 'engine' | 'forma
 export function availability(model: CatalogModel, quant: string): Availability {
 	if (!engineAtLeast(model.minEngine)) return { ok: false, reason: 'engine', requirement: model.minEngine }
 	const file = model.files[quant]
-	if (model.role === 'asr' && file && !file.filename.endsWith('.gguf'))
-		return { ok: false, reason: 'format', requirement: 'GGUF' }
+	if (model.role === 'asr' && file && !file.filename.endsWith('.gguf')) return { ok: false, reason: 'format', requirement: 'GGUF' }
 	return { ok: true }
 }
