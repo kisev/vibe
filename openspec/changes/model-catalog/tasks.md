@@ -2,8 +2,8 @@
 
 ## 1. Catalog data
 
-- [ ] 1.1 Add `@handy-computer/models` as a pnpm dependency and a sync script that copies its `catalog.json` into the desktop tree with a drift check, mirroring handy's pattern; verify `pnpm sync:catalog` copies the file and the check fails when the copy is edited
-- [ ] 1.2 Author the vibe layer `catalog-vibe.json` in the same schema for the non-handy providers (vibe-app mirrors, `ggerganov/whisper.cpp`, `ggml-org` VAD, `ivrit-ai`) and a merge module (concatenate, dedupe by repository+revision+filename, provider display names); verify with a unit test that two same-named entries from different providers both survive and that identity keys are unique
+- [x] 1.1 Add `@handy-computer/models` as a pnpm dependency and a sync script that copies its `catalog.json` into the desktop tree with a drift check, mirroring handy's pattern; verify `pnpm sync:catalog` copies the file and the check fails when the copy is edited
+- [x] 1.2 Author the vibe layer `catalog-vibe.json` in the same schema for the non-handy providers (vibe-app mirrors, `ggerganov/whisper.cpp`, `ggml-org` VAD, `ivrit-ai`) and a merge module (concatenate, dedupe by repository+revision+filename, provider display names); verify with a unit test that two same-named entries from different providers both survive and that identity keys are unique
 
 ## 2. Catalog UI
 

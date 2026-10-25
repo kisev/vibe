@@ -17,6 +17,9 @@ importers:
       '@formatjs/intl-durationformat':
         specifier: ^0.10.1
         version: 0.10.1
+      '@handy-computer/models':
+        specifier: ^0.2.2
+        version: 0.2.2
       '@radix-ui/react-collapsible':
         specifier: ^1.1.12
         version: 1.1.12(@types/react-dom@19.2.3(@types/react@19.2.13))(@types/react@19.2.13)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -623,6 +626,10 @@ packages:
 
   '@formatjs/intl-localematcher@0.8.1':
     resolution: {integrity: sha512-xwEuwQFdtSq1UKtQnyTZWC+eHdv7Uygoa+H2k/9uzBVQjDyp9r20LNDNKedWXll7FssT3GRHvqsdJGYSUWqYFA==}
+
+  '@handy-computer/models@0.2.2':
+    resolution: {integrity: sha512-FklK9es5q34VMGufo9Yl9ic4ie9OPn2xYI4CciTAbNZh850WSFCPmUeu+UUiIdAHldsz7qlDYWMtyj7u6It03A==}
+    engines: {node: '>=20.10'}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -4228,6 +4235,8 @@ snapshots:
     dependencies:
       '@formatjs/fast-memoize': 3.1.0
       tslib: 2.8.1
+
+  '@handy-computer/models@0.2.2': {}
 
   '@humanfs/core@0.19.1': {}
 
