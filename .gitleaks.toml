@@ -1,0 +1,27 @@
+# Secret scanning over the staged set and the full git history. Mock fixtures
+# and docs legitimately contain token-shaped strings; each allowlist entry
+# names why it is here.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Browser-mode mock fixtures and test data hold token-shaped strings that are not secrets"
+paths = [
+  '''desktop/src/mock-tauri/''',
+  '''desktop/src/lib/config\.test\.''',
+  '''website/src/lib/changelog\.test\.''',
+  '''server/tests/''',
+]
+
+[[allowlists]]
+description = "Public updater minisign key shipped on purpose (public half only)"
+regexes = ['''dW50cnVzdGVkIGNvbWVudG6''']
+
+[[allowlists]]
+description = "Handoff protocol tests and old plans use one obvious fake token (0123456789abcdef repeated twice)"
+regexTarget = "match"
+regexes = ['''0123456789abcdef0123456789abcdef''']
+
+[[allowlists]]
+description = "Public shadcn.io registry share URL in a deleted plan (registry tokens are public CDN links)"
+paths = ['''plans/shadcn-polish/''']

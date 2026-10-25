@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/oxlint/.oxlintrc.schema.json",
+  "ignorePatterns": ["**/node_modules/**", "desktop/src/paraglide/**", "desktop/src/mock-tauri/**"],
+  "rules": {
+    "no-console": "off",
+    "typescript/no-non-null-assertion": "off",
+    "eslint/no-unused-vars": "off"
+  }
+}

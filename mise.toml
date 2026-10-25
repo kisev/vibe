@@ -1,0 +1,23 @@
+# Pinned development toolchain for the lint/format gates and task facade.
+# Same stack as kisev/skills and kisev/gitlaw: everything resolves through
+# `mise exec`, so local checks and CI run identical versions.
+min_version = "2026.10.10"
+
+[tools]
+"aqua:evilmartians/lefthook" = "2.2.2"
+"aqua:gitleaks/gitleaks" = "8.30.1"
+"aqua:go-task/task" = "3.54.0"
+"aqua:koalaman/shellcheck" = "0.11.0"
+"aqua:mvdan/sh" = "3.14.1"
+"aqua:rhysd/actionlint" = "1.7.12"
+"aqua:sharkdp/fd" = "10.5.0"
+"aqua:tombi-toml/tombi" = "1.9.3"
+"aqua:aquasecurity/trivy" = "0.76.1"
+"github:editorconfig-checker/editorconfig-checker" = "4.0.2"
+"npm:@commitlint/cli" = "21.2.4"
+"npm:markdownlint-cli2" = "0.24.0"
+"npm:oxfmt" = "0.74.0"
+"npm:oxlint" = "1.89.0"
+"npm:prettier" = "3.6.2"
+"pipx:yamllint" = "1.38.0"
+"pipx:mdformat" = "0.7.19"

@@ -2,7 +2,7 @@
 
 ## Tooling
 
-- Tasks: `chore` — see `chore list`
+- Tasks: `task` — see `task --list`; toolchain pins in `mise.toml`, git gates via `task hooks`
 - JS: `pnpm` only; Python: `uv` standalone scripts (`uv run`)
 
 ## Validation

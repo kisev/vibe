@@ -1,0 +1,61 @@
+# Local quality gates, same stack as kisev/skills and kisev/gitlaw. Install once
+# per checkout with `task hooks`. pre-commit runs the cheap, file-scoped checks
+# in parallel over the staged set; pre-push runs the unit suites; commit-msg
+# lints the message. Binaries come from mise (pinned in mise.toml).
+glob_matcher: doublestar
+
+pre-commit:
+  parallel: true
+  commands:
+    secrets-gitleaks:
+      run: mise exec -- gitleaks git --staged --redact --no-banner -c .gitleaks.toml
+    secrets-trivy:
+      glob: "**/{pyproject.toml,uv.lock,pnpm-lock.yaml,package.json}"
+      run: mise exec -- trivy fs --scanners secret --exit-code 1 --secret-config trivy-secret.yaml .
+    yaml:
+      glob: "**/*.{yml,yaml}"
+      exclude: "{node_modules,desktop/src-tauri/gen}/**"
+      run: mise exec -- yamllint {staged_files}
+    toml-lint:
+      glob: "**/*.toml"
+      exclude: "{node_modules,desktop/project.inlang,website/project.inlang}/**"
+      run: mise exec -- tombi lint {staged_files}
+    toml-format:
+      glob: "**/*.toml"
+      exclude: "{node_modules,desktop/project.inlang,website/project.inlang}/**"
+      run: mise exec -- tombi format --check {staged_files}
+    markdown:
+      glob: "**/*.md"
+      exclude: "{node_modules,desktop/src/paraglide,.claude,.opencode,.agents,i18n/changelog}/**,i18n/docs/*/models.md"
+      run: mise exec -- markdownlint-cli2 --no-globs {staged_files}
+    markdown-format:
+      glob: "**/*.md"
+      exclude: "{node_modules,desktop/src/paraglide,.claude,.opencode,.agents,i18n/changelog}/**,i18n/docs/*/models.md"
+      run: mise exec -- mdformat --check {staged_files}
+    json:
+      glob: "**/*.json"
+      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,desktop/project.inlang,website/project.inlang}/**,desktop/src/data/handy-catalog.json"
+      run: mise exec -- oxfmt --check {staged_files}
+    js:
+      glob: "**/*.{ts,tsx,js,mjs}"
+      exclude: "{node_modules,desktop/src/paraglide}/**"
+      run: mise exec -- oxlint {staged_files}
+    shell:
+      glob: "**/*.sh"
+      run: mise exec -- shfmt -i 4 -d {staged_files} && mise exec -- shellcheck {staged_files}
+    editorconfig:
+      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen}/**"
+      run: mise exec -- editorconfig-checker {staged_files}
+    workflows:
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: mise exec -- actionlint
+
+pre-push:
+  commands:
+    test:
+      run: task test
+
+commit-msg:
+  commands:
+    message:
+      run: mise exec -- commitlint --edit {1}

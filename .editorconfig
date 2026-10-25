@@ -7,5 +7,17 @@ root = true
 [*]
 end_of_line = lf
 insert_final_newline = true
-indent_style = tab
+# formatted trees (markdown, json, toml, shell, css, html) are written with
+# spaces by mdformat, oxfmt, tombi, shfmt and prettier
+indent_style = space
 indent_size = 4
+
+# yaml, data files and the python scripts historically use two-space steps
+# (editorconfig-checker only demands multiples of the size, so mixed 2/4
+# upstream files still pass; the formatters keep their own files exact)
+[*.{yml,yaml,json,toml,py,xml,plist}]
+indent_size = 2
+
+# the frontend codebases are tab-indented
+[*.{ts,tsx,js,jsx,mjs,cjs}]
+indent_style = tab

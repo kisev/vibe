@@ -1,0 +1,187 @@
+# Single facade over the three toolchains (pnpm, uv, cargo). Tasks delegate to
+# the existing scripts — a script change never needs a task edit. Tools resolve
+# through mise; `task hooks` installs the git gates once per checkout.
+version: "3"
+
+tasks:
+  hooks:
+    desc: Install the lefthook git gates once per checkout
+    cmds:
+      - mise exec -- lefthook install
+
+  i18n:generate:
+    desc: Compile paraglide messages for desktop and website
+    cmds:
+      - pnpm --dir desktop i18n:generate
+      - pnpm --dir website i18n:generate
+
+  i18n:stamp:
+    desc: Stamp source hashes into translated content
+    cmds:
+      - uv run scripts/content_i18n.py stamp
+
+  i18n:audit:
+    desc: Full i18n coverage audit
+    cmds:
+      - uv run scripts/check_i18n.py
+
+  docs:models:
+    desc: Regenerate the models docs from the catalog
+    cmds:
+      - pnpm --dir desktop docs:models
+
+  docs:models:check:
+    desc: Fail when the generated models docs are stale
+    cmds:
+      - pnpm --dir desktop exec node scripts/generate-models-docs.mjs check
+
+  sync:catalog:
+    desc: Refresh the vendored handy catalog copy
+    cmds:
+      - pnpm --dir desktop sync:catalog
+
+  sync:catalog:check:
+    desc: Fail when the vendored catalog copy is stale
+    cmds:
+      - pnpm --dir desktop check:catalog
+
+  desktop:test:
+    desc: Desktop unit tests
+    cmds:
+      - pnpm --dir desktop test
+
+  desktop:typecheck:
+    desc: Desktop type check
+    cmds:
+      - pnpm --dir desktop exec tsc --noEmit
+
+  website:test:
+    desc: Website unit tests
+    cmds:
+      - pnpm --dir website test
+
+  website:typecheck:
+    desc: Website type check (build)
+    cmds:
+      - pnpm --dir website run build
+
+  server:test:
+    desc: Server unit tests
+    dir: server
+    cmds:
+      - cargo test -p vibe-server
+
+  server:fmt:
+    desc: rustfmt the server workspace
+    cmds:
+      - cargo fmt --all -- server
+
+  server:clippy:
+    desc: Clippy the server workspace, warnings fatal
+    dir: server
+    cmds:
+      - cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    desc: All unit suites
+    cmds:
+      - task: desktop:test
+      - task: website:test
+      - task: server:test
+
+  lint:
+    desc: Run every linter (whole tree)
+    cmds:
+      - task: lint:yaml
+      - task: lint:toml
+      - task: lint:md
+      - task: lint:json
+      - task: lint:js
+      - task: lint:shell
+      - task: lint:editorconfig
+      - task: lint:workflows
+      - task: lint:secrets
+
+  lint:yaml:
+    cmds:
+      - mise exec -- fd -H -e yml -e yaml -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -X yamllint
+
+  lint:toml:
+    cmds:
+      - mise exec -- fd -H -g '*.toml' -E node_modules -E desktop/project.inlang -E website/project.inlang -E Cargo.lock -X tombi lint
+
+  lint:md:
+    cmds:
+      - mise exec -- fd -H -e md -E node_modules -E desktop/src/paraglide -E .claude -E .opencode -E .agents -E models.md -E i18n/changelog -X markdownlint-cli2 --no-globs
+
+  lint:json:
+    cmds:
+      - >-
+        mise exec -- fd -H -g '*.json' -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
+        -E desktop/project.inlang -E website/project.inlang -X
+        oxfmt --check
+
+  lint:js:
+    cmds:
+      - mise exec -- fd -H -e ts -e tsx -e js -e mjs -E node_modules -E desktop/src/paraglide -X oxlint
+
+  lint:shell:
+    cmds:
+      - mise exec -- fd -H -g '*.sh' -E node_modules -X shfmt -i 4 -d
+      - mise exec -- fd -H -g '*.sh' -E node_modules -X shellcheck
+
+  lint:editorconfig:
+    cmds:
+      - mise exec -- fd -H -t f -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -X editorconfig-checker
+
+  lint:workflows:
+    cmds:
+      - mise exec -- actionlint
+
+  lint:secrets:
+    cmds:
+      - mise exec -- gitleaks git --config .gitleaks.toml --redact --no-banner
+      - mise exec -- trivy fs --scanners secret --exit-code 1 --secret-config trivy-secret.yaml .
+
+  format:
+    desc: Format everything in place
+    cmds:
+      - task: format:md
+      - task: format:json
+      - mise exec -- fd -H -g '*.sh' -E node_modules -X shfmt -i 4 -w
+      - mise exec -- tombi format --check >/dev/null 2>&1 || mise exec -- tombi format
+      - mise exec -- fd -H -e css -e html -E node_modules -X prettier --write
+
+  format:md:
+    cmds:
+      - mise exec -- fd -H -e md -E node_modules -E desktop/src/paraglide -E .claude -E .opencode -E .agents -E models.md -E i18n/changelog -X mdformat
+
+  format:json:
+    cmds:
+      - >-
+        mise exec -- fd -H -g '*.json' -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
+        -E desktop/project.inlang -E website/project.inlang -X
+        oxfmt
+
+  format:check:
+    desc: Fail when anything is unformatted
+    cmds:
+      - mise exec -- fd -H -e md -E node_modules -E desktop/src/paraglide -E .claude -E .opencode -E .agents -E models.md -E i18n/changelog -X mdformat --check
+      - >-
+        mise exec -- fd -H -g '*.json' -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
+        -E desktop/project.inlang -E website/project.inlang -X
+        oxfmt --check
+      - mise exec -- fd -H -g '*.sh' -E node_modules -X shfmt -i 4 -d
+      - mise exec -- fd -H -g '*.toml' -E node_modules -E desktop/project.inlang -E website/project.inlang -X tombi format --check
+      - mise exec -- fd -H -e css -e html -E node_modules -X prettier --check
+
+  dev:tag:
+    desc: Cut a dev build - tag dev.<next> on HEAD and push the tag
+    cmds:
+      - git fetch origin --tags
+      - |
+        next=$(git tag -l 'dev.*' | sed 's/dev\.//' | sort -n | tail -1)
+        next=$((next + 1))
+        git tag -s "dev.$next" -m "Dev build $next"
+        git push origin "dev.$next"
+        echo "tagged dev.$next — watch the Dev Build workflow"

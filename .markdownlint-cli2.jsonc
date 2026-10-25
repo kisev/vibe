@@ -1,0 +1,22 @@
+// markdownlint rules for hand-written Markdown; generated docs are excluded
+// by the task's fd pre-filter. Formatting belongs to mdformat + prettier,
+// so line-length rules stay off. MD036 is off because bold lead-ins on
+// bullets are house style (the changelog), MD040 because many spec and
+// skill fences are intentionally untagged, MD060 because translated
+// tables are byte-mirrored across 22 locales.
+{
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD033": false,
+    "MD041": false,
+    "MD034": false,
+    "MD036": false,
+    "MD040": false,
+    "MD060": false,
+    "MD024": { "siblings_only": true },
+    // numbered steps continue across fenced output between steps
+    "MD029": { "style": "one_or_ordered" },
+    "MD025": { "front_matter_title": "" }
+  }
+}

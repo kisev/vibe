@@ -1,0 +1,5 @@
+# mdformat for hand-written Markdown. Generated docs (i18n/docs/*/models.md)
+# are excluded by the task's fd pre-filter; tables are left byte-stable
+# without the GFM plugin.
+wrap = "keep"
+end_of_line = "lf"

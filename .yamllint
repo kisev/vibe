@@ -1,0 +1,30 @@
+# yamllint for workflows and app YAML. Machine-owned trees are excluded by the
+# task's fd pre-filter; here only rule tuning lives.
+extends: default
+rules:
+    line-length:
+        max: 200
+    document-start: disable
+    truthy:
+        check-keys: false
+    comments:
+        min-spaces-from-content: 1
+    comments-indentation: disable
+    indentation:
+        spaces: consistent
+        indent-sequences: consistent
+    brackets:
+        min-spaces-inside: 0
+        max-spaces-inside: 1
+    braces:
+        min-spaces-inside: 0
+        max-spaces-inside: 1
+ignore: |
+    /node_modules/
+    /desktop/node_modules/
+    /website/node_modules/
+    /*.lock
+    /pnpm-lock.yaml
+    /desktop/pnpm-lock.yaml
+    /website/pnpm-lock.yaml
+    /desktop/src-tauri/gen/
