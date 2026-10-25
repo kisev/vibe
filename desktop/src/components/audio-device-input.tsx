@@ -5,7 +5,7 @@ import { deviceMenuEntries } from '~/lib/device-selection'
 import { ModifyState } from '~/lib/types'
 import { cn } from '~/lib/style'
 import { Label } from '~/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '~/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '~/components/ui/select'
 
 interface AudioDeviceInputProps {
 	type: 'output' | 'input'
@@ -75,13 +75,15 @@ export default function AudioDeviceInput({
 										<button
 											type="button"
 											aria-label={m.hideDevice({ name: entry.label })}
-											// The SelectItem claims pointer events across its whole row, so a plain
-											// stopPropagation on click is too late: by then the item has already
-											// selected the device and closed the dropdown. Stop the events in the
-											// capture phase, where the button still precedes the item's handlers.
+											// The SelectItem claims pointer events across its whole row: mouse
+											// selection happens on its pointerup, so a stopPropagation on click
+											// alone is too late — the item has already selected the device and
+											// closed the dropdown. Stop the pointer events in the capture phase,
+											// where the button still precedes the item's handlers. The click is
+											// left alone on purpose: one synthetic traversal serves both phases,
+											// so stopping it in capture would silence this button's own onClick.
 											onPointerDownCapture={(event) => event.stopPropagation()}
 											onPointerUpCapture={(event) => event.stopPropagation()}
-											onClickCapture={(event) => event.stopPropagation()}
 											onClick={(event) => {
 												event.stopPropagation()
 												if (entry.device) onHide(entry.device)
@@ -94,8 +96,9 @@ export default function AudioDeviceInput({
 							</SelectItem>
 						))}
 					{hasHidden && (
-						<>
-							<SelectLabel>{m.hiddenDevices()}</SelectLabel>
+						<SelectGroup>
+							{/* SelectLabel reads the group context; outside a SelectGroup it throws. */}
+						<SelectLabel>{m.hiddenDevices()}</SelectLabel>
 							{entries
 								.filter((entry) => entry.kind === 'hidden')
 								.map((entry) => (
@@ -103,7 +106,7 @@ export default function AudioDeviceInput({
 										{entry.label}
 									</SelectItem>
 								))}
-						</>
+						</SelectGroup>
 					)}
 				</SelectContent>
 			</Select>
