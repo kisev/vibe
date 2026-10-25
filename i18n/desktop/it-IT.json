@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Download del modello di diarizzazione...",
 	"downloadingAiModels": "Scaricando i modelli AI...",
 	"downloadingModel": "Scaricando il modello...",
+	"downloadingModelFile": "Download di {name}…",
+	"downloadingModels": "Download di {count} modelli",
 	"downloadingYtdlp": "Scaricando i modelli yt-dlp",
 	"enableDiarization": "Attiva la diarizzazione",
 	"enableLogs": "Abilita registri",

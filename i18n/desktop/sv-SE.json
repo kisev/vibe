@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Laddar ner modell för talarigenkänning...",
 	"downloadingAiModels": "Laddar ner AI-modeller...",
 	"downloadingModel": "Hämtar modell...",
+	"downloadingModelFile": "Hämtar {name}…",
+	"downloadingModels": "Hämtar {count} modeller",
 	"downloadingYtdlp": "Laddar ner yt-dlp",
 	"enableDiarization": "Aktivera talarigenkänning",
 	"enableLogs": "Aktivera loggar",

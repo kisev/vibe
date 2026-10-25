@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Téléchargement du modèle de diarisation...",
 	"downloadingAiModels": "Téléchargement de modèles d'IA...",
 	"downloadingModel": "Téléchargement du modèle en cours…",
+	"downloadingModelFile": "Téléchargement de {name}…",
+	"downloadingModels": "Téléchargement de {count} modèles",
 	"downloadingYtdlp": "Téléchargement de yt-dlp",
 	"enableDiarization": "Activer la diarisation des locuteurs",
 	"enableLogs": "Activer les journaux",

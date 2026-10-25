@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Изтегляне на модел за диаризация...",
 	"downloadingAiModels": "Изтегляне на AI модели...",
 	"downloadingModel": "Изтегляне на модел...",
+	"downloadingModelFile": "Изтегляне на {name}…",
+	"downloadingModels": "Изтегляне на {count} модела",
 	"downloadingYtdlp": "Изтегляне на yt-dlp",
 	"enableDiarization": "Активиране на разграничаване на говорещите",
 	"enableLogs": "Активиране на логове",

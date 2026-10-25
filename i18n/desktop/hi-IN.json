@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "वक्ता पहचान मॉडल डाउनलोड हो रहा है…",
 	"downloadingAiModels": "AI मॉडल डाउनलोड हो रहा है...",
 	"downloadingModel": "मॉडल डाउनलोड हो रहा है...",
+	"downloadingModelFile": "{name} डाउनलोड हो रहा है…",
+	"downloadingModels": "{count} मॉडल डाउनलोड हो रहे हैं",
 	"downloadingYtdlp": "yt-dlp डाउनलोड हो रहा है",
 	"enableDiarization": "वक्ता पहचान चालू करें",
 	"enableLogs": "लॉग सक्षम करें",

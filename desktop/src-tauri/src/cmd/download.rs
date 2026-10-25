@@ -18,6 +18,13 @@ use super::ui::set_progress_bar;
 const GGML_MAGIC: &[u8; 4] = b"lmgg";
 const GGUF_MAGIC: &[u8; 4] = b"GGUF";
 
+#[derive(Clone, Serialize)]
+struct DownloadProgress<'a> {
+    url: &'a str,
+    current: u64,
+    total: u64,
+}
+
 /// The smallest model Vibe downloads is the Silero VAD at ~865 KiB. Anything below this is a
 /// truncated stream or an HTML error page saved under a model name, never a model.
 const MIN_MODEL_SIZE: u64 = 256 * 1024;
@@ -272,7 +279,10 @@ async fn download_to_partial(
                     set_progress_bar(app_handle, Some(percentage)).log_error();
                 }
                 if let Some(window) = app_handle.get_webview_window("main") {
-                    window.emit("download_progress", (downloaded, total_size)).log_error();
+                    // The url lets the UI attribute progress when several downloads run in parallel.
+                    window
+                        .emit("download_progress", DownloadProgress { url, current: downloaded, total: total_size })
+                        .log_error();
                 }
                 callback_offset = downloaded;
             }

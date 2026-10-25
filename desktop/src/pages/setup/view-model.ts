@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { emit, listen } from '@tauri-apps/api/event'
+import { emit } from '@tauri-apps/api/event'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { m } from '~/paraglide/messages.js'
@@ -11,6 +11,7 @@ import * as config from '~/lib/config'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { join } from '@tauri-apps/api/path'
 import { ensureVadModel } from '~/lib/vad'
+import { downloadSnapshot, subscribeDownloads } from '~/lib/downloads'
 
 export function viewModel() {
 	const location = useLocation()
@@ -21,20 +22,25 @@ export function viewModel() {
 	const navigate = useNavigate()
 	const preference = usePreferenceProvider()
 
-	function handleProgressEvenets() {
-		listen('download_progress', (event) => {
-			// event.event is the event name (useful if you want to use a single callback fn for multiple event types)
-			// event.payload is the payload object
-			const [current, total] = event.payload as [number, number]
-			const newDownloadProgress = Number(current / total) * 100
-
-			if (newDownloadProgress > downloadProgressRef.current) {
-				// for some reason it jumps if not
-				setDownloadProgress(newDownloadProgress)
-				downloadProgressRef.current = newDownloadProgress
-			}
-		})
-	}
+	// The setup progress bar follows the download registry: the latest-touched
+	// download, resetting when the source switches to a fallback URL.
+	const latestNameRef = useRef<string | null>(null)
+	useEffect(
+		() =>
+			subscribeDownloads(() => {
+				const { latest } = downloadSnapshot()
+				if (!latest) return
+				if (latest.name !== latestNameRef.current) {
+					latestNameRef.current = latest.name
+					downloadProgressRef.current = 0
+				}
+				if (latest.progress > downloadProgressRef.current) {
+					setDownloadProgress(latest.progress)
+					downloadProgressRef.current = latest.progress
+				}
+			}),
+		[],
+	)
 
 	async function readModelMetadata(modelPath: string) {
 		return invoke<utils.ModelMetadata>('get_model_metadata', { modelPath }).catch((error) => {
@@ -73,8 +79,6 @@ export function viewModel() {
 	}
 
 	async function downloadModel() {
-		handleProgressEvenets()
-
 		let lastError = null
 
 		try {

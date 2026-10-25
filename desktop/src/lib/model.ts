@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import * as pathExt from '@tauri-apps/api/path'
 import * as fsExt from '@tauri-apps/plugin-fs'
+import { beginDownload, downloadName, endDownload } from './downloads'
 import { diarizeModelFilename, embeddingModelFilename, segmentModelFilename, vadModelFilename, type ModelDownload, type ModelIntegrity } from './config'
 import { lsFiles } from './fs'
 import { NamedPath } from './types'
@@ -119,13 +120,20 @@ export async function isModelFileUsable(path: string) {
 interface DownloadModelOptions {
 	/** Overwrite exactly this file — used to replace a model that failed its integrity check. */
 	replacePath?: string
+	/** Human label in the shared progress toast; defaults to the file name from the URL. */
+	displayName?: string
 }
 
 export async function downloadModel(source: string | ModelDownload, options: DownloadModelOptions = {}) {
 	const { url, ...integrity }: ModelDownload = typeof source === 'string' ? { url: source } : source
 	const modelPath = options.replacePath ?? (await resolveDownloadPath(url))
-	const result = await invoke<DownloadModelResult>('download_model', { url, path: modelPath, integrity: toIntegrity(integrity) })
-	return result.status === 'completed' ? result.path : null
+	beginDownload(url, options.displayName ?? downloadName(url))
+	try {
+		const result = await invoke<DownloadModelResult>('download_model', { url, path: modelPath, integrity: toIntegrity(integrity) })
+		return result.status === 'completed' ? result.path : null
+	} finally {
+		endDownload(url)
+	}
 }
 
 /** Remove a downloaded model file from disk; the Rust side refuses anything that is not model weights. */

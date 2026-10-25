@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Laster ned modell for talergjenkjenning...",
 	"downloadingAiModels": "Laster ned AI-modeller...",
 	"downloadingModel": "Laster ned modell...",
+	"downloadingModelFile": "Laster ned {name}…",
+	"downloadingModels": "Laster ned {count} modeller",
 	"downloadingYtdlp": "Laster ned yt-dlp",
 	"enableDiarization": "Slå på talergjenkjenning",
 	"enableLogs": "Aktiver logger",

@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "מוריד מודל זיהוי דוברים...",
 	"downloadingAiModels": "מוריד מודלים...",
 	"downloadingModel": "מוריד מודל בינה מלאכותית...",
+	"downloadingModelFile": "מוריד את {name}…",
+	"downloadingModels": "מוריד {count} מודלים",
 	"downloadingYtdlp": "מוריד yt-dlp",
 	"enableDiarization": "הפעלת זיהוי דוברים",
 	"enableLogs": "הפעל לוגים",

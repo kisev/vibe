@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Stahování modelu pro diarizaci...",
 	"downloadingAiModels": "Stahování AI modelů...",
 	"downloadingModel": "Stahování modelu...",
+	"downloadingModelFile": "Stahování {name}…",
+	"downloadingModels": "Stahování {count} modelů",
 	"downloadingYtdlp": "Stahování yt-dlp",
 	"enableDiarization": "Povolit diarizaci mluvčích",
 	"enableLogs": "Povolit záznamy (logy)",

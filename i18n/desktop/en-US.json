@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Downloading diarization model...",
 	"downloadingAiModels": "Downloading AI models...",
 	"downloadingModel": "Downloading Model...",
+	"downloadingModelFile": "Downloading {name}…",
+	"downloadingModels": "Downloading {count} models",
 	"downloadingYtdlp": "Downloading yt-dlp",
 	"enableDiarization": "Enable speaker diarization",
 	"enableLogs": "Enable Logs",

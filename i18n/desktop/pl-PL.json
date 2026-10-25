@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Pobieranie modelu rozpoznawania mówców...",
 	"downloadingAiModels": "Pobieranie modeli AI...",
 	"downloadingModel": "Pobieranie modelu...",
+	"downloadingModelFile": "Pobieranie {name}…",
+	"downloadingModels": "Pobieranie {count} modeli",
 	"downloadingYtdlp": "Pobieranie yt-dlp",
 	"enableDiarization": "Włącz rozpoznawanie mówców",
 	"enableLogs": "Włącz logi",

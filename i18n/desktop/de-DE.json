@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Diarisierungsmodell wird heruntergeladen...",
 	"downloadingAiModels": "KI-Modelle werden heruntergeladen...",
 	"downloadingModel": "Modell wird heruntergeladen...",
+	"downloadingModelFile": "{name} wird geladen…",
+	"downloadingModels": "{count} Modelle werden geladen",
 	"downloadingYtdlp": "yt-dlp wird heruntergeladen",
 	"enableDiarization": "Sprecher-Diarisierung aktivieren",
 	"enableLogs": "Protokolle aktivieren",

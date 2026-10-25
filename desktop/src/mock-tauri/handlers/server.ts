@@ -85,8 +85,8 @@ function fileExists(path: unknown): boolean {
 	return typeof path === 'string' && virtualFs.has(path)
 }
 
-/** Emits `download_progress` tuples; resolves false when aborted mid-flight. */
-async function runDownloadTicks(abortEvent: string): Promise<boolean> {
+/** Emits `download_progress` payloads (url-attributed, like the Rust side); resolves false when aborted. */
+async function runDownloadTicks(abortEvent: string, url: string): Promise<boolean> {
 	const total = 100_000_000
 	let aborted = false
 	const unsub = onMockEvent(abortEvent, () => {
@@ -97,7 +97,7 @@ async function runDownloadTicks(abortEvent: string): Promise<boolean> {
 			await sleep(DOWNLOAD_TICK_MS)
 			if (aborted) return false
 			const current = Math.round((total * tick) / DOWNLOAD_TICKS)
-			emitMockEvent('download_progress', [current, total])
+			emitMockEvent('download_progress', { url, current, total })
 		}
 		return !aborted
 	} finally {
@@ -201,7 +201,7 @@ export const serverHandlers: CommandHandlerMap = {
 
 	download_model: async (args) => {
 		const path = String(args.path ?? `${MODELS_FOLDER}/${DEFAULT_MODEL_FILE}`)
-		const completed = await runDownloadTicks('abort_download')
+		const completed = await runDownloadTicks('abort_download', String(args.url ?? ''))
 		if (!completed) {
 			return { status: 'cancelled' }
 		}
@@ -211,7 +211,7 @@ export const serverHandlers: CommandHandlerMap = {
 
 	download_file: async (args) => {
 		const path = String(args.path ?? '')
-		const completed = await runDownloadTicks('abort_download')
+		const completed = await runDownloadTicks('abort_download', String(args.url ?? ''))
 		if (completed && path) {
 			virtualFs.set(path, null)
 		}

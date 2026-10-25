@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "話者分離モデルをダウンロード中...",
 	"downloadingAiModels": "AIモデルをダウンロード中...",
 	"downloadingModel": "モデルをダウンロード中...",
+	"downloadingModelFile": "{name} をダウンロード中…",
+	"downloadingModels": "{count} 件のモデルをダウンロード中",
 	"downloadingYtdlp": "yt-dlpをダウンロード中",
 	"enableDiarization": "話者分離を有効にする",
 	"enableLogs": "ログを有効化",

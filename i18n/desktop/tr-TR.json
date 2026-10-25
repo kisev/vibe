@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Konuşmacı ayrımı modeli indiriliyor…",
 	"downloadingAiModels": "AI modellerini indiriliyor...",
 	"downloadingModel": "Model indiriliyor...",
+	"downloadingModelFile": "{name} indiriliyor…",
+	"downloadingModels": "{count} model indiriliyor",
 	"downloadingYtdlp": "yt-dlp indiriliyor",
 	"enableDiarization": "Konuşmacı ayrımını etkinleştir",
 	"enableLogs": "Günlükleri Etkinleştir",

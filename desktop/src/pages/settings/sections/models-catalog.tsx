@@ -17,7 +17,6 @@ import {
 } from '~/lib/catalog'
 import { deleteModelFile, downloadModel, getFriendlyModelName } from '~/lib/model'
 import type { ModelDownload } from '~/lib/config'
-import { useToastProvider } from '~/providers/toast'
 import { cn } from '~/lib/style'
 import { Badge } from '~/components/ui/badge'
 import { Progress } from '~/components/ui/progress'
@@ -161,7 +160,6 @@ function QuantItem({
 	file,
 	installed,
 	downloadDisabled,
-	deleteDisabled,
 	onDownload,
 	onDelete,
 }: {
@@ -169,11 +167,9 @@ function QuantItem({
 	file: CatalogFileEntry
 	installed: boolean
 	downloadDisabled: boolean
-	deleteDisabled: boolean
 	onDownload: () => void
 	onDelete: () => void
 }) {
-	const [confirming, setConfirming] = useState(false)
 	return (
 		<SelectPrimitive.Item
 			value={quant}
@@ -184,24 +180,14 @@ function QuantItem({
 			<SelectPrimitive.ItemText>
 				{quant} · {sizeMb(file.size)} MB
 			</SelectPrimitive.ItemText>
-			{confirming ? (
-				<button
-					type="button"
-					aria-label={m.catalogConfirmDelete()}
-					className="ms-auto flex h-6 w-6 items-center justify-center rounded-md text-red-500 hover:bg-accent"
-					{...itemButtonProps(() => {
-						setConfirming(false)
-						onDelete()
-					})}>
-					<Check className="h-3.5 w-3.5" />
-				</button>
-			) : installed ? (
+			{/* Model files are pure re-downloadable assets, so the quant action is one click; the
+			 * card-level delete keeps the confirm step. */}
+			{installed ? (
 				<button
 					type="button"
 					aria-label={m.catalogDelete()}
-					disabled={deleteDisabled}
-					className="ms-auto flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-					{...itemButtonProps(() => setConfirming(true))}>
+					className="ms-auto flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+					{...itemButtonProps(onDelete)}>
 					<Trash2 className="h-3.5 w-3.5" />
 				</button>
 			) : (
@@ -292,7 +278,6 @@ function CatalogCard({
 									file={candidateFile}
 									installed={installedNames.has(candidateFile.filename)}
 									downloadDisabled={!status.ok}
-									deleteDisabled={active && installedNames.has(candidateFile.filename)}
 									onDownload={() =>
 										onDownload({ url: fileUrl(model, candidateFile), size: candidateFile.size, sha256: candidateFile.sha256 })
 									}
@@ -323,7 +308,7 @@ function CatalogCard({
 									icon={<FolderOpen className="h-4 w-4" />}
 									onClick={() => installedEntry && onOpenFolder(installedEntry.path)}
 								/>
-								<DeleteAction label={m.catalogDeleteModel()} disabled={active} onConfirm={() => onDelete(installedPaths)} />
+								<DeleteAction label={m.catalogDeleteModel()} onConfirm={() => onDelete(installedPaths)} />
 							</>
 						)
 					) : (
@@ -398,7 +383,7 @@ function ExtraCard({
 								icon={<FolderOpen className="h-4 w-4" />}
 								onClick={() => onOpenFolder(entry.path)}
 							/>
-							<DeleteAction label={m.catalogDeleteModel()} disabled={active} onConfirm={() => onDelete([entry.path])} />
+							<DeleteAction label={m.catalogDeleteModel()} onConfirm={() => onDelete([entry.path])} />
 						</>
 					)}
 				</div>
@@ -438,7 +423,6 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 	const [provider, setProvider] = useState('all')
 	const [editingPath, setEditingPath] = useState<string | null>(null)
 	const [editingName, setEditingName] = useState('')
-	const progressToast = useToastProvider()
 
 	const installedByName = useMemo(() => new Map(vm.models.map((entry) => [entry.name, entry])), [vm.models])
 	const installedNames = useMemo(() => new Set(installedByName.keys()), [installedByName])
@@ -476,20 +460,14 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 	// The Custom provider is exactly those files; other filters do not apply to them.
 	const showCatalog = provider !== CUSTOM_PROVIDER
 
-	/** One-click download with the catalog's integrity metadata, on the shared progress toast. */
+	/** One-click download with the catalog's integrity metadata; the registry drives the shared toast. */
 	async function startDownload(download: ModelDownload) {
-		progressToast.setMessage(m.downloadingModel())
-		progressToast.setOpen(true)
-		progressToast.setProgress(0)
 		try {
 			const path = await downloadModel(download)
 			if (path) toast.success(m.downloadComplete())
 		} catch (error) {
 			console.error('failed to download the catalog model:', error)
 			toast.error(String(error))
-		} finally {
-			progressToast.setOpen(false)
-			progressToast.setProgress(null)
 		}
 	}
 

@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Descarregant el model de diarització...",
 	"downloadingAiModels": "Descarregant models d'IA...",
 	"downloadingModel": "Descarregant el model...",
+	"downloadingModelFile": "Baixant {name}…",
+	"downloadingModels": "Baixant {count} models",
 	"downloadingYtdlp": "Descarregant yt-dlp",
 	"enableDiarization": "Activar diarització de veu",
 	"enableLogs": "Activar registres (logs)",

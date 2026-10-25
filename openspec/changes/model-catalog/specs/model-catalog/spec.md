@@ -88,7 +88,7 @@ The settings sheet SHALL fill the app window, and the window SHALL open maximize
 
 ### Requirement: Per-quant state and actions in the selector
 
-The quantization selector SHALL show each quantization's install state and size, and SHALL offer the per-file action inline: a check when the file is on disk, a download button for a quant that is not, and a delete button for one that is. The model-level delete removes every downloaded copy of the entry. Deleting asks for a confirm click and never applies to the active model.
+The quantization selector SHALL show each quantization's install state and size, and SHALL offer the per-file action inline: a check when the file is on disk, a download button for a quant that is not, and a one-click delete for one that is (model files are re-downloadable assets). The model-level delete removes every downloaded copy of the entry after a confirm click. The active model is deletable like any other; the stale selection clears when the list refreshes.
 
 #### Scenario: Acting on a quant in the selector
 
@@ -97,8 +97,13 @@ The quantization selector SHALL show each quantization's install state and size,
 
 #### Scenario: Deleting a model
 
-- **WHEN** the user confirms a delete on a card or selector item
+- **WHEN** the user confirms a delete on a card, or clicks delete on a quant item
 - **THEN** the file is removed from disk and the list refreshes
+
+#### Scenario: Deleting the active model
+
+- **WHEN** the user deletes the model that is currently selected
+- **THEN** the file is removed and the selection clears rather than the delete being blocked
 
 ### Requirement: Short language codes
 
@@ -135,6 +140,20 @@ The filter row SHALL lay out its controls with wrapping, and SHALL not place a l
 
 - **WHEN** the filter row has less width than its controls need
 - **THEN** the controls wrap instead of overlapping
+
+### Requirement: Download progress is attributed and stable
+
+Every download SHALL register in a registry keyed by URL, and the shared progress toast SHALL show what is downloading — the file name, or the in-flight count when several run in parallel — with the latest-touched download's percentage. Progress events from the engine carry the URL so parallel downloads cannot overwrite each other's bar.
+
+#### Scenario: Parallel downloads
+
+- **WHEN** two downloads run at the same time
+- **THEN** the toast names the latest-touched file and shows the in-flight count, and the percentage follows that file only
+
+#### Scenario: Named download
+
+- **WHEN** a download starts
+- **THEN** the toast shows its file name instead of a generic label
 
 ### Requirement: One-click verified downloads
 

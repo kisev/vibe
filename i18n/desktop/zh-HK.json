@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "正在下載發言者分離模型…",
 	"downloadingAiModels": "正在下載 AI 模型...",
 	"downloadingModel": "正在下載模型...",
+	"downloadingModelFile": "正在下載 {name}…",
+	"downloadingModels": "正在下載 {count} 個模型",
 	"downloadingYtdlp": "下載 yt-dlp",
 	"enableDiarization": "啟用發言者分離",
 	"enableLogs": "啟用日誌",

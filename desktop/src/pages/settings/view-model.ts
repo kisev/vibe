@@ -28,6 +28,8 @@ import {
 	type ModelMetadata,
 } from '~/lib/model'
 import { buildSkill, installSkill, type SkillTarget } from '~/lib/skill'
+import { downloadSnapshot, subscribeDownloads, updateDownload } from '~/lib/downloads'
+import { downloadModel as downloadModelFromLib } from '~/lib/model'
 import { ensureVadModel } from '~/lib/vad'
 
 export interface GpuDevice {
@@ -224,15 +226,11 @@ export function viewModel() {
 			isUsable: isModelFileUsable,
 			confirm: () => ask(m.downloadRequiredVadModelQuestion(), { title: m.downloadRequiredVadModel(), kind: 'info' }),
 			download: async (url, path) => {
-				progressToast.setMessage('Downloading Silero VAD model…')
-				progressToast.setOpen(true)
-				progressToast.setProgress(0)
 				try {
-					await invoke('download_model', { url, path })
+					await downloadModelFromLib(url, { replacePath: path, displayName: 'Silero VAD' })
 					toast.success(m.downloadComplete())
-				} finally {
-					progressToast.setOpen(false)
-					progressToast.setProgress(null)
+				} catch (error) {
+					toast.error(String(error))
 				}
 			},
 		})
@@ -382,13 +380,30 @@ export function viewModel() {
 	}, [])
 
 	useEffect(() => {
-		const unlisten = listen<[number, number]>('download_progress', (event) => {
-			const [current, total] = event.payload
-			progressToast.setProgress(Number(current / total) * 100)
+		const unlisten = listen<{ url: string; current: number; total: number }>('download_progress', (event) => {
+			updateDownload(event.payload.url, (event.payload.current / event.payload.total) * 100)
 		})
 		return () => {
 			unlisten.then((fn) => fn())
 		}
+	}, [])
+
+	// The shared toast follows the registry, so parallel downloads show one coherent line:
+	// the latest-touched file with its progress, plus the in-flight count when there are several.
+	useEffect(() => {
+		function syncToast() {
+			const { latest, count } = downloadSnapshot()
+			if (!latest) {
+				progressToast.setOpen(false)
+				progressToast.setProgress(null)
+				return
+			}
+			progressToast.setMessage(count > 1 ? m.downloadingModels({ count }) : m.downloadingModelFile({ name: latest.name }))
+			progressToast.setProgress(latest.progress)
+			progressToast.setOpen(true)
+		}
+		syncToast()
+		return subscribeDownloads(syncToast)
 	}, [])
 
 	return {

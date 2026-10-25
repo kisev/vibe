@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Загрузка модели диаризации...",
 	"downloadingAiModels": "Загрузка AI моделей...",
 	"downloadingModel": "Загрузка модели...",
+	"downloadingModelFile": "Скачивание {name}…",
+	"downloadingModels": "Скачивание моделей: {count}",
 	"downloadingYtdlp": "Загрузка yt-dlp",
 	"enableDiarization": "Включить разделение по говорящим",
 	"enableLogs": "Включить логи",

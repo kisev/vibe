@@ -86,6 +86,8 @@
 	"downloadingDiarizeModel": "Đang tải mô hình phân tách người nói...",
 	"downloadingAiModels": "Đang tải xuống mô hình AI...",
 	"downloadingModel": "Đang tải xuống mô hình...",
+	"downloadingModelFile": "Đang tải {name}…",
+	"downloadingModels": "Đang tải {count} mô hình",
 	"downloadingYtdlp": "Đang tải xuống yt-dlp",
 	"enableDiarization": "Bật phân tách người nói",
 	"enableLogs": "Bật nhật ký",

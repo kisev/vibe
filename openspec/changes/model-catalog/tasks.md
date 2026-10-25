@@ -42,3 +42,9 @@
 - [x] 7.4 Provider filter gains Custom for manually downloaded files outside the handy and vibe layers
 - [x] 7.5 Cards link to the model's Hugging Face page at the pinned revision
 - [x] 7.6 New keys translated into every locale, audit green, tsc/vitest green
+
+## 8. Fourth round of feedback: attributed download toast, deletable active model
+
+- [x] 8.1 Download progress events carry the URL; a URL-keyed registry drives the shared toast (file name, count when parallel) and the setup progress bar, replacing the single anonymous percentage that jumped between parallel downloads
+- [x] 8.2 The active model is deletable like any other (stale selection clears on refresh); quant delete is one click — verified in real Chromium via the mock-tauri repro
+- [x] 8.3 New keys translated, audit green, tsc/vitest green
