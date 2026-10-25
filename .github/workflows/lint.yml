@@ -1,0 +1,43 @@
+# One lint gate, shared by hooks and CI: the same mise pins, the same task
+# facade. A green local `task lint` means the same commands ran here.
+name: Lint
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+concurrency:
+    group: lint-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    lint:
+        timeout-minutes: 30
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  install: true
+                  cache: true
+
+            - name: Setup Rust stable
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Lint the tree
+              run: mise exec -- task lint format:check
+
+            - name: Rust format check
+              run: cargo fmt --all -- --check
+
+            - name: Server clippy
+              run: mise exec -- task server:clippy
+
+            - name: Server dependency gates
+              run: mise exec -- task server:deny server:machete
