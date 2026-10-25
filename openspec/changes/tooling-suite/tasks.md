@@ -21,8 +21,8 @@
 
 - [x] 4.1 Extend `rustfmt.toml` with stable keys only; run `cargo fmt` across the workspace
 - [x] 4.2 Add `[workspace.lints.clippy]` (unwrap_used, expect_used, undocumented_unsafe_blocks) to the server workspace; fix the findings; `cargo clippy --workspace --all-targets -- -D warnings` green (cast lints dropped and desktop deferred — see design notes)
-- [ ] 4.3 Add `deny.toml` (licenses allowlist, advisories, duplicates), record the baseline with explicit allowlisted exceptions; `cargo deny check` green
-- [ ] 4.4 Add `cargo machete` to the gate set; clean what it finds
+- [x] 4.3 Add `server/deny.toml` (licenses allowlist, advisories, duplicates, git-source allowlist), record the baseline with explicit allowlisted exceptions; `task server:deny` green (desktop tree stays upstream-pinned, not denied yet)
+- [x] 4.4 Add `cargo machete` to the gate set; clean what it finds
 
 ## 5. CI parity
 

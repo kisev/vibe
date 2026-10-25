@@ -76,6 +76,18 @@ tasks:
     cmds:
       - cargo fmt --all -- server
 
+  server:deny:
+    desc: cargo-deny check for the server workspace
+    dir: server
+    cmds:
+      - mise exec -- cargo deny check
+
+  server:machete:
+    desc: Find unused Rust dependencies in the server workspace
+    dir: server
+    cmds:
+      - mise exec -- cargo machete
+
   server:clippy:
     desc: Clippy the server workspace, warnings fatal
     dir: server
