@@ -210,7 +210,7 @@ jobs:
                   releaseBody: "Dev build of main at ${{ github.sha }}."
                   releaseCommitish: ${{ github.sha }}
                   prerelease: true
-                  uploadUpdaterJson: false
+                  includeUpdaterJson: false
                   args: --target ${{ matrix.triple }} --config ${{ steps.dev-version.outputs.config }}
                   projectPath: ./desktop
                   tauriScript: pnpm exec tauri
