@@ -7,11 +7,12 @@ import { TooltipProvider } from '~/components/ui/tooltip'
 import { ToastProvider } from '~/providers/toast'
 import { m } from '~/paraglide/messages.js'
 import type { CatalogModel } from '~/lib/catalog'
+import type { NamedPath } from '~/lib/types'
 import type { SettingsViewModel } from './shared'
 import { ModelsCatalogSection } from './models-catalog'
 
-const mocks = vi.hoisted(() => ({ downloadModel: vi.fn() }))
-vi.mock('~/lib/model', () => ({ downloadModel: mocks.downloadModel }))
+const mocks = vi.hoisted(() => ({ downloadModel: vi.fn(), selectModel: vi.fn(), openSelectedModel: vi.fn(), setModelDisplayNames: vi.fn() }))
+vi.mock('~/lib/model', () => ({ downloadModel: mocks.downloadModel, getFriendlyModelName: (name: string) => name }))
 
 // jsdom has no pointer-capture API; Radix's select calls it on the trigger.
 beforeAll(() => {
@@ -24,6 +25,9 @@ beforeAll(() => {
 afterEach(() => {
 	cleanup()
 	mocks.downloadModel.mockReset()
+	mocks.selectModel.mockReset()
+	mocks.openSelectedModel.mockReset()
+	mocks.setModelDisplayNames.mockReset()
 })
 
 function fixture(overrides: Partial<CatalogModel> = {}): CatalogModel {
@@ -50,22 +54,28 @@ function fixture(overrides: Partial<CatalogModel> = {}): CatalogModel {
 	}
 }
 
-// The catalog section folds the URL download and folder rows in; the vm mock
-// carries just those handlers.
-const vm = {
-	downloadURL: '',
-	setDownloadURL: vi.fn(),
-	downloadModel: vi.fn(),
-	openModelsUrl: vi.fn(),
-	openModelPath: vi.fn(),
-	changeModelsFolder: vi.fn(),
-} as unknown as SettingsViewModel
+// The catalog section folds the URL download and folder rows in and shows the
+// installed files among the cards; the vm mock carries those handlers.
+function makeVm(models: NamedPath[] = [], modelPath: string | null = null) {
+	return {
+		downloadURL: '',
+		setDownloadURL: vi.fn(),
+		downloadModel: vi.fn(),
+		openModelsUrl: vi.fn(),
+		openModelPath: vi.fn(),
+		changeModelsFolder: vi.fn(),
+		selectModel: mocks.selectModel,
+		openSelectedModel: mocks.openSelectedModel,
+		models,
+		preference: { modelPath, modelDisplayNames: {}, setModelDisplayNames: mocks.setModelDisplayNames },
+	} as unknown as SettingsViewModel
+}
 
-function renderCatalog(models: CatalogModel[]) {
+function renderCatalog(models: CatalogModel[], installed: NamedPath[] = [], modelPath: string | null = null) {
 	return render(
 		<TooltipProvider>
 			<ToastProvider>
-				<ModelsCatalogSection vm={vm} models={models} />
+				<ModelsCatalogSection vm={makeVm(installed, modelPath)} models={models} />
 			</ToastProvider>
 		</TooltipProvider>,
 	)
@@ -212,5 +222,73 @@ describe('catalog filters', () => {
 		await user.click(await screen.findByRole('option', { name: m.catalogAllLanguages() }))
 
 		expect(screen.getByText('English Model')).toBeTruthy()
+	})
+})
+
+describe('installed models in the catalog', () => {
+	it('sorts an installed entry first, marks it and selects it with Use', async () => {
+		const user = userEvent.setup()
+		const path = '/models/fixture-Q8_0.gguf'
+		// The installed model comes second in the list and must still lead; the other entry ships different files.
+		renderCatalog(
+			[
+				fixture({ id: 'other', name: 'Other Model', files: { Q8_0: { filename: 'other-Q8_0.gguf', size: 100, sha256: 'h' } } }),
+				fixture(),
+			],
+			[{ name: 'fixture-Q8_0.gguf', path }],
+		)
+
+		const installedName = await screen.findByText('Fixture Model')
+		const otherName = screen.getByText('Other Model')
+		expect(installedName.compareDocumentPosition(otherName) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+		expect(screen.getByText(m.catalogInstalled())).toBeTruthy()
+
+		await user.click(screen.getByRole('button', { name: m.catalogUse() }))
+		expect(mocks.selectModel).toHaveBeenCalledWith(path)
+	})
+
+	it('marks the active model and offers no Use button for it', () => {
+		const path = '/models/fixture-Q8_0.gguf'
+		renderCatalog([fixture()], [{ name: 'fixture-Q8_0.gguf', path }], path)
+
+		expect(screen.getByText(m.catalogActive())).toBeTruthy()
+		expect(screen.queryByRole('button', { name: m.catalogUse() })).toBeNull()
+	})
+
+	it('renders an installed file the catalog does not know above the cards', () => {
+		renderCatalog([fixture()], [{ name: 'manual-download-Q4.gguf', path: '/models/manual-download-Q4.gguf' }])
+
+		// The display name and the file line both carry it.
+		expect(screen.getAllByText('manual-download-Q4.gguf').length).toBe(2)
+		expect(screen.getByText(m.catalogInstalled())).toBeTruthy()
+		expect(screen.getByRole('button', { name: m.catalogUse() })).toBeTruthy()
+	})
+})
+
+describe('limitations on the card', () => {
+	it('lists what an entry cannot do on its card', () => {
+		renderCatalog([
+			fixture({
+				id: 'plain',
+				capabilities: { streaming: false, translate: false, languageDetection: false, timestamps: true },
+			}),
+		])
+
+		expect(screen.getByText(m.modelLimitationStreaming(), { exact: false })).toBeTruthy()
+		expect(screen.getByText(m.modelLimitationTranslation(), { exact: false })).toBeTruthy()
+		expect(screen.getByText(m.modelLimitationLanguage({ language: 'en' }), { exact: false })).toBeTruthy()
+	})
+
+	it('shows no limitations for a fully capable entry', () => {
+		renderCatalog([
+			fixture({
+				id: 'full',
+				languages: ['en', 'de'],
+				capabilities: { streaming: true, translate: true, languageDetection: true, timestamps: true },
+			}),
+		])
+
+		expect(screen.queryByText(m.modelLimitationStreaming(), { exact: false })).toBeNull()
+		expect(screen.queryByText(m.modelLimitationTranslation(), { exact: false })).toBeNull()
 	})
 })

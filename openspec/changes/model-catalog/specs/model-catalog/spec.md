@@ -41,12 +41,50 @@ Each catalog card SHALL show the provider, the file size in megabytes, the suppo
 
 ### Requirement: One model surface
 
-The models settings SHALL present one coherent flow: installed models as cards carrying the same metadata the catalog shows (matched by file name), the catalog as the way to add models, and the URL download folded into the catalog section. A separate model selector and a separate "model library" group SHALL not coexist with it.
+The models settings SHALL present one coherent flow: the catalog is the single list of models, with installed files highlighted and sorted first, the URL download and folder actions folded in. Separate selector, library, and installed-models groups SHALL not coexist with it.
 
-#### Scenario: Installed card metadata
+#### Scenario: Installed entry in the catalog
 
 - **WHEN** a downloaded model matches a catalog entry by file name
-- **THEN** its card shows that entry's badges and accuracy/speed bars
+- **THEN** that entry's card is visually set apart, carries an installed marker, leads the list, and offers select/rename/reveal instead of a download for the installed quantization
+
+#### Scenario: Installed file outside the catalog
+
+- **WHEN** the models folder holds a file no catalog entry claims
+- **THEN** it still appears above the catalog cards with select, rename, and reveal actions
+
+#### Scenario: The active model
+
+- **WHEN** an installed file is the selected model
+- **THEN** its card is marked active and offers no duplicate select action
+
+### Requirement: Limitations on the card
+
+A catalog entry's limitations — single-language recognition without automatic language detection, no streaming, no translation — SHALL be shown on its card, not in a separate group.
+
+#### Scenario: Reading a card
+
+- **WHEN** an entry lacks streaming, translation, or automatic language detection across several languages
+- **THEN** its card states those limitations inline
+
+#### Scenario: Fully capable entry
+
+- **WHEN** an entry streams, translates, and handles language detection
+- **THEN** its card shows no limitation notes
+
+### Requirement: Settings open on the full window
+
+The settings sheet SHALL fill the app window, and the window SHALL open maximized while settings is visible, restoring the user's previous size on close — the catalog needs the room.
+
+#### Scenario: Opening settings
+
+- **WHEN** the user opens settings
+- **THEN** the window maximizes (unless it already was) and the sheet fills it
+
+#### Scenario: Closing settings
+
+- **WHEN** the user closes settings and the window was not maximized before
+- **THEN** the window returns to its previous size
 
 ### Requirement: One-click verified downloads
 

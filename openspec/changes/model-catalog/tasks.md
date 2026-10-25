@@ -26,3 +26,10 @@
 - [x] 5.1 Replace the "Select model" and "Model library" groups with one Models section: installed models as cards (catalog metadata matched by file name, active model marked, one-click select), the catalog with name search, streaming/translation chips, language and provider filters, and the URL download folded in; drop parameter counts from cards (M vs MB confusion)
 - [x] 5.2 Remove the legacy .bin entries from the vibe layer, the settings catalog, and the generated docs (the engine refuses them; the catalog is a chooser of what works, not an archive), and update the docs generator + parity test accordingly
 - [x] 5.3 Translate the new keys into every locale, regenerate paraglide, stamp, and re-run the i18n audit; keep tsc/vitest green
+
+## 6. Second round of feedback: fullscreen settings, installed-in-catalog, limitations on cards
+
+- [x] 6.1 Maximize the app window while the settings sheet is open (restore on close) and make the sheet fill the window with a readable content column instead of the fixed 640px/3xl box
+- [x] 6.2 Drop the "Installed models" group: installed entries appear in the catalog list, highlighted with a primary ring and an installed badge, sorted first, with select/rename/reveal instead of download for the installed quantization; files outside the catalog still appear above the cards
+- [x] 6.3 Show each entry's limitations (single language without detection, no streaming, no translation) on its card and remove the separate limitations group
+- [x] 6.4 Update the badge key ("Installed"), drop the unused group-title key, keep the audit green, tsc/vitest green

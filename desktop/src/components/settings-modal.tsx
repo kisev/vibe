@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { ModifyState } from '~/lib/types'
 import SettingsPage from '~/pages/settings/page'
 
@@ -20,6 +21,27 @@ export default function SettingsModal({ visible, setVisible, scrollTo }: Setting
 		return () => {
 			document.body.style.overflow = prevBodyOverflow
 			document.documentElement.style.overflow = prevHtmlOverflow
+		}
+	}, [visible])
+
+	// The compact main window has no room for the catalog; zoom the window to the
+	// screen while settings is open and restore the user's size on close.
+	useEffect(() => {
+		if (!visible) return
+		const appWindow = getCurrentWindow()
+		let restore = false
+		let closed = false
+		appWindow
+			.isMaximized()
+			.then((maximized) => {
+				if (closed || maximized) return
+				restore = true
+				return appWindow.maximize()
+			})
+			.catch(() => {})
+		return () => {
+			closed = true
+			if (restore) appWindow.unmaximize().catch(() => {})
 		}
 	}, [visible])
 
