@@ -7,6 +7,7 @@ import { TooltipProvider } from '~/components/ui/tooltip'
 import { ToastProvider } from '~/providers/toast'
 import { m } from '~/paraglide/messages.js'
 import type { CatalogModel } from '~/lib/catalog'
+import type { SettingsViewModel } from './shared'
 import { ModelsCatalogSection } from './models-catalog'
 
 const mocks = vi.hoisted(() => ({ downloadModel: vi.fn() }))
@@ -49,11 +50,22 @@ function fixture(overrides: Partial<CatalogModel> = {}): CatalogModel {
 	}
 }
 
+// The catalog section folds the URL download and folder rows in; the vm mock
+// carries just those handlers.
+const vm = {
+	downloadURL: '',
+	setDownloadURL: vi.fn(),
+	downloadModel: vi.fn(),
+	openModelsUrl: vi.fn(),
+	openModelPath: vi.fn(),
+	changeModelsFolder: vi.fn(),
+} as unknown as SettingsViewModel
+
 function renderCatalog(models: CatalogModel[]) {
 	return render(
 		<TooltipProvider>
 			<ToastProvider>
-				<ModelsCatalogSection models={models} />
+				<ModelsCatalogSection vm={vm} models={models} />
 			</ToastProvider>
 		</TooltipProvider>,
 	)
@@ -69,11 +81,12 @@ describe('models catalog section', () => {
 			}),
 		])
 
-		expect(screen.getByText(/Provider: Handy/)).toBeTruthy()
+		expect(screen.getByText(/Handy/)).toBeTruthy()
 		expect(screen.getByText(/731 MB/)).toBeTruthy()
 		expect(screen.getByText('en')).toBeTruthy()
-		expect(screen.getByText(m.catalogStreaming())).toBeTruthy()
-		expect(screen.getByText(m.catalogTranslation())).toBeTruthy()
+		// The filter chip always shows, so a badge means the text appears twice.
+		expect(screen.getAllByText(m.catalogStreaming()).length).toBe(2)
+		expect(screen.getAllByText(m.catalogTranslation()).length).toBe(2)
 		expect(screen.getByLabelText(m.catalogAccuracy())).toBeTruthy()
 		expect(screen.getByLabelText(m.catalogSpeed())).toBeTruthy()
 	})
@@ -93,8 +106,9 @@ describe('models catalog section', () => {
 
 		expect(screen.queryByLabelText(m.catalogAccuracy())).toBeNull()
 		expect(screen.queryByLabelText(m.catalogSpeed())).toBeNull()
-		expect(screen.queryByText(m.catalogStreaming())).toBeNull()
-		expect(screen.queryByText(m.catalogTranslation())).toBeNull()
+		// Only the filter chip carries the label — no card badge.
+		expect(screen.getAllByText(m.catalogStreaming()).length).toBe(1)
+		expect(screen.getAllByText(m.catalogTranslation()).length).toBe(1)
 	})
 
 	it('switching quantization updates the displayed size', async () => {
@@ -114,8 +128,10 @@ describe('models catalog section', () => {
 		const user = userEvent.setup()
 		mocks.downloadModel.mockResolvedValue('/models/fixture-Q8_0.gguf')
 		renderCatalog([fixture()])
+		// Two rows download: the card's one-click download and the pasted-URL row. The card's comes first.
+		const cardDownload = () => screen.getAllByRole('button', { name: m.downloadModel() })[0]!
 
-		await user.click(screen.getByRole('button', { name: m.downloadModel() }))
+		await user.click(cardDownload())
 		expect(mocks.downloadModel).toHaveBeenCalledWith({
 			url: 'https://huggingface.co/handy-computer/fixture-gguf/resolve/abc123/fixture-Q8_0.gguf',
 			size: 731_357_568,
@@ -124,7 +140,7 @@ describe('models catalog section', () => {
 
 		await user.click(screen.getByRole('combobox', { name: m.catalogQuantization() }))
 		await user.click(await screen.findByRole('option', { name: 'Q4_K_M' }))
-		await user.click(screen.getByRole('button', { name: m.downloadModel() }))
+		await user.click(cardDownload())
 		expect(mocks.downloadModel).toHaveBeenLastCalledWith({
 			url: 'https://huggingface.co/handy-computer/fixture-gguf/resolve/abc123/fixture-Q4_K_M.gguf',
 			size: 485_425_536,
@@ -136,7 +152,7 @@ describe('models catalog section', () => {
 		renderCatalog([fixture({ id: 'ahead-of-engine', minEngine: '9.9.9' })])
 
 		expect(screen.getByText(m.catalogRequiresEngine({ requirement: '9.9.9' }))).toBeTruthy()
-		expect((screen.getByRole('button', { name: m.downloadModel() }) as HTMLButtonElement).disabled).toBe(true)
+		expect((screen.getAllByRole('button', { name: m.downloadModel() })[0] as HTMLButtonElement).disabled).toBe(true)
 	})
 
 	it('marks a legacy .bin entry as needing a GGUF build and disables the download', () => {
@@ -149,8 +165,52 @@ describe('models catalog section', () => {
 		])
 
 		expect(screen.getByText(m.catalogRequiresGguf())).toBeTruthy()
-		expect((screen.getByRole('button', { name: m.downloadModel() }) as HTMLButtonElement).disabled).toBe(true)
+		expect((screen.getAllByRole('button', { name: m.downloadModel() })[0] as HTMLButtonElement).disabled).toBe(true)
 		// A single file ships no quantization selector.
-		expect(screen.queryByRole('combobox')).toBeNull()
+		expect(screen.queryByRole('combobox', { name: m.catalogQuantization() })).toBeNull()
+	})
+})
+
+describe('catalog filters', () => {
+	it('keeps only streaming entries when the streaming chip is on', async () => {
+		const user = userEvent.setup()
+		renderCatalog([
+			fixture({ name: 'Streaming Model' }),
+			fixture({ id: 'plain', name: 'Plain Model', capabilities: { streaming: false, translate: false, languageDetection: false, timestamps: true } }),
+		])
+
+		await user.click(screen.getByRole('button', { name: m.catalogStreaming() }))
+
+		expect(screen.getByText('Streaming Model')).toBeTruthy()
+		expect(screen.queryByText('Plain Model')).toBeNull()
+	})
+
+	it('searches by name and shows the no-matches note when nothing survives', async () => {
+		const user = userEvent.setup()
+		renderCatalog([fixture(), fixture({ id: 'other', name: 'Other Model' })])
+
+		await user.type(screen.getByPlaceholderText(m.catalogSearch()), 'Other')
+
+		expect(screen.getByText('Other Model')).toBeTruthy()
+		expect(screen.queryByText('Fixture Model')).toBeNull()
+
+		await user.type(screen.getByPlaceholderText(m.catalogSearch()), 'zzz')
+		expect(screen.getByText(m.catalogNoMatches())).toBeTruthy()
+	})
+
+	it('filters by language', async () => {
+		const user = userEvent.setup()
+		renderCatalog([fixture({ name: 'English Model', languages: ['en'] }), fixture({ id: 'de', name: 'German Model', languages: ['de'] })])
+
+		await user.click(screen.getByRole('combobox', { name: m.language() }))
+		await user.click(await screen.findByRole('option', { name: 'de' }))
+
+		expect(screen.getByText('German Model')).toBeTruthy()
+		expect(screen.queryByText('English Model')).toBeNull()
+
+		await user.click(screen.getByRole('combobox', { name: m.language() }))
+		await user.click(await screen.findByRole('option', { name: m.catalogAllLanguages() }))
+
+		expect(screen.getByText('English Model')).toBeTruthy()
 	})
 })

@@ -8,6 +8,7 @@ import {
 	engineAtLeast,
 	entryScores,
 	identityKey,
+	matchInstalled,
 	mergeCatalogs,
 	providerName,
 	sizeMb,
@@ -38,9 +39,12 @@ describe('mergeCatalogs', () => {
 		expect(merged.models.map((m) => m.id)).toEqual([handyTwins[0].id])
 	})
 
-	it('filters the settings catalog to ASR entries', () => {
+	it('filters the settings catalog to loadable ASR entries', () => {
 		expect(asrCatalog().every((m) => m.role === 'asr')).toBe(true)
 		expect(asrCatalog().length).toBeLessThan(CATALOG.models.length)
+		// Legacy .bin containers and engine-ahead families stay in the data but never in the chooser.
+		expect(asrCatalog().every((m) => Object.values(m.files).every((f) => f.filename.endsWith('.gguf')))).toBe(true)
+		expect(asrCatalog().every((m) => engineAtLeast(m.minEngine))).toBe(true)
 	})
 })
 
@@ -76,8 +80,14 @@ describe('availability', () => {
 	})
 
 	it('marks legacy .bin ASR files with the format requirement', () => {
-		const model = CATALOG.models.find((m) => m.id === 'vibe-whisper-tiny-legacy-bin')!
-		expect(availability(model, 'F16')).toEqual({ ok: false, reason: 'format', requirement: 'GGUF' })
+		// The vibe layer no longer carries .bin entries, so exercise the format gate with an inline fixture.
+		const legacy: CatalogModel = {
+			...vibeTwins[0],
+			id: 'inline-legacy-bin',
+			files: { F16: { filename: 'ggml-tiny.bin', size: 77_700_000, sha256: '0'.repeat(64) } },
+		}
+		expect(availability(legacy, 'F16')).toEqual({ ok: false, reason: 'format', requirement: 'GGUF' })
+		expect(asrCatalog({ schema: 2, models: [legacy], results: {} })).toEqual([])
 	})
 
 	it('compares dot versions numerically', () => {
@@ -89,6 +99,17 @@ describe('availability', () => {
 })
 
 describe('presentation helpers', () => {
+	it('matches an installed file to its catalog entry', () => {
+		// The -he file is vibe-only; the base parakeet quants are shared with the handy layer.
+		const hebrew = CATALOG.models.find((m) => m.id === 'vibe-parakeet-tdt-0.6b-v3-he')!
+		const match = matchInstalled('parakeet-tdt-0.6b-v3-he-q8_0.gguf')
+		expect(match?.model).toBe(hebrew)
+		expect(match?.quant).toBe('Q8_0')
+		expect(matchInstalled('parakeet-tdt-0.6b-v3-Q4_K_M.gguf')?.model.id).toBe('parakeet-tdt-0.6b-v3')
+		// A manual download the catalog does not know simply matches nothing.
+		expect(matchInstalled('somebody-elses-model.bin')).toBeUndefined()
+	})
+
 	it('maps repository owners to provider display names', () => {
 		expect(providerName('vibe-app/x')).toBe('Vibe')
 		expect(providerName('handy-computer/y')).toBe('Handy')

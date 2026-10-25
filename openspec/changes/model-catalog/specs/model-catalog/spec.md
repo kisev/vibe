@@ -22,7 +22,12 @@ The application SHALL bundle a model catalog combining the upstream handy catalo
 
 ### Requirement: Honest entry metadata
 
-Each catalog card SHALL show the provider, the file size in megabytes, the supported languages, streaming and translation availability, and the published accuracy and speed benchmarks for the selected quantization.
+Each catalog card SHALL show the provider, the file size in megabytes, the supported languages, streaming and translation availability, and the published accuracy and speed benchmarks for the selected quantization. Parameter counts are not shown on cards — they read as a second, confusing size.
+
+#### Scenario: Filtering the catalog
+
+- **WHEN** the user filters by streaming, translation, language, or provider, or searches by name
+- **THEN** only matching entries are shown, and an empty result states that nothing matches
 
 #### Scenario: Card contents
 
@@ -33,6 +38,15 @@ Each catalog card SHALL show the provider, the file size in megabytes, the suppo
 
 - **WHEN** the user switches a model's quantization
 - **THEN** the shown size and benchmarks update to that file's values
+
+### Requirement: One model surface
+
+The models settings SHALL present one coherent flow: installed models as cards carrying the same metadata the catalog shows (matched by file name), the catalog as the way to add models, and the URL download folded into the catalog section. A separate model selector and a separate "model library" group SHALL not coexist with it.
+
+#### Scenario: Installed card metadata
+
+- **WHEN** a downloaded model matches a catalog entry by file name
+- **THEN** its card shows that entry's badges and accuracy/speed bars
 
 ### Requirement: One-click verified downloads
 
@@ -48,14 +62,19 @@ The user SHALL be able to download any catalog model from the models settings, c
 - **WHEN** a downloaded catalog file fails its size or SHA-256 check
 - **THEN** the download is reported as failed, the file is not offered as a model, and retrying is possible
 
-### Requirement: Engine requirements are visible
+### Requirement: The catalog lists only models the engine can load
 
-A catalog model the installed engine cannot load SHALL still be listed, marked with the reason it is unavailable, and MUST NOT be downloadable into a state that pretends it will work.
+The catalog SHALL show only entries the bundled engine can load, and files in
+containers the engine refuses (the legacy whisper `.bin`) SHALL not appear as
+catalog entries at all. A future entry whose family needs a newer engine than
+bundled is filtered the same way — the settings catalog is a chooser of things
+that work here, not an archive.
 
-#### Scenario: Model ahead of the engine
+#### Scenario: Legacy container
 
-- **WHEN** a catalog entry requires an engine newer than the bundled one
-- **THEN** the card states the engine requirement and download is disabled or warned
+- **WHEN** the vibe layer knows a legacy `.bin` file
+
+- **THEN** it is absent from the settings catalog and from the generated docs
 
 #### Scenario: Supported models are unaffected
 

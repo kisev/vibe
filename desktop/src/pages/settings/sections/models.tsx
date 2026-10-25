@@ -1,96 +1,126 @@
 import { useState } from 'react'
 import { Check, Download, FolderOpen, Pencil, X } from 'lucide-react'
 import { m } from '~/paraglide/messages.js'
-import { ReactComponent as FolderIcon } from '~/icons/folder.svg'
-import { ReactComponent as LinkIcon } from '~/icons/link.svg'
-import { ReactComponent as WrenchIcon } from '~/icons/wrench.svg'
 import NumberField from '~/components/number-field'
 import { Input } from '~/components/ui/input'
 import { Switch } from '~/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
-import { ActionRow, IconAction, SettingsGroup, SettingsNote, SettingsRow, rowControlClass, type SettingsViewModel } from './shared'
-import { ModelsCatalogSection } from './models-catalog'
+import { Badge } from '~/components/ui/badge'
+import { IconAction, SettingsGroup, SettingsNote, SettingsRow, rowControlClass, type SettingsViewModel } from './shared'
+import { CardMeta, ScoreBar, ModelsCatalogSection } from './models-catalog'
+import { entryScores, matchInstalled } from '~/lib/catalog'
 import { getFriendlyModelName, modelLimitations } from '~/lib/model'
-import { ModelGlyph } from '~/components/brand-glyph'
+import type { NamedPath } from '~/lib/types'
 
-export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
-	const [editingPath, setEditingPath] = useState<string | null>(null)
-	const [editingName, setEditingName] = useState('')
-	const currentModel = vm.models.find((model) => model.path === vm.preference.modelPath)
-	const isRenaming = Boolean(currentModel && editingPath === currentModel.path)
-
-	function commitRename() {
-		if (!currentModel) return
-		const name = editingName.trim()
-		if (name) vm.preference.setModelDisplayNames({ ...vm.preference.modelDisplayNames, [currentModel.path]: name })
-		setEditingPath(null)
-	}
-
-	function startRename() {
-		if (!currentModel) return
-		setEditingPath(currentModel.path)
-		setEditingName(vm.preference.modelDisplayNames[currentModel.path] ?? getFriendlyModelName(currentModel.name))
-	}
+/**
+ * One installed model: friendly name (or the user's rename), active marker, and
+ * — when the file matches a catalog entry — the same metadata the catalog cards
+ * show. Files the catalog doesn't know (manual downloads) still work; they just
+ * render without catalog metadata.
+ */
+function InstalledCard({
+	vm,
+	model,
+	editing,
+	onStartRename,
+	onCommitRename,
+	onCancelRename,
+	editingName,
+	setEditingName,
+}: {
+	vm: SettingsViewModel
+	model: NamedPath
+	editing: boolean
+	editingName: string
+	setEditingName: (value: string) => void
+	onStartRename: () => void
+	onCommitRename: () => void
+	onCancelRename: () => void
+}) {
+	const displayName = vm.preference.modelDisplayNames[model.path] ?? getFriendlyModelName(model.name)
+	const active = model.path === vm.preference.modelPath
+	const match = matchInstalled(model.name)
+	const scores = match ? entryScores(match.model) : undefined
 
 	return (
-		<div className="space-y-6">
-			<SettingsGroup>
-				<SettingsRow label={m.selectModel()}>
-					{isRenaming ? (
+		<div className="space-y-2.5 px-4 py-3">
+			<div className="flex items-start justify-between gap-4">
+				<div className="min-w-0">
+					<div className="flex items-center gap-2">
+						<span className="text-sm font-medium text-foreground">{displayName}</span>
+						{active && !editing && <Badge>{m.catalogActive()}</Badge>}
+					</div>
+				</div>
+				<div className="flex shrink-0 items-center gap-1.5">
+					{editing ? (
 						<>
 							<Input
 								autoFocus
 								value={editingName}
 								onChange={(event) => setEditingName(event.target.value)}
 								onKeyDown={(event) => {
-									if (event.key === 'Enter') commitRename()
-									if (event.key === 'Escape') setEditingPath(null)
+									if (event.key === 'Enter') onCommitRename()
+									if (event.key === 'Escape') onCancelRename()
 								}}
 								className={`w-56 ${rowControlClass}`}
 							/>
-							<IconAction variant="outline" label={m.save()} icon={<Check className="h-4 w-4" />} onClick={commitRename} />
-							<IconAction variant="outline" label={m.cancel()} icon={<X className="h-4 w-4" />} onClick={() => setEditingPath(null)} />
+							<IconAction variant="outline" label={m.save()} icon={<Check className="h-4 w-4" />} onClick={onCommitRename} />
+							<IconAction variant="outline" label={m.cancel()} icon={<X className="h-4 w-4" />} onClick={onCancelRename} />
 						</>
 					) : (
 						<>
-							<Select
-								value={vm.preference.modelPath ?? undefined}
-								onValueChange={vm.selectModel}
-								onOpenChange={(open) => {
-									if (open) vm.loadModels()
-								}}>
-								<SelectTrigger className={`w-56 ${rowControlClass}`}>
-									<SelectValue placeholder={m.selectModel()} />
-								</SelectTrigger>
-								<SelectContent>
-									{vm.models.map((model, index) => (
-										<SelectItem key={index} value={model.path}>
-											<span className="flex items-center gap-2">
-												<ModelGlyph name={model.name} className="text-muted-foreground" />
-												{vm.preference.modelDisplayNames[model.path] ?? getFriendlyModelName(model.name)}
-											</span>
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-							<IconAction
-								variant="outline"
-								label={m.showInFolder()}
-								icon={<FolderOpen className="h-4 w-4" />}
-								disabled={!currentModel}
-								onClick={() => currentModel && vm.openSelectedModel(currentModel.path)}
-							/>
-							<IconAction
-								variant="outline"
-								label={m.rename()}
-								icon={<Pencil className="h-4 w-4" />}
-								disabled={!currentModel}
-								onClick={startRename}
-							/>
+							{!active && <IconAction variant="outline" label={m.catalogUse()} icon={<Check className="h-4 w-4" />} onClick={() => vm.selectModel(model.path)} />}
+							<IconAction variant="outline" label={m.rename()} icon={<Pencil className="h-4 w-4" />} onClick={onStartRename} />
+							<IconAction variant="outline" label={m.showInFolder()} icon={<FolderOpen className="h-4 w-4" />} onClick={() => vm.openSelectedModel(model.path)} />
 						</>
 					)}
-				</SettingsRow>
-			</SettingsGroup>
+				</div>
+			</div>
+
+			{match && <CardMeta model={match.model} sizeBytes={match.file.size} />}
+
+			{scores && (scores.accuracy !== undefined || scores.speed !== undefined) && (
+				<div className="space-y-1.5">
+					{scores.accuracy !== undefined && <ScoreBar label={m.catalogAccuracy()} score={scores.accuracy} />}
+					{scores.speed !== undefined && <ScoreBar label={m.catalogSpeed()} score={scores.speed} />}
+				</div>
+			)}
+		</div>
+	)
+}
+
+export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
+	const [editingPath, setEditingPath] = useState<string | null>(null)
+	const [editingName, setEditingName] = useState('')
+
+	function commitRename(model: NamedPath) {
+		const name = editingName.trim()
+		if (name) vm.preference.setModelDisplayNames({ ...vm.preference.modelDisplayNames, [model.path]: name })
+		setEditingPath(null)
+	}
+
+	return (
+		<div className="space-y-6">
+			{vm.models.length > 0 && (
+				<SettingsGroup title={m.catalogInstalled()}>
+					{vm.models.map((model) => (
+						<InstalledCard
+							key={model.path}
+							vm={vm}
+							model={model}
+							editing={editingPath === model.path}
+							editingName={editingName}
+							setEditingName={setEditingName}
+							onStartRename={() => {
+								setEditingPath(model.path)
+								setEditingName(vm.preference.modelDisplayNames[model.path] ?? getFriendlyModelName(model.name))
+							}}
+							onCommitRename={() => commitRename(model)}
+							onCancelRename={() => setEditingPath(null)}
+						/>
+					))}
+				</SettingsGroup>
+			)}
 
 			{modelLimitations(vm.preference.modelMetadata?.capabilities).length > 0 && (
 				<SettingsGroup title={m.modelLimitations()}>
@@ -167,24 +197,7 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 				</SettingsGroup>
 			)}
 
-			<SettingsGroup title={m.settingsModelFiles()}>
-				<SettingsRow label={m.downloadModel()}>
-					<Input
-						type="text"
-						value={vm.downloadURL}
-						onChange={(event) => vm.setDownloadURL(event.target.value)}
-						placeholder={m.pasteModelLink()}
-						onKeyDown={(event) => (event.key === 'Enter' ? vm.downloadModel() : null)}
-						className={`w-56 ${rowControlClass}`}
-					/>
-					<IconAction label={m.downloadModel()} icon={<Download className="h-4 w-4" />} onClick={vm.downloadModel} disabled={!vm.downloadURL} />
-				</SettingsRow>
-				<ActionRow label={m.downloadModelsLink()} icon={<LinkIcon className="h-4 w-4" />} onClick={vm.openModelsUrl} />
-				<ActionRow label={m.modelsFolder()} icon={<FolderIcon className="h-4 w-4" />} onClick={vm.openModelPath} />
-				<ActionRow label={m.changeModelsFolder()} icon={<WrenchIcon className="h-4 w-4" />} onClick={vm.changeModelsFolder} />
-			</SettingsGroup>
-
-			<ModelsCatalogSection />
+			<ModelsCatalogSection vm={vm} />
 		</div>
 	)
 }

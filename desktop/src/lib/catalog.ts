@@ -105,9 +105,31 @@ export function mergeCatalogs(handy: CatalogData, vibe: { schema: number; models
 
 export const CATALOG: CatalogData = mergeCatalogs(handyFile as unknown as CatalogData, vibeFile as unknown as { schema: number; models: CatalogModel[] })
 
-/** ASR entries for the settings catalog. */
+/**
+ * ASR entries for the settings catalog — only what the bundled engine can load.
+ * The catalog is a chooser of models that work here, not an archive: legacy
+ * `.bin` containers and families ahead of the engine are filtered out (they
+ * stay in the data; the docs generator and tests see the same filter).
+ */
 export function asrCatalog(catalog: CatalogData = CATALOG): CatalogModel[] {
-	return catalog.models.filter((model) => model.role === 'asr')
+	return catalog.models.filter((model) => {
+		if (model.role !== 'asr') return false
+		if (!engineAtLeast(model.minEngine)) return false
+		return Object.values(model.files).every((file) => file.filename.endsWith('.gguf'))
+	})
+}
+
+/** The catalog entry an installed model file matches, by file name. */
+export function matchInstalled(
+	filename: string,
+	catalog: CatalogData = CATALOG,
+): { model: CatalogModel; quant: string; file: CatalogFileEntry } | undefined {
+	for (const model of asrCatalog(catalog)) {
+		for (const [quant, file] of Object.entries(model.files)) {
+			if (file.filename === filename) return { model, quant, file }
+		}
+	}
+	return undefined
 }
 
 /** Best (lowest) error across the languages a benchmark reports — the headline accuracy. */

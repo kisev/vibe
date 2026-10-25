@@ -113,12 +113,6 @@ function extractProse(markdown) {
 	return { head: markdown.slice(0, headEnd), gigaamDetails: gigaamMatch[0], tail: markdown.slice(tailStart) }
 }
 
-/** ASR files not ending .gguf are the legacy whisper.cpp container. */
-function isLegacy(model) {
-	const files = Object.values(model.files)
-	return files.length > 0 && files.every((file) => !file.filename.endsWith('.gguf'))
-}
-
 function languagesLabel(languages) {
 	if (languages.length === 0) return ''
 	const listed = languages.length <= 5 ? languages.join(', ') : `${languages.slice(0, 5).join(', ')} +${languages.length - 5}`
@@ -151,17 +145,20 @@ function render(markdown) {
 	const handy = JSON.parse(readFileSync(join(root, 'src', 'data', 'handy-catalog.json'), 'utf8'))
 	const vibe = JSON.parse(readFileSync(join(root, 'src', 'data', 'catalog-vibe.json'), 'utf8'))
 	const merged = mergeCatalogs(handy, vibe)
-	const asr = merged.models.filter((model) => model.role === 'asr')
-	const current = asr.filter((model) => !isLegacy(model))
-	const legacy = asr.filter(isLegacy)
-	const curated = current.filter((model) => model.curated)
-	const others = current.filter((model) => !model.curated)
+	// Mirror the settings catalog's rule exactly (src/lib/catalog.ts): the page
+	// documents what the bundled engine can load — role ASR, minEngine met, GGUF
+	// files only. Legacy .bin containers and families ahead of the engine stay out.
+	const asr = merged.models.filter(
+		(model) =>
+			model.role === 'asr' &&
+			engineAtLeast(model.minEngine) &&
+			Object.values(model.files).every((file) => file.filename.endsWith('.gguf')),
+	)
+	const curated = asr.filter((model) => model.curated)
+	const others = asr.filter((model) => !model.curated)
 	const blocks = [
 		...curated.map((model) => entryBlock(model, true)),
 		...others.map((model) => entryBlock(model, false)),
-		'### Legacy (reference only)',
-		'These pre-GGUF whisper.cpp containers are kept for reference only: the unified engine loads GGUF only.',
-		...legacy.map((model) => entryBlock(model, false)),
 	]
 	const anchorIndex = blocks.findIndex((block) => block.includes(`huggingface.co/${GIGAAM_ANCHOR}/tree/`))
 	if (anchorIndex < 0) throw new Error(`no docs block for ${GIGAAM_ANCHOR}; cannot place the GigaAM details block`)
@@ -169,7 +166,7 @@ function render(markdown) {
 	const page = `${head}${AVAILABLE_HEADING}\n\n${blocks.join('\n\n')}\n\n${tail}`
 	return {
 		page,
-		counts: { documented: asr.length, curated: curated.length, legacy: legacy.length, handy: handy.models.length, vibeKept: merged.models.length - handy.models.length },
+		counts: { documented: asr.length, curated: curated.length, legacy: 0, handy: handy.models.length, vibeKept: merged.models.length - handy.models.length },
 	}
 }
 

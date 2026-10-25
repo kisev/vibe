@@ -1,4 +1,4 @@
-<!-- source: a147ada70d29 -->
+<!-- source: ecfa61d40a2e -->
 
 # 🌟 Vibe-Modelle 🌟
 
@@ -890,31 +890,6 @@ Von Vibe · 627M Parameter · Sprachen: he
 
 [👉 Modell ansehen](https://huggingface.co/vibe-app/parakeet-tdt-0.6b-v3-he-gguf/tree/740e0ca8957f142803b4a2d534d47eb1b4f75c9d)  
 [🔽 Q8_0 · 758 MB](https://huggingface.co/vibe-app/parakeet-tdt-0.6b-v3-he-gguf/resolve/740e0ca8957f142803b4a2d534d47eb1b4f75c9d/parakeet-tdt-0.6b-v3-he-q8_0.gguf?download=true)
-
-### Veraltete Modelle (nur zur Referenz)
-
-Diese whisper.cpp-Container aus der Zeit vor GGUF werden nur zur Referenz aufbewahrt: Die vereinheitlichte Engine lädt ausschließlich GGUF.
-
-### Whisper Tiny (veraltetes .bin)
-
-Von whisper.cpp · 39M Parameter · Sprachen: en
-
-[👉 Modell ansehen](https://huggingface.co/ggerganov/whisper.cpp/tree/5359861c739e955e79d9a303bcbc70fb988958b1)  
-[🔽 F16 · 78 MB](https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-tiny.bin?download=true)
-
-### Whisper Large v3 Turbo (veraltetes .bin)
-
-Von whisper.cpp · 809M Parameter · Sprachen: af, am, ar, az, ba +93
-
-[👉 Modell ansehen](https://huggingface.co/ggerganov/whisper.cpp/tree/5359861c739e955e79d9a303bcbc70fb988958b1)  
-[🔽 F16 · 1625 MB](https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo.bin?download=true)
-
-### Whisper Large v3 Turbo, Ivrit AI (veraltetes .bin)
-
-Von Ivrit AI · 809M Parameter · Sprachen: he, en
-
-[👉 Modell ansehen](https://huggingface.co/ivrit-ai/whisper-large-v3-turbo-ggml/tree/2130c78e4a9cb4914cc4df91a1c3031407789705)  
-[🔽 F16 · 1625 MB](https://huggingface.co/ivrit-ai/whisper-large-v3-turbo-ggml/resolve/2130c78e4a9cb4914cc4df91a1c3031407789705/ggml-model.bin?download=true)
 
 Viel Freude beim Entdecken dieser Modelle und beim Aufwerten Ihres Vibe! 🌐✨
 

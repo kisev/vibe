@@ -10,8 +10,39 @@
 			"license": "cc-by-4.0",
 			"family": "parakeet",
 			"parameters": "627M",
-			"languages": ["bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it", "lv", "lt", "mt", "pl", "pt", "ro", "ru", "sk", "sl", "es", "sv", "uk"],
-			"capabilities": { "streaming": false, "translate": false, "languageDetection": true, "timestamps": true },
+			"languages": [
+				"bg",
+				"hr",
+				"cs",
+				"da",
+				"nl",
+				"en",
+				"et",
+				"fi",
+				"fr",
+				"de",
+				"el",
+				"hu",
+				"it",
+				"lv",
+				"lt",
+				"mt",
+				"pl",
+				"pt",
+				"ro",
+				"ru",
+				"sk",
+				"sl",
+				"es",
+				"sv",
+				"uk"
+			],
+			"capabilities": {
+				"streaming": false,
+				"translate": false,
+				"languageDetection": true,
+				"timestamps": true
+			},
 			"quant": "Q4_K_M",
 			"role": "asr",
 			"curated": false,
@@ -33,8 +64,46 @@
 			"license": "other",
 			"family": "parakeet",
 			"parameters": "638M",
-			"languages": ["en-US", "en-GB", "es-US", "es-ES", "fr-FR", "fr-CA", "it-IT", "pt-BR", "pt-PT", "nl-NL", "de-DE", "tr-TR", "ru-RU", "ar-AR", "hi-IN", "ja-JP", "ko-KR", "vi-VN", "uk-UA", "pl-PL", "sv-SE", "cs-CZ", "nb-NO", "da-DK", "bg-BG", "fi-FI", "hr-HR", "sk-SK", "zh-CN", "hu-HU", "ro-RO", "et-EE"],
-			"capabilities": { "streaming": true, "translate": false, "languageDetection": true, "timestamps": true },
+			"languages": [
+				"en-US",
+				"en-GB",
+				"es-US",
+				"es-ES",
+				"fr-FR",
+				"fr-CA",
+				"it-IT",
+				"pt-BR",
+				"pt-PT",
+				"nl-NL",
+				"de-DE",
+				"tr-TR",
+				"ru-RU",
+				"ar-AR",
+				"hi-IN",
+				"ja-JP",
+				"ko-KR",
+				"vi-VN",
+				"uk-UA",
+				"pl-PL",
+				"sv-SE",
+				"cs-CZ",
+				"nb-NO",
+				"da-DK",
+				"bg-BG",
+				"fi-FI",
+				"hr-HR",
+				"sk-SK",
+				"zh-CN",
+				"hu-HU",
+				"ro-RO",
+				"et-EE"
+			],
+			"capabilities": {
+				"streaming": true,
+				"translate": false,
+				"languageDetection": true,
+				"timestamps": true
+			},
 			"quant": "Q4_K_M",
 			"role": "asr",
 			"curated": false,
@@ -56,8 +125,15 @@
 			"license": "cc-by-4.0",
 			"family": "parakeet",
 			"parameters": "627M",
-			"languages": ["he"],
-			"capabilities": { "streaming": false, "translate": false, "languageDetection": false, "timestamps": true },
+			"languages": [
+				"he"
+			],
+			"capabilities": {
+				"streaming": false,
+				"translate": false,
+				"languageDetection": false,
+				"timestamps": true
+			},
 			"quant": "Q8_0",
 			"role": "asr",
 			"curated": false,
@@ -71,75 +147,6 @@
 			}
 		},
 		{
-			"id": "vibe-whisper-tiny-legacy-bin",
-			"name": "Whisper Tiny (legacy .bin)",
-			"description": "The pre-GGUF whisper.cpp container; kept for reference — the unified engine loads GGUF only",
-			"repository": "ggerganov/whisper.cpp",
-			"revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
-			"license": "mit",
-			"family": "whisper",
-			"parameters": "39M",
-			"languages": ["en"],
-			"capabilities": { "streaming": false, "translate": true, "languageDetection": true, "timestamps": true },
-			"quant": "F16",
-			"role": "asr",
-			"curated": false,
-			"minEngine": "0.2.4",
-			"files": {
-				"F16": {
-					"filename": "ggml-tiny.bin",
-					"size": 77691713,
-					"sha256": "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21"
-				}
-			}
-		},
-		{
-			"id": "vibe-whisper-large-v3-turbo-legacy-bin",
-			"name": "Whisper Large v3 Turbo (legacy .bin)",
-			"description": "The pre-GGUF whisper.cpp container; kept for reference — the unified engine loads GGUF only",
-			"repository": "ggerganov/whisper.cpp",
-			"revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
-			"license": "mit",
-			"family": "whisper",
-			"parameters": "809M",
-			"languages": ["af", "am", "ar", "az", "ba", "be", "bg", "bn", "bs", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et", "eu", "fa", "fi", "fo", "fr", "gl", "gu", "ha", "haw", "he", "hi", "hr", "ht", "hu", "hy", "id", "is", "it", "ja", "jw", "ka", "kk", "km", "kn", "ko", "ky", "la", "lb", "ln", "lo", "lt", "lv", "mg", "mi", "mk", "ml", "mn", "mr", "ms", "mt", "my", "ne", "nl", "nn", "no", "oc", "pa", "pl", "ps", "pt", "ro", "ru", "sa", "sd", "si", "sk", "sl", "sn", "so", "sq", "sr", "su", "sv", "sw", "ta", "te", "tg", "th", "tk", "tl", "tr", "tt", "uk", "ur", "uz", "vi", "yi", "yo", "yue", "zh"],
-			"capabilities": { "streaming": false, "translate": true, "languageDetection": true, "timestamps": true },
-			"quant": "F16",
-			"role": "asr",
-			"curated": false,
-			"minEngine": "0.2.4",
-			"files": {
-				"F16": {
-					"filename": "ggml-large-v3-turbo.bin",
-					"size": 1624555275,
-					"sha256": "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69"
-				}
-			}
-		},
-		{
-			"id": "vibe-ivrit-whisper-turbo-legacy-bin",
-			"name": "Whisper Large v3 Turbo, Ivrit AI (legacy .bin)",
-			"description": "Hebrew-focused whisper.cpp build in the pre-GGUF container; kept for reference — the unified engine loads GGUF only",
-			"repository": "ivrit-ai/whisper-large-v3-turbo-ggml",
-			"revision": "2130c78e4a9cb4914cc4df91a1c3031407789705",
-			"license": "mit",
-			"family": "whisper",
-			"parameters": "809M",
-			"languages": ["he", "en"],
-			"capabilities": { "streaming": false, "translate": true, "languageDetection": true, "timestamps": true },
-			"quant": "F16",
-			"role": "asr",
-			"curated": false,
-			"minEngine": "0.2.4",
-			"files": {
-				"F16": {
-					"filename": "ggml-model.bin",
-					"size": 1624555275,
-					"sha256": "c8090411113357097bfafc2b8e228ec1639fa7f5fe4ecb5d054ac0ccef8641b1"
-				}
-			}
-		},
-		{
 			"id": "vibe-silero-vad-6.2.0",
 			"name": "Silero VAD v6.2.0",
 			"description": "The voice-activity detector GigaAM and the planner use; still in its original .bin container, which the engine loads for VAD",
@@ -149,7 +156,12 @@
 			"family": "silero_vad",
 			"parameters": "2M",
 			"languages": [],
-			"capabilities": { "streaming": false, "translate": false, "languageDetection": false, "timestamps": false },
+			"capabilities": {
+				"streaming": false,
+				"translate": false,
+				"languageDetection": false,
+				"timestamps": false
+			},
 			"quant": "F16",
 			"role": "vad",
 			"curated": false,

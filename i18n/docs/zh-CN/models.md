@@ -1,4 +1,4 @@
-<!-- source: a147ada70d29 -->
+<!-- source: ecfa61d40a2e -->
 
 # 🌟 Vibe 模型 🌟
 
@@ -890,31 +890,6 @@ vibe-server transcribe <model.gguf> <audio.wav> --vad-model ggml-silero-v6.2.0.b
 
 [👉 查看模型](https://huggingface.co/vibe-app/parakeet-tdt-0.6b-v3-he-gguf/tree/740e0ca8957f142803b4a2d534d47eb1b4f75c9d)  
 [🔽 Q8_0 · 758 MB](https://huggingface.co/vibe-app/parakeet-tdt-0.6b-v3-he-gguf/resolve/740e0ca8957f142803b4a2d534d47eb1b4f75c9d/parakeet-tdt-0.6b-v3-he-q8_0.gguf?download=true)
-
-### 旧版模型（仅供参考）
-
-这些 GGUF 之前的 whisper.cpp 容器仅供参考：统一引擎只加载 GGUF。
-
-### Whisper Tiny (legacy .bin)
-
-由 whisper.cpp 提供 · 39M 参数 · 语言：en
-
-[👉 查看模型](https://huggingface.co/ggerganov/whisper.cpp/tree/5359861c739e955e79d9a303bcbc70fb988958b1)  
-[🔽 F16 · 78 MB](https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-tiny.bin?download=true)
-
-### Whisper Large v3 Turbo (legacy .bin)
-
-由 whisper.cpp 提供 · 809M 参数 · 语言：af, am, ar, az, ba +93
-
-[👉 查看模型](https://huggingface.co/ggerganov/whisper.cpp/tree/5359861c739e955e79d9a303bcbc70fb988958b1)  
-[🔽 F16 · 1625 MB](https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo.bin?download=true)
-
-### Whisper Large v3 Turbo, Ivrit AI (legacy .bin)
-
-由 Ivrit AI 提供 · 809M 参数 · 语言：he, en
-
-[👉 查看模型](https://huggingface.co/ivrit-ai/whisper-large-v3-turbo-ggml/tree/2130c78e4a9cb4914cc4df91a1c3031407789705)  
-[🔽 F16 · 1625 MB](https://huggingface.co/ivrit-ai/whisper-large-v3-turbo-ggml/resolve/2130c78e4a9cb4914cc4df91a1c3031407789705/ggml-model.bin?download=true)
 
 尽情探索这些模型，让你的 Vibe 更强大！🌐✨
 

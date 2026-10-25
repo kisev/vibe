@@ -20,3 +20,9 @@
 
 - [x] 4.1 Run `tsc`, `vitest`, and the i18n audit; verify zero failures
 - [ ] 4.2 Verify manually: download a catalog model end to end (progress, verification, appearance in the model list), and confirm a failed-integrity download is reported and not selectable
+
+## 5. Interface consolidation (user feedback after the first cut)
+
+- [x] 5.1 Replace the "Select model" and "Model library" groups with one Models section: installed models as cards (catalog metadata matched by file name, active model marked, one-click select), the catalog with name search, streaming/translation chips, language and provider filters, and the URL download folded in; drop parameter counts from cards (M vs MB confusion)
+- [x] 5.2 Remove the legacy .bin entries from the vibe layer, the settings catalog, and the generated docs (the engine refuses them; the catalog is a chooser of what works, not an archive), and update the docs generator + parity test accordingly
+- [x] 5.3 Translate the new keys into every locale, regenerate paraglide, stamp, and re-run the i18n audit; keep tsc/vitest green
