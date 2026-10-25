@@ -27,16 +27,25 @@ export interface ModelDownload extends ModelIntegrity {
 	url: string
 }
 
-// TODO: fill in `size` and `sha256` for every entry below from the real published artifacts
-// (`curl -sI <url>` for the length, `shasum -a 256 <file>` for the hash). They are deliberately
-// left unset rather than guessed: a wrong value would reject a perfectly good download.
+// Every URL comes from the bundled model catalog with its pinned revision and
+// real size + SHA-256, so magic setup downloads exactly the verified artifact
+// the settings catalog offers — no floating `main` links, no legacy .bin files
+// the unified engine refuses to load.
 export const modelUrls: Record<'default' | 'hebrew', ModelDownload[]> = {
 	default: [
-		{ url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin' },
-		{ url: 'https://huggingface.co/vibe-app/whisper-large-v3-turbo-gguf/resolve/main/ggml-large-v3-turbo.bin' }, // Hugging Face fallback
-		{ url: 'https://github.com/thewh1teagle/vibe/releases/download/model-files-v1.0/ggml-large-v3-turbo.bin' }, // GitHub fallback
+		{
+			url: 'https://huggingface.co/handy-computer/whisper-large-v3-turbo-gguf/resolve/5eaf945c7978e564bae5b28a5b1639dd93c2bfb1/whisper-large-v3-turbo-Q8_0.gguf',
+			size: 886381760,
+			sha256: 'b2e30cc286bc9f3aba4db9099fc7403543497c05ce7100d0d83091ddfd25a183',
+		},
 	],
-	hebrew: [{ url: 'https://huggingface.co/ivrit-ai/whisper-large-v3-turbo-ggml/resolve/main/ggml-model.bin' }],
+	hebrew: [
+		{
+			url: 'https://huggingface.co/vibe-app/parakeet-tdt-0.6b-v3-he-gguf/resolve/740e0ca8957f142803b4a2d534d47eb1b4f75c9d/parakeet-tdt-0.6b-v3-he-q8_0.gguf',
+			size: 758224288,
+			sha256: '37a6787344617fd7402397cd7ec4dd4f4bda779cb3112ac571e7b3329194e8dd',
+		},
+	],
 }
 
 /**
@@ -45,7 +54,10 @@ export const modelUrls: Record<'default' | 'hebrew', ModelDownload[]> = {
  * `e2e-ctc` — use the same filename pattern.
  */
 export const gigaamModelFilename = 'gigaam-v3-e2e-rnnt-Q8_0.gguf'
-export const gigaamModelUrl = `https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/main/${gigaamModelFilename}`
+export const gigaamModelUrl =
+	'https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/f719d70812344f4d0fb8c11c0887b190501a7465/gigaam-v3-e2e-rnnt-Q8_0.gguf'
+export const gigaamModelSha256 = '78d63b47723b7f8d78c6113a6ef983b5a86e2a86f6c273e1f5cb6967b1c4467a'
+export const gigaamModelSize = 273724832
 
 export const embeddingModelFilename = 'wespeaker_en_voxceleb_CAM++.onnx'
 export const segmentModelFilename = 'segmentation-3.0.onnx'

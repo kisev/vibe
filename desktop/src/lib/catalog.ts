@@ -103,7 +103,7 @@ export function mergeCatalogs(handy: CatalogData, vibe: { schema: number; models
 	return { schema: handy.schema, models, results: handy.results ?? {} }
 }
 
-export const CATALOG: CatalogData = mergeCatalogs(handyFile as unknown as CatalogData, vibeFile as { schema: number; models: CatalogModel[] })
+export const CATALOG: CatalogData = mergeCatalogs(handyFile as unknown as CatalogData, vibeFile as unknown as { schema: number; models: CatalogModel[] })
 
 /** ASR entries for the settings catalog. */
 export function asrCatalog(catalog: CatalogData = CATALOG): CatalogModel[] {

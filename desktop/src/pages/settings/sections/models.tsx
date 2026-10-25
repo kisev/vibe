@@ -9,6 +9,7 @@ import { Input } from '~/components/ui/input'
 import { Switch } from '~/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { ActionRow, IconAction, SettingsGroup, SettingsNote, SettingsRow, rowControlClass, type SettingsViewModel } from './shared'
+import { ModelsCatalogSection } from './models-catalog'
 import { getFriendlyModelName, modelLimitations } from '~/lib/model'
 import { ModelGlyph } from '~/components/brand-glyph'
 
@@ -182,6 +183,8 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 				<ActionRow label={m.modelsFolder()} icon={<FolderIcon className="h-4 w-4" />} onClick={vm.openModelPath} />
 				<ActionRow label={m.changeModelsFolder()} icon={<WrenchIcon className="h-4 w-4" />} onClick={vm.changeModelsFolder} />
 			</SettingsGroup>
+
+			<ModelsCatalogSection />
 		</div>
 	)
 }
