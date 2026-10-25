@@ -6,23 +6,28 @@ Defines the fork's continuous build contract: when a dev build runs, which platf
 
 ## Requirements
 
-### Requirement: Build on every main push
+### Requirement: Build on dev tags
 
-The system SHALL start a dev build for every push to `main` and on manual dispatch, always building the revision that triggered it.
+The system SHALL start a dev build when a `dev.<number>` tag is pushed, and on manual dispatch, always building the revision the tag points at. Pushes to `main` and other branches SHALL NOT start a build.
+
+#### Scenario: Dev tag pushed
+
+- **WHEN** a `dev.<number>` tag is pushed
+- **THEN** a dev build starts for the commit the tag points at, and its published version derives its number from the tag
 
 #### Scenario: Push to main
 
-- **WHEN** a commit is pushed to `main`
-- **THEN** a dev build starts for that commit
+- **WHEN** a commit is pushed to `main` without a tag
+- **THEN** no dev build starts
 
 #### Scenario: Manual dispatch
 
 - **WHEN** the workflow is started by hand
 - **THEN** it builds the selected revision
 
-#### Scenario: Other branches
+#### Scenario: Other tags
 
-- **WHEN** a commit is pushed to a branch other than `main`
+- **WHEN** a tag that is not a dev tag is pushed
 - **THEN** no dev build starts
 
 ### Requirement: Five-platform coverage
