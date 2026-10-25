@@ -199,6 +199,12 @@ export const serverHandlers: CommandHandlerMap = {
 		return runTranscribe(options)
 	},
 
+	// The browser mode has no real integrity checks: every listed file is usable.
+	check_model_files: (args) =>
+		((args.paths ?? []) as string[]).map((path) => ({ path, valid: true, size: 0, reason: null })),
+
+	cleanup_partial_downloads: () => [],
+
 	download_model: async (args) => {
 		const path = String(args.path ?? `${MODELS_FOLDER}/${DEFAULT_MODEL_FILE}`)
 		const completed = await runDownloadTicks('abort_download', String(args.url ?? ''))
