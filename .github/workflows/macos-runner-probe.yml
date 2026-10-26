@@ -19,8 +19,10 @@ jobs:
                 include:
                     - runner: macos-latest
                       triple: aarch64-apple-darwin
-                    - runner: macos-latest
-                      triple: x86_64-apple-darwin
+                    - runner: macos-15
+                      triple: aarch64-apple-darwin
+                    - runner: macos-14
+                      triple: aarch64-apple-darwin
         steps:
             - name: Heartbeat for 19 minutes
               run: |
