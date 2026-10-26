@@ -69,11 +69,11 @@ Each file type SHALL have exactly one linter and at most one formatter, followin
 
 ### Requirement: Elevated Rust gates
 
-The Rust workspace SHALL carry lint gates beyond rustfmt defaults: a curated `[workspace.lints.clippy]` set (including `unwrap_used`, `expect_used`, `undocumented_unsafe_blocks`) enforced with `-D warnings`, a `cargo-deny` configuration covering licenses, advisories, and duplicate versions, and `cargo-machete` for unused dependencies.
+The server Rust workspace SHALL carry lint gates beyond rustfmt defaults: a curated `[workspace.lints.clippy]` set (including `unwrap_used`, `expect_used`, `undocumented_unsafe_blocks`) enforced with `-D warnings`, a `cargo-deny` configuration covering licenses, advisories, and duplicate versions, and `cargo-machete` for unused dependencies. The desktop workspace keeps its existing CI gate until its unwrap/expect cleanup lands; elevating it is a separate follow-up change.
 
 #### Scenario: Workspace lints apply everywhere
 
-- **WHEN** clippy runs on any crate in the workspace
+- **WHEN** clippy runs on any crate in the server workspace
 - **THEN** the curated set applies through the workspace inheritance and warnings fail the run
 
 #### Scenario: License gate

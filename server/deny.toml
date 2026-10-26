@@ -62,8 +62,20 @@ id = "RUSTSEC-2026-0386"
 reason = "tokio unsoundness, no patch released; server does not use the unsafe constructors"
 
 [bans]
-multiple-versions = "warn"
-deny = []
+multiple-versions = "deny"
+
+# Accepted transitive duplicates: windows-sys rides in on three different
+# major-versioned dependents (reqwest, notify and the tauri-era system crates
+# have not converged), core-foundation comes via both objc2 (0.10) and
+# reqwest's security-framework line (0.9). Both are compile-time-only for the
+# non-native target, so the cost is build time, not correctness.
+[[bans.skip]]
+name = "windows-sys"
+reason = "three transitive majors pending upstream convergence"
+
+[[bans.skip]]
+name = "core-foundation"
+reason = "objc2 0.10 vs security-framework 0.9 lines"
 
 [sources]
 unknown-registry = "deny"

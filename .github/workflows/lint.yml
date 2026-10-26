@@ -1,5 +1,7 @@
 # One lint gate, shared by hooks and CI: the same mise pins, the same task
-# facade. A green local `task lint` means the same commands ran here.
+# facade. A green local `task lint` means the same commands ran here. The
+# frontend unit suites ride along so a push exercises what pre-push does
+# locally; server tests have their own server-test.yml.
 name: Lint
 
 on:
@@ -41,3 +43,37 @@ jobs:
 
             - name: Server dependency gates
               run: mise exec -- task server:deny server:machete
+
+    frontend-tests:
+        timeout-minutes: 20
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  install: true
+                  cache: true
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  package_json_file: desktop/package.json
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  cache-dependency-path: |
+                      desktop/pnpm-lock.yaml
+                      website/pnpm-lock.yaml
+
+            - name: Install frontend dependencies
+              run: |
+                  pnpm --dir desktop install --frozen-lockfile
+                  pnpm --dir website install --frozen-lockfile
+
+            - name: Frontend unit tests
+              run: mise exec -- task desktop:test website:test
