@@ -79,18 +79,20 @@ jobs:
       - name: Install Vulkan SDK (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        timeout-minutes: 8
+        env:
+          VULKAN_VERSION: 1.4.357.0
         run: |
-            # The LunarG installer is a Qt app whose headless 'install' command is
-            # disabled by the vendor: every flag form either hangs a headless runner
-            # or falls back to GUI. vcpkg (preinstalled on the runner) builds the same
-            # toolchain, and ggml's cmake picks it up through the VULKAN_SDK variable.
-            $vcpkg = $env:VCPKG_INSTALLATION_ROOT
-            & "$vcpkg\vcpkg.exe" install --triplet x64-windows vulkan-headers vulkan-loader spirv-headers shaderc glslang
-            $inst = "$vcpkg\installed\x64-windows"
-            if (-not (Get-ChildItem "$inst" -Recurse -Filter glslc.exe -ErrorAction SilentlyContinue | Select-Object -First 1)) { throw 'glslc.exe not found after the vcpkg install' }
-            "VULKAN_SDK=$inst" | Out-File -FilePath $env:GITHUB_ENV -Append
-            "$inst\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
-            "$inst\tools\shaderc" | Out-File -FilePath $env:GITHUB_PATH -Append
+            # Same headless invocation as llama.cpp's build-vulkan CI: the
+            # QtIFW flags --accept-licenses --default-answer --confirm-command
+            # are the only silent form this installer accepts (/S and
+            # --mode unattended hang a headless runner); it lands in
+            # C:\VulkanSDK\<version> in well under a minute.
+            curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
+            & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+            if (-not (Test-Path "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin\glslc.exe")) { throw 'glslc.exe not found after the SDK install' }
+            "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Build vibe-server
         shell: bash
