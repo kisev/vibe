@@ -152,6 +152,30 @@ jobs:
                       echo "CHANGELOG_EOF"
                   } >> "$GITHUB_OUTPUT"
 
+            # ggml's Vulkan backend needs headers + glslc + glslangValidator +
+            # SPIRV-Headers cmake config at build time only; the loader comes
+            # from the user's GPU driver at runtime. Noble ships all of it in
+            # apt, jammy (kept for the older glibc floor) needs the LunarG repo.
+            - name: Install Vulkan build prerequisites (noble)
+              if: runner.os == 'Linux' && matrix.triple == 'aarch64-unknown-linux-gnu'
+              run: sudo apt-get update && sudo apt-get install -y libvulkan-dev glslc glslang-tools spirv-headers
+
+            - name: Install Vulkan SDK (jammy)
+              if: matrix.triple == 'x86_64-unknown-linux-gnu'
+              run: |
+                  wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc >/dev/null
+                  sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+                  sudo apt-get update && sudo apt-get install -y vulkan-sdk
+
+            - name: Install Vulkan SDK (Windows)
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  choco install -y vulkansdk --no-progress
+                  $sdk = (Get-ChildItem C:\VulkanSDK | Sort-Object Name -Descending | Select-Object -First 1).FullName
+                  "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
+                  "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
             - name: Build vibe-server
               shell: bash
               env:

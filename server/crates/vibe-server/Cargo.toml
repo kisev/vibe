@@ -47,6 +47,12 @@ tokio = { version = "1", features = ["test-util"] }
 [target.'cfg(target_os = "macos")'.dependencies]
 transcribe-cpp = { version = "=0.4.1", default-features = false, features = ["metal"] }
 
+# Vulkan is the GPU backend on Windows and Linux, matching the pre-port ggml
+# libraries; the loader is opened from the GPU driver at runtime, so building
+# needs only the Vulkan headers and glslc.
+[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
+transcribe-cpp = { version = "=0.4.1", default-features = false, features = ["vulkan"] }
+
 [target."cfg(windows)".dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading"] }
 

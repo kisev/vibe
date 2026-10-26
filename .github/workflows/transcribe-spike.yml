@@ -48,6 +48,21 @@ jobs:
 
             - uses: dtolnay/rust-toolchain@stable
 
+            # Build-time Vulkan prerequisites for the ggml backend (the
+            # runner's GPU is irrelevant; only the compiler toolchain matters).
+            - name: Install Vulkan build prerequisites (Linux)
+              if: runner.os == 'Linux'
+              run: sudo apt-get update && sudo apt-get install -y libvulkan-dev glslc glslang-tools spirv-headers
+
+            - name: Install Vulkan SDK (Windows)
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  choco install -y vulkansdk --no-progress
+                  $sdk = (Get-ChildItem C:\VulkanSDK | Sort-Object Name -Descending | Select-Object -First 1).FullName
+                  "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
+                  "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
             # Compiles the transcribe-cpp-sys dependency (the whole C++ tree)
             # via cmake, then links vibe-server against it.
             - name: Build vibe-server with the engine dependency

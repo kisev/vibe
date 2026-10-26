@@ -27,7 +27,11 @@ chore fetch-libs
 cargo build -p vibe-server --release
 ```
 
-On Windows, the vibe-server binary uses Rust's default MSVC target. The Vulkan loader is opened at runtime, so building and running vibe-server needs no Vulkan SDK; only `chore build-libs` does, for the headers and `glslc`:
+On Windows, the vibe-server binary uses Rust's default MSVC target. The Vulkan loader is opened at runtime, so running vibe-server needs no Vulkan SDK. Building does need the Vulkan headers plus `glslc`, `glslangValidator`, and the SPIRV-Headers cmake config:
+
+- **Ubuntu 24.04 / openSUSE**: `sudo apt install libvulkan-dev glslc glslang-tools spirv-headers` / `sudo zypper install vulkan-devel shaderc glslang-devel spirv-headers`
+- **Ubuntu 22.04**: no `glslc` package and a config-less `spirv-headers` — use the [LunarG repo](https://packages.lunarg.com/) and install `vulkan-sdk`
+- **Windows**: `choco install vulkansdk` (or the LunarG installer), with `VULKAN_SDK` on the environment
 
 ```bash
 cargo build -p vibe-server --release

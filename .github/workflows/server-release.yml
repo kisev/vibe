@@ -70,6 +70,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Setup chore
         uses: getchore/setup-chore@v1
+      # Build-time only: headers + glslc + glslangValidator + SPIRV-Headers
+      # cmake config for the ggml Vulkan backend; runtime uses the GPU driver.
+      - name: Install Vulkan build prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libvulkan-dev glslc glslang-tools spirv-headers
+
+      - name: Install Vulkan SDK (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+            choco install -y vulkansdk --no-progress
+            $sdk = (Get-ChildItem C:\VulkanSDK | Sort-Object Name -Descending | Select-Object -First 1).FullName
+            "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
       - name: Build vibe-server
         shell: bash
         env:
