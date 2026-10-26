@@ -1,0 +1,55 @@
+# GitHub's runner pools occasionally kill jobs mid-flight (the macOS pool spent
+# 2026-10-26 cancelling random jobs at exactly 15:01 with no logs — proven by a
+# bare-heartbeat probe). A killed runner never runs its own steps, so the only
+# thing that can react is something watching from outside: this sweep re-runs
+# the failed jobs of the latest release run the way a human would. Latest-run
+# only — a dry test of a 24h-window rule showed it resurrecting deliberately
+# cancelled debug runs — capped at 3 attempts. Lint is deliberately not
+# covered: its failures are content failures, and auto-retrying them would
+# paint broken code green.
+name: CI janitor
+
+on:
+    schedule:
+        - cron: '*/30 * * * *'
+    workflow_dispatch:
+
+permissions:
+    actions: write
+
+jobs:
+    heal:
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - name: Re-run infra-killed release jobs
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPO: ${{ github.repository }}
+              run: |
+                  for wf in dev-build.yml website.yml; do
+                      run_id=$(gh api "repos/$REPO/actions/workflows/$wf/runs?per_page=1" \
+                          --jq '.workflow_runs[0].id // empty' 2>/dev/null)
+                      [ -z "$run_id" ] && continue
+                      read -r st concl attempt <<< "$(gh api "repos/$REPO/actions/runs/$run_id" \
+                          --jq '"\(.status) \(.conclusion // "-") \(.run_attempt)"' 2>/dev/null)"
+                      echo "latest $wf: run $run_id [$st/$concl] attempt $attempt"
+                      if [ "$st" != "completed" ]; then
+                          echo "  running — left alone"
+                          continue
+                      fi
+                      if [ "$concl" = "success" ] || [ "$concl" = "skipped" ]; then
+                          echo "  green — nothing to heal"
+                          continue
+                      fi
+                      if [ "$attempt" -ge 3 ]; then
+                          echo "  cap: attempt $attempt, left for a human"
+                          continue
+                      fi
+                      if gh run rerun "$run_id" -R "$REPO" --failed; then
+                          echo "  healed: rerunning the failed jobs of $run_id"
+                      else
+                          echo "  skip: rerun refused (likely already running)"
+                      fi
+                  done
+                  echo "janitor sweep done"
