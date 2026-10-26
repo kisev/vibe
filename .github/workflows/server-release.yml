@@ -93,6 +93,11 @@ jobs:
             if (-not (Test-Path "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin\glslc.exe")) { throw 'glslc.exe not found after the SDK install' }
             "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}" | Out-File -FilePath $env:GITHUB_ENV -Append
             "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+            # cmake links the loader by absolute path, but the rust crate links
+            # vulkan-1 by name, so link.exe also needs the SDK lib dir on LIB.
+            $vulkanLib = (Get-ChildItem "C:\VulkanSDK\${env:VULKAN_VERSION}" -Recurse -Filter vulkan-1.lib | Select-Object -First 1).DirectoryName
+            if (-not $vulkanLib) { throw 'vulkan-1.lib not found in the SDK install' }
+            "LIB=$vulkanLib;${env:LIB}" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build vibe-server
         shell: bash
