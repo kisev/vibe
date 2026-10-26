@@ -1,0 +1,23 @@
+# Temporary diagnostic: discover the LunarG installer's real silent mode.
+name: Vulkan SDK probe
+on:
+    workflow_dispatch:
+jobs:
+    probe:
+        runs-on: windows-latest
+        timeout-minutes: 10
+        steps:
+            - name: Download the installer
+              shell: pwsh
+              run: curl.exe -L --retry 5 -o VulkanSDK.exe https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe
+            - name: Ask it for usage
+              shell: pwsh
+              run: |
+                  ./VulkanSDK.exe --help 2>&1 | Out-String -Width 500
+                  exit 0
+            - name: Try to list as an SFX archive
+              shell: pwsh
+              run: |
+                  7z l VulkanSDK.exe > listing.txt 2>&1
+                  Get-Content listing.txt -TotalCount 40
+                  exit 0
