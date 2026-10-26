@@ -32,6 +32,13 @@ jobs:
             - name: Setup Rust stable
               uses: dtolnay/rust-toolchain@stable
 
+            # clippy compiles the engine with GGML_VULKAN=ON since the Vulkan
+            # backend landed, so the lint runner needs the same build
+            # prerequisites as the dev and release builds (noble ships them
+            # all in apt).
+            - name: Install Vulkan build prerequisites
+              run: sudo apt-get update && sudo apt-get install -y libvulkan-dev glslc glslang-tools spirv-headers
+
             - name: Lint the tree
               run: mise exec -- task lint format:check
 
