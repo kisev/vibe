@@ -59,8 +59,10 @@ jobs:
               shell: pwsh
               run: |
                   curl.exe -L --retry 5 -o VulkanSDK.exe https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe
-                  # choco dropped the vulkansdk package; the LunarG installer is silent via /S
-                  ./VulkanSDK.exe /S | Out-Null
+                  # choco dropped the vulkansdk package. The LunarG installer is
+                  # InstallBuilder: '/S' is not a silent flag there and hangs the runner
+                  # headless — '--mode unattended' is the supported silent mode.
+                  ./VulkanSDK.exe --mode unattended --accept-licenses
                   $sdk = (Get-ChildItem C:\VulkanSDK | Sort-Object Name -Descending | Select-Object -First 1).FullName
                   "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
                   "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
