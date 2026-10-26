@@ -215,8 +215,8 @@ impl Engine {
         })
     }
 
-    pub fn transcribe(&mut self, samples: &[f32], options: TranscribeOptions) -> anyhow::Result<TranscribeResult> {
-        self.validate_request(&options)?;
+    pub fn transcribe(&mut self, samples: &[f32], mut options: TranscribeOptions) -> anyhow::Result<TranscribeResult> {
+        self.validate_request(&mut options)?;
         if self.caps.requires_vad {
             // Bounded families run through VAD-detected speech, exactly as the
             // hand-written engines did: whole-buffer input is refused by design.
@@ -292,13 +292,13 @@ impl Engine {
         &mut self,
         samples: &[f32],
         ranges: &[(usize, usize)],
-        options: TranscribeOptions,
+        mut options: TranscribeOptions,
         callbacks: StreamCallbacks<'_>,
     ) -> anyhow::Result<TranscribeResult> {
         if self.caps.max_input_seconds.is_none() {
             bail!("{} does not accept an external chunk plan", self.caps.engine);
         }
-        self.validate_request(&options)?;
+        self.validate_request(&mut options)?;
         let StreamCallbacks {
             mut on_progress,
             mut on_segment,
@@ -332,10 +332,10 @@ impl Engine {
     pub fn transcribe_stream(
         &mut self,
         samples: &[f32],
-        options: TranscribeOptions,
+        mut options: TranscribeOptions,
         callbacks: StreamCallbacks<'_>,
     ) -> anyhow::Result<TranscribeResult> {
-        self.validate_request(&options)?;
+        self.validate_request(&mut options)?;
         let StreamCallbacks {
             mut on_progress,
             mut on_segment,
@@ -450,7 +450,11 @@ impl Engine {
 
     /// Rejects options the loaded engine cannot honor before any audio is
     /// decoded, so CLI and streaming requests fail with a specific reason.
-    pub fn validate_request(&self, options: &TranscribeOptions) -> anyhow::Result<()> {
+    /// A stable-timestamp request the engine cannot run is downgraded to a
+    /// warning and dropped instead, like word timestamps: it is a quality
+    /// enhancement, never a semantic option, and clients send it without
+    /// checking the model's capabilities.
+    pub fn validate_request(&self, options: &mut TranscribeOptions) -> anyhow::Result<()> {
         let engine = self.caps.engine.as_str();
         if options.translate && !self.caps.translation {
             bail!("{engine} does not support translation");
@@ -459,7 +463,8 @@ impl Engine {
             bail!("{engine} does not support text prompts");
         }
         if options.stable_timestamps && !self.caps.stable_timestamps {
-            bail!("{engine} does not support stable timestamps");
+            tracing::warn!("{engine} does not support stable timestamps; ignoring the flag");
+            options.stable_timestamps = false;
         }
         if self.caps.languages.len() == 1 && !self.caps.language_detection {
             let only = &self.caps.languages[0];

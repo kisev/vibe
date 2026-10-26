@@ -314,18 +314,18 @@ fn gigaam_request_contract_and_segments() {
     // is an `unsupported_language` error that maps to HTTP 400.
     let accepted = [None, Some("ru".to_string()), Some("auto".to_string()), Some(String::new())];
     for language in accepted {
-        let options = TranscribeOptions {
+        let mut options = TranscribeOptions {
             language,
             ..transcription_options(Some(vad_path.clone()))
         };
-        engine.validate_request(&options).expect("Russian is accepted");
+        engine.validate_request(&mut options).expect("Russian is accepted");
     }
     for language in ["en", "de", "ru-RU"] {
-        let options = TranscribeOptions {
+        let mut options = TranscribeOptions {
             language: Some(language.to_string()),
             ..transcription_options(Some(vad_path.clone()))
         };
-        let err = engine.validate_request(&options).expect_err("language is not supported");
+        let err = engine.validate_request(&mut options).expect_err("language is not supported");
         assert_eq!(crate::server::engine_error_code(&err), "unsupported_language");
         assert_eq!(crate::server::engine_error_status(&err), axum::http::StatusCode::BAD_REQUEST);
     }
@@ -340,13 +340,20 @@ fn gigaam_request_contract_and_segments() {
             prompt: Some("prompt".to_string()),
             ..transcription_options(Some(vad_path.clone()))
         },
-        TranscribeOptions {
-            stable_timestamps: true,
-            ..transcription_options(Some(vad_path.clone()))
-        },
     ] {
-        engine.validate_request(&options).expect_err("option is not supported");
+        engine
+            .validate_request(&mut options.clone())
+            .expect_err("option is not supported");
     }
+
+    // A stable-timestamp request the engine cannot honor is dropped with a
+    // warning instead of failing: clients send the flag unconditionally.
+    let mut stable = TranscribeOptions {
+        stable_timestamps: true,
+        ..transcription_options(Some(vad_path.clone()))
+    };
+    engine.validate_request(&mut stable).expect("the flag is ignored");
+    assert!(!stable.stable_timestamps);
 
     // Word timestamps are ignored; the result still carries segment times.
     let result = engine

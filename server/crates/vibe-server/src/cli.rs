@@ -241,7 +241,7 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
         crate::server::diarization::diarize(model_path, &samples)
     });
 
-    let options = TranscribeOptions {
+    let mut options = TranscribeOptions {
         language: args.language,
         detect_language: args.detect_language,
         translate: args.translate,
@@ -265,7 +265,7 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
     };
     // Validation raises the same language error the engine does, so the marker
     // has to cover both paths: a rejected language never reaches `transcribe`.
-    ctx.validate_request(&options).map_err(unsupported_language_marker)?;
+    ctx.validate_request(&mut options).map_err(unsupported_language_marker)?;
     if let (Some(requested), Some(maximum)) = (args.chunk_seconds, ctx.max_input_seconds()) {
         if requested > maximum {
             anyhow::bail!("--chunk-seconds must not exceed {maximum} for this engine");

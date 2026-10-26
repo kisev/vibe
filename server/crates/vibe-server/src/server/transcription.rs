@@ -74,8 +74,8 @@ pub(super) async fn transcribe(
     }
 
     if let Some(ctx) = model.ctx.as_ref() {
-        let options = build_options(&form, config.verbose(), stable_timestamps, vad_model_path.clone());
-        if let Err(err) = ctx.validate_request(&options) {
+        let mut options = build_options(&form, config.verbose(), stable_timestamps, vad_model_path.clone());
+        if let Err(err) = ctx.validate_request(&mut options) {
             return Err(Box::new(error(
                 super::engine_error_status(&err),
                 super::engine_error_code(&err),
