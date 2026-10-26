@@ -14,4 +14,4 @@
 ## 3. Docs and validation
 
 - [x] 3.1 Document the Linux/Windows build prerequisite in `server/docs/BUILDING.md`
-- [ ] 3.2 Cut a dev build (dev.41) and confirm the Windows `vibe-server.exe devices` lists the RTX 5070 Ti and a transcription runs on the GPU; enumeration stays empty-but-working on machines without Vulkan
+- [x] 3.2 Cut a dev build (dev.41) and confirm the Windows `vibe-server.exe devices` lists the RTX 5070 Ti and a transcription runs on the GPU; enumeration stays empty-but-working on machines without Vulkan (confirmed on dev.42: transcription runs on the 5070 Ti)
