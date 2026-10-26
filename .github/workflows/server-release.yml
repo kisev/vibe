@@ -81,11 +81,14 @@ jobs:
         shell: pwsh
         run: |
             curl.exe -L --retry 5 -o VulkanSDK.exe https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe
-            # choco dropped the vulkansdk package. The LunarG installer is
-            # InstallBuilder: '/S' is not a silent flag there and hangs the runner
-            # headless — '--mode unattended' is the supported silent mode.
-            ./VulkanSDK.exe --mode unattended --accept-licenses
-            $sdk = (Get-ChildItem C:\VulkanSDK | Sort-Object Name -Descending | Select-Object -First 1).FullName
+            # choco dropped the vulkansdk package and the LunarG installer is Qt
+            # Installer Framework: '/S' and '--mode' are not its flags (the first
+            # hangs a headless runner, the second falls back to GUI). The supported
+            # headless form is the 'install' command with the CLI answer flags.
+            ./VulkanSDK.exe --accept-licenses --accept-messages --default-answer --confirm-command --root C:\VulkanSDK install
+            $glslc = (Get-ChildItem C:\VulkanSDK -Recurse -Filter glslc.exe | Select-Object -First 1).FullName
+            if (-not $glslc) { throw 'glslc.exe not found after the Vulkan SDK install' }
+            $sdk = Split-Path (Split-Path $glslc)
             "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
             "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
