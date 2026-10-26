@@ -29,6 +29,10 @@ concurrency:
 
 jobs:
     build:
+        # The cleanup job needs the tag this run published under — tag push
+        # and manual dispatch alike.
+        outputs:
+            tag: ${{ steps.dev-version.outputs.tag }}
         timeout-minutes: 90
         # Release-grade LTO is most of a dev build's wall clock; the tracked
         # profile stays as it is for real releases.
@@ -275,3 +279,30 @@ jobs:
                   args: --target ${{ matrix.triple }} --config ${{ steps.dev-version.outputs.config }}
                   projectPath: ./desktop
                   tauriScript: pnpm exec tauri
+
+    # One dev release at a time: the tags carry the history, the releases page
+    # shows only the newest complete build. Runs after all five cells have
+    # published, so a failed run leaves the previous complete release in place
+    # (and the janitor's --failed rerun re-runs this job once the run heals).
+    cleanup:
+        needs: build
+        if: success()
+        timeout-minutes: 5
+        runs-on: ubuntu-latest
+        steps:
+            - name: Delete every dev release except this run's
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  # Dev prereleases only: the tag pattern and the prerelease flag
+                  # must both match, so stable releases are never selected. By id,
+                  # not tag name — duplicate releases on one tag must all go.
+                  # Never --cleanup-tag: the tag is the history.
+                  gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate \
+                      --jq '.[] | select(.prerelease and (.tag_name | test("^dev\\.")) and .tag_name != "${{ needs.build.outputs.tag }}")) | .id' \
+                  | while read -r rid; do
+                        [ -z "$rid" ] && continue
+                        gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$rid"
+                        echo "deleted dev release $rid (tag kept)"
+                    done
+                  echo "cleanup done: only ${{ needs.build.outputs.tag }} remains"
