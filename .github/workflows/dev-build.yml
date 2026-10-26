@@ -293,16 +293,21 @@ jobs:
             - name: Delete every dev release except this run's
               env:
                   GH_TOKEN: ${{ github.token }}
+                  KEEP: ${{ needs.build.outputs.tag }}
               run: |
+                  set -euo pipefail
+                  # A green cleanup must mean the sweep actually ran: an empty
+                  # KEEP or a failed query is an error, not a silent no-op.
+                  [ -n "$KEEP" ] || { echo "no tag came from the build outputs"; exit 1; }
                   # Dev prereleases only: the tag pattern and the prerelease flag
                   # must both match, so stable releases are never selected. By id,
                   # not tag name — duplicate releases on one tag must all go.
                   # Never --cleanup-tag: the tag is the history.
                   gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate \
-                      --jq '.[] | select(.prerelease and (.tag_name | test("^dev\\.")) and .tag_name != "${{ needs.build.outputs.tag }}")) | .id' \
+                      --jq '.[] | select(.prerelease and (.tag_name | test("^dev\\.")) and .tag_name != env.KEEP) | .id' \
                   | while read -r rid; do
-                        [ -z "$rid" ] && continue
+                        if [ -z "$rid" ]; then continue; fi
                         gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$rid"
                         echo "deleted dev release $rid (tag kept)"
                     done
-                  echo "cleanup done: only ${{ needs.build.outputs.tag }} remains"
+                  echo "cleanup done: only $KEEP remains"

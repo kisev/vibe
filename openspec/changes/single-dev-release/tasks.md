@@ -11,5 +11,5 @@
 
 ## 3. Validation
 
-- [ ] 3.1 Cut the next dev tag (dev.44): the run publishes, cleanup fires, and exactly one dev release remains (`dev.44`) while the tag list still counts every previous `dev.*` tag
+- [ ] 3.1 Cut the next dev tag: the run publishes, cleanup fires, and exactly one dev release remains while the tag list still counts every previous `dev.*` tag (dev.44 exposed a jq typo in the job — green run, empty sweep; the typo is fixed with `set -euo pipefail` and the invariant was restored by hand, the fixed job proves itself on dev.45)
 - [ ] 3.2 Confirm the janitor composition: a failed-then-healed run ends with the cleanup job green (the skipped `if: success()` job re-runs as part of the `--failed` rerun)
