@@ -38,7 +38,9 @@ Controller.prototype.ComponentSelectionPageCallback = function () {
 };
 
 Controller.prototype.TargetDirectoryPageCallback = function () {
-    gui.currentPageWidget().TargetDirectoryLineEdit.setText("C:\\VulkanSDK");
+    // D: is user-writable on the runner: C:\VulkanSDK would trigger a UAC
+    // prompt no headless session can confirm, and the install hangs.
+    gui.currentPageWidget().TargetDirectoryLineEdit.setText("D:\\VulkanSDK");
     gui.clickButton(buttons.NextButton);
 };
 

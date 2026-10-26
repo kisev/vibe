@@ -178,8 +178,8 @@ jobs:
                   # controller script drives the pages instead; it needs no interaction.
                   $controller = "$env:GITHUB_WORKSPACE\.github\vulkan-sdk-controller.qs"
                   Start-Process -Wait -FilePath .\VulkanSDK.exe -ArgumentList "--script=$controller"
-                  if (-not (Test-Path C:\VulkanSDK)) { throw 'C:\VulkanSDK missing after the Vulkan SDK install' }
-                  $glslc = (Get-ChildItem C:\VulkanSDK -Recurse -Filter glslc.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+                  if (-not (Test-Path D:\VulkanSDK)) { throw 'D:\VulkanSDK missing after the Vulkan SDK install' }
+                  $glslc = (Get-ChildItem D:\VulkanSDK -Recurse -Filter glslc.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
                   if (-not $glslc) { throw 'glslc.exe not found after the Vulkan SDK install' }
                   $sdk = Split-Path (Split-Path $glslc)
                   "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
