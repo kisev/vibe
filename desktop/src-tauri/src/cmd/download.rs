@@ -341,13 +341,27 @@ async fn download_to_partial(
     Ok(DownloadOutcome::Completed)
 }
 
+/// Legacy diarization artifacts superseded by the GGUF sortformer: the ONNX
+/// sortformer and the segmentation/embedding pair. The startup migration is
+/// the only caller allowed to remove them, matched by exact file name.
+const LEGACY_DIARIZATION_FILES: [&str; 3] = [
+    "diar_streaming_sortformer_4spk-v2.1.onnx",
+    "wespeaker_en_voxceleb_CAM++.onnx",
+    "segmentation-3.0.onnx",
+];
+
 /// Delete one model file from disk, on request from the models settings. The
 /// path comes from the models folder scan, but the extension guard keeps a
-/// stale or malformed path from removing anything but model weights.
+/// stale or malformed path from removing anything but model weights — the
+/// legacy diarization artifacts above are the one name-matched exception.
 #[tauri::command]
 pub async fn delete_model_file(path: String) -> Result<()> {
     let path = PathBuf::from(&path);
-    if !is_model_path(&path) {
+    let legacy = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| LEGACY_DIARIZATION_FILES.contains(&name));
+    if !legacy && !is_model_path(&path) {
         bail!("refusing to delete a non-model file: {path:?}");
     }
     remove_if_exists(&path)?;

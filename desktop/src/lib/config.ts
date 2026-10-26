@@ -74,10 +74,17 @@ export const segmentModelUrl = 'https://github.com/thewh1teagle/vibe/releases/do
  *
  * Anyone upgrading still has the old `.onnx` sitting in their models folder. Nothing reads it any
  * more and it is not a `.gguf`/`.bin`, so it stays invisible to the model listing; the gate simply
- * finds this file missing and offers the download. Deleting the stale 492 MB file is left to them.
+ * finds this file missing and offers the download. The startup migration removes the superseded
+ * files after the replacement downloads, so the folder does not carry ~500 MB of dead weight.
  */
 export const diarizeModelFilename = 'diar_streaming_sortformer_4spk-v2.q8_0.gguf'
 export const diarizeModelUrl = 'https://huggingface.co/vibe-app/diar-streaming-sortformer-4spk-v2-gguf/resolve/main/diar_streaming_sortformer_4spk-v2.q8_0.gguf'
+/** Superseded diarization artifacts the migration cleans up once the GGUF above is in place. */
+export const legacyDiarizationFilenames = [
+	'diar_streaming_sortformer_4spk-v2.1.onnx',
+	'wespeaker_en_voxceleb_CAM++.onnx',
+	'segmentation-3.0.onnx',
+]
 export const diarizeModelIntegrity: ModelIntegrity = {
 	size: 147075776,
 	sha256: '0679cfeb1ce356d0dea9470b31274f4bfc7eb927497d82005483770666da998a',

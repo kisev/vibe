@@ -739,5 +739,7 @@
   "phonePairedOn": "Paired {date}",
   "phoneRevokeDevice": "Revoke",
   "phoneRevokeDeviceNamed": "Revoke {name}",
-  "whatsNew": "What's new"
+  "whatsNew": "What's new",
+  "diarizationMigrateQuestion": "The diarization model changed format with the new engine. Download the new model (~25MB) now?",
+  "diarizationMigratedOff": "Speaker detection is off until the new model is downloaded."
 }

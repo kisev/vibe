@@ -739,5 +739,7 @@
   "phonePairedOn": "Привязан {date}",
   "phoneRevokeDevice": "Отозвать",
   "phoneRevokeDeviceNamed": "Отозвать {name}",
-  "whatsNew": "Что нового"
+  "whatsNew": "Что нового",
+  "diarizationMigrateQuestion": "Модель диаризации сменила формат вместе с новым движком. Скачать новую модель (~25 МБ)?",
+  "diarizationMigratedOff": "Обнаружение говорящих выключено, пока не будет скачана новая модель."
 }

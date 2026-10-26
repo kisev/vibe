@@ -6,6 +6,7 @@ import { DEFAULT_AUTO_EXPORT, type AutoExportSettings } from '~/lib/auto-export'
 import { CONFIG_KEYS } from '~/lib/config-keys'
 import { KEEP_AWAKE, startKeepAwake, stopKeepAwake } from '~/lib/keep-awake'
 import { usePersisted } from '~/lib/config-store'
+import { runDiarizationMigration } from '~/lib/diarization-migration'
 import { TextFormat } from '~/components/format-select'
 import { ModifyState } from '~/lib/types'
 import { supportedLanguages } from '~/lib/i18n'
@@ -256,6 +257,15 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 	const [recentLanguages, setRecentLanguages] = usePersisted<{ code: string; ts: number }[]>(CONFIG_KEYS.recentLanguages, [])
 	const [diarizeEnabled, setDiarizeEnabled] = usePersisted<boolean>(CONFIG_KEYS.diarizeEnabled, false)
 	const [stableTimestampsEnabled, setStableTimestampsEnabled] = usePersisted<boolean>(CONFIG_KEYS.stableTimestampsEnabled, false)
+	// Once per session: the diarization model changed format with the unified
+	// engine, so a persisted toggle can point at a file that is no longer
+	// downloaded — revalidate it before the first transcription, not after.
+	const diarizationMigrationDone = useRef(false)
+	useEffect(() => {
+		if (diarizationMigrationDone.current || !diarizeEnabled) return
+		diarizationMigrationDone.current = true
+		void runDiarizationMigration(diarizeEnabled, () => setDiarizeEnabled(false))
+	}, [diarizeEnabled, setDiarizeEnabled])
 	const [chunkSeconds, setChunkSeconds] = usePersisted<number | null>(CONFIG_KEYS.chunkSeconds, null)
 	const [storedExportOptions, setStoredExportOptions] = usePersisted<Partial<ExportOptions>>(CONFIG_KEYS.exportOptions, DEFAULT_EXPORT_OPTIONS)
 	// One key holding several settings can be half-written by an older build or a hand-edited

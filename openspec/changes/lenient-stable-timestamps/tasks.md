@@ -8,4 +8,4 @@
 
 ## 2. Validation
 
-- [ ] 2.1 Cut a dev build and confirm a GigaAM transcription that sends `stable_timestamps` succeeds (on the 5070 Ti it doubles as the GPU validation) and the log carries the warning
+- [x] 2.1 Cut a dev build and confirm a GigaAM transcription that sends `stable_timestamps` succeeds (on the 5070 Ti it doubles as the GPU validation) and the log carries the warning (dev.42: the same profile that errored on dev.41 transcribes on the GPU)
