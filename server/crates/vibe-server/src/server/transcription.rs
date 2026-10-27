@@ -73,8 +73,12 @@ pub(super) async fn transcribe(
         )));
     }
 
+    // One options object for validation, inference, and the chunk-cache key:
+    // validate_request drops unsupported enhancement flags in place, and the
+    // same post-drop value must key the cache, not a second build carrying
+    // the original flag.
+    let mut options = build_options(&form, config.verbose(), stable_timestamps, vad_model_path.clone());
     if let Some(ctx) = model.ctx.as_ref() {
-        let mut options = build_options(&form, config.verbose(), stable_timestamps, vad_model_path.clone());
         if let Err(err) = ctx.validate_request(&mut options) {
             return Err(Box::new(error(
                 super::engine_error_status(&err),
@@ -102,7 +106,6 @@ pub(super) async fn transcribe(
         return stream_transcription(request);
     }
 
-    let verbose = config.verbose();
     let model_path = model.model_path.clone();
     let ctx = model
         .ctx
@@ -117,7 +120,7 @@ pub(super) async fn transcribe(
         )));
     }
 
-    let opts = build_options(&form, verbose, stable_timestamps, vad_model_path.clone());
+    let opts = options;
     let plan = plan_for(ctx, &samples, &diar_segments, vad_model_path.as_deref(), chunk_seconds);
     let result = match (plan.as_ref(), config.cache_dir()) {
         (Some(plan), Some(root)) => super::chunk_cache::transcribe_cached(ctx, &model_path, &samples, plan, &opts, root),
