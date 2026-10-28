@@ -36,7 +36,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/vibe-server"]
+    "externalBin": ["binaries/vibe-server"],
+    "windows": {
+      "nsis": {
+        "installerHooks": "./windows/nsis-hooks.nsh"
+      }
+    }
   },
   "plugins": {
     "updater": {
