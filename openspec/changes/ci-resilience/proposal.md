@@ -7,7 +7,7 @@ This week the Actions tab went red for three distinct reasons, two of which will
 ## What Changes
 
 - Deploy Website's `build` and `deploy` jobs stop using `macos-latest`: they upload a static artifact and publish GitHub Pages, nothing in them is Apple-specific — the whole class of macOS-pool flakiness disappears from releases.
-- A small scheduled janitor workflow re-runs failed jobs of Dev Build and Deploy Website automatically, capped at 3 attempts per run, using only `gh` and the built-in token.
+- A small janitor workflow re-runs failed jobs of Dev Build and Deploy Website automatically, capped at 3 attempts per run, using only `gh` and the built-in token — event-driven on red completions, with a daily backstop sweep.
 - Every workflow that compiles the server carries the Vulkan build prerequisites — the landed lint fix becomes a standing requirement, not a one-off.
 - The temporary macOS probe workflow is deleted.
 
