@@ -21,10 +21,18 @@ The fork is `kisev/vibe` (SSH remote `git@github.com:kisev/vibe.git`). Every sou
 
 ## Decisions
 
+- **Split the installer identity, not the application identity.** The winget channel matches installed apps by Add/Remove-Programs fields; the fork build inherits upstream's exact tuple — DisplayName `vibe` (productName), ProductCode `vibe`, Publisher `com` (derived from the unchanged reverse-domain identifier) — so winget correlates it with the upstream community package `Thewh1teagle.vibe`, whose manifest declares that same ProductCode with `UpgradeBehavior: install` and downloads from upstream releases. The fork's version scheme (`3.2.2-dev.44`) sorts below `3.2.2`, so winget dutifully "upgrades" the fork install to upstream. The fix rewrites the ARP Publisher and ProductCode to fork values via an NSIS installer hook (`bundle.windows.nsis.installerHooks`): productName, identifier, and install location stay as they are, so settings, deep links, and the existing install path are untouched — the in-app updater never was the vector, and it stays pointed at the fork.
+
+- **The fork's own winget package waits for signed stable releases.** A `kisev.Vibe` manifest in winget-pkgs pointing at fork releases is what turns `winget upgrade` into a fork channel, but winget-pkgs carries stable releases only; dev prereleases do not belong there, and the fork's stable release pipeline is still blocked on signing (task 4.1). Until then the identity split alone delivers the required half: winget cannot offer or install upstream over a fork build.
+
 - **Generate a fresh minisign keypair for the fork** (Tauri updater signing) rather than reusing any upstream material. Private key and password go into fork Actions secrets (`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`); the public key is committed into `tauri.conf.json`. Alternative — keeping the upstream pubkey — would only work if the fork never signs, which contradicts `createUpdaterArtifacts`.
+
 - **Keep the upstream identifier** `github.com.thewh1teagle.vibe`. Changing it would strand settings, transcripts, deep links (`vibe://`), and OS registration for every existing install; the identifier is not itself an update source. The reverse-domain constant in `keepawake.rs` follows the identifier.
+
 - **Repoint functional URLs, keep credit URLs.** About/repo/issues/bug-report/changelog/models-doc/pairing point at the fork; donation (`supportVibeURL`) and Discord stay upstream — the fork benefits from upstream's community and owes upstream the credit. yt-dlp stays as is.
+
 - **Fork origins derived from the repo:** website `https://kisev.github.io/vibe/`, repository `https://github.com/kisev/vibe`. `config.ts` stays the single source; `changelogURL(version)` keeps its shape.
+
 - **`server-v*` releases live in the fork.** `chorefile` switches to `gh://kisev/vibe`; the current pin (`v0.8.0`) must be published in the fork before a standard app build can fetch it. The dev-build workflow is unaffected (it builds the sidecar from the tree by design).
 
 ## Risks / Trade-offs

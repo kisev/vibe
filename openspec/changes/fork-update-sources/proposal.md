@@ -11,6 +11,7 @@ The fork keeps checking the upstream update channel (`thewh1teagle/vibe`), so a 
 - Dev tooling fetches the `vibe-server` sidecar from the fork (`gh://kisev/vibe`), which requires publishing `server-v*` releases in the fork; the first one pins the current `.server-version` (`v0.8.0`).
 - The application identifier (`github.com.thewh1teagle.vibe`) and reverse domain deliberately stay unchanged, so existing installs keep their settings, deep links, and OS-level identity.
 - A currently installed upstream build keeps checking upstream — a remote install cannot be repointed; repointing takes installing a fork build once.
+- The Windows installer identity diverges from upstream: the Add/Remove-Programs entry a fork build writes carries the fork's publisher and product code, so `winget upgrade` cannot correlate a fork installation with the upstream community package (`Thewh1teagle.vibe`) and overwrite it with an upstream build — the reported failure mode, where `winget upgrade` replaced a fork dev build with upstream 3.2.2. Once the fork ships signed stable releases, the fork's own winget package makes `winget upgrade` pull fork releases instead.
 
 ## Capabilities
 

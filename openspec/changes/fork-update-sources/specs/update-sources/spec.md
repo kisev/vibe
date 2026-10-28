@@ -86,6 +86,25 @@ The application identifier and reverse domain SHALL remain the upstream ones, so
 - **WHEN** an existing installation is replaced by a fork build of the same version line
 - **THEN** settings, transcripts, and model files remain in place and are picked up unchanged
 
+### Requirement: Package managers cannot swap a fork install for upstream
+
+A fork build's installer identity in the OS package database SHALL differ from the upstream package's identity, so a package-manager upgrade neither offers nor installs an upstream build over a fork installation; the application identifier, install location, and stored data SHALL be unaffected by the identity change. Once the fork publishes its own package entry, a fork installation SHALL upgrade from the fork's releases through it.
+
+#### Scenario: winget upgrade with only the upstream package in the catalog
+
+- **WHEN** a fork build is installed and `winget upgrade` runs while only the upstream `Thewh1teagle.vibe` package exists in the catalog
+- **THEN** the fork installation does not match it and is left untouched
+
+#### Scenario: The fork's own package is installed
+
+- **WHEN** the fork publishes a winget package pointing at its releases and a fork build is installed
+- **THEN** `winget upgrade` offers and installs the newer fork release, never an upstream one
+
+#### Scenario: The identity split keeps data in place
+
+- **WHEN** a fork build with the fork installer identity replaces an earlier fork build
+- **THEN** settings, transcripts, and models stay in place under the unchanged application identifier
+
 ### Requirement: Upstream credit links stay upstream
 
 Donation and community-chat entry points SHALL continue to point at the upstream project, so support for the original author is not diverted by the fork.
