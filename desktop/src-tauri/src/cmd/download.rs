@@ -341,9 +341,10 @@ async fn download_to_partial(
     Ok(DownloadOutcome::Completed)
 }
 
-/// Legacy diarization artifacts superseded by the GGUF sortformer: the ONNX
-/// sortformer and the segmentation/embedding pair. The startup migration is
-/// the only caller allowed to remove them, matched by exact file name.
+/// Legacy diarization artifacts superseded by the current GGUF: the broken v2
+/// mirror the engine rejects, the ONNX sortformer, and the segmentation/
+/// embedding pair. The startup migration is the only caller allowed to remove
+/// them, matched by exact file name.
 const LEGACY_DIARIZATION_FILES: [&str; 4] = [
     "diar_streaming_sortformer_4spk-v2.q8_0.gguf",
     "diar_streaming_sortformer_4spk-v2.1.onnx",
