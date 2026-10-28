@@ -67,9 +67,9 @@ The dev build MUST run without any repository secret and MUST NOT require an ext
 - **WHEN** a dev build finishes
 - **THEN** its bundles carry no updater artifacts and require no signing key
 
-### Requirement: One release per commit
+### Requirement: One dev release at a time
 
-Each run SHALL publish its bundles to a prerelease tagged `dev.<run-number>`, where the run number grows monotonically, so later runs always sort above earlier ones on the releases page. The release name SHALL carry the application version with its `-dev.<short-commit>` suffix and the release body SHALL name the full commit SHA, so every build remains identifiable as a complete snapshot of one revision and never shares a release with another.
+The repository SHALL hold exactly one dev prerelease: the newest dev run that completed. Each green run SHALL publish its bundles to a prerelease tagged `dev.<run-number>` — the number grows monotonically — and SHALL then delete every other `dev.*` release. Deleting a dev release SHALL NOT delete its tag, and stable releases SHALL never be touched. The release name SHALL carry the application version with its `-dev.<short-commit>` suffix and the release body SHALL name the full commit SHA, so the surviving build remains identifiable as a complete snapshot of one revision.
 
 #### Scenario: New commit
 
@@ -79,17 +79,17 @@ Each run SHALL publish its bundles to a prerelease tagged `dev.<run-number>`, wh
 #### Scenario: Failed run
 
 - **WHEN** a run fails to produce some platform bundles
-- **THEN** no assets of that run land in a release of a different commit
+- **THEN** no assets of that run land in a release of a different commit, and the previous complete release is not deleted
 
 #### Scenario: Re-run of a failed run
 
 - **WHEN** a partially failed run is re-run
-- **THEN** it reuses its own `dev.<run-number>` release and the five matrix jobs share it as before
+- **THEN** it reuses its own `dev.<run-number>` release, the five matrix jobs share it as before, and the cleanup runs when the run completes
 
 #### Scenario: Later builds
 
-- **WHEN** a later commit is built after an earlier one
-- **THEN** the later commit's bundles go to their own release, which appears above the earlier one on the releases page, and the earlier releases keep their assets unchanged
+- **WHEN** a later commit is built and completes
+- **THEN** its release becomes the only dev release — earlier dev releases are deleted with their tags left in place, so the tag numbers keep growing monotonically
 
 #### Scenario: Commit identity survives the tag change
 
@@ -132,3 +132,12 @@ A failure on one platform SHALL NOT stop the other platforms from building or pu
 
 - **WHEN** one platform fails to build
 - **THEN** the remaining platforms still build and publish their bundles
+
+### Requirement: Stable releases are untouchable
+
+The dev-release cleanup SHALL consider only prereleases whose tag matches `dev.*`; stable releases SHALL never be selected, deleted, or modified by it.
+
+#### Scenario: Stable releases are untouchable
+
+- **WHEN** the cleanup deletes dev releases
+- **THEN** stable releases and their assets are not considered or modified
