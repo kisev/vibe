@@ -136,14 +136,19 @@ jobs:
                       bundle: { createUpdaterArtifacts: false },
                       plugins: { updater: { endpoints: [] } }
                   }')
-                  # The release body is the accumulated unreleased changelog entry,
-                  # so a dev install shows what it carries; GitHub renders the
-                  # sections as-is, only the frontmatter drops.
+                  # The release body leads with the full commit SHA — the release
+                  # must identify its revision without the tag (the name carries
+                  # only 7 chars) — followed by the accumulated unreleased
+                  # changelog entry, so a dev install shows what it carries;
+                  # GitHub renders the sections as-is, only the frontmatter drops.
                   if [ -f i18n/changelog/unreleased.md ]; then
-                      body=$(awk 'c==2{print} /^---$/{c++}' i18n/changelog/unreleased.md | sed '/./,$!d' | head -c 60000)
+                      changelog=$(awk 'c==2{print} /^---$/{c++}' i18n/changelog/unreleased.md | sed '/./,$!d' | head -c 60000)
                   else
-                      body="Dev build of main at ${GITHUB_SHA}."
+                      changelog=""
                   fi
+                  # One line, no literal newlines: a continuation at column 0
+                  # would end the YAML block scalar.
+                  body="Dev build of main at ${GITHUB_SHA}."$'\n\n'"${changelog}"
                   {
                       echo "version=$version"
                       echo "tag=$tag"
