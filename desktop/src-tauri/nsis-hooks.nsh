@@ -11,12 +11,14 @@
 ; The fork deliberately keeps upstream's productName and identifier so
 ; settings, deep links, and the install path survive a fork install, but that
 ; same tuple is what winget correlates with the upstream community package
-; (Thewh1teagle.vibe: Publisher "com", ProductCode "vibe"): its catalog
-; version outranks our dev-suffixed ones, and `winget upgrade` replaces the
-; fork install with an upstream build. The post-install hook rewrites the
-; Add/Remove-Programs identity to the fork's own publisher and product code,
-; which breaks that correlation. Data never moves: it lives under the
-; identifier, which stays unchanged.
+; (Thewh1teagle.vibe: its catalog version outranks our dev-suffixed ones, and
+; `winget upgrade` replaces the fork install with an upstream build). The
+; post-install hook rewrites the Add/Remove-Programs identity to the fork's
+; own publisher and product code so the entry names the fork. That alone does
+; not break the match — dev.47 proved winget still offered upstream 3.2.2 over
+; an install whose ARP already read kisev/vibe-fork: the package matches on
+; more than that tuple (Name/DisplayName and install location survive). Data
+; never moves: it lives under the identifier, which stays unchanged.
 ; NSIS resolves !include against the directory the top-level script is
 ; compiled from (target/<triple>/release/nsis/x64), not against the including
 ; file, so the path has to be built from this file's own directory or the
