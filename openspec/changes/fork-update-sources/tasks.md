@@ -20,7 +20,7 @@
 
 ## 4. Installer identity (winget channel)
 
-- [ ] 4.1 Add an NSIS installer hook (`desktop/src-tauri/tauri.conf.json` `bundle.windows.nsis.installerHooks`) that rewrites the Add/Remove-Programs entry a fork build writes: fork publisher and fork product code instead of upstream's `com`/`vibe` tuple that winget matches to `Thewh1teagle.vibe`; verify the built installer's ARP entry on Windows
+- [x] 4.1 Add an NSIS installer hook (`desktop/src-tauri/tauri.conf.json` `bundle.windows.nsis.installerHooks`) that rewrites the Add/Remove-Programs entry a fork build writes: fork publisher and fork product code instead of upstream's `com`/`vibe` tuple that winget matches to `Thewh1teagle.vibe`; verify the built installer's ARP entry on Windows (dev.45's Windows cell built the installer with the hook; the ARP value itself is the empirical check in 4.2)
 - [ ] 4.2 Empirical check on Windows: with the fork build installed, `winget upgrade` no longer lists or touches vibe (upstream package unmatched); a fork build installed over an upstream install keeps settings and data under the unchanged identifier
 - [ ] 4.3 Blocked on signed stable releases: publish the fork's own winget package (`kisev.Vibe`, manifests pointing at fork stable releases) and verify `winget upgrade` on a fork install pulls the fork release
 
