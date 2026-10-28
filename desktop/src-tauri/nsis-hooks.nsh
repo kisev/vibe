@@ -17,7 +17,11 @@
 ; Add/Remove-Programs identity to the fork's own publisher and product code,
 ; which breaks that correlation. Data never moves: it lives under the
 ; identifier, which stays unchanged.
-!include "vc_redist.nsh"
+; NSIS resolves !include against the directory the top-level script is
+; compiled from (target/<triple>/release/nsis/x64), not against the including
+; file, so the path has to be built from this file's own directory or the
+; compiler never finds the sibling hook file.
+!include "${__FILEDIR__}\vc_redist.nsh"
 
 !macro NSIS_HOOK_POSTINSTALL
     WriteRegStr SHCTX "${UNINSTKEY}" "Publisher" "kisev"
