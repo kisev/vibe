@@ -26,7 +26,8 @@
 ; the fork. Rewriting values cannot break that: dev.47 diverged Publisher and
 ; ProductCode values and the match survived, and a live DisplayName rewrite
 ; probe failed the same way. The post-install hook instead moves the whole
-; entry to a fork-named key; winget then sees ProductCode "vibe-fork", which
+; entry to a fork-named key; winget then sees ProductCode "vibe-kisev-fork",
+; which
 ; the fork's own future winget package will declare. The Publisher override is
 ; load-bearing too: winget's fallback is an exact NormalizedNameAndPublisher
 ; filter, and the template writes the upstream publisher there. Data never
@@ -40,7 +41,7 @@
 !macro MoveUninstStrValue NAME
     ReadRegStr $R0 SHCTX "${UNINSTKEY}" "${NAME}"
     ${If} $R0 != ""
-        WriteRegStr SHCTX "${UNINSTKEY}-fork" "${NAME}" "$R0"
+        WriteRegStr SHCTX "${UNINSTKEY}-kisev-fork" "${NAME}" "$R0"
     ${EndIf}
 !macroend
 
@@ -50,7 +51,7 @@
     ClearErrors
     ReadRegDWORD $R0 SHCTX "${UNINSTKEY}" "${NAME}"
     ${Unless} ${Errors}
-        WriteRegDWORD SHCTX "${UNINSTKEY}-fork" "${NAME}" "$R0"
+        WriteRegDWORD SHCTX "${UNINSTKEY}-kisev-fork" "${NAME}" "$R0"
     ${EndUnless}
 !macroend
 
@@ -58,10 +59,14 @@
     ; Rehome the Add/Remove-Programs entry under a fork-named key so the
     ; install stops correlating with the upstream winget package.
     ; A previous fork build may have left values here; drop them so stale
-    ; entries cannot survive the copy below.
+    ; entries cannot survive the copy below. Two names: dev.48 (and the
+    ; manual key-rename probe) used "-fork".
     DeleteRegKey SHCTX "${UNINSTKEY}-fork"
+    DeleteRegKey SHCTX "${UNINSTKEY}-kisev-fork"
 
-    !insertmacro MoveUninstStrValue "DisplayName"
+    ; The product name the fork claims in Apps and Features -- not the
+    ; template's "${PRODUCTNAME}", which is the upstream name winget knows.
+    WriteRegStr SHCTX "${UNINSTKEY}-kisev-fork" "DisplayName" "vibe-kisev-fork"
     !insertmacro MoveUninstStrValue "DisplayIcon"
     !insertmacro MoveUninstStrValue "DisplayVersion"
     !insertmacro MoveUninstStrValue "InstallLocation"
@@ -78,12 +83,12 @@
         ; runtime.
         ReadRegStr $R0 SHCTX "${UNINSTKEY}" "$MultiUser.InstallMode"
         ${If} $R0 != ""
-            WriteRegStr SHCTX "${UNINSTKEY}-fork" "$MultiUser.InstallMode" "$R0"
+            WriteRegStr SHCTX "${UNINSTKEY}-kisev-fork" "$MultiUser.InstallMode" "$R0"
         ${EndIf}
     !endif
 
-    WriteRegStr SHCTX "${UNINSTKEY}-fork" "Publisher" "kisev"
-    WriteRegStr SHCTX "${UNINSTKEY}-fork" "ProductCode" "vibe-fork"
+    WriteRegStr SHCTX "${UNINSTKEY}-kisev-fork" "Publisher" "kisev"
+    WriteRegStr SHCTX "${UNINSTKEY}-kisev-fork" "ProductCode" "vibe-kisev-fork"
 
     DeleteRegKey SHCTX "${UNINSTKEY}"
 !macroend
@@ -91,8 +96,11 @@
 !macro NSIS_HOOK_POSTUNINSTALL
     ; The uninstaller removes the template's key itself; the fork entry lives
     ; under ours, so remove it too or it would orphan a ghost in
-    ; Apps and Features.
+    ; Apps and Features. Both names, for builds that used the older one.
     DeleteRegKey SHCTX "${UNINSTKEY}-fork"
+    DeleteRegKey SHCTX "${UNINSTKEY}-kisev-fork"
     DeleteRegKey HKLM "${UNINSTKEY}-fork"
+    DeleteRegKey HKLM "${UNINSTKEY}-kisev-fork"
     DeleteRegKey HKCU "${UNINSTKEY}-fork"
+    DeleteRegKey HKCU "${UNINSTKEY}-kisev-fork"
 !macroend
