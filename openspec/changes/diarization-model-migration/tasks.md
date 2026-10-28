@@ -2,7 +2,7 @@
 
 ## 1. Migration
 
-- [x] 1.1 Allow `delete_model_file` to remove the three legacy diarization artifacts by exact file name, keeping the extension guard for everything else (`desktop/src-tauri/src/cmd/download.rs`)
+- [x] 1.1 Allow `delete_model_file` to remove the four legacy diarization artifacts (the broken v2 GGUF plus the three ONNX files) by exact file name, keeping the extension guard for everything else (`desktop/src-tauri/src/cmd/download.rs`)
 - [x] 1.2 Add `legacyDiarizationFilenames` next to the current diarization model constants (`desktop/src/lib/config.ts`)
 - [x] 1.3 Implement `runDiarizationMigration` in `desktop/src/lib/diarization-migration.ts`: no-op when disabled or already installed, one download offer, disable-with-notice on decline or failure, best-effort legacy cleanup on success
 - [x] 1.4 Wire it as a one-shot effect in the preference provider so every entry point is covered

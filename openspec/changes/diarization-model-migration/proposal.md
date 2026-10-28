@@ -6,9 +6,9 @@ The unified engine replaced the diarization stack: the ONNX sortformer and the s
 
 ## What Changes
 
-- The desktop runs a startup migration when speaker detection is enabled: if the current diarization model is not on disk, it offers the download once, keeps the preference enabled on success, and removes the obsolete ONNX artifacts.
+- The desktop runs a startup migration when speaker detection is enabled: if the current diarization model is not on disk, it offers the download once, keeps the preference enabled on success, and removes the superseded artifacts.
 - Declining or a failed download disables the preference with a visible notice instead of leaving it silently broken.
-- `delete_model_file` learns the three legacy diarization file names, so the migration can clean them up through the same guarded command (its extension guard still refuses everything else).
+- `delete_model_file` learns the four legacy diarization file names — the broken v2 GGUF mirror the engine rejects (found during validation; the live download now points at the v2.1 Q8_0 GGUF) plus the three ONNX files — so the migration can clean them up through the same guarded command (its extension guard still refuses everything else).
 
 ## Capabilities
 
