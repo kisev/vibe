@@ -59,7 +59,7 @@ describe('runDiarizationMigration', () => {
 	it('downloads the replacement and removes every legacy artifact', async () => {
 		isUsableMock.mockResolvedValue(false)
 		askMock.mockResolvedValue(true)
-		downloadMock.mockResolvedValue('C:/models/diar_streaming_sortformer_4spk-v2.q8_0.gguf')
+		downloadMock.mockResolvedValue('C:/models/diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf')
 		expect(await runDiarizationMigration(true, disable)).toBe('migrated')
 		expect(downloadMock).toHaveBeenCalledWith(
 			{ url: config.diarizeModelUrl, ...config.diarizeModelIntegrity },
@@ -75,7 +75,7 @@ describe('runDiarizationMigration', () => {
 	it('a cleanup failure does not fail the migration', async () => {
 		isUsableMock.mockResolvedValue(false)
 		askMock.mockResolvedValue(true)
-		downloadMock.mockResolvedValue('C:/models/diar_streaming_sortformer_4spk-v2.q8_0.gguf')
+		downloadMock.mockResolvedValue('C:/models/diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf')
 		deleteMock.mockRejectedValue(new Error('refused'))
 		expect(await runDiarizationMigration(true, disable)).toBe('migrated')
 	})

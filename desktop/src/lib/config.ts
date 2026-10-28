@@ -70,24 +70,29 @@ export const segmentModelUrl = 'https://github.com/thewh1teagle/vibe/releases/do
  * for this model — its speaker-cache compression makes discrete near-tie decisions that quant
  * error can flip, permuting speaker labels mid-stream.
  *
- * Mirrored into the vibe-app org from `nvidia/diar_streaming_sortformer_4spk-v2` (cc-by-4.0).
+ * v2.1 from the handy-computer catalog at a pinned revision. The unified engine rejects the
+ * vibe-app v2 mirror outright (`gguf load error` — verified locally on a sha-verified copy
+ * against the engine crate's own smoke fixture, which is v2.1), so shipping v2 leaves
+ * diarization silently empty behind the server's warn-and-continue.
  *
- * Anyone upgrading still has the old `.onnx` sitting in their models folder. Nothing reads it any
- * more and it is not a `.gguf`/`.bin`, so it stays invisible to the model listing; the gate simply
- * finds this file missing and offers the download. The startup migration removes the superseded
- * files after the replacement downloads, so the folder does not carry ~500 MB of dead weight.
+ * Anyone upgrading still has the superseded artifacts sitting in their models folder — the
+ * legacy ONNX trio is invisible to the model listing (not a `.gguf`/`.bin`), while the broken
+ * v2 GGUF stays listed until removed. The gate finds the new file missing and offers the
+ * download; the startup migration removes the superseded files after the replacement
+ * downloads, so the folder does not carry the dead weight.
  */
-export const diarizeModelFilename = 'diar_streaming_sortformer_4spk-v2.q8_0.gguf'
-export const diarizeModelUrl = 'https://huggingface.co/vibe-app/diar-streaming-sortformer-4spk-v2-gguf/resolve/main/diar_streaming_sortformer_4spk-v2.q8_0.gguf'
+export const diarizeModelFilename = 'diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf'
+export const diarizeModelUrl = 'https://huggingface.co/handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf/resolve/ae4afbb5c3d33b71cf2dbf600022b655ee706dd0/diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf'
 /** Superseded diarization artifacts the migration cleans up once the GGUF above is in place. */
 export const legacyDiarizationFilenames = [
+	'diar_streaming_sortformer_4spk-v2.q8_0.gguf',
 	'diar_streaming_sortformer_4spk-v2.1.onnx',
 	'wespeaker_en_voxceleb_CAM++.onnx',
 	'segmentation-3.0.onnx',
 ]
 export const diarizeModelIntegrity: ModelIntegrity = {
-	size: 147075776,
-	sha256: '0679cfeb1ce356d0dea9470b31274f4bfc7eb927497d82005483770666da998a',
+	size: 139310336,
+	sha256: 'a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9',
 }
 export const vadModelFilename = 'ggml-silero-v6.2.0.bin'
 export const vadModelUrl = 'https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin'
