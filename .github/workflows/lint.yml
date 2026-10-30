@@ -97,6 +97,39 @@ jobs:
             - name: Frontend unit tests
               run: mise exec -- task desktop:test website:test
 
+    # Windows-only link failures of the server tree cannot surface anywhere
+    # else in CI before a dev build — this job links the native-stack helper
+    # on a real Windows runner, so an unresolved import is a red Lint run,
+    # never a burned dev tag (dev.64 taught us: ggml-cpu needs advapi32).
+    helper-link-check:
+        timeout-minutes: 20
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Rust stable
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  target: x86_64-pc-windows-msvc
+
+            - name: Cache cargo
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: server
+
+            - name: Fetch the prebuilt ggml libraries
+              shell: bash
+              run: |
+                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
+                  curl --location --fail --retry 3 -o /tmp/ggml-libs.tar.gz \
+                    "https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-windows-amd64-msvc.tar.gz"
+                  tar -xzf /tmp/ggml-libs.tar.gz -C /tmp
+                  mv /tmp/lib server/libs/lib
+
+            - name: Link the native diarization helper
+              shell: bash
+              run: cargo build --manifest-path server/Cargo.toml -p vibe-diarize-native --target x86_64-pc-windows-msvc
+
     # The release channel is not a compile gate. Dev machines without the GTK
     # stack (and any host, for Windows-only code paths) get their first desktop
     # Rust compile HERE — on every push to main, minutes after the push — so a
