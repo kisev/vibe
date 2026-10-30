@@ -59,26 +59,26 @@ fn speaker_label(speaker_id: usize) -> String {
     format!("Speaker {}", speaker_id + 1)
 }
 
-/// Markdown transcript with one timestamped block per segment. Speaker labels
-/// are included only when diarization produced one for that segment.
+/// Markdown transcript with one timestamped block per segment run. Speaker
+/// labels are included only when diarization produced one; a segment with word
+/// timings is first split wherever the speaker changes (see `speakers`).
 pub fn format_markdown(segments: &[Segment], diar_segments: &[diarization::Segment]) -> String {
     let mut out = String::from("# Transcript\n\n");
     for segment in segments {
-        let start = cs_to_seconds(segment.start);
-        let end = cs_to_seconds(segment.end);
-        let speaker = match_speaker(start, end, diar_segments);
-        out.push_str("**[");
-        out.push_str(&cs_to_vtt_time(segment.start));
-        out.push_str(" --> ");
-        out.push_str(&cs_to_vtt_time(segment.end));
-        out.push(']');
-        if let Some(speaker) = speaker {
-            out.push(' ');
-            out.push_str(&speaker_label(speaker));
+        for run in crate::server::speakers::attribute(segment, diar_segments) {
+            out.push_str("**[");
+            out.push_str(&cs_to_vtt_time(run.start));
+            out.push_str(" --> ");
+            out.push_str(&cs_to_vtt_time(run.end));
+            out.push(']');
+            if let Some(speaker) = run.speaker {
+                out.push(' ');
+                out.push_str(&speaker_label(speaker));
+            }
+            out.push_str("**\n\n");
+            out.push_str(run.text.trim());
+            out.push_str("\n\n");
         }
-        out.push_str("**\n\n");
-        out.push_str(segment.text.trim());
-        out.push_str("\n\n");
     }
     out
 }
@@ -117,30 +117,43 @@ pub fn build_verbose_json(
     diar_segments: &[diarization::Segment],
     plan: Option<&crate::plan::Plan>,
 ) -> VerboseJson {
+    let mut segments = Vec::new();
+    for segment in &result.segments {
+        let planned = plan
+            .and_then(|plan| planned_chunk(plan, cs_to_seconds(segment.start), cs_to_seconds(segment.end)))
+            .filter(|chunk| !chunk.speakers.is_empty());
+        // A segment with word timings splits into one row per speaker run;
+        // the word-matched speaker is finer than the chunk's dominant id, so
+        // it wins when both exist. Everything else keeps the chunk/overlap
+        // attribution unchanged.
+        let runs = crate::server::speakers::attribute(segment, diar_segments);
+        let split = runs.len() > 1 || (!segment.words.is_empty() && !diar_segments.is_empty());
+        for run in runs {
+            let speaker = if split {
+                run.speaker.or_else(|| {
+                    planned
+                        .and_then(|chunk| dominant_speaker(chunk, diar_segments))
+                        .map(usize::from)
+                })
+            } else {
+                planned.map_or_else(
+                    || match_speaker(cs_to_seconds(run.start), cs_to_seconds(run.end), diar_segments),
+                    |chunk| dominant_speaker(chunk, diar_segments).map(usize::from),
+                )
+            };
+            segments.push(VerboseSegment {
+                start: cs_to_seconds(run.start),
+                end: cs_to_seconds(run.end),
+                text: run.text,
+                speaker,
+                speakers: planned.map(|chunk| chunk.speakers.clone()),
+                no_speech_prob: segment.no_speech_prob,
+            });
+        }
+    }
     VerboseJson {
         text: result.text(),
-        segments: result
-            .segments
-            .iter()
-            .map(|segment| {
-                let start = cs_to_seconds(segment.start);
-                let end = cs_to_seconds(segment.end);
-                let planned = plan
-                    .and_then(|plan| planned_chunk(plan, start, end))
-                    .filter(|chunk| !chunk.speakers.is_empty());
-                VerboseSegment {
-                    start,
-                    end,
-                    text: segment.text.clone(),
-                    speaker: planned.map_or_else(
-                        || match_speaker(start, end, diar_segments),
-                        |chunk| dominant_speaker(chunk, diar_segments).map(usize::from),
-                    ),
-                    speakers: planned.map(|chunk| chunk.speakers.clone()),
-                    no_speech_prob: segment.no_speech_prob,
-                }
-            })
-            .collect(),
+        segments,
     }
 }
 
@@ -240,6 +253,7 @@ mod tests {
             end: 250,
             text: "привет".into(),
             no_speech_prob: 0.0,
+            words: Vec::new(),
         }];
         let turns = [turn(0.5, 3.0, 0)];
         let markdown = format_markdown(&segments, &turns);
@@ -253,6 +267,7 @@ mod tests {
             end,
             text: text.into(),
             no_speech_prob: 0.25,
+            words: Vec::new(),
         }
     }
 
@@ -340,6 +355,79 @@ mod tests {
         assert_eq!(match_speaker(1.0, 2.0, &[]), None);
     }
 
+    fn word(start: i64, end: i64, text: &str) -> crate::engine::Word {
+        crate::engine::Word {
+            start,
+            end,
+            text: text.to_owned(),
+        }
+    }
+
+    #[test]
+    fn markdown_splits_a_segment_where_the_speaker_changes() {
+        let segments = [Segment {
+            start: 0,
+            end: 300,
+            text: "привет пока".into(),
+            no_speech_prob: 0.0,
+            words: vec![word(0, 100, "привет "), word(100, 300, "пока ")],
+        }];
+        let turns = [turn(0.0, 1.0, 0), turn(1.0, 3.0, 1)];
+        let markdown = format_markdown(&segments, &turns);
+        assert!(markdown.contains("**[00:00:00.000 --> 00:00:01.000] Speaker 1**\n\nпривет"));
+        assert!(markdown.contains("**[00:00:01.000 --> 00:00:03.000] Speaker 2**\n\nпока"));
+    }
+
+    #[test]
+    fn verbose_json_splits_on_word_timings_too() {
+        let segments = [Segment {
+            start: 0,
+            end: 300,
+            text: "привет пока".into(),
+            no_speech_prob: 0.1,
+            words: vec![word(0, 100, "привет "), word(100, 300, "пока ")],
+        }];
+        let turns = [turn(0.0, 1.0, 0), turn(1.0, 3.0, 1)];
+        let json = build_verbose_json(
+            &TranscribeResult {
+                segments: segments.to_vec(),
+                language: None,
+            },
+            &turns,
+            None,
+        );
+        assert_eq!(json.segments.len(), 2);
+        assert_eq!(json.segments[0].text, "привет");
+        assert_eq!(json.segments[0].speaker, Some(0));
+        assert_eq!(json.segments[1].text, "пока");
+        assert_eq!(json.segments[1].speaker, Some(1));
+    }
+
+    #[test]
+    fn word_rows_without_diarization_change_nothing() {
+        let segments = [Segment {
+            start: 0,
+            end: 200,
+            text: "привет пока".into(),
+            no_speech_prob: 0.0,
+            words: vec![word(0, 100, "привет "), word(100, 200, "пока ")],
+        }];
+        let markdown = format_markdown(&segments, &[]);
+        assert!(markdown.contains("**[00:00:00.000 --> 00:00:02.000]**"));
+        assert!(!markdown.contains("Speaker"));
+        let json = build_verbose_json(
+            &TranscribeResult {
+                segments: segments.to_vec(),
+                language: None,
+            },
+            &[],
+            None,
+        );
+        assert_eq!(json.segments.len(), 1);
+        assert_eq!(json.segments[0].text, "привет пока");
+        assert!(json.segments[0].speaker.is_none());
+    }
+
     #[test]
     fn srt_writes_one_indexed_cue_per_segment() {
         let segments = [segment(100, 250, "привет"), segment(300, 400, "пока")];
@@ -387,6 +475,7 @@ mod planner_tests {
             end,
             text: "hello".to_string(),
             no_speech_prob: 0.0,
+            words: Vec::new(),
         }
     }
 

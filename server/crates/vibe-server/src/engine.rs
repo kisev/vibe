@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
 use anyhow::{bail, Context as _};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use transcribe_cpp::{Capabilities, Feature, Model, RunOptions, Task, TimestampKind, Transcript};
 
 /// One VAD model per path and option set. GigaAM caps speech segments below
@@ -12,14 +12,25 @@ pub struct VadCache {
     pub model: transcribe_cpp::Model,
 }
 
+/// One word of a segment, in centiseconds like [`Segment`]'s bounds. Word
+/// rows exist only for families that produce word-or-finer timestamps.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct Word {
+    pub start: i64,
+    pub end: i64,
+    pub text: String,
+}
+
 /// A transcript segment with timestamps in centiseconds, matching the units
 /// the formatters and the diarization overlap matcher expect.
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Segment {
     pub start: i64,
     pub end: i64,
     pub text: String,
     pub no_speech_prob: f32,
+    /// Empty unless the family produced word timings for this segment.
+    pub words: Vec<Word>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -386,6 +397,9 @@ impl Engine {
                             end: end_ms / 10,
                             text,
                             no_speech_prob: 0.0,
+                            // Streaming deltas carry no word rows; the batch
+                            // path is where word timings exist.
+                            words: Vec::new(),
                         };
                         if let Some(callback) = on_segment.as_mut() {
                             callback(&segment);
@@ -508,16 +522,23 @@ impl Engine {
 /// Map a transcript's segments, or synthesize one spanning the input when the
 /// family emits only running text (GigaAM today): every model input still
 /// yields exactly one row the planner and the overlap matcher can place.
+///
+/// The engine reports times relative to the audio it was given, so a chunked
+/// run shifts every row (and its word rows) by the chunk's offset into the
+/// recording — without this, chunked families report every chunk starting at
+/// zero and diarization overlap matches them all to the first speaker turn.
 fn segments_for(transcript: &Transcript, start_sample: usize, end_sample: usize) -> Vec<Segment> {
+    let offset = (start_sample as f64 / crate::plan::SAMPLE_RATE * 100.0) as i64;
     let mapped: Vec<Segment> = transcript
         .segments
         .iter()
         .filter(|segment| !segment.text.is_empty())
         .map(|segment| Segment {
-            start: segment.t0_ms / 10,
-            end: segment.t1_ms / 10,
+            start: segment.t0_ms / 10 + offset,
+            end: segment.t1_ms / 10 + offset,
             text: segment.text.clone(),
             no_speech_prob: 0.0,
+            words: words_for(transcript, segment, offset),
         })
         .collect();
     if !mapped.is_empty() {
@@ -526,14 +547,34 @@ fn segments_for(transcript: &Transcript, start_sample: usize, end_sample: usize)
     let text = transcript.text.trim();
     if end_sample > start_sample && !text.is_empty() {
         vec![Segment {
-            start: (start_sample as f64 / crate::plan::SAMPLE_RATE * 100.0) as i64,
+            start: offset,
             end: (end_sample as f64 / crate::plan::SAMPLE_RATE * 100.0) as i64,
             text: text.to_owned(),
             no_speech_prob: 0.0,
+            words: Vec::new(),
         }]
     } else {
         Vec::new()
     }
+}
+
+/// The transcript's word rows for one engine segment, in centiseconds, shifted
+/// by the chunk offset. Families without word timings leave the row ranges
+/// empty.
+fn words_for(transcript: &Transcript, segment: &transcribe_cpp::Segment, offset: i64) -> Vec<Word> {
+    let first = segment.first_word.max(0) as usize;
+    let end = first + segment.n_words.max(0) as usize;
+    transcript
+        .words
+        .get(first..end)
+        .unwrap_or_default()
+        .iter()
+        .map(|word| Word {
+            start: word.t0_ms / 10 + offset,
+            end: word.t1_ms / 10 + offset,
+            text: word.text.clone(),
+        })
+        .collect()
 }
 
 /// Emit the segments of `transcript` past `seen` through `on_segment`.
@@ -548,6 +589,7 @@ fn emit_new(seen: &mut usize, transcript: &Transcript, on_segment: &mut Option<O
             end: segment.t1_ms / 10,
             text: segment.text.clone(),
             no_speech_prob: 0.0,
+            words: words_for(transcript, segment, 0),
         })
         .collect();
     *seen += fresh.len();

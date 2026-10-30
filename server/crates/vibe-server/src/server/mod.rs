@@ -3,6 +3,7 @@ pub(crate) mod diarization;
 mod form;
 pub(crate) mod format;
 mod routes;
+pub(crate) mod speakers;
 mod stream;
 pub(crate) mod transcription;
 pub(crate) mod unload_timeout;

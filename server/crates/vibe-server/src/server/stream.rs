@@ -204,6 +204,7 @@ mod tests {
             end,
             text: "hello".to_string(),
             no_speech_prob: 0.0,
+            words: Vec::new(),
         }
     }
 

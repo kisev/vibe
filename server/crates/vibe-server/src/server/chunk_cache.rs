@@ -8,12 +8,16 @@ use crate::engine::Engine;
 use crate::plan::Plan;
 
 /// A segment as it is stored in the cache; identical to the engine's output.
+/// Word rows default to empty so entries written before they were kept load
+/// unchanged — speaker splitting simply falls back to overlap for them.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct StoredSegment {
     start: i64,
     end: i64,
     text: String,
     no_speech_prob: f32,
+    #[serde(default)]
+    words: Vec<crate::engine::Word>,
 }
 
 impl From<&crate::engine::Segment> for StoredSegment {
@@ -23,6 +27,7 @@ impl From<&crate::engine::Segment> for StoredSegment {
             end: segment.end,
             text: segment.text.clone(),
             no_speech_prob: segment.no_speech_prob,
+            words: segment.words.clone(),
         }
     }
 }
@@ -34,6 +39,7 @@ impl From<StoredSegment> for crate::engine::Segment {
             end: segment.end,
             text: segment.text,
             no_speech_prob: segment.no_speech_prob,
+            words: segment.words,
         }
     }
 }
@@ -322,6 +328,7 @@ mod tests {
                 end: (chunk.core_end * 100.0) as i64,
                 text: format!("{:.1}-{:.1}", chunk.core_start, chunk.core_end),
                 no_speech_prob: 0.0,
+                words: Vec::new(),
             }])
         }
     }
@@ -374,6 +381,7 @@ mod tests {
             end: 100,
             text: "cached marker".to_string(),
             no_speech_prob: 0.0,
+            words: Vec::new(),
         }];
         std::fs::write(
             entry.join("parts").join("part-000000.json"),
@@ -418,6 +426,7 @@ mod tests {
             end: 100,
             text: "schema-1 marker".to_string(),
             no_speech_prob: 0.0,
+            words: Vec::new(),
         }];
         legacy.write_part(0, &marker).unwrap();
         drop(legacy);
@@ -428,6 +437,7 @@ mod tests {
             end: 100,
             text: "schema-2 fresh".to_string(),
             no_speech_prob: 0.0,
+            words: Vec::new(),
         }];
         let mut run = move |_: &crate::plan::Chunk| Ok(fresh.clone());
         let segments = Resolution {
