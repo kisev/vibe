@@ -24,8 +24,8 @@ pre-commit:
       run: sh -c 'files=$(printf "%s\n" {staged_files} | grep -v "Cargo\.toml$" || true); [ -z "$files" ] || mise exec -- tombi lint $files'
     toml-format:
       glob: "**/*.toml"
-      exclude: "{node_modules,desktop/project.inlang,website/project.inlang}/**,**/Cargo.toml"
-      run: sh -c 'files=$(printf "%s\n" {staged_files} | grep -v "Cargo\.toml$" || true); [ -z "$files" ] || mise exec -- tombi format --check $files'
+      # the engine export scripts' pyproject.toml is vendored from upstream byte-for-byte
+      run: sh -c 'files=$(printf "%s\n" {staged_files} | grep -v "Cargo\.toml$" | grep -v "^server/crates/[^/]*/scripts/" || true); [ -z "$files" ] || mise exec -- tombi format --check $files'
     markdown:
       glob: "**/*.md"
       exclude: "{node_modules,desktop/src/paraglide,.claude,.opencode,.agents,i18n/changelog}/**,i18n/docs/*/models.md"
@@ -44,9 +44,14 @@ pre-commit:
       run: mise exec -- oxlint {staged_files}
     shell:
       glob: "**/*.sh"
+      # website/public/installer.sh is upstream's script; its SC2024 info
+      # (sudo </dev/tty redirect) is upstream's call, re-checked on every sync
+      exclude: "website/public/installer.sh"
       run: mise exec -- shfmt -i 4 -d {staged_files} && mise exec -- shellcheck {staged_files}
     editorconfig:
-      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen}/**"
+      # server/libs and the engine export scripts are vendored from upstream
+      # byte-for-byte; their formatting is upstream's, re-checked on every sync.
+      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,server/libs,server/crates/nemotron-rs/scripts,server/crates/parakeet-rs/scripts}/**"
       run: mise exec -- editorconfig-checker {staged_files}
     workflows:
       glob: ".github/workflows/*.{yml,yaml}"

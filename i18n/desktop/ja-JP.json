@@ -72,7 +72,7 @@
   "customizeInfo": "ggmlまたはgguf形式（拡張子が'.bin'）のサポートモデルをダウンロードしてください。モデルディレクトリに移動し、ドロップダウンから選択します。再起動は不要です🌟",
   "dark": "ダーク",
   "diarizeThreshold": "話者認識のしきい値",
-  "diarizeMaxSpeakersNote": "最大4人までの話者を検出できます。",
+  "diarizeMaxSpeakersNote": "最大8人までの話者を検出できます。",
   "diarization": "話者分離",
   "discordCommunity": "Discordコミュニティ",
   "downloadFile": "ダウンロードして文字起こし",
@@ -739,5 +739,7 @@
   "phonePairedOn": "{date} にペアリング",
   "phoneRevokeDevice": "解除",
   "phoneRevokeDeviceNamed": "{name} を解除",
-  "whatsNew": "更新内容"
+  "whatsNew": "更新内容",
+  "betaUpdates": "ベータアップデート",
+  "betaUpdatesInfo": "新しいバージョンを他のユーザーより数日早く受け取れます。"
 }

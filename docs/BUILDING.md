@@ -91,13 +91,9 @@ task format:check  # fail when anything is unformatted
 1. Increment version in `tauri.conf.json` and commit
 1. Run the Release workflow from GitHub Actions (workflow_dispatch)
 
-It will create releases for `Windows`, `Linux`, and `macOS`
-
-Along with `latest.json` file (used for auto updater).
-
-When `Release` action finishes, it will run `Deploy landing` action
-
-and update downloads links in landing page.
+It builds `Windows`, `Linux` and `macOS` into a GitHub prerelease, with the
+`latest.json` the updater reads. Users get it only once a channel points at it —
+see [UPDATER.md](UPDATER.md).
 
 ## Landing
 

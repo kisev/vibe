@@ -1,6 +1,17 @@
 [workspace]
+# vibe-server runs the fork's transcribe.cpp unified engine; the pure-Rust
+# crates below are upstream's native stack, restored dormant until stage-2
+# wiring routes their models to them (see openspec/changes/sync-upstream-main).
+members = [
+    "crates/nemotron-diarize-rs",
+    "crates/nemotron-rs",
+    "crates/parakeet-rs",
+    "crates/vibe-server",
+    "crates/vad-rs",
+    "crates/ggml-rs-sys",
+    "crates/whisper-rs",
+]
 resolver = "2"
-members = ["crates/vibe-server"]
 
 [workspace.package]
 edition = "2021"

@@ -72,7 +72,7 @@
   "customizeInfo": "Download any supported model in ggml or gguf format (with the file extension ending in '.bin'). Transfer it to the models directory, then select from the dropdown. No need to restart 🌟",
   "dark": "Dark",
   "diarizeThreshold": "Speaker recognition threshold",
-  "diarizeMaxSpeakersNote": "Supports up to 4 speakers detection.",
+  "diarizeMaxSpeakersNote": "Supports up to 8 speakers detection.",
   "diarization": "Diarization",
   "discordCommunity": "Discord Community",
   "downloadFile": "Download and transcribe",
@@ -741,5 +741,7 @@
   "phoneRevokeDeviceNamed": "Revoke {name}",
   "whatsNew": "What's new",
   "diarizationMigrateQuestion": "The diarization model changed format with the new engine. Download the new model (~25MB) now?",
-  "diarizationMigratedOff": "Speaker detection is off until the new model is downloaded."
+  "diarizationMigratedOff": "Speaker detection is off until the new model is downloaded.",
+  "betaUpdates": "Beta updates",
+  "betaUpdatesInfo": "Get new versions a few days early, before everyone else."
 }

@@ -72,7 +72,7 @@
   "customizeInfo": "Last ned hvilken som helst støttet modell i ggml- eller gguf-format (med filutvidelse som slutter på «.bin»). Flytt den til modellmappen, og velg deretter fra listen. Ingen behov for omstart 🌟",
   "dark": "Mørk",
   "diarizeThreshold": "Grense for taleridentifikasjon",
-  "diarizeMaxSpeakersNote": "Støtter gjenkjenning av inntil 4 talere.",
+  "diarizeMaxSpeakersNote": "Støtter gjenkjenning av inntil 8 talere.",
   "diarization": "Talergjenkjenning",
   "discordCommunity": "Discord-fellesskap",
   "downloadFile": "Last ned og transkriber",
@@ -739,5 +739,7 @@
   "phonePairedOn": "Sammenkoblet {date}",
   "phoneRevokeDevice": "Trekk tilbake",
   "phoneRevokeDeviceNamed": "Trekk tilbake {name}",
-  "whatsNew": "Hva er nytt"
+  "whatsNew": "Hva er nytt",
+  "betaUpdates": "Betaoppdateringer",
+  "betaUpdatesInfo": "Få nye versjoner noen dager tidligere enn alle andre."
 }

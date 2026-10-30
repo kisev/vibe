@@ -72,7 +72,7 @@
   "customizeInfo": "הורידו קובץ מודלים (ggml או gguf) עם סיומת .bin, העבירו לתיקיית המודלים ובחרו את הקובץ כאן מהתפריט הנפתח. אין צורך להפעיל מחדש! 🌟",
   "dark": "כהה",
   "diarizeThreshold": "סף זיהוי דוברים",
-  "diarizeMaxSpeakersNote": "תומך בזיהוי של עד 4 דוברים.",
+  "diarizeMaxSpeakersNote": "תומך בזיהוי של עד 8 דוברים.",
   "diarization": "זיהוי דוברים",
   "discordCommunity": "קהילת דיסקורד",
   "downloadFile": "הורד ותמלל",
@@ -739,5 +739,7 @@
   "tuningCustomized": "מותאם אישית",
   "resetWhisperOptions": "איפוס אפשרויות Whisper",
   "resetAudioProcessing": "איפוס עיבוד האודיו",
-  "whatsNew": "מה חדש"
+  "whatsNew": "מה חדש",
+  "betaUpdates": "עדכוני בטא",
+  "betaUpdatesInfo": "קבלו גרסאות חדשות כמה ימים מוקדם יותר, לפני כולם."
 }

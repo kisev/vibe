@@ -19,10 +19,13 @@ mod server;
 mod setup;
 mod transcript;
 mod tray;
+mod updater;
 use tauri::Emitter;
 
 #[cfg(target_os = "macos")]
 mod dock;
+#[cfg(target_os = "macos")]
+mod system_audio;
 
 #[cfg(windows)]
 mod custom_protocol;
@@ -46,6 +49,7 @@ async fn main() -> Result<()> {
     let mut builder = tauri::Builder::default()
         .manage(tray::TrayState::default())
         .manage(keepawake::KeepAwake::new())
+        .manage(updater::PendingUpdate::default())
         .manage(tokio::sync::Mutex::<Option<handoff::HandoffState>>::new(None))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
@@ -57,6 +61,7 @@ async fn main() -> Result<()> {
         }))
         .setup(|app| {
             setup::setup(app)?;
+            analytics::init(app);
             analytics::track_event(app, analytics::events::APP_STARTED);
 
             Ok(())
@@ -84,18 +89,6 @@ async fn main() -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         builder = builder.plugin(tauri_nspanel::init());
-    }
-
-    if analytics::is_aptabase_configured() {
-        let options = tauri_plugin_aptabase::InitOptions {
-            host: Some(analytics::APTABASE_BASE_URL.to_string()),
-            ..Default::default()
-        };
-        builder = builder.plugin(
-            tauri_plugin_aptabase::Builder::new(analytics::APTABASE_APP_KEY)
-                .with_options(options)
-                .build(),
-        );
     }
 
     let app = builder
@@ -170,7 +163,10 @@ async fn main() -> Result<()> {
             meeting_prompt::set_meeting_detection_enabled,
             meeting_prompt::get_meeting_prompt_state,
             meeting_prompt::dismiss_meeting_prompt,
-            meeting_prompt::meeting_prompt_ready
+            meeting_prompt::meeting_prompt_ready,
+            updater::update_check,
+            updater::update_download,
+            updater::update_install
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -191,7 +187,7 @@ async fn main() -> Result<()> {
             if !EXIT_REPORTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
                 analytics::track_event_handle(app, analytics::events::APP_EXITED);
                 // Bounded: a slow or unreachable ingest host must not hold up quitting.
-                analytics::flush_events_bounded(app, std::time::Duration::from_secs(2));
+                analytics::flush_events_bounded(std::time::Duration::from_secs(2));
             }
             // A base URL left in the config file would point an agent at a dead port.
             cmd::config::set_api_base_url(app, None).log_error();

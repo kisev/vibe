@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import * as pathExt from '@tauri-apps/api/path'
 import * as fsExt from '@tauri-apps/plugin-fs'
 import { beginDownload, downloadName, endDownload } from './downloads'
-import { diarizeModelFilename, embeddingModelFilename, segmentModelFilename, vadModelFilename, type ModelDownload, type ModelIntegrity } from './config'
+import { diarizeModelFilename, embeddingModelFilename, legacyDiarizationFilenames, segmentModelFilename, vadModelFilename, type ModelDownload, type ModelIntegrity } from './config'
 import { lsFiles } from './fs'
 import { NamedPath } from './types'
 
@@ -90,7 +90,7 @@ export async function cleanupPartialDownloads(folder?: string): Promise<string[]
  * are never transcription models. The gates that need them address them by exact path, so leaving
  * them out of this listing does not make them look missing.
  */
-const AUXILIARY_MODEL_FILENAMES = [vadModelFilename, diarizeModelFilename, embeddingModelFilename, segmentModelFilename]
+const AUXILIARY_MODEL_FILENAMES = [vadModelFilename, diarizeModelFilename, ...legacyDiarizationFilenames, embeddingModelFilename, segmentModelFilename]
 
 export function isAuxiliaryModelFile(filename: string) {
 	return AUXILIARY_MODEL_FILENAMES.some((auxiliary) => auxiliary.toLowerCase() === filename.toLowerCase())
