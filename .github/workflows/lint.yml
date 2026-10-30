@@ -39,6 +39,18 @@ jobs:
             - name: Install Vulkan build prerequisites
               run: sudo apt-get update && sudo apt-get install -y libvulkan-dev glslc glslang-tools spirv-headers
 
+            # Clippy covers the whole server workspace, including the dormant
+            # upstream crates: ggml-rs-sys's build script wants the prebuilt
+            # ggml libraries (upstream's `chore setup` fetches these; the pin
+            # is read from server/libs so a bump never rots this step).
+            - name: Fetch the prebuilt ggml libraries
+              run: |
+                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
+                  curl --location --fail --retry 3 -o /tmp/ggml-libs.tar.gz \
+                    "https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-linux-x86_64.tar.gz"
+                  tar -xzf /tmp/ggml-libs.tar.gz -C /tmp
+                  mv /tmp/lib server/libs/lib
+
             - name: Lint the tree
               run: mise exec -- task lint format:check
 
