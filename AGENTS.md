@@ -17,6 +17,10 @@ Custom skills live in `.claude/skills/<name>/SKILL.md`.
 
 Agent mode: parallel moves, instant iteration, speed by default. Split heavy work until obvious. Estimate by output size — 300 lines = minutes. Correct over easy: rework is slower than doing it right once. Plan resolved → execute, don't re-analyze.
 
+## Release discipline
+
+A `dev.<n>` tag publishes a release — it is never a validation vehicle. Code that needs a compile/CI check goes to main and is validated by the Lint run it triggers (server clippy + desktop cargo check + tests), which has no release side effects. Tag only from a green Lint run on that exact revision; never tag "to see if it builds".
+
 ## Working in parallel
 
 Split large work across ~4–5 subagents, one disjoint module-group each — no shared files; only the coordinator touches shared/root config. Fix contracts (interfaces, design docs) up front. Throughput is per-agent (~100 tok/s, no global limit), so N agents ≈ N× speed — delegate bulk implementation to strong subagents (e.g. Opus 5 for correctness-sensitive code); keep the main loop for planning, contracts, and integration.
