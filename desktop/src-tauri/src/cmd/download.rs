@@ -1,4 +1,4 @@
-use crate::error::LogError;
+use crate::error::{CommandResult, LogError};
 use eyre::{bail, Context, Result};
 use futures::future::{AbortHandle, Abortable};
 use futures_util::StreamExt;
@@ -357,7 +357,7 @@ const LEGACY_DIARIZATION_FILES: [&str; 4] = [
 /// stale or malformed path from removing anything but model weights — the
 /// legacy diarization artifacts above are the one name-matched exception.
 #[tauri::command]
-pub async fn delete_model_file(path: String) -> Result<()> {
+pub async fn delete_model_file(path: String) -> CommandResult<()> {
     let path = PathBuf::from(&path);
     let legacy = path
         .file_name()
@@ -377,7 +377,7 @@ pub async fn download_model(
     url: String,
     path: String,
     integrity: Option<DownloadIntegrity>,
-) -> Result<DownloadModelResult> {
+) -> CommandResult<DownloadModelResult> {
     tracing::debug!("Download model invoked! with path {}", path);
 
     let integrity = integrity.unwrap_or_default();
@@ -388,7 +388,7 @@ pub async fn download_model(
 }
 
 #[tauri::command]
-pub async fn download_file(app_handle: tauri::AppHandle, url: String, path: String) -> Result<()> {
+pub async fn download_file(app_handle: tauri::AppHandle, url: String, path: String) -> CommandResult<()> {
     tracing::debug!("Download file invoked! with path {}", path);
 
     match download_to_partial(&app_handle, &url, Path::new(&path), &DownloadIntegrity::default(), false).await? {
@@ -428,7 +428,7 @@ pub fn check_model_files(paths: Vec<String>) -> Vec<ModelFileCheck> {
 /// stale one only wastes disk space — except the one the caller is about to publish, which
 /// `download_to_partial` handles before this ever runs.
 #[tauri::command]
-pub fn cleanup_partial_downloads(folder: String) -> Result<Vec<String>> {
+pub fn cleanup_partial_downloads(folder: String) -> CommandResult<Vec<String>> {
     let mut removed = Vec::new();
     let entries = match std::fs::read_dir(&folder) {
         Ok(entries) => entries,
