@@ -89,10 +89,12 @@ tasks:
       - mise exec -- cargo machete
 
   server:clippy:
-    desc: Clippy the server workspace, warnings fatal
+    desc: Clippy the fork-owned server crates, warnings fatal
     dir: server
     cmds:
-      - cargo clippy --workspace --all-targets -- -D warnings
+      # The dormant upstream crates are vendored byte-for-byte; their lint
+      # cleanliness is upstream's CI. New fork-owned crates join -p here.
+      - cargo clippy -p vibe-server --all-targets -- -D warnings
 
   test:
     desc: All unit suites
