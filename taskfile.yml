@@ -188,7 +188,7 @@ tasks:
         -E desktop/project.inlang -E website/project.inlang -X
         oxfmt --check
       - mise exec -- fd -H -e sh -E node_modules -X shfmt -i 4 -d
-      - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E desktop/project.inlang -E website/project.inlang -X tombi format --check
+      - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E pyproject.toml -E desktop/project.inlang -E website/project.inlang -X tombi format --check
       - mise exec -- fd -H -e css -e html -E node_modules -X prettier --check
 
   dev:tag:
