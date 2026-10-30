@@ -50,11 +50,6 @@ reason = "zip used only at build time on the pinned swagger-ui bundle"
 id = "RUSTSEC-2026-0369"
 reason = "zip used only at build time on the pinned swagger-ui bundle"
 
-# paste is unmaintained; transitive via utoipa, no replacement pin available
-[[advisories.ignore]]
-id = "RUSTSEC-2024-0436"
-reason = "unmaintained transitive of utoipa; no patched release to move to"
-
 # tokio AsyncFd constructors are unsound from safe code; the server never
 # constructs AsyncFd from a foreign fd, and no patched tokio exists yet
 [[advisories.ignore]]
@@ -77,11 +72,16 @@ reason = "three transitive majors pending upstream convergence"
 name = "core-foundation"
 reason = "objc2 0.10 vs security-framework 0.9 lines"
 
+# bindgen (ggml-rs-sys build) pins shlex 1.x while cc takes 2.x; the majors
+# cannot converge until bindgen releases a 2.x line
+[[bans.skip]]
+name = "shlex"
+reason = "bindgen 1.x vs cc 2.x lines"
+
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = [
-  # pinned fork of eyre used by the desktop crate
-  "https://github.com/thewh1teagle/eyre",
-]
+# everything in the server tree resolves from crates.io now; the old eyre
+# git fork pin lives only in the desktop crate
+allow-git = []
