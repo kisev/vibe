@@ -1,6 +1,6 @@
 {
   "bundle": {
-    "externalBin": ["binaries/vibe-server", "binaries/ffmpeg"],
+    "externalBin": ["binaries/vibe-server", "binaries/vibe-diarize-native", "binaries/ffmpeg"],
     "windows": {
       "nsis": {
         "installerHooks": "nsis-hooks.nsh"

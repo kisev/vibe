@@ -125,9 +125,11 @@ jobs:
             - name: Type-check the desktop crate
               run: |
                   # tauri's build script wants the frontend dist and the sidecar
-                  # binary to exist; both are only real in a release build. The
-                  # sidecar is matched with its target-triple suffix.
+                  # binaries to exist; both are only real in a release build. The
+                  # sidecars are matched with their target-triple suffix.
                   mkdir -p desktop/dist desktop/src-tauri/binaries
-                  touch "desktop/src-tauri/binaries/vibe-server-$(rustc -vV | sed -n 's/host: //p')"
+                  triple="$(rustc -vV | sed -n 's/host: //p')"
+                  touch "desktop/src-tauri/binaries/vibe-server-$triple" \
+                    "desktop/src-tauri/binaries/vibe-diarize-native-$triple"
                   chmod +x desktop/src-tauri/binaries/*
                   cargo check --manifest-path desktop/src-tauri/Cargo.toml --all-targets

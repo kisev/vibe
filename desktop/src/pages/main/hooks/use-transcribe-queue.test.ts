@@ -54,7 +54,7 @@ describe('shared transcription options', () => {
 
 	it('keeps diarization working for GigaAM', async () => {
 		expect(await buildSharedOptions(preferenceWith(gigaam, { diarizeEnabled: true }))).toEqual({
-			diarize_model: '/models/diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf',
+			diarize_model: '/models/nemotron-3-diarization-Q8_0.gguf',
 			vad_model: '/models/ggml-silero-v6.2.0.bin',
 		})
 	})

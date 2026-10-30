@@ -644,7 +644,7 @@ pub fn model_capabilities(model: &Model) -> anyhow::Result<EngineCapabilities> {
 /// Reads `general.architecture` straight from the GGUF container, so an
 /// unsupported family is rejected by name even when the engine's own error
 /// only carries a status code.
-fn gguf_architecture(path: &str) -> Option<String> {
+pub(crate) fn gguf_architecture(path: &str) -> Option<String> {
     use std::io::Read;
 
     let mut bytes = Vec::new();

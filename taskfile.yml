@@ -93,8 +93,10 @@ tasks:
     dir: server
     cmds:
       # The dormant upstream crates are vendored byte-for-byte; their lint
-      # cleanliness is upstream's CI. New fork-owned crates join -p here.
-      - cargo clippy -p vibe-server --all-targets -- -D warnings
+      # cleanliness is upstream's CI (upstream never lints server/ — its root
+      # workspace excludes it). New fork-owned crates join -p here; ggml-rs-sys
+      # carries the one fork-side allow line for its generated bindings.
+      - cargo clippy -p vibe-server -p vibe-diarize-native --all-targets -- -D warnings
 
   test:
     desc: All unit suites

@@ -1,11 +1,14 @@
 [workspace]
-# vibe-server runs the fork's transcribe.cpp unified engine; the pure-Rust
-# crates below are upstream's native stack, restored dormant until stage-2
-# wiring routes their models to them (see openspec/changes/sync-upstream-main).
+# vibe-server runs the fork's transcribe.cpp unified engine. The pure-Rust
+# crates are upstream's native stack; Nemotron diarization is served through
+# vibe-diarize-native, a runtime-loaded module (the two GGML builds cannot
+# share a binary). The rest stay dormant until their models route to them
+# (see openspec/changes/sync-upstream-main).
 members = [
     "crates/nemotron-diarize-rs",
     "crates/nemotron-rs",
     "crates/parakeet-rs",
+    "crates/vibe-diarize-native",
     "crates/vibe-server",
     "crates/vad-rs",
     "crates/ggml-rs-sys",

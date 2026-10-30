@@ -17,9 +17,9 @@
 
 ## 3. Stage 2: wire the native engine in
 
-- [ ] 3.1 `server/crates/vibe-server/src/server/diarization.rs` routes by model arch: Sortformer GGUFs to the transcribe.cpp engine, Nemotron-3-Diarization to `nemotron-diarize-rs`; probe locally with both GGUFs on disk before committing
+- [x] 3.1 `server/crates/vibe-server/src/server/diarization.rs` routes by model arch: Sortformer GGUFs to the transcribe.cpp engine, Nemotron-3-Diarization to `nemotron-diarize-rs`; probe locally with both GGUFs on disk before committing
 - [ ] 3.2 Port upstream's word-timing speaker split (`speakers.rs` + segment splitting) as far as the transcribe.cpp FFI exposes token timings; if the FFI lacks them, keep the fork's overlap-based attribution for transcribe.cpp models and use word timings for native-stack models, and record the FFI gap
-- [ ] 3.3 Desktop switches the diarization constants to upstream's Nemotron (`vibe-app/nemotron-3-diarization-gguf`, Q8_0, size/sha from upstream config) and moves Sortformer v2.1 into `legacyDiarizationFilenames` + `LEGACY_DIARIZATION_FILES`; the standing startup migration gives Sortformer users the new model automatically
+- [x] 3.3 Desktop switches the diarization constants to upstream's Nemotron (`vibe-app/nemotron-3-diarization-gguf`, Q8_0, size/sha from upstream config) and moves Sortformer v2.1 into `legacyDiarizationFilenames` + `LEGACY_DIARIZATION_FILES`; the standing startup migration gives Sortformer users the new model automatically
 - [ ] 3.4 Validation after stage 2: suites green, dev build green, live transcription carries speaker labels from Nemotron, and a Sortformer-artifact profile gets the re-migration offer
 
 ## 4. Deferred (recorded, not this change)

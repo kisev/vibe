@@ -65,34 +65,30 @@ export const embeddingModelUrl = 'https://github.com/thewh1teagle/vibe/releases/
 export const segmentModelUrl = 'https://github.com/thewh1teagle/vibe/releases/download/v0.0.1/segmentation-3.0.onnx'
 
 /**
- * Diarization runs NVIDIA Sortformer on ggml now, not ONNX Runtime, so this is a GGUF built from
- * the original `.nemo` checkpoint rather than an ONNX export. Q8_0: the k-quant tiers are unsafe
- * for this model — its speaker-cache compression makes discrete near-tie decisions that quant
- * error can flip, permuting speaker labels mid-stream.
+ * Diarization runs NVIDIA Nemotron-3-Diarization (up to 8 speakers) on ggml, a GGUF exported from
+ * the HF safetensors by `server/crates/nemotron-diarize-rs/scripts/export.py --dtype q8_0`.
+ * Q8_0 matches F32 segments on our checks at a quarter of the size.
  *
- * v2.1 from the handy-computer catalog at a pinned revision. The unified engine rejects the
- * vibe-app v2 mirror outright (`gguf load error` — verified locally on a sha-verified copy
- * against the engine crate's own smoke fixture, which is v2.1), so shipping v2 leaves
- * diarization silently empty behind the server's warn-and-continue.
+ * Mirrored into the vibe-app org from `nvidia/Nemotron-3-Diarization` (OpenMDW 1.1).
  *
- * Anyone upgrading still has the superseded artifacts sitting in their models folder — the
- * legacy ONNX trio is invisible to the model listing (not a `.gguf`/`.bin`), while the broken
- * v2 GGUF stays listed until removed. The gate finds the new file missing and offers the
- * download; the startup migration removes the superseded files after the replacement
- * downloads, so the folder does not carry the dead weight.
+ * Anyone upgrading still has the superseded artifacts sitting in their models folder. The gate
+ * finds the new file missing and offers the download; the startup migration removes the
+ * superseded files after the replacement downloads, so the folder does not carry the dead weight.
  */
-export const diarizeModelFilename = 'diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf'
-export const diarizeModelUrl = 'https://huggingface.co/handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf/resolve/ae4afbb5c3d33b71cf2dbf600022b655ee706dd0/diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf'
-/** Superseded diarization artifacts the migration cleans up once the GGUF above is in place. */
+export const diarizeModelFilename = 'nemotron-3-diarization-Q8_0.gguf'
+export const diarizeModelUrl = 'https://huggingface.co/vibe-app/nemotron-3-diarization-gguf/resolve/main/nemotron-3-diarization-Q8_0.gguf'
+/** Superseded diarization artifacts the migration cleans up once the replacement above downloads.
+ * Listed here also keeps the old GGUFs from showing up as transcription models meanwhile. */
 export const legacyDiarizationFilenames = [
 	'diar_streaming_sortformer_4spk-v2.q8_0.gguf',
 	'diar_streaming_sortformer_4spk-v2.1.onnx',
+	'diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf',
 	'wespeaker_en_voxceleb_CAM++.onnx',
 	'segmentation-3.0.onnx',
 ]
 export const diarizeModelIntegrity: ModelIntegrity = {
-	size: 139310336,
-	sha256: 'a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9',
+	size: 108541632,
+	sha256: 'a25f026847d765c8661fd5095c73a0e5f20d310dcb8249c654e3828592a2fc73',
 }
 export const vadModelFilename = 'ggml-silero-v6.2.0.bin'
 export const vadModelUrl = 'https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin'

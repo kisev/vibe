@@ -14,6 +14,9 @@ path = "src/main.rs"
 # Exact pin: engine upgrades are deliberate events (parity re-run), never a
 # cargo update side effect.
 transcribe-cpp = { version = "=0.4.1", default-features = false }
+# Nemotron-3-Diarization runs in the vibe-diarize-native helper beside the
+# executable — transcribe.cpp's GGML and the native stack's prebuilt GGML
+# cannot share a binary, so the native engine is a separate process.
 
 anyhow = "1"
 axum = { version = "0.8", features = ["multipart"] }

@@ -1,0 +1,24 @@
+[package]
+name = "vibe-diarize-native"
+version = "0.1.0"
+edition.workspace = true
+description = "Nemotron-3-Diarization as a standalone tool vibe-server runs beside itself"
+repository.workspace = true
+license.workspace = true
+
+# A separate process is what keeps the two GGML stacks apart: vibe-server's
+# binary links transcribe.cpp's GGML 0.26, this tool statically links the
+# prebuilt GGML 0.22 the native stack is built against, and neither ever sees
+# the other's symbols. The prebuilt libraries are not -fPIC, so a shared
+# module was not an option either; a plain binary links them as-is.
+[[bin]]
+name = "vibe-diarize-native"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+nemotron-diarize-rs = { path = "../nemotron-diarize-rs" }
+hound = "3.5"
+
+[lints]
+workspace = true
