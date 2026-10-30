@@ -364,7 +364,7 @@ pub async fn delete_model_file(path: String) -> CommandResult<()> {
         .and_then(|name| name.to_str())
         .is_some_and(|name| LEGACY_DIARIZATION_FILES.contains(&name));
     if !legacy && !is_model_path(&path) {
-        bail!("refusing to delete a non-model file: {path:?}");
+        return Err(eyre::eyre!("refusing to delete a non-model file: {path:?}").into());
     }
     remove_if_exists(&path)?;
     tracing::info!("deleted model file {}", path.display());
@@ -393,7 +393,7 @@ pub async fn download_file(app_handle: tauri::AppHandle, url: String, path: Stri
 
     match download_to_partial(&app_handle, &url, Path::new(&path), &DownloadIntegrity::default(), false).await? {
         DownloadOutcome::Completed => Ok(()),
-        DownloadOutcome::Cancelled => return Err(eyre::eyre!("Download cancelled")),
+        DownloadOutcome::Cancelled => return Err(eyre::eyre!("Download cancelled").into()),
     }
 }
 
@@ -433,7 +433,7 @@ pub fn cleanup_partial_downloads(folder: String) -> CommandResult<Vec<String>> {
     let entries = match std::fs::read_dir(&folder) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(removed),
-        Err(error) => return Err(error).context(format!("Failed to read the models folder {folder}")),
+        Err(error) => return Err(eyre::Report::new(error).wrap_err(format!("Failed to read the models folder {folder}")).into()),
     };
 
     for entry in entries.flatten() {
