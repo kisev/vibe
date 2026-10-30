@@ -12,7 +12,7 @@
 
 - [x] 2.1 Desktop suites green on the merge result: `pnpm tsc` + `pnpm vitest` (`desktop/`)
 - [x] 2.2 Server workspace green: `cargo test` on all seven members (`server/`)
-- [ ] 2.3 Cut a dev build of the merge; it publishes green under the one-dev-release scheme with version base 3.3.0
+- [x] 2.3 Cut a dev build of the merge; it publishes green under the one-dev-release scheme with version base 3.3.0
 - [ ] 2.4 Live checks on that build: transcription carries speaker labels from Sortformer v2.1 (unchanged this stage), `winget upgrade` stays quiet, and the ARP identity is `vibe-kisev-fork`
 
 ## 3. Stage 2: wire the native engine in
