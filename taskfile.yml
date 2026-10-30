@@ -139,8 +139,10 @@ tasks:
 
   lint:shell:
     cmds:
-      - mise exec -- fd -H -e sh -E node_modules -X shfmt -i 4 -d
-      - mise exec -- fd -H -e sh -E node_modules -X shellcheck
+      # installer.sh is upstream's script; its SC2024 info (sudo </dev/tty
+      # redirect) is upstream's call, re-checked on every sync
+      - mise exec -- fd -H -e sh -E node_modules -E website/public/installer.sh -X shfmt -i 4 -d
+      - mise exec -- fd -H -e sh -E node_modules -E website/public/installer.sh -X shellcheck
 
   lint:editorconfig:
     cmds:
