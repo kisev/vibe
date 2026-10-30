@@ -53,6 +53,12 @@ pre-commit:
       # byte-for-byte; their formatting is upstream's, re-checked on every sync.
       exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,server/libs,server/crates/nemotron-rs/scripts,server/crates/parakeet-rs/scripts}/**"
       run: mise exec -- editorconfig-checker {staged_files}
+    rust-format:
+      # rustfmt needs no compilation, so every commit checks it; the lint
+      # workflow runs the same command tree-wide
+      glob: "desktop/src-tauri/**/*.rs"
+      run: cargo fmt --all -- --check
+
     workflows:
       glob: ".github/workflows/*.{yml,yaml}"
       run: mise exec -- actionlint

@@ -433,7 +433,11 @@ pub fn cleanup_partial_downloads(folder: String) -> CommandResult<Vec<String>> {
     let entries = match std::fs::read_dir(&folder) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(removed),
-        Err(error) => return Err(eyre::Report::new(error).wrap_err(format!("Failed to read the models folder {folder}")).into()),
+        Err(error) => {
+            return Err(eyre::Report::new(error)
+                .wrap_err(format!("Failed to read the models folder {folder}"))
+                .into())
+        }
     };
 
     for entry in entries.flatten() {
