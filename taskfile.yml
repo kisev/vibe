@@ -146,7 +146,9 @@ tasks:
 
   lint:editorconfig:
     cmds:
-      - mise exec -- fd -H -t f -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -X editorconfig-checker
+      # server/libs and the engine export scripts are vendored from upstream
+      # byte-for-byte; their formatting is upstream's, re-checked on every sync
+      - mise exec -- fd -H -t f -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E server/libs -E "server/crates/*/scripts" -X editorconfig-checker
 
   lint:workflows:
     cmds:
