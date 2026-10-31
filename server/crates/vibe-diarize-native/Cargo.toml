@@ -20,12 +20,9 @@ anyhow = "1"
 nemotron-diarize-rs = { path = "../nemotron-diarize-rs" }
 hound = "3.5"
 
-# The prebuilt ggml-cpu reads the registry (CPU device context), so the link
-# needs advapi32; windows-sys' Registry feature is what carries that link
-# directive through to the binary. Upstream's vibe-server gets it transitively
-# from its larger dependency graph — this helper's graph is too small.
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_System_Registry"] }
+# advapi32 for the prebuilt ggml-cpu's registry reads is linked by build.rs:
+# a windows-sys feature alone emits nothing unless some code calls a registry
+# function, and nothing in this small graph does.
 
 [lints]
 workspace = true
