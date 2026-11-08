@@ -22,7 +22,7 @@ An upstream integration SHALL land in main only after the desktop and server tes
 #### Scenario: Diarization after a model-family switch
 
 - **WHEN** an integration adopts an upstream change to the diarization model family
-- **THEN** a transcription on the merge result's dev build produces speaker labels from the new model before the merge lands
+- **THEN** a transcription on a dev build of the integration's result produces speaker labels from the new model — for every stage that lands, since a staged integration validates the model behaviors that stage touches
 
 ### Requirement: Upstream model switches extend the legacy migration list
 
