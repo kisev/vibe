@@ -10,7 +10,7 @@ import {
 	defaultQuant,
 	entryScores,
 	fileUrl,
-	providerName,
+	providerOf,
 	sizeMb,
 	type CatalogFileEntry,
 	type CatalogModel,
@@ -51,7 +51,7 @@ export function CardMeta({ model, sizeBytes }: { model: CatalogModel; sizeBytes:
 	return (
 		<div className="space-y-1.5">
 			<div className="text-xs text-muted-foreground">
-				{providerName(model.repository)} · {sizeMb(sizeBytes)} MB
+				{providerOf(model)} · {sizeMb(sizeBytes)} MB
 			</div>
 			<div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
 				<span>{compactLanguages(model.languages)}</span>
@@ -437,14 +437,14 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 	}
 
 	const languages = useMemo(() => [...new Set(models.flatMap((model) => model.languages.map(baseLanguage)))].sort(), [models])
-	const providers = useMemo(() => [...new Set(models.map((model) => providerName(model.repository)))].sort(), [models])
+	const providers = useMemo(() => [...new Set(models.map((model) => providerOf(model)))].sort(), [models])
 
 	const visible = useMemo(() => {
 		const filtered = models.filter((model) => {
 			if (streaming && !model.capabilities.streaming) return false
 			if (translation && !model.capabilities.translate) return false
 			if (language !== 'all' && !model.languages.some((tag) => baseLanguage(tag) === language)) return false
-			if (provider !== 'all' && provider !== CUSTOM_PROVIDER && providerName(model.repository) !== provider) return false
+			if (provider !== 'all' && provider !== CUSTOM_PROVIDER && providerOf(model) !== provider) return false
 			if (query && !model.name.toLowerCase().includes(query.trim().toLowerCase())) return false
 			return true
 		})

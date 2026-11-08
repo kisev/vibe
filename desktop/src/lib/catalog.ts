@@ -71,6 +71,39 @@ export function providerName(repository: string): string {
 	return names[owner] ?? owner
 }
 
+/**
+ * Handy-layer entries the vibe project publishes — the whisper line its
+ * download page has always linked to, as GGUF builds of the `.bin` files the
+ * engine refuses. They display under the Vibe provider even though the files
+ * live in handy-computer repositories. Ids live here, not in the vendored
+ * catalog copy, so a `sync:catalog` refresh cannot drop the attribution; an
+ * id that leaves the catalog upstream simply stops matching.
+ */
+export const VIBE_PICK_IDS: ReadonlySet<string> = new Set([
+	'whisper-tiny',
+	'whisper-tiny.en',
+	'whisper-base',
+	'whisper-base.en',
+	'whisper-small',
+	'whisper-small.en',
+	'whisper-medium',
+	'whisper-medium.en',
+	'whisper-large',
+	'whisper-large-v2',
+	'whisper-large-v3',
+	'whisper-large-v3-turbo',
+])
+
+/**
+ * The provider an entry is attributed to: an official vibe pick answers
+ * "Vibe" whatever repository hosts it, everything else takes the repository
+ * owner's display name. The card's link still names the actual repository.
+ */
+export function providerOf(model: Pick<CatalogModel, 'id' | 'repository'>): string {
+	if (VIBE_PICK_IDS.has(model.id)) return 'Vibe'
+	return providerName(model.repository)
+}
+
 /** The provider-qualified identity of one downloadable file. */
 export function identityKey(model: CatalogModel, quant: string): string {
 	const file = model.files[quant]

@@ -11,7 +11,9 @@ import {
 	matchInstalled,
 	mergeCatalogs,
 	providerName,
+	providerOf,
 	sizeMb,
+	VIBE_PICK_IDS,
 	type CatalogData,
 	type CatalogModel,
 } from './catalog'
@@ -114,6 +116,29 @@ describe('presentation helpers', () => {
 		expect(providerName('vibe-app/x')).toBe('Vibe')
 		expect(providerName('handy-computer/y')).toBe('Handy')
 		expect(providerName('someone-else/z')).toBe('someone-else')
+	})
+
+	it('attributes the official vibe picks to Vibe wherever the files live', () => {
+		// Every picked id must still exist in the loadable catalog; one that
+		// left upstream would silently stop matching, so pin all twelve.
+		for (const id of VIBE_PICK_IDS) {
+			const model = asrCatalog().find((m) => m.id === id)
+			expect(model, id).toBeDefined()
+			expect(providerOf(model!)).toBe('Vibe')
+			// The hosting origin stays handy — the pick changes the label only.
+			expect(model!.repository).toMatch(/^handy-computer\//)
+		}
+		// A non-picked handy entry keeps its owner-derived name, and the
+		// vibe-app entries reach Vibe through the owner map as before.
+		expect(providerOf(CATALOG.models.find((m) => m.id === 'canary-180m-flash')!)).toBe('Handy')
+		expect(providerOf(CATALOG.models.find((m) => m.id === 'vibe-parakeet-tdt-0.6b-v3')!)).toBe('Vibe')
+		// The Vibe provider carries exactly the fifteen ASR entries: twelve
+		// picks plus the three vibe-app mirrors.
+		expect(asrCatalog().filter((m) => providerOf(m) === 'Vibe')).toHaveLength(15)
+		// A pick id with no catalog row behind it stays inert: the pure
+		// function still answers, the catalog listing never shows a ghost.
+		expect(providerOf({ id: 'whisper-tiny', repository: 'handy-computer/whisper-tiny-gguf' })).toBe('Vibe')
+		expect(asrCatalog().filter((m) => m.id === 'whisper-tiny')).toHaveLength(1)
 	})
 
 	it('prefers Q8_0 as the default quantization and falls back along the ladder', () => {

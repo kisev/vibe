@@ -262,6 +262,34 @@ describe('catalog filters', () => {
 		await user.click(await screen.findByRole('option', { name: m.catalogAllProviders() }))
 		expect(screen.getByText('Fixture Model')).toBeTruthy()
 	})
+
+	it('groups the official vibe picks under the Vibe provider and downloads from the handy host', async () => {
+		const user = userEvent.setup()
+		renderCatalog([
+			fixture({ id: 'whisper-tiny', name: 'Whisper Tiny', repository: 'handy-computer/whisper-tiny-gguf' }),
+			fixture({ id: 'not-a-pick', name: 'Plain Handy Model' }),
+		])
+
+		// The pick carries the Vibe label on its card while it still lives in
+		// a handy repository; the plain handy entry keeps its owner name.
+		expect(screen.getByText(/Vibe · 731 MB/)).toBeTruthy()
+		expect(screen.getByText(/Handy · 731 MB/)).toBeTruthy()
+
+		await user.click(screen.getByRole('combobox', { name: m.catalogProvider() }))
+		await user.click(await screen.findByRole('option', { name: 'Vibe' }))
+		expect(screen.getByText('Whisper Tiny')).toBeTruthy()
+		expect(screen.queryByText('Plain Handy Model')).toBeNull()
+
+		// The download still resolves against the actual handy repository —
+		// the pick relabels the provider, never the hosting origin.
+		await user.click(screen.getByRole('combobox', { name: m.catalogQuantization() }))
+		await user.click(screen.getAllByRole('button', { name: m.downloadModel() })[0])
+		expect(mocks.downloadModel).toHaveBeenCalledWith({
+			url: 'https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/abc123/fixture-Q8_0.gguf',
+			size: 731_357_568,
+			sha256: 'hash-q8',
+		})
+	})
 })
 
 describe('quant selector affordances', () => {
