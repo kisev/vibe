@@ -50,6 +50,11 @@ reason = "zip used only at build time on the pinned swagger-ui bundle"
 id = "RUSTSEC-2026-0369"
 reason = "zip used only at build time on the pinned swagger-ui bundle"
 
+# ZipArchive::extract abort on a crafted symlink entry; no patched 3.x yet.
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0429"
+reason = "zip used only at build time on the pinned swagger-ui bundle"
+
 # tokio AsyncFd constructors are unsound from safe code; the server never
 # constructs AsyncFd from a foreign fd, and no patched tokio exists yet
 [[advisories.ignore]]
