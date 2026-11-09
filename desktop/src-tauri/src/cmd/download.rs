@@ -29,10 +29,12 @@ struct DownloadProgress<'a> {
 /// truncated stream or an HTML error page saved under a model name, never a model.
 const MIN_MODEL_SIZE: u64 = 256 * 1024;
 
-/// A locked destination (antivirus, or a server process still holding the previous model open)
-/// usually clears within a second, so retry the swap before giving up.
-const PUBLISH_ATTEMPTS: u32 = 5;
-const PUBLISH_RETRY_DELAY: Duration = Duration::from_millis(200);
+/// A locked file (antivirus scanning a freshly written multi-gigabyte download, or a process
+/// still holding the previous model open) can stay locked for tens of seconds, so the publish
+/// backs off exponentially for about half a minute before giving up.
+const PUBLISH_ATTEMPTS: u32 = 9;
+const PUBLISH_RETRY_BASE: Duration = Duration::from_millis(250);
+const PUBLISH_RETRY_MAX: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
@@ -203,22 +205,33 @@ fn try_publish(partial: &Path, destination: &Path) -> Result<()> {
     }
 }
 
-/// Swap the finished `.part` in, retrying while the destination is locked. On Windows antivirus or
-/// a running server can hold the old model open for a moment; the caller keeps the `.part` when this
-/// still fails, so the next attempt publishes it instead of downloading the file again.
-fn publish_download(partial: &Path, destination: &Path) -> Result<()> {
-    let mut attempt = 1;
-    loop {
+/// Swap the finished `.part` in, retrying while the file is locked. On Windows the antivirus
+/// scans a freshly written multi-gigabyte download on close and holds a handle to it for tens
+/// of seconds; every rename until then fails with a sharing violation. The backoff covers a
+/// scan, and the caller keeps the `.part` when this still fails, so the next attempt publishes
+/// it instead of downloading the file again.
+async fn publish_download(partial: &Path, destination: &Path) -> Result<()> {
+    let mut delay = PUBLISH_RETRY_BASE;
+    for attempt in 1..=PUBLISH_ATTEMPTS {
         match try_publish(partial, destination) {
             Ok(()) => return Ok(()),
             Err(error) if attempt < PUBLISH_ATTEMPTS => {
                 tracing::warn!("publish attempt {attempt} for {} failed: {error:?}", destination.display());
-                attempt += 1;
-                std::thread::sleep(PUBLISH_RETRY_DELAY);
+                tokio::time::sleep(delay).await;
+                delay = (delay * 2).min(PUBLISH_RETRY_MAX);
             }
-            Err(error) => return Err(error),
+            Err(error) => {
+                return Err(error).context(format!(
+                    "Failed to publish {} to {} — the file is locked by another process, most \
+                     likely the antivirus scanning the fresh download. The downloaded bytes are \
+                     kept; trying again publishes them without re-downloading",
+                    partial.display(),
+                    destination.display()
+                ))
+            }
         }
     }
+    unreachable!("the loop returns on its last iteration")
 }
 
 async fn download_to_partial(
@@ -236,7 +249,7 @@ async fn download_to_partial(
         match verify_finished_download(&partial, destination, integrity) {
             Ok(()) => {
                 tracing::info!("publishing the leftover download of {}", destination.display());
-                publish_download(&partial, destination)?;
+                publish_download(&partial, destination).await?;
                 return Ok(DownloadOutcome::Completed);
             }
             Err(error) => {
@@ -337,7 +350,7 @@ async fn download_to_partial(
 
     // From here the file is complete and verified, so a failure can only be a locked destination.
     // Leave the `.part` in place for the next attempt rather than throwing the download away.
-    publish_download(&partial, destination)?;
+    publish_download(&partial, destination).await?;
     Ok(DownloadOutcome::Completed)
 }
 
@@ -481,23 +494,23 @@ mod tests {
         );
     }
 
-    #[test]
-    fn publish_download_moves_a_complete_partial_file() {
+    #[tokio::test]
+    async fn publish_download_moves_a_complete_partial_file() {
         let dir = test_dir("publish");
         fs::create_dir_all(&dir).unwrap();
         let destination = dir.join("model.bin");
         let partial = partial_path(&destination);
         fs::write(&partial, b"complete model").unwrap();
 
-        publish_download(&partial, &destination).unwrap();
+        publish_download(&partial, &destination).await.unwrap();
 
         assert_eq!(fs::read(&destination).unwrap(), b"complete model");
         assert!(!partial.exists());
         fs::remove_dir_all(dir).unwrap();
     }
 
-    #[test]
-    fn publish_download_replaces_an_existing_file_without_leaving_a_backup() {
+    #[tokio::test]
+    async fn publish_download_replaces_an_existing_file_without_leaving_a_backup() {
         let dir = test_dir("replace");
         fs::create_dir_all(&dir).unwrap();
         let destination = dir.join("yt-dlp");
@@ -506,7 +519,7 @@ mod tests {
         fs::write(&destination, b"old binary").unwrap();
         fs::write(&partial, b"new binary").unwrap();
 
-        publish_download(&partial, &destination).unwrap();
+        publish_download(&partial, &destination).await.unwrap();
 
         assert_eq!(fs::read(&destination).unwrap(), b"new binary");
         assert!(!partial.exists());
