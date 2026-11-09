@@ -86,7 +86,7 @@
   "downloadModel": "Download model",
   "downloadModelsLink": "Download Models",
   "downloadComplete": "Download complete",
-  "downloadDiarizeModel": "Speaker diarization requires a model (~25MB). Download it now?",
+  "downloadDiarizeModel": "Speaker diarization requires a model (~108MB). Download it now?",
   "downloadRequiredVadModel": "Download required VAD model",
   "downloadRequiredVadModelQuestion": "This transcription model requires Silero VAD. Download it before selecting the model?",
   "downloading": "Downloading... {progress}%",
@@ -747,7 +747,7 @@
   "phoneRevokeDevice": "Revoke",
   "phoneRevokeDeviceNamed": "Revoke {name}",
   "whatsNew": "What's new",
-  "diarizationMigrateQuestion": "The diarization model changed format with the new engine. Download the new model (~25MB) now?",
+  "diarizationMigrateQuestion": "The diarization model changed format with the new engine. Download the new model (~108MB) now?",
   "diarizationMigratedOff": "Speaker detection is off until the new model is downloaded.",
   "betaUpdates": "Beta updates",
   "betaUpdatesInfo": "Get new versions a few days early, before everyone else."

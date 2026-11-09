@@ -5,8 +5,9 @@ import { emit, listen } from '@tauri-apps/api/event'
 import { register, unregister, isRegistered } from '@tauri-apps/plugin-global-shortcut'
 import * as clipboard from '@tauri-apps/plugin-clipboard-manager'
 import { trackTranscribeFailed, trackTranscribeStarted, trackTranscribeSucceeded } from '~/lib/analytics'
-import { AudioDevice, selectInputDevice } from '~/lib/audio'
+import { AudioDevice } from '~/lib/audio'
 import { CONFIG_KEYS } from '~/lib/config-keys'
+import { resolveSelection } from '~/lib/device-selection'
 import { gpuOutOfMemoryBefore } from '~/lib/gpu-memory'
 import { readConfig, usePersisted } from '~/lib/config-store'
 import { createClient, fillPrompt } from '~/lib/ai'
@@ -127,7 +128,13 @@ export function HotkeyProvider({ children }: { children: ReactNode }) {
 		isStartingRef.current = true
 		try {
 			const devices = await invoke<AudioDevice[]>('get_audio_devices')
-			const input = selectInputDevice(devices, readConfig<string | null>(CONFIG_KEYS.inputDeviceId, null))
+			const savedName = readConfig<string | null>(CONFIG_KEYS.inputDeviceName, null)
+			const hiddenNames = readConfig<string[]>(CONFIG_KEYS.hiddenInputDevices, [])
+			const input = resolveSelection(
+				devices.filter((device) => device.isInput),
+				savedName,
+				hiddenNames,
+			).device
 			if (!input) {
 				console.error('No input device found')
 				return

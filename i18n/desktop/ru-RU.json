@@ -77,7 +77,7 @@
   "downloadModel": "Скачать модель",
   "downloadModelsLink": "Скачать модели",
   "downloadComplete": "Загрузка завершена",
-  "downloadDiarizeModel": "Для разделения по говорящим нужна модель (~25 МБ). Скачать сейчас?",
+  "downloadDiarizeModel": "Для разделения по говорящим нужна модель (~108 МБ). Скачать сейчас?",
   "downloadRequiredVadModel": "Скачать необходимую модель VAD",
   "downloadRequiredVadModelQuestion": "Для этой модели транскрипции требуется Silero VAD. Скачать её перед выбором модели?",
   "downloading": "Загрузка... {progress}%",
@@ -738,8 +738,17 @@
   "phoneRevokeDevice": "Отозвать",
   "phoneRevokeDeviceNamed": "Отозвать {name}",
   "whatsNew": "Что нового",
-  "diarizationMigrateQuestion": "Модель диаризации сменила формат вместе с новым движком. Скачать новую модель (~25 МБ)?",
+  "diarizationMigrateQuestion": "Модель диаризации сменила формат вместе с новым движком. Скачать новую модель (~108 МБ)?",
   "diarizationMigratedOff": "Обнаружение говорящих выключено, пока не будет скачана новая модель.",
   "betaUpdates": "Бета-обновления",
-  "betaUpdatesInfo": "Получайте новые версии на несколько дней раньше всех остальных."
+  "betaUpdatesInfo": "Получайте новые версии на несколько дней раньше всех остальных.",
+  "compareChooseFile": "Выберите аудиофайл",
+  "compareModels": "Сравнить модели",
+  "compareNeedTwo": "Выберите входной файл и хотя бы две модели",
+  "comparePickModels": "Модели для сравнения",
+  "compareProcessingRecording": "Завершение записи…",
+  "compareRecord": "Записать фрагмент",
+  "compareRecording": "Запись…",
+  "compareRun": "Запустить сравнение",
+  "compareStopRecording": "Остановить запись"
 }
