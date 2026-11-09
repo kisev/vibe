@@ -14,4 +14,4 @@
 ## 3. Validation
 
 - [x] 3.1 Desktop suites green locally: `pnpm tsc` + `pnpm test` (`desktop/`); push to main and let the Lint run (frontend-tests job) confirm
-- [ ] 3.2 Live check on the next dev build: filter by Vibe shows the full line, a whisper GGUF downloads and transcribes (any fixture audio suffices)
+- [x] 3.2 Live check on the next dev build: filter by Vibe shows the full line, a whisper GGUF downloads and transcribes (any fixture audio suffices)
