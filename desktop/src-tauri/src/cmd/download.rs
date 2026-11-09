@@ -30,11 +30,11 @@ struct DownloadProgress<'a> {
 const MIN_MODEL_SIZE: u64 = 256 * 1024;
 
 /// A locked file (antivirus scanning a freshly written multi-gigabyte download, or a process
-/// still holding the previous model open) can stay locked for tens of seconds, so the publish
-/// backs off exponentially for about half a minute before giving up.
-const PUBLISH_ATTEMPTS: u32 = 9;
+/// still holding the previous model open) can stay locked for a minute or more, so the publish
+/// backs off exponentially for about a minute and a half before giving up.
+const PUBLISH_ATTEMPTS: u32 = 15;
 const PUBLISH_RETRY_BASE: Duration = Duration::from_millis(250);
-const PUBLISH_RETRY_MAX: Duration = Duration::from_secs(8);
+const PUBLISH_RETRY_MAX: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
@@ -437,13 +437,22 @@ pub fn check_model_files(paths: Vec<String>) -> Vec<ModelFileCheck> {
         .collect()
 }
 
-/// Delete leftover `*.part` files in the models folder. Partial downloads cannot be resumed, and a
-/// stale one only wastes disk space — except the one the caller is about to publish, which
-/// `download_to_partial` handles before this ever runs.
+/// A `.part` younger than this may be a finished download whose publish only the virus scanner's
+/// handle is holding up — the next download attempt publishes those bytes instead of fetching the
+/// file again. Only abandoned leftovers older than this are deleted.
+const PARTIAL_TTL: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+
+/// Delete `*.part` files that were abandoned days ago. A recent one is kept: it may be a complete,
+/// verified download waiting for its file lock to be released, and `download_to_partial` publishes
+/// such a leftover before downloading anything.
 #[tauri::command]
 pub fn cleanup_partial_downloads(folder: String) -> CommandResult<Vec<String>> {
+    cleanup_partial_downloads_older_than(&folder, PARTIAL_TTL)
+}
+
+fn cleanup_partial_downloads_older_than(folder: &str, ttl: Duration) -> CommandResult<Vec<String>> {
     let mut removed = Vec::new();
-    let entries = match std::fs::read_dir(&folder) {
+    let entries = match std::fs::read_dir(folder) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(removed),
         Err(error) => {
@@ -458,6 +467,15 @@ pub fn cleanup_partial_downloads(folder: String) -> CommandResult<Vec<String>> {
         if path.extension().and_then(|extension| extension.to_str()) != Some("part") {
             continue;
         }
+        let abandoned = entry
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .and_then(|modified| std::time::SystemTime::now().duration_since(modified).ok())
+            .is_some_and(|age| age > ttl);
+        if !abandoned {
+            continue;
+        }
         match std::fs::remove_file(&path) {
             Ok(()) => removed.push(path.to_string_lossy().to_string()),
             Err(error) => tracing::warn!("failed to remove the stale download {}: {error}", path.display()),
@@ -470,8 +488,8 @@ pub fn cleanup_partial_downloads(folder: String) -> CommandResult<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::{
-        check_model_files, cleanup_partial_downloads, partial_path, publish_download, remove_if_exists, validate_model_file,
-        verify_finished_download, DownloadIntegrity, MIN_MODEL_SIZE,
+        check_model_files, cleanup_partial_downloads, cleanup_partial_downloads_older_than, partial_path, publish_download,
+        remove_if_exists, validate_model_file, verify_finished_download, DownloadIntegrity, MIN_MODEL_SIZE,
     };
     use std::{fs, path::Path, path::PathBuf, time::SystemTime};
 
@@ -611,7 +629,7 @@ mod tests {
     }
 
     #[test]
-    fn cleanup_partial_downloads_removes_only_leftover_parts() {
+    fn cleanup_partial_downloads_removes_only_abandoned_parts() {
         let dir = test_dir("sweep");
         fs::create_dir_all(&dir).unwrap();
         let model = dir.join("ggml-model.bin");
@@ -619,8 +637,15 @@ mod tests {
         write_model(&model, b"lmgg");
         fs::write(&leftover, b"half").unwrap();
 
-        let removed = cleanup_partial_downloads(dir.to_string_lossy().to_string()).unwrap();
+        // A fresh `.part` may be a finished download waiting out a virus scanner's lock, so the
+        // default sweep keeps it.
+        let kept = cleanup_partial_downloads(dir.to_string_lossy().to_string()).unwrap();
+        assert!(kept.is_empty());
+        assert!(leftover.exists());
 
+        // With the age threshold at zero every `.part` counts as abandoned; the model itself is
+        // never touched.
+        let removed = cleanup_partial_downloads_older_than(&dir.to_string_lossy(), Duration::ZERO).unwrap();
         assert_eq!(removed.len(), 1);
         assert!(model.exists());
         assert!(!leftover.exists());
