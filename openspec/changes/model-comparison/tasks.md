@@ -2,17 +2,17 @@
 
 ## 1. Cards without borrowed verdicts
 
-- [ ] 1.1 Remove the `ScoreBar` accuracy/speed row from the catalog card in `models-catalog.tsx` and the score computation feeding it on the render path (`lib/catalog.ts` relative scores), keeping provider/size/languages/badges
+- [ ] 1.1 Remove the `ScoreBar` accuracy/speed row from the catalog card in `models-catalog.tsx` and the score computation feeding it on the render path (`entryScores` relative scores in `lib/catalog.ts`), keeping provider/size/languages/badges
 - [ ] 1.2 Retire the `catalogAccuracy`/`catalogSpeed` strings and the `ScoreBar` component if nothing else renders it; update `models-catalog.test.tsx`
 
 ## 2. Comparison input
 
 - [ ] 2.1 Add the comparison section to the models page: pick input by short in-place recording (reuse `use-recording`) or by audio-file dialog; show the chosen input with its duration
-- [ ] 2.2 Multi-select of installed models (`listInstalledModels`), with the run disabled until two or more are chosen
+- [ ] 2.2 Multi-select of installed models (`listInstalledModels` — the listing already excludes auxiliary VAD/diarization/embedding/segment files), with the run disabled until two or more are chosen
 
 ## 3. Sequential runner
 
-- [ ] 3.1 Run the selected models one after another over the existing endpoints (`/v1/models/load`, `/v1/audio/transcriptions`), identical plain options per run (language preference only), desktop wall-clock timing per model
+- [ ] 3.1 Run the selected models one after another over the existing endpoints (`/v1/models/load`, `/v1/audio/transcriptions`), identical plain options per run (language preference only — no diarization, so the `vibe-diarize-native` helper never spawns), desktop wall-clock timing per model
 - [ ] 3.2 Progress per run in the section; a failed run shows its reason and the remaining models still run
 
 ## 4. Outputs and results
