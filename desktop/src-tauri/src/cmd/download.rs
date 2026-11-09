@@ -491,7 +491,7 @@ mod tests {
         check_model_files, cleanup_partial_downloads, cleanup_partial_downloads_older_than, partial_path, publish_download,
         remove_if_exists, validate_model_file, verify_finished_download, DownloadIntegrity, MIN_MODEL_SIZE,
     };
-    use std::{fs, path::Path, path::PathBuf, time::SystemTime};
+    use std::{fs, path::Path, path::PathBuf, time::Duration, time::SystemTime};
 
     fn test_dir(name: &str) -> PathBuf {
         let unique = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos();
