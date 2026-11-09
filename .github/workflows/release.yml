@@ -86,6 +86,38 @@ jobs:
             - name: Fetch the sidecars for ${{ matrix.target_triple }}
               run: chore setup ${{ matrix.target_triple }}
 
+            # vibe-diarize-native statically links the prebuilt GGML the native
+            # stack is built against; vibe-server stays on transcribe.cpp's GGML.
+            # The pin is read from server/libs so a bump never rots this step.
+            - name: Fetch the prebuilt ggml libraries
+              shell: bash
+              run: |
+                  triple="${{ matrix.target_triple }}"
+                  case "$triple" in
+                    aarch64-apple-darwin) asset=darwin-arm64 ;;
+                    x86_64-apple-darwin) asset=darwin-x86_64 ;;
+                    x86_64-unknown-linux-gnu) asset=linux-x86_64 ;;
+                    aarch64-unknown-linux-gnu) asset=linux-aarch64 ;;
+                    x86_64-pc-windows-msvc) asset=windows-amd64-msvc ;;
+                    *) echo "no ggml libraries asset for $triple" >&2; exit 1 ;;
+                  esac
+                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
+                  curl --location --fail --retry 3 -o /tmp/ggml-libs.tar.gz \
+                    "https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-$asset.tar.gz"
+                  tar -xzf /tmp/ggml-libs.tar.gz -C /tmp
+                  mv /tmp/lib server/libs/lib
+
+            - name: Build the native diarization helper
+              shell: bash
+              run: |
+                  triple="${{ matrix.target_triple }}"
+                  exe=""
+                  if [[ "$triple" == *windows* ]]; then exe=".exe"; fi
+                  cd server
+                  cargo build -p vibe-diarize-native --release --target "$triple"
+                  cp "target/$triple/release/vibe-diarize-native$exe" \
+                    "../desktop/src-tauri/binaries/vibe-diarize-native-$triple$exe"
+
             - name: Setup macOS signing env
               if: matrix.platform == 'macos-latest' && inputs.sign-macos
               run: |
