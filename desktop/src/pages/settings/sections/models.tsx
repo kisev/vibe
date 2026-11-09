@@ -5,6 +5,7 @@ import { Switch } from '~/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { IconAction, SettingsGroup, SettingsRow, rowControlClass, type SettingsViewModel } from './shared'
 import { ModelsCatalogSection } from './models-catalog'
+import { ModelsComparisonSection } from './models-comparison'
 import { getFriendlyModelName } from '~/lib/model'
 
 /**
@@ -70,6 +71,7 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 			)}
 
 			<ModelsCatalogSection vm={vm} />
+			<ModelsComparisonSection vm={vm} />
 		</div>
 	)
 }
