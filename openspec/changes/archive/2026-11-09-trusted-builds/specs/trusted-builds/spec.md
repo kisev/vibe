@@ -1,5 +1,7 @@
 # Spec Delta
 
+> **NOT APPLIED — change abandoned 2026-11-09.** This delta is kept only as a decision record and must not be synced into the main specs.
+
 ## Purpose
 
 Free build trust: verifiable provenance for every published artifact without paid certificates, and a provider switch for Windows Authenticode so a free publicly trusted option slots in when approved.

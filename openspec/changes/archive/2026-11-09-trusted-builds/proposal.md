@@ -1,5 +1,7 @@
 # Proposal
 
+> **Status: abandoned (2026-11-09).** The user will never maintain artifact-signing infrastructure — no Authenticode certificates, no SignPath Foundation application, no Apple Developer Program. The free-provenance layer (attestations, SBOM, trivy) and the macOS install documentation are not pursued either. This change is archived as a decision record; none of its tasks were implemented.
+
 ## Why
 
 The fork's binaries are unsigned: Windows shows SmartScreen warnings, and nothing proves a downloaded bundle came from this repository's workflow. The user accepts only free options — Apple's $99/year Developer Program is out, so macOS stays unsigned by design. Free trust, however, is available at three layers: the updater is already minisign-signed (done), GitHub can attest that artifacts came from exactly this workflow (free, no certificates), and Windows binaries can get a publicly trusted Authenticode signature for free through the SignPath Foundation's open-source program.

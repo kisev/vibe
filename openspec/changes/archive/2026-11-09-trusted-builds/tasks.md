@@ -1,5 +1,7 @@
 # Tasks
 
+> _Abandoned 2026-11-09 before any task started — see `proposal.md`. None of these tasks will be implemented._
+
 ## 1. Free provenance
 
 - [ ] 1.1 Add an attest job to the release workflow: `actions/attest-build-provenance` over every published bundle; verify with `gh attestation verify` on one artifact in the same run

@@ -17,12 +17,12 @@ The application SHALL check for updates only at the fork's releases channel, and
 
 #### Scenario: Signature trust
 
-- **WHEN** the fork publishes a signed release and the build offers it
+- **WHEN** the fork publishes a release with minisign-signed updater artifacts and the build offers it
 - **THEN** the signature verifies against the fork's public key bundled in the build
 
 ### Requirement: Fork releases are signed
 
-The fork's release workflow SHALL produce updater artifacts signed with the fork's private updater key, so every published release can be installed and updated by fork builds.
+The fork's release workflow SHALL produce updater artifacts signed with the fork's private updater key, so every published release can be installed and updated by fork builds. Platform binaries themselves MAY be unsigned: code signing (Authenticode, Apple notarization) is out of scope permanently, and updater authenticity rests on the minisign signature of `latest.json`.
 
 #### Scenario: Release run
 
@@ -88,17 +88,12 @@ The application identifier and reverse domain SHALL remain the upstream ones, so
 
 ### Requirement: Package managers cannot swap a fork install for upstream
 
-A fork build's installer identity in the OS package database SHALL differ from the upstream package's identity, so a package-manager upgrade neither offers nor installs an upstream build over a fork installation; the application identifier, install location, and stored data SHALL be unaffected by the identity change. Once the fork publishes its own package entry, a fork installation SHALL upgrade from the fork's releases through it.
+A fork build's installer identity in the OS package database SHALL differ from the upstream package's identity, so a package-manager upgrade neither offers nor installs an upstream build over a fork installation; the application identifier, install location, and stored data SHALL be unaffected by the identity change. The fork SHALL NOT publish its own package-manager entry.
 
 #### Scenario: winget upgrade with only the upstream package in the catalog
 
 - **WHEN** a fork build is installed and `winget upgrade` runs while only the upstream `Thewh1teagle.vibe` package exists in the catalog
 - **THEN** the fork installation does not match it and is left untouched
-
-#### Scenario: The fork's own package is installed
-
-- **WHEN** the fork publishes a winget package pointing at its releases and a fork build is installed
-- **THEN** `winget upgrade` offers and installs the newer fork release, never an upstream one
 
 #### Scenario: The identity split keeps data in place
 

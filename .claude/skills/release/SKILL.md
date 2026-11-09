@@ -1,13 +1,18 @@
 ---
 name: release
-description: Ship a Vibe release end to end — decide whether server/ needs its own release first, bump the version, PR and squash-merge, start the Windows sign server, run release.yml with signing, promote the prerelease, deploy the website. Use when the user asks to cut, ship or publish a release, or invokes /release.
+description: Ship a Vibe release end to end — decide whether server/ needs its own release first, bump the version, PR and squash-merge, run release.yml unsigned, promote the prerelease, deploy the website. Use when the user asks to cut, ship or publish a release, or invokes /release.
 ---
 
 # Release
 
-Seven steps. Each has a gate — do not start the next one until the gate is green.
+Six steps. Each has a gate — do not start the next one until the gate is green.
 Report the version, the run URLs and the gate results as you go; ask before
 skipping a step.
+
+Windows binaries ship unsigned, permanently: the fork has no code-signing
+infrastructure (no Authenticode certificate, no SignPath approval) and never
+passes `-f sign-windows=true`. Minisign protects the updater path; SmartScreen
+warns once on first install and the release notes say so.
 
 ## 0. Preflight
 
@@ -84,39 +89,22 @@ Repo-level auto-merge is **off** (`allow_auto_merge: false`), so `--auto` silent
 does nothing — poll the checks and merge when they settle. Then `git switch main
 && git pull`.
 
-## 4. Start the sign server
-
-The Windows job reaches a YubiKey on this machine through a Cloudflare tunnel.
+## 4. Release
 
 ```
-uv run --env-file .env.local scripts/sign.py serve      # background
-curl "$TUNNEL_URL/"                                     # {"status":"ok"}
+gh workflow run release.yml --ref main
 ```
 
-Values live only in `.env.local` (gitignored) — pass the file, never print or copy
-the values. The server prints a ready-to-paste `export SIGN_TUNNEL_SECRET=…` line
-at startup, so whatever you redirect its output to holds a live secret: keep that
-log outside the repo and delete it when the release is done.
+~20 min. tauri-action creates the tag `vX.Y.Z` and a **prerelease**. Leave both
+signing inputs at their `false` defaults: there is no signing infrastructure to
+reach, and a signing-enabled run would only fail or ship an unexpected config.
+The Windows job produces an unsigned `vibe.exe`; that is the accepted permanent
+state.
 
-Check the tunnel with **curl**, not urllib or requests — Cloudflare answers a
-non-browser user-agent with `403 error code: 1010`, which looks exactly like a dead
-tunnel.
+**Gate:** all 5 platform jobs green. A single failed platform can be re-run with
+`gh run rerun <id> --failed`.
 
-**Gate:** the curl returns `{"status":"ok"}`. Never trigger step 5 before it does —
-an unsigned Windows build ships a SmartScreen warning to every user.
-
-## 5. Release
-
-```
-gh workflow run release.yml --ref main -f sign-windows=true -f sign-macos=true
-```
-
-~20 min. tauri-action creates the tag `vX.Y.Z` and a **prerelease**.
-
-**Gate:** all 5 platform jobs green, and `[sign] OK: vibe.exe` in the Windows job
-log. A single failed platform can be re-run with `gh run rerun <id> --failed`.
-
-## 6. Promote
+## 5. Promote
 
 ```
 awk 'c==2{print} /^---$/{c++}' i18n/changelog/<version>.md > /tmp/notes.md
@@ -128,15 +116,14 @@ the website never disagree; the reader's-language version lives at
 `https://kisev.github.io/vibe/changelog/<version>`. Dev releases pick the body up
 from `unreleased.md` automatically.
 
-## 7. Deploy the website and stop the sign server
+## 6. Deploy the website
 
 ```
 gh workflow run website.yml --ref main
-pkill -f 'sign.py serve'
 ```
 
 The website also deploys on `release: published`, but trigger it explicitly so the
 changelog page carries the new entry without waiting.
 
-**Gate:** `website.yml` green, and `https://thewh1teagle.github.io/vibe/changelog/<version>`
+**Gate:** `website.yml` green, and `https://kisev.github.io/vibe/changelog/<version>`
 serves the new entry.

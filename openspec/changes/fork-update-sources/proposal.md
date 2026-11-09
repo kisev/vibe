@@ -11,7 +11,7 @@ The fork keeps checking the upstream update channel (`thewh1teagle/vibe`), so a 
 - Dev tooling fetches the `vibe-server` sidecar from the fork (`gh://kisev/vibe`), which requires publishing `server-v*` releases in the fork; the first one pins the current `.server-version` (`v0.8.0`).
 - The application identifier (`github.com.thewh1teagle.vibe`) and reverse domain deliberately stay unchanged, so existing installs keep their settings, deep links, and OS-level identity.
 - A currently installed upstream build keeps checking upstream — a remote install cannot be repointed; repointing takes installing a fork build once.
-- The Windows installer identity diverges from upstream: the Add/Remove-Programs entry a fork build writes carries the fork's publisher and product code, so `winget upgrade` cannot correlate a fork installation with the upstream community package (`Thewh1teagle.vibe`) and overwrite it with an upstream build — the reported failure mode, where `winget upgrade` replaced a fork dev build with upstream 3.2.2. Once the fork ships signed stable releases, the fork's own winget package makes `winget upgrade` pull fork releases instead.
+- The Windows installer identity diverges from upstream: the Add/Remove-Programs entry a fork build writes carries the fork's publisher and product code, so `winget upgrade` cannot correlate a fork installation with the upstream community package (`Thewh1teagle.vibe`) and overwrite it with an upstream build — the reported failure mode, where `winget upgrade` replaced a fork dev build with upstream 3.2.2. The fork will not publish its own winget package: it requires stable releases and the user maintains no code-signing infrastructure (decision 2026-11-09), so the identity split is the complete fix.
 
 ## Capabilities
 
@@ -24,5 +24,5 @@ The fork keeps checking the upstream update channel (`thewh1teagle/vibe`), so a 
 ## Impact
 
 - `desktop/src-tauri/tauri.conf.json` (updater endpoint + pubkey), `desktop/src/lib/config.ts`, `desktop/src/lib/app.ts`, `desktop/src-tauri/src/diagnostics.rs`, `desktop/src-tauri/src/keepawake.rs`, `desktop/src-tauri/src/handoff/mod.rs`, the handoff mock and URL tests, root `chorefile` server download, and fork repository secrets (updater signing key).
-- Fork release workflow behavior: updater artifacts (`latest.json`) must be produced and signed on every release run.
+- Fork release workflow behavior: updater artifacts (`latest.json`) must be produced and minisign-signed on every release run. Windows binaries ship unsigned — Authenticode and Apple notarization are permanently out of scope.
 - No server code, no transcription behavior.
