@@ -47,7 +47,7 @@ jobs:
             cmake_args: -DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF
           - runner: ubuntu-24.04-arm
             binary: vibe-server-linux-arm64
-          - runner: macos-14
+          - runner: macos-latest
             binary: vibe-server-darwin-arm64
             package_os: darwin
             package_arch: arm64
