@@ -91,8 +91,7 @@ function renderCatalog(models: CatalogModel[], installed: NamedPath[] = [], mode
 }
 
 describe('models catalog section', () => {
-	it('renders provider, size, languages, both badges and both bars for a benchmarked entry', () => {
-		// The fixture borrows a real benchmarked id, so entryScores resolves against the real catalog.
+	it('renders provider, size, languages and both badges for a benchmarked entry', () => {
 		renderCatalog([
 			fixture({
 				id: 'parakeet-unified-en-0.6b',
@@ -105,8 +104,8 @@ describe('models catalog section', () => {
 		// The filter chip always shows, so a badge means the text appears twice.
 		expect(screen.getAllByText(m.catalogStreaming()).length).toBe(2)
 		expect(screen.getAllByText(m.catalogTranslation()).length).toBe(2)
-		expect(screen.getByLabelText(m.catalogAccuracy())).toBeTruthy()
-		expect(screen.getByLabelText(m.catalogSpeed())).toBeTruthy()
+		// Published benchmarks are the comparison lab's job now — the card carries no score bars.
+		expect(screen.queryByRole('progressbar')).toBeNull()
 	})
 
 	it('compacts a long language list to the first three plus a count', () => {
@@ -114,7 +113,7 @@ describe('models catalog section', () => {
 		expect(screen.getByText('en, de, es +2')).toBeTruthy()
 	})
 
-	it('renders no bars or badges for an unbenchmarked, non-streaming entry', () => {
+	it('renders no badges for a non-streaming, non-translating entry', () => {
 		renderCatalog([
 			fixture({
 				id: 'never-benchmarked',
@@ -122,8 +121,6 @@ describe('models catalog section', () => {
 			}),
 		])
 
-		expect(screen.queryByLabelText(m.catalogAccuracy())).toBeNull()
-		expect(screen.queryByLabelText(m.catalogSpeed())).toBeNull()
 		// Only the filter chip carries the label — no card badge.
 		expect(screen.getAllByText(m.catalogStreaming()).length).toBe(1)
 		expect(screen.getAllByText(m.catalogTranslation()).length).toBe(1)

@@ -3,10 +3,8 @@ import {
 	CATALOG,
 	asrCatalog,
 	availability,
-	catalogBests,
 	defaultQuant,
 	engineAtLeast,
-	entryScores,
 	identityKey,
 	matchInstalled,
 	mergeCatalogs,
@@ -47,26 +45,6 @@ describe('mergeCatalogs', () => {
 		// Legacy .bin containers and engine-ahead families stay in the data but never in the chooser.
 		expect(asrCatalog().every((m) => Object.values(m.files).every((f) => f.filename.endsWith('.gguf')))).toBe(true)
 		expect(asrCatalog().every((m) => engineAtLeast(m.minEngine))).toBe(true)
-	})
-})
-
-describe('entryScores', () => {
-	it('gives a benchmarked entry relative bars against the catalog best', () => {
-		const model = CATALOG.models.find((m) => m.id === 'parakeet-unified-en-0.6b')!
-		const scores = entryScores(model)
-		expect(scores.accuracy).toBeGreaterThan(0)
-		expect(scores.accuracy).toBeLessThanOrEqual(1)
-		expect(scores.speed).toBeGreaterThan(0)
-		expect(scores.speed).toBeLessThanOrEqual(1)
-		// The catalog best scores the full bar.
-		const bestError = catalogBests().accuracy
-		const best = CATALOG.models.find((m) => CATALOG.results[m.id] && Math.min(...Object.values(CATALOG.results[m.id].accuracy).map((r) => r.error)) === bestError)!
-		expect(entryScores(best).accuracy).toBe(1)
-	})
-
-	it('gives an unbenchmarked entry no bars rather than fake ones', () => {
-		const model = CATALOG.models.find((m) => !CATALOG.results[m.id])!
-		expect(entryScores(model)).toEqual({})
 	})
 })
 

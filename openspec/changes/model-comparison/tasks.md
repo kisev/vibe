@@ -2,8 +2,8 @@
 
 ## 1. Cards without borrowed verdicts
 
-- [ ] 1.1 Remove the `ScoreBar` accuracy/speed row from the catalog card in `models-catalog.tsx` and the score computation feeding it on the render path (`entryScores` relative scores in `lib/catalog.ts`), keeping provider/size/languages/badges
-- [ ] 1.2 Retire the `catalogAccuracy`/`catalogSpeed` strings and the `ScoreBar` component if nothing else renders it; update `models-catalog.test.tsx`
+- [x] 1.1 Remove the `ScoreBar` accuracy/speed row from the catalog card in `models-catalog.tsx` and the score computation feeding it on the render path (`entryScores` relative scores in `lib/catalog.ts`), keeping provider/size/languages/badges
+- [x] 1.2 Retire the `catalogAccuracy`/`catalogSpeed` strings and the `ScoreBar` component if nothing else renders it; update `models-catalog.test.tsx`
 
 ## 2. Comparison input
 

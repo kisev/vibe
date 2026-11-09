@@ -8,7 +8,6 @@ import {
 	availability,
 	baseLanguage,
 	defaultQuant,
-	entryScores,
 	fileUrl,
 	providerOf,
 	sizeMb,
@@ -19,7 +18,6 @@ import { deleteModelFile, downloadModel, getFriendlyModelName } from '~/lib/mode
 import type { ModelDownload } from '~/lib/config'
 import { cn } from '~/lib/style'
 import { Badge } from '~/components/ui/badge'
-import { Progress } from '~/components/ui/progress'
 import { Input } from '~/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { ActionRow, IconAction, SettingsGroup, SettingsRow, rowControlClass, type SettingsViewModel } from './shared'
@@ -34,16 +32,6 @@ const CUSTOM_PROVIDER = 'custom'
 export function compactLanguages(languages: string[]): string {
 	const bases = [...new Set(languages.map(baseLanguage))]
 	return bases.length <= 3 ? bases.join(', ') : `${bases.slice(0, 3).join(', ')} +${bases.length - 3}`
-}
-
-/** One relative-score bar; an unbenchmarked score renders nothing rather than a fake bar. */
-export function ScoreBar({ label, score }: { label: string; score: number }) {
-	return (
-		<div className="flex items-center gap-2">
-			<span className="w-20 shrink-0 text-xs text-muted-foreground">{label}</span>
-			<Progress value={Math.round(score * 100)} aria-label={label} className="h-1.5" />
-		</div>
-	)
 }
 
 /** Provider, size, languages, badges — the metadata every card shares. Parameter counts stay off cards (M reads as MB). */
@@ -233,7 +221,6 @@ function CatalogCard({
 	const [quant, setQuant] = useState(defaultQuant(model))
 	const file = model.files[quant] ?? Object.values(model.files)[0]
 	const status = availability(model, quant)
-	const scores = entryScores(model)
 	const limitations = catalogLimitations(model)
 	const thisQuantInstalled = Boolean(file && installedNames.has(file.filename))
 	// Every copy of this entry on disk — the model-level delete removes them all.
@@ -323,13 +310,6 @@ function CatalogCard({
 			</div>
 
 			<CardMeta model={model} sizeBytes={file?.size ?? 0} />
-
-			{(scores.accuracy !== undefined || scores.speed !== undefined) && (
-				<div className="space-y-1.5">
-					{scores.accuracy !== undefined && <ScoreBar label={m.catalogAccuracy()} score={scores.accuracy} />}
-					{scores.speed !== undefined && <ScoreBar label={m.catalogSpeed()} score={scores.speed} />}
-				</div>
-			)}
 
 			{limitations.length > 0 && <p className="text-xs text-muted-foreground">{limitations.join(' ')}</p>}
 

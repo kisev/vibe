@@ -162,38 +162,6 @@ export function matchInstalled(filename: string, catalog: CatalogData = CATALOG)
 	return undefined
 }
 
-/** Best (lowest) error across the languages a benchmark reports — the headline accuracy. */
-function headlineAccuracy(benchmark: CatalogBenchmark): number | undefined {
-	const errors = Object.values(benchmark.accuracy).map((row) => row.error)
-	return errors.length ? Math.min(...errors) : undefined
-}
-
-/** The best headline accuracy and CPU speed in the catalog; bars are relative to these. */
-export function catalogBests(catalog: CatalogData = CATALOG): { accuracy: number; speed: number } {
-	let accuracy = Infinity
-	let speed = 0
-	for (const model of asrCatalog(catalog)) {
-		const benchmark = catalog.results[model.id]
-		if (!benchmark) continue
-		const error = headlineAccuracy(benchmark)
-		if (error !== undefined) accuracy = Math.min(accuracy, error)
-		speed = Math.max(speed, benchmark.performance.cpu)
-	}
-	return { accuracy: accuracy === Infinity ? 1 : accuracy, speed: speed || 1 }
-}
-
-/** Relative scores in 0..1 against the catalog bests; absent when unbenchmarked. */
-export function entryScores(model: CatalogModel, catalog: CatalogData = CATALOG): { accuracy?: number; speed?: number } {
-	const benchmark = catalog.results[model.id]
-	if (!benchmark) return {}
-	const bests = catalogBests(catalog)
-	const error = headlineAccuracy(benchmark)
-	return {
-		...(error !== undefined && { accuracy: Math.min(1, bests.accuracy / error) }),
-		...(benchmark.performance.cpu > 0 && { speed: Math.min(1, benchmark.performance.cpu / bests.speed) }),
-	}
-}
-
 /** Preferred quantization order; the first one the entry ships in wins. */
 const QUANT_PREFERENCE = ['Q8_0', 'Q6_K', 'Q5_K_M', 'Q4_K_M', 'F16', 'F32']
 
