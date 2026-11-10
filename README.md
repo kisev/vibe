@@ -1,5 +1,5 @@
 <p align="center">
-  <a target="blank" href="https://github.com/thewh1teagle/vibe">
+  <a target="blank" href="https://github.com/kisev/vibe">
     <img
         width="96px"
         alt="Vibe logo"
@@ -16,11 +16,11 @@
 </p>
 
 <p align="center">
-  <a target="_blank" href="https://thewh1teagle.github.io/vibe/">
+  <a target="_blank" href="https://kisev.github.io/vibe/">
     🔗 Download Vibe
   </a>
     &nbsp; | &nbsp; Give it a Star ⭐ | &nbsp;
-    <a target="_blank" href="https://thewh1teagle.github.io/vibe/?action=support-vibe">Support the project 🤝</a>
+    <a target="_blank" href="https://thewh1teagle.github.io/vibe/?action=support-vibe">Support the original project 🤝</a>
 </p>
 
 <hr />
@@ -28,7 +28,7 @@
 ## Screenshots
 
 <p align="center">
-    <a target="_blank" href="https://thewh1teagle.github.io/vibe/">
+    <a target="_blank" href="https://kisev.github.io/vibe/">
         <img width=720 src="./design/app-preview-light.png" alt="Vibe transcription app">
     </a>
 </p>
@@ -75,16 +75,18 @@
 
 Get started with local development in [the building guide](docs/BUILDING.md).
 
-Ideas, bug reports and translation fixes are welcome — please [open an issue](https://github.com/thewh1teagle/vibe/issues).
+Ideas, bug reports and translation fixes are welcome — please [open an issue](https://github.com/kisev/vibe/issues).
 Pull requests are limited to a few collaborators. See [CONTRIBUTE.md](CONTRIBUTE.md).
 
 # Community
 
 [![Discord](https://img.shields.io/badge/chat-discord-7289da.svg)](https://discord.gg/EcxWSstQN8)
 
-# Roadmap 🛣️
+This is the upstream project's community chat; the fork does not run a separate one.
 
-You can see the roadmap in [Vibe-Roadmap](https://github.com/users/thewh1teagle/projects/5/views/1)
+# Changelog 🛣️
+
+Release notes live at [kisev.github.io/vibe/changelog](https://kisev.github.io/vibe/changelog).
 
 # Add translation 🌐
 
@@ -92,21 +94,23 @@ See the [translation guide](docs/TRANSLATIONS.md).
 
 # Docs 📄
 
-see [Vibe Docs](https://github.com/thewh1teagle/vibe/tree/main/docs)
+see [Vibe Docs](https://github.com/kisev/vibe/tree/main/docs)
 
 # I want to know more
 
-Medium [post](https://medium.com/@thewh1teagle/creating-vibe-multilingual-audio-transcription-872ab6d9dbb0)
+The original project's background: Medium [post](https://medium.com/@thewh1teagle/creating-vibe-multilingual-audio-transcription-872ab6d9dbb0)
 
 # Issue report
 
-You can open [new issue](https://github.com/thewh1teagle/vibe/issues/new?assignees=octocat&labels=bug&projects=&template=bug_report.yaml&title=%5BShort+title%5D) and it's recommend to check [DEBUG.md](docs/DEBUG.md) first.
+You can open [new issue](https://github.com/kisev/vibe/issues/new?assignees=octocat&labels=bug&projects=&template=bug_report.yaml&title=%5BShort+title%5D) and it's recommend to check [DEBUG.md](docs/DEBUG.md) first.
 
 # Privacy Policy 🔒
 
-Your privacy is important to us. Please review our [Privacy Policy](http://thewh1teagle.github.io/vibe/?action=open-privacy-policy) to understand how we handle your data.
+Your privacy is important to us. Please review our [Privacy Policy](https://kisev.github.io/vibe/?action=open-privacy-policy) to understand how we handle your data.
 
 # Credits
+
+This fork is based on [Vibe](https://github.com/thewh1teagle/vibe) by [@thewh1teagle](https://github.com/thewh1teagle); the original project remains the upstream for the engine and the community.
 
 Thanks for [tauri.app](https://tauri.app/) for making the best apps framework I ever seen
 
