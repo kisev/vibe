@@ -406,7 +406,7 @@ pub async fn download_file(app_handle: tauri::AppHandle, url: String, path: Stri
 
     match download_to_partial(&app_handle, &url, Path::new(&path), &DownloadIntegrity::default(), false).await? {
         DownloadOutcome::Completed => Ok(()),
-        DownloadOutcome::Cancelled => return Err(eyre::eyre!("Download cancelled").into()),
+        DownloadOutcome::Cancelled => Err(eyre::eyre!("Download cancelled").into()),
     }
 }
 

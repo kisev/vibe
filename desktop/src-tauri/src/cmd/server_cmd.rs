@@ -52,7 +52,7 @@ pub fn resolve_server_binary(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
         return Ok(path);
     }
 
-    return Err(eyre::eyre!("vibe-server binary not found"));
+    Err(eyre::eyre!("vibe-server binary not found"))
 }
 
 pub fn resolve_ffmpeg_path(app_handle: &tauri::AppHandle) -> Option<PathBuf> {

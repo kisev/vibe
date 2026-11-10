@@ -8,8 +8,8 @@
 
 """Point an update channel at a release. See docs/UPDATER.md.
 
-    uv run scripts/channel.py 3.3.0 --channel beta
-    uv run scripts/channel.py 3.3.0 --channel stable
+    uv run scripts/channel.py 1.0.0 --channel beta
+    uv run scripts/channel.py 1.0.0 --channel stable
 
 Writes website/public/updater/<channel>.json from the release's own latest.json. Commit it to
 main and the website deploy publishes it.
@@ -25,7 +25,7 @@ from pathlib import Path
 import httpx
 
 CHANNELS_DIR = Path(__file__).resolve().parent.parent / "website/public/updater"
-MANIFEST_URL = "https://github.com/thewh1teagle/vibe/releases/download/v{version}/latest.json"
+MANIFEST_URL = "https://github.com/kisev/vibe/releases/download/v{version}/latest.json"
 
 
 def version_key(version: str) -> tuple[int, ...]:
