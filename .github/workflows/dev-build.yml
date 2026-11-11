@@ -153,9 +153,12 @@ jobs:
                   fi
                   version="$base-dev.$n.$short"
                   # One no-space JSON: tauri-action splits args on whitespace.
+                  # Dev builds carry signed updater artifacts so the Dev channel
+                  # can move them forward; the endpoints stay empty because the
+                  # channel file is chosen at runtime (see docs/UPDATER.md).
                   config=$(jq -cn --arg v "$version" '{
                       version: $v,
-                      bundle: { createUpdaterArtifacts: false },
+                      bundle: { createUpdaterArtifacts: true },
                       plugins: { updater: { endpoints: [] } }
                   }')
                   # The release body leads with the full commit SHA — the release
@@ -327,13 +330,17 @@ jobs:
               uses: tauri-apps/tauri-action@v0
               env:
                   GITHUB_TOKEN: ${{ github.token }}
+                  # The same updater key as release.yml: a dev install verifies
+                  # dev artifacts with the pubkey bundled in every build.
+                  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+                  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
               with:
                   tagName: ${{ steps.dev-version.outputs.tag }}
                   releaseName: Dev build ${{ steps.dev-version.outputs.version }}
                   releaseBody: ${{ steps.dev-version.outputs.body }}
                   releaseCommitish: ${{ github.sha }}
                   prerelease: true
-                  includeUpdaterJson: false
+                  includeUpdaterJson: true
                   args: --target ${{ matrix.triple }} --config ${{ steps.dev-version.outputs.config }}
                   projectPath: ./desktop
                   tauriScript: pnpm exec tauri
@@ -369,3 +376,19 @@ jobs:
                         echo "deleted dev release $rid (tag kept)"
                     done
                   echo "cleanup done: only $KEEP remains"
+
+    # The dev channel manifest is generated at website build time from the
+    # newest complete dev prerelease (scripts/dev_manifest.py). Dispatching the
+    # deploy here is what makes a fresh dev build reachable by the Dev channel.
+    deploy-website:
+        needs: [build, cleanup]
+        if: success()
+        timeout-minutes: 5
+        runs-on: ubuntu-latest
+        permissions:
+            actions: write
+        steps:
+            - name: Refresh the website and its dev manifest
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: gh workflow run website.yml --ref main --repo "$GITHUB_REPOSITORY"

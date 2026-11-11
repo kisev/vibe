@@ -3,6 +3,10 @@ name: Release
 on:
     workflow_dispatch:
         inputs:
+            version:
+                description: 'Version to build and tag, e.g. 1.1.0-rc.1 (default: the version in tauri.conf.json)'
+                type: string
+                default: ''
             sign-windows:
                 description: 'Sign Windows binaries via remote YubiKey'
                 type: boolean
@@ -40,6 +44,31 @@ jobs:
         runs-on: ${{ matrix.platform }}
         steps:
             - uses: actions/checkout@v4
+
+            # A candidate is the same build as a release, only its version and
+            # tag differ: `X.Y.Z-rc.N` sorts below `X.Y.Z`, which is what keeps
+            # Dev → Beta → Release moving forward. See docs/UPDATER.md.
+            - name: Apply the version override
+              if: inputs.version != ''
+              shell: bash
+              env:
+                  VERSION: ${{ inputs.version }}
+              run: |
+                  if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+                      echo "::error::release overrides are cut from main only (on $GITHUB_REF)"
+                      exit 1
+                  fi
+                  if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+                      echo "::error::version must be X.Y.Z or X.Y.Z-rc.N, got $VERSION"
+                      exit 1
+                  fi
+                  python3 - <<'PY'
+                  import json, os, pathlib
+                  path = pathlib.Path("desktop/src-tauri/tauri.conf.json")
+                  config = json.loads(path.read_text())
+                  config["version"] = os.environ["VERSION"]
+                  path.write_text(json.dumps(config, indent=2) + "\n")
+                  PY
 
             - name: setup pnpm
               uses: pnpm/action-setup@v4

@@ -19,6 +19,9 @@ task website-build {
     # Rewrites the download links to point at the current release. Needs
     # GH_TOKEN in CI; unauthenticated it falls back to the public API.
     uv run ../scripts/website_links.py
+    # Points updater/dev.json at the newest complete dev build. Keeps the
+    # previous file when that release is partial or the API fails.
+    uv run ../scripts/dev_manifest.py
     # The docs are served from the site, so they are copied in rather than
     # linked. Removed first so a deleted page does not survive in dist.
     remove public/docs
