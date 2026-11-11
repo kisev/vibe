@@ -27,7 +27,7 @@ The comparison section SHALL accept its input either as a recording made in plac
 
 ### Requirement: Sequential runs with timing
 
-The comparison SHALL transcribe the same input on each selected model one after another, loading one model at a time, and SHALL report the wall-clock processing time of every completed run. Runs of one comparison SHALL use identical transcription options — the language preference, plus the bundled VAD model for engines that cannot plan their input without one — so the difference between results is the model, not the settings.
+The comparison SHALL transcribe the same input on each selected model one after another, loading one model at a time, and SHALL report the wall-clock processing time of every completed run. Runs of one comparison SHALL use identical transcription options — the language preference, the bundled VAD model for engines that cannot plan their input without one, and the same speaker separation when the user enabled it — so the difference between results is the model, not the settings.
 
 #### Scenario: Order of runs
 
@@ -43,6 +43,11 @@ The comparison SHALL transcribe the same input on each selected model one after 
 
 - **WHEN** a selected model's engine cannot plan its input without a VAD model
 - **THEN** its run supplies the bundled VAD model and completes, while engines that do not require one run with the plain options
+
+#### Scenario: Speaker separation
+
+- **WHEN** the separate diarization model is installed, usable, and the section's speaker-separation switch is on
+- **THEN** every run of the comparison passes that model and its transcript lines carry the speaker, and when the switch is off or the model is missing every run is plain transcription
 
 ### Requirement: Comparable markdown outputs
 
@@ -80,3 +85,22 @@ After a comparison, the section SHALL offer a results surface that covers the ap
 
 - **WHEN** a result column is shown
 - **THEN** the markdown file written for that model can be revealed from the column
+
+### Requirement: Readable results surface
+
+The results surface SHALL keep each column's transcript in its own scroll region so a long text never displaces the header or collapses another column, SHALL state each non-baseline column's added and removed word counts, and SHALL place the close control so it overlaps no other control.
+
+#### Scenario: Long transcript
+
+- **WHEN** a transcript is taller than the window
+- **THEN** that column scrolls on its own and the header stays in place
+
+#### Scenario: Difference counts
+
+- **WHEN** a column differs from the baseline
+- **THEN** the column states how many words it added and how many it missed
+
+#### Scenario: Close control
+
+- **WHEN** the surface is shown
+- **THEN** the close control sits clear of the baseline selector and the highlight switch

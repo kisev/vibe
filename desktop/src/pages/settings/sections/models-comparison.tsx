@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { join } from '@tauri-apps/api/path'
 import * as dialog from '@tauri-apps/plugin-dialog'
 import { Check, FolderOpen, Loader2, Mic, Play, Square, Upload, X } from 'lucide-react'
 import { m } from '~/paraglide/messages.js'
@@ -12,11 +13,12 @@ import { openPath } from '~/lib/app'
 import * as config from '~/lib/config'
 import { pathToNamedPath } from '~/lib/fs'
 import { getMediaDurationSeconds } from '~/lib/media'
-import { getModelDisplayName } from '~/lib/model'
+import { getModelDisplayName, isModelFileUsable } from '~/lib/model'
 import { runComparison, tauriComparisonIo, type ComparisonModel, type ComparisonRun } from '~/lib/model-comparison'
 import { cn } from '~/lib/style'
 import { useRecording } from '~/pages/home/hooks/use-recording'
 import { Button } from '~/components/ui/button'
+import { Switch } from '~/components/ui/switch'
 import { IconAction, SettingsField, SettingsGroup, SettingsRow, type SettingsViewModel } from './shared'
 import { ModelsComparisonResults } from './models-comparison-results'
 
@@ -72,8 +74,27 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 	const [runs, setRuns] = useState<ComparisonRun[]>([])
 	const [running, setRunning] = useState(false)
 	const [showResults, setShowResults] = useState(false)
+	// Speaker separation is optional: it makes the transcripts readable by voice but
+	// adds its own time to every run, so the same switch applies to all models.
+	const [diarize, setDiarize] = useState(false)
+	const [diarizeModelPath, setDiarizeModelPath] = useState<string | null>(null)
 	// The record_finish listener outlives renders, so the awaiting flag needs a ref as well.
 	const awaitingRef = useRef(false)
+
+	useEffect(() => {
+		let active = true
+		void (async () => {
+			const folder = await invoke<string>('get_models_folder')
+			const path = await join(folder, config.diarizeModelFilename)
+			const usable = await isModelFileUsable(path)
+			if (!active) return
+			setDiarizeModelPath(usable ? path : null)
+			setDiarize(usable)
+		})()
+		return () => {
+			active = false
+		}
+	}, [])
 
 	useEffect(() => {
 		// The recording hook enumerates devices only while `homeTab === 'record'`, and
@@ -164,6 +185,7 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 				unloadTimeoutMinutes: vm.preference.unloadTimeoutMinutes,
 			},
 			vm.preference.projectsPath,
+			diarize ? diarizeModelPath : null,
 		)
 		const queued: ComparisonRun[] = models.map((model) => ({ model, status: 'queued' }))
 		setRunning(true)
@@ -220,6 +242,19 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 					</>
 				)}
 			</SettingsRow>
+
+			{diarizeModelPath && (
+				<SettingsRow label={m.diarization()} description={m.infoDiarization()}>
+					<Switch
+						checked={diarize}
+						disabled={busy}
+						onCheckedChange={(on) => {
+							setDiarize(on)
+							setRuns([])
+						}}
+					/>
+				</SettingsRow>
+			)}
 
 			<SettingsField label={m.comparePickModels()}>
 				<div className="space-y-1">

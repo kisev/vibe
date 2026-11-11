@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { TooltipProvider } from '~/components/ui/tooltip'
 import { ToastProvider } from '~/providers/toast'
 import { m } from '~/paraglide/messages.js'
+import * as config from '~/lib/config'
 import type { InstalledModel } from '~/lib/model'
 import type { SettingsViewModel } from './shared'
 import { ModelsComparisonSection } from './models-comparison'
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
 	stopRecord: vi.fn(),
 	refreshDevices: vi.fn(),
 	getMediaDurationSeconds: vi.fn(),
+	isModelFileUsable: vi.fn(),
 	openPath: vi.fn(),
 	listeners: new Map<string, (event: { payload: unknown }) => void>(),
 }))
@@ -26,7 +28,13 @@ vi.mock('~/lib/model-comparison', () => ({
 	runComparison: mocks.runComparison,
 	tauriComparisonIo: mocks.tauriComparisonIo,
 }))
-vi.mock('~/lib/model', () => ({ getModelDisplayName: (name: string) => name }))
+vi.mock('~/lib/model', () => ({
+	getModelDisplayName: (name: string) => name,
+	isModelFileUsable: mocks.isModelFileUsable,
+}))
+vi.mock('@tauri-apps/api/path', () => ({
+	join: async (...parts: string[]) => parts.join('/'),
+}))
 vi.mock('~/pages/home/hooks/use-recording', () => ({
 	useRecording: () => ({
 		isRecording: false,
@@ -61,6 +69,7 @@ beforeEach(() => {
 	mocks.runComparison.mockResolvedValue([])
 	mocks.tauriComparisonIo.mockReturnValue({})
 	mocks.getMediaDurationSeconds.mockResolvedValue(12)
+	mocks.isModelFileUsable.mockResolvedValue(false)
 })
 
 afterEach(() => {
@@ -178,13 +187,44 @@ describe('models comparison section', () => {
 			{},
 			expect.any(Function),
 		)
-		expect(mocks.tauriComparisonIo).toHaveBeenCalledWith({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null)
+		expect(mocks.tauriComparisonIo).toHaveBeenCalledWith({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null, null)
 
 		expect(await screen.findByText('3s')).toBeTruthy()
 		expect(screen.getByText('Error: boom')).toBeTruthy()
 
 		await user.click(screen.getByRole('button', { name: m.showInFolder() }))
 		expect(mocks.openPath).toHaveBeenCalledWith({ name: 'Alpha', path: '/out/Alpha.md' })
+	})
+
+	it('offers speaker separation only when the separate model is installed, and applies it to every run', async () => {
+		// A metadata read here means the switch row exists; the file check decides.
+		mocks.isModelFileUsable.mockResolvedValue(true)
+		mocks.invoke.mockImplementation(async (command: string) => {
+			if (command === 'get_models_folder') return 'C:/models'
+			if (command === 'pick_media_paths') return ['/x/clip.wav']
+			return null
+		})
+		const user = userEvent.setup()
+		renderSection([model('alpha.gguf'), model('beta.gguf')])
+
+		// Separation is on by default once the model is usable, so the first run
+		// already shows speakers instead of a wall of text.
+		const toggle = await screen.findByRole('switch')
+		expect(toggle.getAttribute('aria-checked')).toBe('true')
+		expect(screen.getByText(m.diarization())).toBeTruthy()
+
+		await user.click(screen.getByRole('button', { name: m.compareChooseFile() }))
+		await screen.findByText('clip.wav')
+		await user.click(screen.getByRole('button', { name: 'alpha.gguf' }))
+		await user.click(screen.getByRole('button', { name: 'beta.gguf' }))
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+		expect(mocks.tauriComparisonIo).toHaveBeenCalledWith(expect.anything(), null, `C:/models/${config.diarizeModelFilename}`)
+
+		// Off is a real choice: the next run asks for plain transcripts and drops the
+		// stale side-by-side results of the run that used separation.
+		await user.click(toggle)
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+		expect(mocks.tauriComparisonIo).toHaveBeenLastCalledWith(expect.anything(), null, null)
 	})
 
 	it('opens the full results view with a baseline and diff switch after a run', async () => {

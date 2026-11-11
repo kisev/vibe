@@ -55,3 +55,13 @@ describe('segmentsText', () => {
 		expect(segmentsText([{ text: ' hello ' }, { text: '   ' }, { text: 'world' }])).toBe('hello\nworld')
 	})
 })
+
+describe('diffWords on realistic transcripts', () => {
+	it('finds differences between two model outputs', () => {
+		const base = 'Привет, как дела? Сегодня мы обсудим новый релиз.\nДавай начнём с бэкенда.'
+		const candidate = 'Привет, как у тебя дела? Сегодня обсудим новый релиз.\nНачнём с бэкенда.'
+		const parts = diffWords(base, candidate)
+		expect(parts.some((part) => part.kind === 'added')).toBe(true)
+		expect(parts.some((part) => part.kind === 'removed')).toBe(true)
+	})
+})

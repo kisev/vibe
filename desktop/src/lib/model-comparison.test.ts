@@ -190,6 +190,20 @@ describe('tauriComparisonIo transcribe options', () => {
 		expect(invokeMock).toHaveBeenCalledWith('transcribe', { options: { path: '/rec/clip.wav', lang: 'ru' } })
 	})
 
+	it('adds the separation model to the options when the comparison asks for speakers', async () => {
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: false } }
+			return { segments: [] }
+		})
+		const withDiarize = tauriComparisonIo({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null, 'C:/models/speakers.gguf')
+
+		await withDiarize.transcribe('/models/whisper.gguf', '/rec/clip.wav', 'ru')
+
+		expect(invokeMock).toHaveBeenCalledWith('transcribe', {
+			options: { path: '/rec/clip.wav', lang: 'ru', diarize_model: 'C:/models/speakers.gguf' },
+		})
+	})
+
 	it('still transcribes when the model metadata cannot be read', async () => {
 		invokeMock.mockImplementation(async (command: string) => {
 			if (command === 'get_model_metadata') throw new Error('unreadable header')

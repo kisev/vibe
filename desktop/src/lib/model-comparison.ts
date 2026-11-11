@@ -142,7 +142,7 @@ export interface ComparisonLoadOptions {
 }
 
 /** The Tauri-backed world: the same `load_model` / `transcribe` commands the transcription queue uses. */
-export function tauriComparisonIo(load: ComparisonLoadOptions, projectsPath?: string | null): ComparisonIo {
+export function tauriComparisonIo(load: ComparisonLoadOptions, projectsPath?: string | null, diarizeModelPath?: string | null): ComparisonIo {
 	return {
 		loadModel: async (path) => {
 			// `gpu_fallback` is a warning toast in the main flow, not a failure: the run proceeded on the CPU.
@@ -154,14 +154,19 @@ export function tauriComparisonIo(load: ComparisonLoadOptions, projectsPath?: st
 			})
 		},
 		// Plain options by design: the language preference alone, plus the bundled
-		// VAD model for engines that cannot plan speech ranges without one. No
-		// diarization, no stable timestamps, no decoding knobs — differences
-		// between the outputs are model differences, and the diarization helper
-		// never spawns inside a measurement.
+		// VAD model for engines that cannot plan speech ranges without one, and the
+		// diarization model when the comparison asks for speaker separation. No
+		// stable timestamps, no decoding knobs — differences between the outputs are
+		// model differences. Every run of one comparison gets the same set.
 		transcribe: async (modelPath, path, language) => {
 			const vadModel = await comparisonVadModel(modelPath)
 			const result = await invoke<{ segments: Segment[] }>('transcribe', {
-				options: { path, lang: language, ...(vadModel ? { vad_model: vadModel } : {}) },
+				options: {
+					path,
+					lang: language,
+					...(vadModel ? { vad_model: vadModel } : {}),
+					...(diarizeModelPath ? { diarize_model: diarizeModelPath } : {}),
+				},
 			})
 			return result.segments
 		},
