@@ -27,7 +27,7 @@ The comparison section SHALL accept its input either as a recording made in plac
 
 ### Requirement: Sequential runs with timing
 
-The comparison SHALL transcribe the same input on each selected model one after another, loading one model at a time, and SHALL report the wall-clock processing time of every completed run. Runs of one comparison SHALL use identical transcription options so the difference between results is the model, not the settings.
+The comparison SHALL transcribe the same input on each selected model one after another, loading one model at a time, and SHALL report the wall-clock processing time of every completed run. Runs of one comparison SHALL use identical transcription options — the language preference, plus the bundled VAD model for engines that cannot plan their input without one — so the difference between results is the model, not the settings.
 
 #### Scenario: Order of runs
 
@@ -38,6 +38,11 @@ The comparison SHALL transcribe the same input on each selected model one after 
 
 - **WHEN** a run finishes
 - **THEN** the section shows that model's processing time alongside its name
+
+#### Scenario: An engine that requires VAD
+
+- **WHEN** a selected model's engine cannot plan its input without a VAD model
+- **THEN** its run supplies the bundled VAD model and completes, while engines that do not require one run with the plain options
 
 ### Requirement: Comparable markdown outputs
 

@@ -1,8 +1,18 @@
 // The pure half of the comparison lab: `runComparison` against a fake world. The
 // Tauri-backed `tauriComparisonIo` is deliberately out of scope — everything that
 // touches the OS lives there, while the runner only needs the injected contract.
+import { invoke } from '@tauri-apps/api/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { comparisonFolderName, comparisonStamp, runComparison, type ComparisonIo, type ComparisonModel, type ComparisonStatus } from './model-comparison'
+import * as config from '~/lib/config'
+import {
+	comparisonFolderName,
+	comparisonStamp,
+	runComparison,
+	tauriComparisonIo,
+	type ComparisonIo,
+	type ComparisonModel,
+	type ComparisonStatus,
+} from './model-comparison'
 
 // The module imports Tauri globals and the markdown renderer at load time; none of
 // them is on the path under test, so keep the real modules out of the runner.
@@ -25,19 +35,15 @@ const folder = `/projects/comparisons/${stamp}-clip`
 function fakeIo(failures: { load?: string; transcribe?: string; render?: string } = {}) {
 	const calls: string[] = []
 	const writes: { path: string; text: string }[] = []
-	// `transcribe` has no model argument, so the fake remembers what was loaded; that is
-	// how a transcribe failure is aimed at exactly one model of the comparison.
-	let loaded: string | null = null
 	const io: ComparisonIo = {
 		loadModel: async (path) => {
 			calls.push(`load ${path}`)
 			if (path === failures.load) throw new Error(`cannot load ${path}`)
-			loaded = path
 		},
-		transcribe: async (path, language) => {
+		transcribe: async (modelPath, path, language) => {
 			calls.push(`transcribe ${path} ${language}`)
 			// Tauri rejects with a bare string, so one test keeps that rejection shape.
-			if (loaded === failures.transcribe) return Promise.reject('no audio track')
+			if (modelPath === failures.transcribe) return Promise.reject('no audio track')
 			return [{ start: 0, stop: 1, text: 'spoken words' }]
 		},
 		renderMarkdown: async (name, segments) => {
@@ -150,6 +156,49 @@ describe('runComparison', () => {
 		expect(runs.map((run) => run.status)).toEqual(['done', 'error'])
 		expect(runs[1].error).toBe('render exploded')
 		expect(writes.map((write) => write.path)).toEqual([`${folder}/Alpha.md`])
+	})
+})
+
+describe('tauriComparisonIo transcribe options', () => {
+	const io = () => tauriComparisonIo({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null)
+	const invokeMock = invoke as unknown as ReturnType<typeof vi.fn>
+
+	beforeEach(() => invokeMock.mockReset())
+
+	it('supplies the bundled VAD model to an engine that requires one', async () => {
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: true } }
+			if (command === 'get_models_folder') return 'C:/models'
+			return { segments: [] }
+		})
+
+		await io().transcribe('/models/gigaam.gguf', '/rec/clip.wav', 'ru')
+
+		expect(invokeMock).toHaveBeenCalledWith('transcribe', {
+			options: { path: '/rec/clip.wav', lang: 'ru', vad_model: `C:/models/${config.vadModelFilename}` },
+		})
+	})
+
+	it('leaves an engine without the requirement on the plain options', async () => {
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: false } }
+			return { segments: [] }
+		})
+
+		await io().transcribe('/models/whisper.gguf', '/rec/clip.wav', 'ru')
+
+		expect(invokeMock).toHaveBeenCalledWith('transcribe', { options: { path: '/rec/clip.wav', lang: 'ru' } })
+	})
+
+	it('still transcribes when the model metadata cannot be read', async () => {
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === 'get_model_metadata') throw new Error('unreadable header')
+			return { segments: [] }
+		})
+
+		await io().transcribe('/models/odd.gguf', '/rec/clip.wav', 'ru')
+
+		expect(invokeMock).toHaveBeenCalledWith('transcribe', { options: { path: '/rec/clip.wav', lang: 'ru' } })
 	})
 })
 

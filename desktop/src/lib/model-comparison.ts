@@ -6,6 +6,8 @@ import { invoke } from '@tauri-apps/api/core'
 import * as pathApi from '@tauri-apps/api/path'
 import * as fs from '@tauri-apps/plugin-fs'
 import { renderExport } from '~/lib/auto-export'
+import * as config from '~/lib/config'
+import { requiresVad, type ModelMetadata } from '~/lib/model'
 import { projectExportFilename } from '~/lib/project-name'
 import { transcriptsFolder } from '~/lib/transcripts-store'
 import type { Segment } from '~/lib/transcript'
@@ -35,8 +37,8 @@ export interface ComparisonRun {
 export interface ComparisonIo {
 	/** Load one model (or confirm it is resident); rejects on load failure. */
 	loadModel(path: string): Promise<void>
-	/** Transcribe the input file with the plain options; rejects on failure. */
-	transcribe(path: string, language: string): Promise<Segment[]>
+	/** Transcribe the input file with the plain options for the loaded model; rejects on failure. */
+	transcribe(modelPath: string, path: string, language: string): Promise<Segment[]>
 	/** The markdown rendering of one transcript. */
 	renderMarkdown(name: string, segments: Segment[]): Promise<string>
 	/** The comparisons root: `<projects>/comparisons`. */
@@ -91,7 +93,7 @@ export async function runComparison(
 		const startedAt = performance.now()
 		try {
 			await io.loadModel(run.model.path)
-			const segments = await io.transcribe(input.path, language)
+			const segments = await io.transcribe(run.model.path, input.path, language)
 			// Stop the clock when the transcript returns: rendering and writing are not model
 			// processing time, and timing covers load-if-needed plus transcription only.
 			const seconds = Math.round((performance.now() - startedAt) / 1000)
@@ -109,6 +111,24 @@ export async function runComparison(
 		emit(index)
 	}
 	return runs
+}
+
+/**
+ * The bundled VAD model for an engine that cannot plan its speech ranges without
+ * one. It is not a comparison option: every model that requires it gets the same
+ * file, so outputs still differ only by the model. An engine that does not
+ * advertise the requirement gets no `vad_model`, and a metadata read failure
+ * falls through to the transcribe call's own error.
+ */
+async function comparisonVadModel(modelPath: string): Promise<string | null> {
+	try {
+		const metadata = await invoke<ModelMetadata>('get_model_metadata', { modelPath })
+		if (!requiresVad(metadata?.capabilities)) return null
+		const modelsFolder = await invoke<string>('get_models_folder')
+		return `${modelsFolder}/${config.vadModelFilename}`
+	} catch {
+		return null
+	}
 }
 
 /** What the load call needs from the user's hardware preferences. */
@@ -130,12 +150,16 @@ export function tauriComparisonIo(load: ComparisonLoadOptions, projectsPath?: st
 				unloadTimeoutMinutes: load.unloadTimeoutMinutes,
 			})
 		},
-		// Plain options by design: the language preference and nothing else. No
+		// Plain options by design: the language preference alone, plus the bundled
+		// VAD model for engines that cannot plan speech ranges without one. No
 		// diarization, no stable timestamps, no decoding knobs — differences
 		// between the outputs are model differences, and the diarization helper
 		// never spawns inside a measurement.
-		transcribe: async (path, language) => {
-			const result = await invoke<{ segments: Segment[] }>('transcribe', { options: { path, lang: language } })
+		transcribe: async (modelPath, path, language) => {
+			const vadModel = await comparisonVadModel(modelPath)
+			const result = await invoke<{ segments: Segment[] }>('transcribe', {
+				options: { path, lang: language, ...(vadModel ? { vad_model: vadModel } : {}) },
+			})
 			return result.segments
 		},
 		renderMarkdown: (name, segments) =>
