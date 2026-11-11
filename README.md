@@ -69,6 +69,10 @@
 `Windows`
 `Linux`
 
+# Upgrading from an older fork build ⬆️
+
+The fork's own version line starts at 1.0.0. Builds from the earlier `3.3.0-dev.*` line sort above 1.0.0, so the in-app updater will not offer it: install the 1.0.0 build from the [download page](https://kisev.github.io/vibe/) manually once — settings, transcripts, and models carry over. From 1.0.0 on, updates arrive in the app as usual.
+
 # Contribute 🤝
 
 ## Developers
