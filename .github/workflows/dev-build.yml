@@ -44,7 +44,7 @@ jobs:
               uses: jdx/mise-action@v2
               with:
                   install: true
-                  install_args: task
+                  install_args: aqua:go-task/task
                   cache: true
             - name: The dev tag lives on the dev branch
               shell: bash
@@ -102,7 +102,7 @@ jobs:
               uses: jdx/mise-action@v2
               with:
                   install: true
-                  install_args: task
+                  install_args: aqua:go-task/task
                   cache: true
 
             - name: Setup pnpm
@@ -262,7 +262,7 @@ jobs:
               uses: jdx/mise-action@v2
               with:
                   install: true
-                  install_args: task
+                  install_args: aqua:go-task/task
                   cache: true
 
             - name: Prune old dev releases, keeping the recent ones

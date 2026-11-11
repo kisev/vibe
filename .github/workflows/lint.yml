@@ -112,7 +112,7 @@ jobs:
               uses: jdx/mise-action@v2
               with:
                   install: true
-                  install_args: task
+                  install_args: aqua:go-task/task
                   cache: true
 
             - name: Setup Rust stable
@@ -153,7 +153,7 @@ jobs:
               uses: jdx/mise-action@v2
               with:
                   install: true
-                  install_args: task
+                  install_args: aqua:go-task/task
                   cache: true
 
             - name: Setup Rust stable
