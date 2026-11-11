@@ -1,0 +1,91 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Weekly dependency updates. Cargo, npm and GitHub Actions are grouped by ecosystem.",
+    "Majors open as separate PRs and never automerge. The repo's own Lint run is the gate.",
+    "The mise `min_version` pin is managed by hand; every [tools] pin below is covered by a regex manager."
+  ],
+  "extends": ["config:recommended"],
+  "timezone": "Etc/UTC",
+  "schedule": ["* 5-8 * * 1"],
+  "ignorePaths": ["server/crates/*/scripts/**", "server/libs/**"],
+  "automerge": false,
+  "mise": {
+    "enabled": false
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["cargo"],
+      "groupName": "cargo dependencies",
+      "automerge": false
+    },
+    {
+      "matchManagers": ["npm"],
+      "groupName": "npm dependencies",
+      "automerge": false
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions dependencies",
+      "automerge": false
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "groupName": "major {{{depName}}}",
+      "dependencyDashboardApproval": false,
+      "automerge": false
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "mise aqua: pins resolve through the tool's GitHub releases",
+      "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
+      "matchStrings": ["\"aqua:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "mise github: pins resolve through GitHub releases",
+      "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
+      "matchStrings": ["\"github:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "mise npm: pins resolve through the npm registry",
+      "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
+      "matchStrings": ["\"npm:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "mise npm: pins with per-tool options resolve through the npm registry",
+      "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
+      "matchStrings": [
+        "\"npm:(?<depName>[^\"\\s]+)\"\\s*=\\s*\\{[^}]*version\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "mise cargo: pins resolve through crates.io",
+      "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
+      "matchStrings": ["\"cargo:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "datasourceTemplate": "crate",
+      "versioningTemplate": "cargo"
+    },
+    {
+      "customType": "regex",
+      "description": "mise pipx: pins resolve through PyPI",
+      "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
+      "matchStrings": ["\"pipx:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "pep440"
+    }
+  ]
+}

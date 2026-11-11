@@ -1,0 +1,46 @@
+# Weekly dependency PRs. Renovate is self-hosted here because the repository
+# does not use the Renovate app; it needs the RENOVATE_TOKEN secret.
+#
+# The token is a fine-grained personal access token with:
+#   - Contents: read and write
+#   - Pull requests: read and write
+# It must be added as the repository secret RENOVATE_TOKEN. Without it the run
+# fails loudly instead of silently skipping a week.
+name: Dependency Updates
+
+on:
+    schedule:
+        - cron: "0 6 * * 1"
+    workflow_dispatch:
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    renovate:
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Check RENOVATE_TOKEN
+              env:
+                  RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+              run: |
+                  if [ -z "$RENOVATE_TOKEN" ]; then
+                      echo "::error::RENOVATE_TOKEN is not set. Add a fine-grained token with contents and pull-requests write access as the repository secret RENOVATE_TOKEN."
+                      exit 1
+                  fi
+
+            - name: Renovate
+              uses: renovatebot/github-action@v41
+              with:
+                  token: ${{ secrets.RENOVATE_TOKEN }}
+                  # Same version as mise.toml, so a local dry run matches this run.
+                  renovate-version: 44.234.1
+              env:
+                  RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+                  RENOVATE_CONFIG_FILE: renovate.json
+                  LOG_LEVEL: info

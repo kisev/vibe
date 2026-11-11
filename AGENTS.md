@@ -6,6 +6,16 @@
 - Upstream: `task upstream:fetch` (branches only); tags under `refs/upstream-tags/*` via `task upstream:tags` — see `docs/UPSTREAM.md`
 - JS: `pnpm` only; Python: `uv` standalone scripts (`uv run`)
 
+## Dependencies
+
+Python dependencies live in the root uv project (`pyproject.toml` + `uv.lock`), not in per-script PEP 723 blocks; `uv run` resolves them from anywhere in the tree.
+
+- `task deps:check` — report outdated Cargo, pnpm and Python packages (read-only)
+- `task deps:update` — update within declared ranges; majors stay put
+- `task deps:update:major` — explicit, prompted major upgrades; review the diff
+
+Two Renovate paths share `renovate.json`: `task deps:renovate:dry` previews what Renovate would change, and `task deps:renovate` applies it to a clean working tree (no token, no PRs) — review and commit the diff like any other change. CI runs the weekly `.github/workflows/dependency-updates.yml`: one grouped PR per ecosystem, majors separate, no automerge. The workflow needs a fine-grained `RENOVATE_TOKEN` repository secret with contents and pull requests write access; it fails with a named-secret message when it is missing.
+
 ## Validation
 
 Plan validation scripts: `plans/<name>/<name>_001.py` (+ `.md`), standalone `uv` scripts.
