@@ -1,0 +1,31 @@
+# Temporary diagnostic: does this repository's GITHUB_TOKEN carry
+# contents:write for release creation? Dispatched by hand, never scheduled.
+name: Token Probe
+
+on:
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    probe:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Try to create and delete a draft release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  tag="probe-$GITHUB_RUN_ID"
+                  if gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
+                      -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" -F draft=true > release.json 2> err.txt; then
+                    id=$(jq -r .id release.json)
+                    echo "created draft release $id"
+                    gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+                    echo "PROBE_OK"
+                  else
+                    echo "PROBE_FAIL"
+                    cat err.txt
+                    exit 1
+                  fi
