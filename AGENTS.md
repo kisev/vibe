@@ -21,6 +21,8 @@ Agent mode: parallel moves, instant iteration, speed by default. Split heavy wor
 
 A `dev.<n>` tag publishes a release — it is never a validation vehicle. Code that needs a compile/CI check goes to main and is validated by the Lint run it triggers (server clippy + desktop cargo check + tests), which has no release side effects. Tag only from a green Lint run on that exact revision; never tag "to see if it builds".
 
+Dev builds live on the `dev` branch: `main` carries the release line, and every `dev.<n>` tag is cut on `dev` only — `task dev:tag` refuses off `dev`, and the Dev Build workflow fails a tag whose commit is not contained in `dev`. Later dev builds clean up older `dev.<n>` tags and their releases; that is expected — dev builds are a moving channel, not history.
+
 ## Working in parallel
 
 Split large work across ~4–5 subagents, one disjoint module-group each — no shared files; only the coordinator touches shared/root config. Fix contracts (interfaces, design docs) up front. Throughput is per-agent (~100 tok/s, no global limit), so N agents ≈ N× speed — delegate bulk implementation to strong subagents (e.g. Opus 5 for correctness-sensitive code); keep the main loop for planning, contracts, and integration.

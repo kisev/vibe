@@ -28,7 +28,29 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
+    guard:
+        # Dev builds belong to the dev branch: a dev tag cut anywhere else is a
+        # mistake, and so is a manual dispatch on another branch.
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - name: The dev tag lives on the dev branch
+              shell: bash
+              run: |
+                  git fetch --no-tags origin dev
+                  if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF_NAME" != "dev" ]]; then
+                      echo "Dev builds are cut from the dev branch; this dispatch ran on $GITHUB_REF_NAME" >&2
+                      exit 1
+                  fi
+                  if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+                      echo "dev tags are cut on the dev branch only; $GITHUB_REF_NAME is not contained in dev" >&2
+                      exit 1
+                  fi
+
     build:
+        needs: guard
         # The cleanup job needs the tag this run published under — tag push
         # and manual dispatch alike.
         outputs:

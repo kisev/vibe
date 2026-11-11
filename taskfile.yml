@@ -196,10 +196,15 @@ tasks:
       - mise exec -- fd -H -e css -e html -E node_modules -X prettier --check
 
   dev:tag:
-    desc: Cut a dev build - tag dev.<next> on HEAD and push the tag
+    desc: Cut a dev build - tag dev.<next> on the dev branch and push the tag
     cmds:
-      - git fetch origin --tags
+      - git fetch origin main dev --tags --prune --prune-tags
       - |
+        branch=$(git rev-parse --abbrev-ref HEAD)
+        if [ "$branch" != "dev" ]; then
+          echo "dev tags are cut on the dev branch only (on $branch now): git switch dev && git merge --ff-only main" >&2
+          exit 1
+        fi
         next=$(git tag -l 'dev.*' | sed 's/dev\.//' | sort -n | tail -1)
         next=$((next + 1))
         git tag -s "dev.$next" -m "Dev build $next"
