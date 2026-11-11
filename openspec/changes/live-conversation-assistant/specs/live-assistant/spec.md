@@ -15,6 +15,11 @@ While a recording runs with the assistant enabled, the application SHALL derive 
 - **WHEN** a recording is running with the assistant on and speech is being transcribed
 - **THEN** the panel shows the current topic and a suggested reply, refreshed as the conversation continues
 
+#### Scenario: Both sides
+
+- **WHEN** the recording captures the microphone and the system-audio loopback
+- **THEN** the hints are derived from the merged transcript of both sides, and the panel names a missing side when only one is recorded
+
 #### Scenario: Silence
 
 - **WHEN** no new speech has been transcribed since the last refresh

@@ -32,3 +32,4 @@
 - [ ] 6.1 Live: a dev install on the Dev channel is offered and installs the next dev build, keeping settings and identifier; verify from the update UI and the ARP entry
 - [ ] 6.2 Live: a release install on the Dev channel reports no update and explains why; switching back to Release works
 - [ ] 6.3 Negative: a tampered dev manifest is refused with an error and the installed version is untouched
+- [ ] 6.4 Live acceptance: the update group reads clearly (current version, channel, last check, one obvious action), switching Release/Dev behaves as explained, and the dev → dev upgrade works in the app; report what should change before archiving

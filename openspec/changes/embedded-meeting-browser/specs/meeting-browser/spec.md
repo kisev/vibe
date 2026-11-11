@@ -2,88 +2,83 @@
 
 ## Purpose
 
-Open configured meeting sites inside Vibe, record them with consent, and hand links from the rest of the system into that window — without becoming the user's default browser.
+Open any link inside Vibe, treat configured meeting hosts as recordable sessions, and hand links into Vibe through the one OS mechanism an installed app actually owns — its own URL scheme.
 
 ## ADDED Requirements
 
-### Requirement: Meeting sites open in an app window
+### Requirement: Any link opens in an app browser
 
-The application SHALL open URLs on configured meeting hosts in a Vibe-hosted webview window with address, back, forward, and reload controls. Navigation to a host outside the allowlist SHALL open in the system browser instead of inside the app. The window SHALL use a browser data partition separate from the application's own storage.
+The application SHALL open links in a Vibe-hosted Chromium webview window with address, back, forward, and reload controls. Links to configured meeting hosts SHALL additionally show a meeting bar. The browser window SHALL use a data partition separate from the application's own storage and SHALL NOT inject scripts into pages.
 
-#### Scenario: An allowed meeting link
+#### Scenario: An arbitrary link
 
-- **WHEN** a meeting URL on an allowed host is opened from the deep link or inside the app
-- **THEN** it loads in a Vibe meeting window and the page gets its own camera/microphone prompts
+- **WHEN** the user opens any URL from the app or the deep link
+- **THEN** it loads in the Vibe browser window with working navigation controls
 
-#### Scenario: A link outside the allowlist
+#### Scenario: A meeting link
 
-- **WHEN** the meeting page navigates or the user enters a URL on a host that is not allowed
-- **THEN** that URL opens in the system browser and the meeting window stays on its allowed host
+- **WHEN** the URL is on a host marked as a meeting host
+- **THEN** the same window shows the meeting bar with a record action
 
-#### Scenario: Cannot host
+#### Scenario: The page's own permissions
 
-- **WHEN** the platform webview cannot host the meeting (unsupported call features or an intentional fallback)
-- **THEN** the URL opens in the system browser with a notice, and the app keeps working
+- **WHEN** the page asks for camera or microphone access
+- **THEN** the platform webview asks the user, and Vibe does not grant the permission on its own
 
-### Requirement: The host allowlist is configurable
+### Requirement: Meeting hosts are configurable
 
-Settings SHALL list meeting hosts with a default set (`telemost.yandex.ru`, `stream.wb.ru`) and SHALL let the user add, remove, and mark each host for automatic recording. Matching SHALL be by host, over https only.
+Settings SHALL list meeting hosts with a default set (`telemost.yandex.ru`, `stream.wb.ru`) and SHALL let the user add and remove hosts. Host matching SHALL be by host name over https.
 
 #### Scenario: Adding a host
 
-- **WHEN** the user adds a host to the allowlist
-- **THEN** links on that host open in the meeting window and respect that host's auto-record setting
+- **WHEN** the user adds a host
+- **THEN** links on that host show the meeting bar
 
 #### Scenario: Removing a host
 
 - **WHEN** the user removes a host
-- **THEN** its links no longer open in the meeting window and open in the system browser instead
+- **THEN** its links still open in the browser but without the meeting bar
 
-### Requirement: Deep links hand meeting URLs to the app
+### Requirement: Recording is one click away in a meeting
 
-The application SHALL accept `vibe://open/?url=<https meeting url>`, validate that the URL is https and on an allowed host, and route it to a meeting window; a second invocation SHALL focus the existing window rather than fail. A URL that fails validation SHALL NOT be opened inside the app without an explicit confirmation.
+For a meeting host, the meeting bar SHALL offer a prominent record action that starts the existing recording (system audio and microphone as configured) and shows a visible recording indicator in the meeting window and the main window; a second action stops it. Recording SHALL remain manual — this change adds no automatic start.
 
-#### Scenario: Handoff from another app
+#### Scenario: Starting a call
 
-- **WHEN** `vibe://open/?url=` names an allowed meeting URL
-- **THEN** the app opens or focuses its meeting window on that URL
-
-#### Scenario: A non-allowed URL
-
-- **WHEN** the deep link names a host that is not allowed or a non-https scheme
-- **THEN** the app does not load it silently; it asks, and declining leaves the app untouched
-
-### Requirement: Auto-record is consented and visible
-
-For a host marked for automatic recording, entering a meeting in the meeting window SHALL start recording system audio and microphone after a one-time confirmation for that host, SHALL show a recording indicator in the meeting window and the main window, and SHALL stop recording when the meeting ends, the window closes, or a recording is already running.
-
-#### Scenario: Joining a meeting with auto-record
-
-- **WHEN** the user joins a call on an auto-record host and has confirmed that host before
-- **THEN** recording starts with a visible indicator naming the meeting
-
-#### Scenario: First automatic recording on a host
-
-- **WHEN** auto-record would start for a host the user has not confirmed
-- **THEN** the app asks once, and declining leaves the call unrecorded while remembering the choice
-
-#### Scenario: The meeting ends
-
-- **WHEN** the call ends or the meeting window closes
-- **THEN** the recording stops cleanly and the transcript is produced as usual
+- **WHEN** the user opens a meeting on a configured host
+- **THEN** the meeting bar shows "Record this call" and pressing it starts recording with a visible indicator
 
 #### Scenario: Already recording
 
-- **WHEN** a recording is already running when a meeting is joined
-- **THEN** no second recording starts and the meeting window shows the active indicator
+- **WHEN** a recording is already running and a meeting window opens
+- **THEN** the bar shows the active state instead of offering a second recording
+
+#### Scenario: Leaving the call
+
+- **WHEN** the browser window closes while the meeting recording is running
+- **THEN** the app warns and lets the user stop or keep recording
+
+### Requirement: Deep links hand URLs to the app
+
+The application SHALL accept `vibe://open/?url=<https url>`, validate the scheme and URL, and route it to the browser window; a second invocation SHALL focus the existing window rather than fail. A URL that fails validation SHALL NOT be opened without explicit confirmation.
+
+#### Scenario: Handoff from another app
+
+- **WHEN** `vibe://open/?url=` names an https URL
+- **THEN** the app opens or focuses its browser window on that URL
+
+#### Scenario: Invalid input
+
+- **WHEN** the deep link names a non-https scheme or malformed URL
+- **THEN** the app does not load it silently and asks before doing anything
 
 ### Requirement: In-app meetings do not double-prompt
 
-While a meeting is active in an app window, the existing external-meeting detection prompt SHALL NOT appear for that same meeting, and detection of external calls SHALL continue unchanged.
+While a meeting runs in an app browser window, the existing external-meeting detection prompt SHALL NOT appear for that same meeting, and detection of external calls SHALL continue unchanged.
 
 #### Scenario: An in-app call
 
-- **WHEN** a call runs in the meeting window
+- **WHEN** a call runs in the Vibe browser window
 - **THEN** the external detection prompt stays silent for it
 
 #### Scenario: An external call

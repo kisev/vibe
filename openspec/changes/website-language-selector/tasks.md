@@ -26,3 +26,4 @@
 - [ ] 5.1 Render every page in a non-English locale and verify no hardcoded English remains
 - [ ] 5.2 Verify the docs/changelog whole-page fallback and the chrome per-key fallback on a locale with partial coverage
 - [ ] 5.3 Verify the deployed GitHub Pages site keeps the selector on mobile and that a shared `?lang=` link opens in that language
+- [ ] 5.4 Live acceptance: browse every page in a non-English locale on desktop and mobile and report any string that stayed English or reads wrong; adjust before archiving

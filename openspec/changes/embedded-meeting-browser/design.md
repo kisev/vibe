@@ -2,56 +2,61 @@
 
 ## Context
 
-The app already registers the `vibe` deep-link scheme and forwards a second-instance invocation (`use-deep-links.tsx`, `use-single-instance.tsx`), detects external meetings from browser processes and prompts to record (`meeting_prompt.rs`), and records system audio plus microphone through the existing recorder. Tauri 2 with WebView2 on Windows is the primary target. See `proposal.md` and `specs/meeting-browser/spec.md`.
+The app already registers the `vibe` URL scheme and forwards second-instance invocations (`use-deep-links.tsx`, `use-single-instance.tsx`), creates auxiliary windows with `WebviewWindowBuilder` (`meeting_prompt.rs`, `dictation_indicator.rs`), detects external meetings from browser processes, and records several devices at once — input and loopback streams are merged by ffmpeg in `start_record` (`cmd/audio.rs`), so both sides of a call are available in one recording. Tauri is v2.10 without the `unstable` feature, so child webviews are not available; a standalone `WebviewWindow` is.
+
+See `proposal.md` and `specs/meeting-browser/spec.md`.
+
+## How link interception actually works
+
+Desktop apps that appear to "own" their links register their own URL scheme, and their own web pages or installers invoke it: Zoom uses `zoommtg://`/`zoomus://`, Teams `msteams://`, Mattermost `mattermost://`, Telegram `tg://`; the Telemost desktop client does the same with its own scheme. When a page calls such a scheme, the browser asks to open the app — which is why the result feels like an OS-level integration. Windows' "Apps for websites" association is the other route, but it requires the website to declare the app, which a third party cannot do for telemost.yandex.ru or stream.wb.ru.
+
+A browser never hands an `https://` link to an installed app unless that app is the default browser. Vibe therefore owns exactly one honest mechanism here: `vibe://`. This change registers `vibe://open/?url=…`, accepts it from other apps and scripts, and opens the target in Vibe's own Chromium browser. Direct link clicks from a browser remain out of reach unless Vibe is made the default browser, which is deliberately out of scope.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- A meeting window that is unmistakably Vibe's, isolated from the app's own webview storage.
-- Predictable recording: start with the call, stop with the window, never two recordings.
-- Link handoff that works today without hijacking the user's default browser.
+- Any link opens in a real Chromium window inside Vibe, with ordinary browser controls.
+- A meeting host turns the window into a record-ready session with one visible action.
+- No new trust surface: the content page gets no injected scripts and its own storage.
 
 **Non-Goals:**
 
-- Becoming the default browser or per-domain OS handler for `https` links.
-- Injecting scripts into third-party meeting pages.
-- Detecting call state through the services' internal APIs.
-- Supporting every meeting platform; hosts are user-configured.
+- Capturing `https` clicks from the system browser.
+- Automatic recording; recording stays one click in this iteration.
+- Extensions, default-browser takeover, or per-site scraping to detect call state.
+- Script injection or automatic logins.
 
 ## Decisions
 
-- **A window per meeting, app chrome where the platform allows it.** The meeting window is a Tauri window hosting a child webview of the meeting URL on platforms with multi-webview support (Windows first), so Vibe can draw an address bar, back/forward/reload, and the recording indicator around the page. Where a child webview cannot host the site, the fallback is a standalone `WebviewWindow` with native chrome and navigation shortcuts; if even that fails, the URL opens in the system browser with a notice. This keeps the feature honest per platform instead of pretending parity.
+- **Two windows: content and a meeting bar.** The content is a standalone `WebviewWindow` loading the URL (WebView2 on Windows, the same Chromium engine as Chrome and Edge; WKWebView/WebKitGTK elsewhere). A small always-on-top "meeting bar" window, built like the existing meeting-prompt/dictation windows, holds the trusted app UI: address, back, forward, reload, record/stop, and the recording indicator. The bar drives the content window through Tauri commands and listens to its navigation events. Alternatives considered: enabling `tauri/unstable` for an embedded child webview (rejected for build risk and unstable API), and a bare OS window with no chrome (rejected: no address bar, no one-click record).
 
-- **Allowlist by host, https only.** Each entry is `{host, autoRecord}`; matching is exact host or a `*.` suffix, lowercased, on `https`. No wildcards across unrelated domains. Navigation events are checked on every hop, including redirects; a non-allowed target is handed to the system browser and the meeting webview does not follow it. This is also the injection direction: nothing is ever injected into the page, so the allowlist is not a script boundary, only a navigation one.
+- **Any URL is allowed in the content window; the host list only decides what is a meeting.** Opening a random link behaves like a minimal browser. Hosts in the meeting list (defaults telemost.yandex.ru, stream.wb.ru) make the bar show "Record this call" and the in-app-session state that suppresses the external prompt. Removing a host keeps the link openable but drops the meeting affordances. This keeps the allowlist a UX filter, not a security boundary.
 
-- **The deep link is a routing hint, not a trust boundary.** `vibe://open/?url=` parses and validates the URL in Rust before any window is created, focuses an existing window for the same URL, and only auto-opens allowed hosts. Anything else asks first and defaults to the system browser. Unknown callers cannot make Vibe load arbitrary content without confirmation; auto-record additionally requires a stored per-host confirmation.
+- **Recording is a manual action in the bar.** "Record this call" starts the existing recorder with the user's configured devices (microphone and, when enabled, the system-audio loopback), the indicator appears in both the bar and the main window, and a second action stops. If another recording is already running, the bar shows the active state instead. Closing the window while its recording runs asks whether to stop or keep recording. Automatic start is a separate, later decision.
 
-- **Call lifecycle is window-and-navigation based.** A session starts when the meeting window opens on an allowed host and ends when it closes or navigates away from the host for a grace period. Service-specific call-state detection is a non-goal: it would require scraping each service and would break silently. The consequence — a window left open on the meeting page keeps recording — is mitigated by the visible indicator and the window's own stop control; the consent copy says recording follows the window.
+- **Deep links are validated before any window opens.** `vibe://open/?url=` is parsed in Rust, the scheme must be `https`, the URL must be well formed, and the app focuses an existing window for the same URL instead of spawning duplicates. Invalid input asks before doing anything. Because any local process can invoke `vibe://`, validation is the only gate and nothing is auto-recorded from a link.
 
-- **Auto-record is per host, consented once.** The first automatic recording on a host asks; the answer is stored with the host entry. Starting uses the existing recorder and refuses when a recording already runs (shows the active indicator instead). The indicator is a small always-on-top overlay in the meeting window plus the main window state, so recording is never invisible.
+- **Isolation is per-window storage.** The content webview gets its own data directory so service cookies never mix with the app's storage; Vibe never reads page credentials. Camera and microphone permissions are the platform webview's own prompts. The bar is app UI and holds no page content.
 
-- **Separate webview data directory.** The meeting webview gets its own data partition, so service cookies and logins never mix with the app's own webview. No credential capture by Vibe; logins happen in the page as in a browser.
-
-- **Detection suppression is state-driven.** `meeting_prompt.rs` gains an "in-app session active" input: while a meeting window runs, the external prompt for that same browser process/window is suppressed; when the window closes, detection resumes. External calls are otherwise untouched.
+- **Meeting detection suppression is state-driven.** While an in-app meeting window is open on a meeting host, `meeting_prompt.rs` suppresses the external prompt for that session; when the window closes, detection resumes. External-browser calls behave exactly as they do today.
 
 ## Risks / Trade-offs
 
-- [Services refuse embedded webviews or degrade WebRTC] → Fallback to the system browser per platform and per host; the host list documents which are validated.
-- [Child webviews are platform-uneven] → Explicit fallback ladder (child webview → standalone webview window → system browser) and Windows-first validation.
-- [A window left open records a silent room] → Recording indicator, stop control, and consent copy that recording follows the meeting window.
-- \[Deep-link abuse (any app can invoke `vibe://`)\] → Rust-side validation, confirmation for non-allowed URLs, no auto-record without a stored consent.
-- [Legal/consent exposure when recording meetings] → The one-time per-host confirmation, a visible indicator, and no automatic upload; transcripts stay local.
-- [Data partition growth] → The meeting profile is a normal browser profile under app data; a settings action clears it.
+- [Sites refuse embedded webviews or degrade WebRTC] → The window is a normal Chromium webview with its own storage; if a service still fails, the bar offers "Open in system browser" as an escape hatch.
+- [Two windows are clumsier than a single app window] → The bar is small, always-on-top while the meeting window is focused, and can be collapsed; it is the price of not shipping an unstable embedded-webview API.
+- [Direct https clicks still open in the system browser] → Documented plainly, with the `vibe://` handoff and the in-app browser as the supported paths; default-browser takeover stays a future, explicit decision.
+- [A recording keeps running after the call ends] → The indicator is visible in both windows and closing the window prompts; stopping is one click.
+- [Platform differences] → Windows is validated first; macOS/Linux create the window where the webview supports the site and otherwise fall back to the system browser.
 
 ## Migration Plan
 
-1. Ship the window manager and allowlist with auto-record off by default; links still work externally.
-1. Add the deep-link route and the handoff action.
-1. Enable per-host auto-record after Windows validation on telemost and stream.wb.ru.
-1. Rollback: remove hosts or disable the feature; deep links fall back to the system browser and existing detection remains.
+1. Ship the browser window and bar with the default host list; recording stays manual.
+1. Extend the deep-link and single-instance paths to `vibe://open/?url=`.
+1. Wire the in-app session state into meeting detection.
+1. Validate on Windows with Telemost and stream.wb.ru; other platforms fall back gracefully.
 
 ## Open Questions
 
-- Whether the macOS/Linux fallback should attempt a standalone webview or go straight to the system browser.
-- Whether a per-host meeting-path pattern is needed to distinguish "on the site" from "in a call"; the first version treats any navigation on the host as a session.
+- Whether the bar should be a separate window or a toolbar row rendered by the main window's frontend on top of the meeting window; the two-window approach is the least risky today.
+- Whether a later iteration should offer optional auto-record per host, now explicitly out of scope.

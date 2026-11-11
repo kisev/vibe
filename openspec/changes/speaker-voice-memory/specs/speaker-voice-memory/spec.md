@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Voice profiles let a diarized speaker be recognized across recordings: the app stores a local voice embedding per known person, proposes names for matching speakers, and applies confirmed names automatically while keeping every identity decision reversible.
+Voice profiles carry speaker identity across recordings. Every transcript opens with a complete speaker list: each detected voice is either named by a match, named with confirmation, or explicitly marked undetermined for the user to name — never a bare "Speaker N" left unaddressed.
 
 ## ADDED Requirements
 
@@ -12,7 +12,7 @@ The application SHALL store voice profiles on the local device only, each with a
 
 #### Scenario: A profile is created from a named speaker
 
-- **WHEN** the user names a diarized speaker in a transcript and keeps the offered "remember this voice" choice
+- **WHEN** the user names a diarized speaker and keeps the offered "remember this voice" choice
 - **THEN** a profile carrying that name and an embedding computed from that speaker's audio exists locally
 
 #### Scenario: A profile can be deleted
@@ -20,52 +20,79 @@ The application SHALL store voice profiles on the local device only, each with a
 - **WHEN** the user deletes a profile
 - **THEN** its embeddings and name are gone from the device, and later transcripts match against the remaining profiles only
 
-#### Scenario: Nothing leaves the device
+### Requirement: Every match carries a confidence
 
-- **WHEN** a voice profile is created or matched
-- **THEN** no audio, embedding, or profile name is sent over the network
+Each detected speaker SHALL be matched against the stored profiles and SHALL carry a confidence expressed on a 0–100 scale shown in 25-point bands: 0 — definitely not, 25 — probably not, 50 — possibly, 75 — probably, 100 — definitely. The mapping from embedding similarity to confidence SHALL be calibrated against labelled recordings so the bands mean the same for every voice model, and the UI SHALL show the percentage as well as the band.
 
-### Requirement: Matching proposes names for diarized speakers
+#### Scenario: A clear match
 
-After a transcript is diarized, the application SHALL compare each detected speaker's embedding against the stored profiles and SHALL present a matching profile name as a suggestion when the similarity is at or above the profile's match threshold. A suggestion SHALL be accepted, rejected, or replaced by another name, and rejecting it SHALL leave the speaker unnamed (or named as before) without changing the profile.
+- **WHEN** a speaker's voice closely matches a profile
+- **THEN** the speaker shows that profile's name with a confidence in the top band
 
-#### Scenario: A known voice in a new recording
+#### Scenario: Bands are meaningful
 
-- **WHEN** a diarized speaker matches a stored profile clearly
-- **THEN** the transcript shows that profile's name for the speaker, pending the confirmation rule below
+- **WHEN** the calibration set is evaluated
+- **THEN** matches in the top band are correct at a materially higher rate than matches in the middle band, and the mapping is stable across models
 
-#### Scenario: An unknown voice
+### Requirement: Confidence decides between automatic naming, confirmation, and unknown
 
-- **WHEN** no profile reaches the match threshold
-- **THEN** the speaker keeps the default label and the user can name it as today
+The application SHALL apply two user-configurable thresholds: automatic naming (default 75) and asking (default 50). At or above the automatic threshold the matched name SHALL be filled in automatically and SHALL remain editable; between the thresholds the name SHALL be filled in but marked as awaiting confirmation; below the asking threshold the speaker SHALL be marked "could not determine" and left for the user to name, with no profile name applied.
 
-#### Scenario: A rejected suggestion
+#### Scenario: Automatic naming
 
-- **WHEN** the user rejects a suggested profile name
-- **THEN** the speaker is not linked to that profile and the transcript keeps its previous naming
+- **WHEN** a speaker matches a profile at or above the automatic threshold
+- **THEN** the transcript is written with the profile name and the user can still replace it
 
-### Requirement: Confirmed identities label later transcripts automatically
+#### Scenario: Confirmation
 
-Once a speaker-to-profile link has been confirmed by the user, subsequent recordings SHALL fill that profile's name automatically only when the match is clear. Weak or ambiguous matches — two profiles close to each other, or similarity below the confirmation threshold — SHALL remain suggestions and SHALL NOT overwrite a name the user typed in the current transcript.
+- **WHEN** a speaker matches a profile between the asking and automatic thresholds
+- **THEN** the name is filled in, visibly marked as unconfirmed, and one action confirms or changes it
 
-#### Scenario: The next meeting with a confirmed person
+#### Scenario: Undetermined
 
-- **WHEN** a confirmed profile matches a speaker in a new transcript clearly
-- **THEN** that speaker is labeled with the profile name without further prompting
+- **WHEN** no profile reaches the asking threshold
+- **THEN** the speaker is marked "could not determine", no profile name is applied, and the user is prompted to name it
 
-#### Scenario: An ambiguous match
+#### Scenario: Thresholds change behavior
 
-- **WHEN** two profiles are similarly close to one speaker, or similarity is below the confirmation threshold
-- **THEN** the app presents the candidates as suggestions instead of choosing one
+- **WHEN** the user changes either threshold in settings
+- **THEN** the next transcripts follow the new values without a restart
 
-#### Scenario: A user-typed name wins
+### Requirement: The transcript always ends with a complete speaker list
 
-- **WHEN** the user has typed a name for a speaker in the current transcript and a profile match would disagree
-- **THEN** the typed name stays and the match is shown as a non-destructive suggestion
+Every diarized transcript SHALL present a speaker list naming every detected speaker — matched, pending confirmation, or undetermined — and SHALL NOT ship with unattended generic labels as the final state. The list SHALL be visible in the transcript view and SHALL allow naming, renaming, and rejecting any proposed match, including automatic ones.
+
+#### Scenario: A meeting with three voices
+
+- **WHEN** a transcript with three diarized speakers is opened
+- **THEN** all three appear in the speaker list with their names or their undetermined state, and each can be named or corrected in place
+
+### Requirement: A voice sample can be heard per speaker
+
+The speaker list SHALL offer playback of a short excerpt of each speaker's own audio (about ten to fifteen seconds) so the user can decide identity by ear. Playback SHALL stop early on request, and starting one excerpt SHALL stop any other playing excerpt.
+
+#### Scenario: Listening to a speaker
+
+- **WHEN** the user presses play on a speaker row
+- **THEN** that speaker's excerpt plays, and pressing play on another speaker stops the first
+
+#### Scenario: No usable excerpt
+
+- **WHEN** a speaker has no speech long enough for an excerpt
+- **THEN** the row says so and the play action is unavailable for that speaker
+
+### Requirement: Proposed names are always overridable
+
+Any name applied by a match, including an automatic one, SHALL be replaceable in the transcript without touching the stored profile unless the user explicitly chooses to remember the new voice. Rejecting a match SHALL leave the profile unchanged.
+
+#### Scenario: Overriding an automatic name
+
+- **WHEN** the user renames a speaker that was named automatically
+- **THEN** the transcript uses the new name and the matched profile keeps its data
 
 ### Requirement: Profiles are manageable
 
-The application SHALL provide a settings surface that lists voice profiles with their names and voice counts, and SHALL allow renaming, merging two profiles that are the same person, and deleting a profile.
+Settings SHALL provide a dedicated voice-profiles section listing every profile with its name and the number of recordings it was heard in, and SHALL allow renaming, merging two profiles that are the same person, and deleting a profile.
 
 #### Scenario: Rename
 
@@ -79,14 +106,14 @@ The application SHALL provide a settings surface that lists voice profiles with 
 
 ### Requirement: Voice memory degrades gracefully
 
-When diarization is disabled, the embedding model is not installed, or the recording produced no usable speaker audio, the app SHALL transcribe and label speakers exactly as before and SHALL NOT fail the transcript or block naming.
+When diarization is disabled, the embedding model is not installed, or the recording produced no usable speaker audio, the app SHALL transcribe exactly as before and SHALL NOT block naming or fail the transcript.
 
 #### Scenario: Embedding model missing
 
 - **WHEN** a recording is transcribed with diarization on but the embedding model absent
-- **THEN** the transcript completes with default speaker labels and naming works manually
+- **THEN** the transcript completes with the speaker list in its undetermined state, and naming works manually
 
 #### Scenario: Diarization off
 
 - **WHEN** speaker separation is disabled
-- **THEN** no voice profiles are created or suggested for that transcript
+- **THEN** no matches or proposals are produced for that transcript

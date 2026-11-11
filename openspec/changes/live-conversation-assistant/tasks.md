@@ -5,6 +5,7 @@
 - [ ] 1.1 Subscribe the assistant to transcription segment events while a recording runs and maintain the rolling window plus digest state; verify with a fake event stream that the window keeps the last N minutes and clears on stop
 - [ ] 1.2 Build the hint prompt with transcript text delimited as data and the requested output shape (topic + 1–3 replies, transcript language); verify snapshot tests for the prompt shape and that transcript text cannot alter the system section
 - [ ] 1.3 Add the throttle and generation counter (minimum interval, minimum new words, one in flight, stale response discarded, abort on stop); verify with fake timers and a slow provider
+- [ ] 1.4 Verify both sides: record with the microphone and the system-audio loopback selected, confirm `start_record` merges them and the assistant's window includes the other participants; when only one side is selected, the panel says so
 
 ## 2. Providers
 
@@ -27,3 +28,4 @@
 
 - [ ] 5.1 End-to-end check in a dev build with a local OpenAI-compatible endpoint: record a conversation and verify hints refresh at the intended cadence with no network egress
 - [ ] 5.2 End-to-end check with a remote provider and a CLI provider; verify the disclosure appears, failures are quiet, and stopping the recording cancels requests
+- [ ] 5.3 Live acceptance: run a real call with the assistant and report whether the hints are timely, relevant, and cheap enough, and whether the panel placement works during a meeting; adjust before archiving

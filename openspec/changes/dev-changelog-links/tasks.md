@@ -16,3 +16,4 @@
 
 - [ ] 3.1 Live: open a link naming an old dev version and the alias itself, and verify both render the current dev entry
 - [ ] 3.2 Verify the dev build's "What's new" opens the alias, not a versioned dev path
+- [ ] 3.3 Live acceptance: open an old dev-version link from a previous release note and confirm it lands on the current dev entry; report anything that reads confusingly

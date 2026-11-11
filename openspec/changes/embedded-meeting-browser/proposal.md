@@ -6,13 +6,11 @@ Meeting links (telemost.yandex.ru, stream.wb.ru, and whatever the user adds) ope
 
 ## What Changes
 
-- An in-app meeting browser: a Vibe window that loads a meeting URL in the platform webview with minimal chrome (address, back/forward/reload), an isolated browser profile, and navigation restricted to configured hosts. Links to other hosts open in the system browser.
-- A configurable host list in settings (defaults: `telemost.yandex.ru`, `stream.wb.ru`), each entry optionally marked to start recording automatically.
-- A `vibe://open/?url=…` handoff, reusing the app's existing `vibe://` registration and single-instance forwarding: the app validates the URL, opens an allowed meeting in the meeting window, and otherwise asks before handing it to the system browser. The same action is available as "Open in Vibe" from inside the app.
-- Honest scope of interception: browsers only hand an `https` link to Vibe when Vibe is the default browser or a companion extension is installed. The desktop-app pattern the user described works for services that register their own protocol; Vibe cannot claim `telemost://` or an equivalent. This change ships the in-app window and the `vibe://` handoff; default-browser/extension interception is a documented follow-up, not part of this change.
-- Auto-record with consent: entering a meeting on an allowed host with auto-record enabled starts the existing recorder (system audio + microphone), shows a recording indicator in the meeting window and the main window, and stops when the meeting ends or the window closes. The first automatic recording per host asks for confirmation once.
-- Meeting detection integration: an in-app meeting session suppresses the duplicate external-browser prompt; detection of external calls keeps working unchanged.
-- Security and privacy: the meeting webview uses its own data partition, never captures credentials, does not inject scripts into the page, and grants camera/microphone permissions only through the page's own prompts.
+- An in-app browser window built on the platform Chromium webview (WebView2 on Windows, the same engine as Chrome and Edge) that can open any link — a meeting URL, a service dashboard, anything the user pastes. It has address/back/forward/reload controls and an isolated browser profile.
+- Hosts the user marks as meeting hosts (defaults: `telemost.yandex.ru`, `stream.wb.ru`) get a meeting bar with a prominent **Record this call** action, so joining a call in Vibe makes pressing record the obvious next step instead of something to remember after switching windows. Recording stays manual in this iteration.
+- A configurable host list in settings, plus the app's existing `vibe://` deep-link scheme extended with `vibe://open/?url=…`: an installed desktop app cannot take over `https` links from a browser unless it is the default browser or the site itself invokes the app's scheme (that is exactly how Zoom (`zoommtg://`), Teams (`msteams://`), Mattermost (`mattermost://`) and the Telemost desktop app work — their own pages or installers call their scheme). This change therefore ships the mechanism Vibe can honestly own: a registered `vibe://` handoff plus an in-app Chromium browser that opens any link. Becoming the default browser is left out of scope.
+- Meeting detection integration: an in-app meeting window suppresses the duplicate external-browser prompt; detection of calls in other browsers keeps working unchanged.
+- Security and privacy: the browser window uses its own data partition, never captures credentials, does not inject scripts into pages, and grants camera/microphone permissions only through the page's own prompts.
 
 ## Capabilities
 

@@ -8,6 +8,7 @@ The app transcribes meetings, but help arrives after the call: summaries and que
 
 - A live assistant panel during recording: streaming transcript segments feed a bounded rolling window, and the chosen provider returns short, refreshed hints — the current topic and a suggested reply.
 - Provider choice is explicit and provider-agnostic: Anthropic API, any OpenAI-compatible endpoint (vLLM, Ollama, LM Studio, llama-swap, a remote gateway), or a CLI adapter that drives an already-configured `claude`, `codex`, or `opencode` executable.
+- Both sides of the conversation are heard: `start_record` already accepts several devices and merges the microphone with the system-audio loopback through ffmpeg, so the transcript the assistant reads carries the user and the other participants together; no second capture path is added.
 - Audio never leaves the device: recognition stays on the local server; only transcript text is sent, and only to the provider the user selected. Local endpoints keep the whole session on the machine; the session states where text goes.
 - Hints refresh on a bounded cadence (minimum interval and minimum new words), one request in flight at a time, cancelled when the recording stops; provider failures are quiet and never affect the recording.
 - Hints are advisory and ephemeral: nothing is written into the transcript, nothing is sent on the user's behalf, and the panel is off until enabled.
