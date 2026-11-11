@@ -6,14 +6,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~
 import { IconAction, SettingsGroup, SettingsRow, rowControlClass, type SettingsViewModel } from './shared'
 import { ModelsCatalogSection } from './models-catalog'
 import { ModelsComparisonSection } from './models-comparison'
+import { SpeakerSeparationModelGroup } from './models-speaker'
 import { getFriendlyModelName } from '~/lib/model'
 
 /**
- * The models settings: hardware knobs and corrupt-file recovery, then the
- * comparison lab, then the catalog section that carries everything about
- * choosing, installing and selecting models (installed entries included,
- * highlighted and sorted first). The catalog ends the page — it is the long
- * list, and nothing should sit below it.
+ * The models settings: hardware knobs and corrupt-file recovery, the auxiliary
+ * speaker-separation model, then the comparison lab, then the catalog section
+ * that carries everything about choosing, installing and selecting models
+ * (installed entries included, highlighted and sorted first). The catalog ends
+ * the page — it is the long list, and nothing should sit below it.
  */
 export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 	return (
@@ -72,6 +73,7 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 				</SettingsGroup>
 			)}
 
+			<SpeakerSeparationModelGroup />
 			<ModelsComparisonSection vm={vm} />
 			<ModelsCatalogSection vm={vm} />
 		</div>

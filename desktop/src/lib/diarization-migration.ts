@@ -23,7 +23,12 @@ export async function runDiarizationMigration(diarizeEnabled: boolean, disable: 
 	if (!diarizeEnabled) return 'not-needed'
 	const modelsFolder = await invoke<string>('get_models_folder')
 	const modelPath = await join(modelsFolder, config.diarizeModelFilename)
-	if (await isModelFileUsable(modelPath)) return 'installed'
+	if (await isModelFileUsable(modelPath)) {
+		// The replacement is already in place — a fresh install, or the download gate ran
+		// before this migration. The superseded artifacts are still dead weight; sweep them.
+		await cleanupLegacyDiarizationFiles(modelsFolder)
+		return 'installed'
+	}
 
 	const confirmed = await ask(m.diarizationMigrateQuestion(), { title: m.diarization(), kind: 'info' })
 	if (!confirmed) {

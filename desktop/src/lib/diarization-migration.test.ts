@@ -34,10 +34,12 @@ describe('runDiarizationMigration', () => {
 		expect(invokeMock).not.toHaveBeenCalled()
 	})
 
-	it('does nothing when the current model is already on disk', async () => {
+	it('keeps the current model and sweeps the superseded artifacts', async () => {
 		isUsableMock.mockResolvedValue(true)
 		expect(await runDiarizationMigration(true, disable)).toBe('installed')
 		expect(askMock).not.toHaveBeenCalled()
+		expect(downloadMock).not.toHaveBeenCalled()
+		expect(deleteMock).toHaveBeenCalledTimes(config.legacyDiarizationFilenames.length)
 	})
 
 	it('disables the preference with a notice when the download is declined', async () => {
