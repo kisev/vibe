@@ -24,3 +24,19 @@ Each catalog card SHALL show the provider, the file size in megabytes, the suppo
 
 - **WHEN** the user switches a model's quantization
 - **THEN** the shown size updates to that file's value
+
+## ADDED Requirements
+
+### Requirement: Installed files use canonical names
+
+Labels for installed model files SHALL use the catalog's canonical model name and the published quantization spelling (`Q8_0`), auxiliary models SHALL be named as their projects name them, and a file the catalog does not know SHALL read as a spaced name that keeps acronyms and quantization tokens intact — never `Q8 0`.
+
+#### Scenario: A catalog model on disk
+
+- **WHEN** an installed file matches a catalog entry
+- **THEN** its label is the entry's name with the quantization key, e.g. `GigaAM v3 E2E-RNN-T · Q8_0`
+
+#### Scenario: An unknown file
+
+- **WHEN** an installed file matches no catalog entry
+- **THEN** its label keeps acronyms and quantization spelling readable, e.g. `My Custom Model Q5_K_S`

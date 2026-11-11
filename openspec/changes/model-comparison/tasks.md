@@ -19,6 +19,9 @@
 
 - [x] 4.1 Write each completed transcript as `<model-name>.md` via the auto-export markdown renderer into one `comparisons/<timestamp>-<input>/` folder
 - [x] 4.2 Result list: model, processing time, link to its markdown file (open/reveal); tests for the runner, timing capture, and failure isolation
+- [x] 4.3 Full-window results view opened by "Compare results": one column per completed model with its time, word count, transcript, and file reveal, a selectable baseline, and a word-level diff (missed words struck out, extra words highlighted) with a toggle; kept in memory from the run; verify with component tests for opening the view, the column metadata, and the diff library's unit tests
+- [x] 4.4 Canonical model labels: match installed files to the catalog's name and quantization (`GigaAM v3 E2E-RNN-T · Q8_0`), name auxiliary models as their projects do (`Nemotron-3-Diarization Q8_0`), and keep acronyms and `Q8_0`/`Q4_K_M` intact in the file-name fallback; applied to the comparison, corrupt-model list, retranscribe dialog, catalog extras, and the speaker-model row; verify with naming unit tests
+- [x] 4.5 Translate the four new desktop strings (`compareResults`, `compareHighlight`, `compareBaseline`, `compareWordCount`) through the normal flow and run the audit; verify `task i18n:audit` reports no missing keys for the new strings
 
 ## 5. Validation
 

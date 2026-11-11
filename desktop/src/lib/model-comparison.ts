@@ -27,6 +27,8 @@ export interface ComparisonRun {
 	status: ComparisonStatus
 	/** Wall-clock seconds of the whole run — load-if-needed plus transcription; set on done. */
 	seconds?: number
+	/** The transcript itself, kept in memory so results can be compared side by side; set on done. */
+	segments?: Segment[]
 	/** Absolute path of the written markdown file; set on done. */
 	outputPath?: string
 	/** Why the run failed; set on error. */
@@ -103,6 +105,7 @@ export async function runComparison(
 			await io.writeText(outputPath, markdown)
 			run.status = 'done'
 			run.seconds = seconds
+			run.segments = segments
 			run.outputPath = outputPath
 		} catch (error) {
 			run.status = 'error'

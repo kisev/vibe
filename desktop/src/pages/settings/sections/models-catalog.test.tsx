@@ -23,6 +23,7 @@ vi.mock('~/lib/model', () => ({
 	downloadModel: mocks.downloadModel,
 	deleteModelFile: mocks.deleteModelFile,
 	getFriendlyModelName: (name: string) => name,
+	getModelDisplayName: (name: string) => name,
 }))
 
 // jsdom has no pointer-capture API; Radix's select calls it on the trigger.

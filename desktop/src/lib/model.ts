@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import * as pathExt from '@tauri-apps/api/path'
 import * as fsExt from '@tauri-apps/plugin-fs'
+import { matchInstalled } from './catalog'
 import { beginDownload, downloadName, endDownload } from './downloads'
 import { diarizeModelFilename, embeddingModelFilename, legacyDiarizationFilenames, segmentModelFilename, vadModelFilename, type ModelDownload, type ModelIntegrity } from './config'
 import { lsFiles } from './fs'
@@ -37,10 +38,61 @@ export async function getFilenameFromUrl(url: string) {
 	return fileName
 }
 
+/** Quantization suffixes keep their published spelling: `Q8_0`, `Q4_K_M`, `F16`, `BF16`. */
+const QUANT_TOKEN = /^(?:q\d+(?:_[a-z0-9]+)+|q\d+|iq\d+(?:_[a-z0-9]+)+|iq\d+|f16|f32|bf16)$/i
+/** Tokens that read wrong title-cased: a model's own casing, not the file name's. */
+const NAME_TOKENS: Record<string, string> = {
+	gigaam: 'GigaAM',
+	rnnt: 'RNNT',
+	ctc: 'CTC',
+	e2e: 'E2E',
+	tdt: 'TDT',
+	asr: 'ASR',
+	vad: 'VAD',
+	lm: 'LM',
+	nmt: 'NMT',
+	ct2: 'CT2',
+}
+/** Auxiliary models the catalog does not list, named as their projects do. */
+const AUXILIARY_NAMES: Record<string, string> = {
+	'nemotron-3-diarization-q8_0.gguf': 'Nemotron-3-Diarization Q8_0',
+	'ggml-silero-v6.2.0.bin': 'Silero VAD v6.2.0',
+}
+
+function nameTokens(bare: string) {
+	// Underscores are separators in model names, except inside a quantization token,
+	// where they are part of the published spelling (`Q8_0`).
+	return bare.split(/[-\s]+/).flatMap((chunk) => (QUANT_TOKEN.test(chunk) ? [chunk] : chunk.split(/_+/)))
+}
+
+/**
+ * A readable name from a model file name alone: quantization stays `Q8_0` rather
+ * than `Q8 0`, versions keep their `v`, and known model acronyms keep their casing.
+ */
 export function getFriendlyModelName(filename: string) {
-	const name = filename.replace(MODEL_EXTENSION_PATTERN, '').replace(/^ggml[-_]?/, '')
-	if (!name || name === 'model') return 'Custom model'
-	return name.replace(/[-_]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+	const bare = filename.replace(MODEL_EXTENSION_PATTERN, '').replace(/^ggml[-_]?/, '')
+	if (!bare || bare === 'model') return 'Custom model'
+	return nameTokens(bare)
+		.filter(Boolean)
+		.map((token) => {
+			if (QUANT_TOKEN.test(token)) return token.toUpperCase()
+			if (/^v\d+(?:\.\d+)*$/i.test(token)) return token.toLowerCase()
+			return NAME_TOKENS[token.toLowerCase()] ?? token.charAt(0).toUpperCase() + token.slice(1)
+		})
+		.join(' ')
+}
+
+/**
+ * The name a model file is shown by: the catalog's canonical name and quantization
+ * when the file is a catalog artifact, the project's own name for an auxiliary
+ * model, and the improved file-name reading for anything else.
+ */
+export function getModelDisplayName(filename: string) {
+	const auxiliary = AUXILIARY_NAMES[filename.toLowerCase()]
+	if (auxiliary) return auxiliary
+	const match = matchInstalled(filename)
+	if (match) return `${match.model.name} · ${match.quant}`
+	return getFriendlyModelName(filename)
 }
 
 /** A model file on disk, together with the verdict of the backend integrity check. */

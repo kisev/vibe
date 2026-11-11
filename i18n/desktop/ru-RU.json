@@ -742,13 +742,17 @@
   "diarizationMigratedOff": "Обнаружение говорящих выключено, пока не будет скачана новая модель.",
   "betaUpdates": "Бета-обновления",
   "betaUpdatesInfo": "Получайте новые версии на несколько дней раньше всех остальных.",
+  "compareBaseline": "Опорный вариант",
   "compareChooseFile": "Выберите аудиофайл",
+  "compareHighlight": "Подсветить различия",
   "compareModels": "Сравнить модели",
   "compareNeedTwo": "Выберите входной файл и хотя бы две модели",
   "comparePickModels": "Модели для сравнения",
   "compareProcessingRecording": "Завершение записи…",
   "compareRecord": "Записать фрагмент",
   "compareRecording": "Запись…",
+  "compareResults": "Сравнить результаты",
   "compareRun": "Запустить сравнение",
-  "compareStopRecording": "Остановить запись"
+  "compareStopRecording": "Остановить запись",
+  "compareWordCount": "{count} слов"
 }

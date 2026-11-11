@@ -7,7 +7,7 @@ import { IconAction, SettingsGroup, SettingsRow, rowControlClass, type SettingsV
 import { ModelsCatalogSection } from './models-catalog'
 import { ModelsComparisonSection } from './models-comparison'
 import { SpeakerSeparationModelGroup } from './models-speaker'
-import { getFriendlyModelName } from '~/lib/model'
+import { getModelDisplayName } from '~/lib/model'
 
 /**
  * The models settings: hardware knobs and corrupt-file recovery, the auxiliary
@@ -64,7 +64,7 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 					{vm.corruptModels.map((model) => (
 						<SettingsRow
 							key={model.path}
-							label={getFriendlyModelName(model.name)}
+							label={getModelDisplayName(model.name)}
 							description={m.modelFileCorruptDescription({ name: model.name })}>
 							<IconAction label={m.reDownload()} icon={<Download className="h-4 w-4" />} onClick={() => vm.redownloadModel(model)} />
 							<IconAction label={m.showInFolder()} icon={<FolderOpen className="h-4 w-4" />} onClick={() => vm.openSelectedModel(model.path)} />

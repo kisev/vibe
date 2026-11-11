@@ -26,7 +26,7 @@ vi.mock('~/lib/model-comparison', () => ({
 	runComparison: mocks.runComparison,
 	tauriComparisonIo: mocks.tauriComparisonIo,
 }))
-vi.mock('~/lib/model', () => ({ getFriendlyModelName: (name: string) => name }))
+vi.mock('~/lib/model', () => ({ getModelDisplayName: (name: string) => name }))
 vi.mock('~/pages/home/hooks/use-recording', () => ({
 	useRecording: () => ({
 		isRecording: false,
@@ -185,6 +185,37 @@ describe('models comparison section', () => {
 
 		await user.click(screen.getByRole('button', { name: m.showInFolder() }))
 		expect(mocks.openPath).toHaveBeenCalledWith({ name: 'Alpha', path: '/out/Alpha.md' })
+	})
+
+	it('opens the full results view with a baseline and diff switch after a run', async () => {
+		mocks.runComparison.mockResolvedValue([
+			{
+				model: { name: 'Alpha', path: '/models/alpha.gguf' },
+				status: 'done',
+				seconds: 3,
+				outputPath: '/out/Alpha.md',
+				segments: [{ start: 0, stop: 1, text: 'hello world' }],
+			},
+			{
+				model: { name: 'Beta', path: '/models/beta.gguf' },
+				status: 'done',
+				seconds: 5,
+				outputPath: '/out/Beta.md',
+				segments: [{ start: 0, stop: 1, text: 'hello there' }],
+			},
+		])
+		const user = userEvent.setup()
+		renderSection([model('alpha.gguf'), model('beta.gguf')])
+		await chooseFile(user)
+		await user.click(screen.getByRole('button', { name: 'alpha.gguf' }))
+		await user.click(screen.getByRole('button', { name: 'beta.gguf' }))
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+
+		await user.click(await screen.findByRole('button', { name: m.compareResults() }))
+
+		expect(await screen.findByText(m.compareBaseline())).toBeTruthy()
+		expect(screen.getByText(m.compareHighlight())).toBeTruthy()
+		expect(screen.getAllByText(/2 words/)).toHaveLength(2)
 	})
 
 	it('does not offer corrupt model files', () => {

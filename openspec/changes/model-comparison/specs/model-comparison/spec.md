@@ -61,3 +61,22 @@ A run that fails SHALL not abort the remaining runs; the section SHALL show the 
 
 - **WHEN** the middle model of three fails to load or transcribe
 - **THEN** the third model still runs, two markdown files are written, and the failure is shown with its reason
+
+### Requirement: Side-by-side results
+
+After a comparison, the section SHALL offer a results surface that covers the application window and shows, for each completed model, its transcript and wall-clock processing time side by side, with the markdown file written for it reachable from its column. The surface SHALL let the user choose a baseline run and SHALL highlight word-level differences between the baseline and every other transcript, and SHALL remain readable with the highlighting off.
+
+#### Scenario: Results after a run
+
+- **WHEN** a comparison finishes
+- **THEN** a "Compare results" action opens the full-window surface with one column per completed model
+
+#### Scenario: Difference highlighting
+
+- **WHEN** highlighting is on
+- **THEN** words the model missed relative to the baseline are struck out and its extra words are highlighted, and choosing another baseline recomputes the differences
+
+#### Scenario: Files
+
+- **WHEN** a result column is shown
+- **THEN** the markdown file written for that model can be revealed from the column

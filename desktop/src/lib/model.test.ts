@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { hidesDecodingOptions, hidesStableTimestamps, requiresVad, resolveModelLanguage, withoutUnsupportedOptions, type ModelCapabilities } from './model'
+import {
+	getFriendlyModelName,
+	getModelDisplayName,
+	hidesDecodingOptions,
+	hidesStableTimestamps,
+	requiresVad,
+	resolveModelLanguage,
+	withoutUnsupportedOptions,
+	type ModelCapabilities,
+} from './model'
 
 const whisper: ModelCapabilities = {
 	engine: 'whisper',
@@ -109,5 +118,27 @@ describe('resolveModelLanguage', () => {
 		expect(resolveModelLanguage(whisper, 'en')).toBe('en')
 		expect(resolveModelLanguage(whisper, 'auto')).toBe('auto')
 		expect(resolveModelLanguage(null, 'auto')).toBe('auto')
+	})
+})
+
+describe('model names', () => {
+	it('keeps quantization spelling, versions, and known acronyms', () => {
+		expect(getFriendlyModelName('gigaam-v3-e2e-rnnt-Q8_0.gguf')).toBe('GigaAM v3 E2E RNNT Q8_0')
+		expect(getFriendlyModelName('parakeet-ultra-Q4_K_M.gguf')).toBe('Parakeet Ultra Q4_K_M')
+		expect(getFriendlyModelName('ggml-silero-v6.2.0.bin')).toBe('Silero v6.2.0')
+	})
+
+	it('uses the catalog name and quantization for a catalog file', () => {
+		expect(getModelDisplayName('gigaam-v3-e2e-rnnt-Q8_0.gguf')).toBe('GigaAM v3 E2E-RNN-T · Q8_0')
+		expect(getModelDisplayName('parakeet-ultra-Q8_0.gguf')).toBe('Parakeet Ultra · Q8_0')
+	})
+
+	it('names auxiliary models as their projects do', () => {
+		expect(getModelDisplayName('nemotron-3-diarization-Q8_0.gguf')).toBe('Nemotron-3-Diarization Q8_0')
+		expect(getModelDisplayName('ggml-silero-v6.2.0.bin')).toBe('Silero VAD v6.2.0')
+	})
+
+	it('falls back to the readable file name for an unknown file', () => {
+		expect(getModelDisplayName('my-custom-model-Q5_K_S.gguf')).toBe('My Custom Model Q5_K_S')
 	})
 })

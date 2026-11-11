@@ -12,12 +12,13 @@ import { openPath } from '~/lib/app'
 import * as config from '~/lib/config'
 import { pathToNamedPath } from '~/lib/fs'
 import { getMediaDurationSeconds } from '~/lib/media'
-import { getFriendlyModelName } from '~/lib/model'
+import { getModelDisplayName } from '~/lib/model'
 import { runComparison, tauriComparisonIo, type ComparisonModel, type ComparisonRun } from '~/lib/model-comparison'
 import { cn } from '~/lib/style'
 import { useRecording } from '~/pages/home/hooks/use-recording'
 import { Button } from '~/components/ui/button'
 import { IconAction, SettingsField, SettingsGroup, SettingsRow, type SettingsViewModel } from './shared'
+import { ModelsComparisonResults } from './models-comparison-results'
 
 const mediaExtensions = [...config.audioExtensions, ...config.videoExtensions]
 
@@ -70,6 +71,7 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 	const [selected, setSelected] = useState<Set<string>>(new Set())
 	const [runs, setRuns] = useState<ComparisonRun[]>([])
 	const [running, setRunning] = useState(false)
+	const [showResults, setShowResults] = useState(false)
 	// The record_finish listener outlives renders, so the awaiting flag needs a ref as well.
 	const awaitingRef = useRef(false)
 
@@ -143,7 +145,7 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 	}
 
 	function displayName(entry: { name: string; path: string }) {
-		return vm.preference.modelDisplayNames[entry.path] ?? getFriendlyModelName(entry.name)
+		return vm.preference.modelDisplayNames[entry.path] ?? getModelDisplayName(entry.name)
 	}
 
 	const selectableModels = vm.models.filter(selectable)
@@ -248,6 +250,11 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 					{m.compareRun()}
 				</Button>
 				{needMore && !running && <span className="text-xs text-muted-foreground">{m.compareNeedTwo()}</span>}
+				{runs.some((candidate) => candidate.status === 'done') && !running && (
+					<Button variant="secondary" onClick={() => setShowResults(true)}>
+						{m.compareResults()}
+					</Button>
+				)}
 			</div>
 
 			{runs.map((run) => (
@@ -255,6 +262,10 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 					<RunStatus run={run} />
 				</SettingsRow>
 			))}
+
+			{input && (
+				<ModelsComparisonResults input={input} runs={runs} open={showResults} onOpenChange={setShowResults} />
+			)}
 		</SettingsGroup>
 	)
 }

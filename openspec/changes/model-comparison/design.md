@@ -7,11 +7,20 @@
 ## Decisions
 
 - **Client-side orchestration, no new server API.** The desktop already drives model loads; the lab loops `load → transcribe` per selected model over the existing endpoints. A batch server endpoint would couple the server to a settings-page concern and duplicate what two calls already express.
+
 - **Timing is desktop wall-clock per model.** One measurement covering load-if-needed and transcription is what the user experiences when switching models; splitting it would need server timing fields for little value. The clock starts when a model's run begins and stops when its transcript returns.
+
 - **Same plain options for every run.** The lab sends the user's language preference and nothing user-chosen — no diarization, no stable timestamps — so differences in the outputs are model differences. Engines that cannot plan their input without a VAD model receive the same bundled silero file the app already uses for bounded models; that is an engine necessity rather than a setting, and every model that needs it gets the identical file. Since the sync the server runs two engines (transcribe.cpp for ASR, the `vibe-diarize-native` helper process for diarization); plain no-diarization runs never spawn the helper, so every timed run stays on the ASR engine. The lab is a judging instrument, not a second transcription screen.
+
 - **One folder per comparison, markdown only.** Files land under a `comparisons/<timestamp>-<input-name>/` folder next to the audio-export convention, named `<model-name>.md`; links use the existing reveal-in-file-manager command. Markdown because it renders in every viewer and the user asked for it.
+
 - **The catalog keeps its benchmark data.** The bars go away (component, score computation on the render path, `catalogAccuracy`/`catalogSpeed` strings, their tests), but the catalog file itself still carries the numbers for anyone scripting against them — the card is the thing that stops asserting them.
+
 - **Sequential, one model in memory at a time.** The server loads a model per request path; running sequentially keeps VRAM bounded (relevant at 12 GB with large models) and gives clean per-model timing without interleaving.
+
+- **Results live in memory and open on a full-window surface.** The runner keeps each completed run's segments alongside its seconds and file path, so the results view needs no file parsing and reflects exactly what was measured. The view is a full-screen dialog inside the settings surface, opened by a "Compare results" action once at least one run completed: one column per model with its time, word count, transcript, and file reveal. A word-level LCS diff against a selectable baseline highlights missed and extra words; past a token cap the view shows plain text instead of building an unbounded table. The written markdown files stay the durable artifacts; the view is the quick read.
+
+- **Names come from the catalog, not from file names, when the catalog knows the file.** `getModelDisplayName` matches an installed file against the catalog and renders the canonical entry name with its quantization key (`GigaAM v3 E2E-RNN-T · Q8_0`). Auxiliary models carry their project names (`Nemotron-3-Diarization Q8_0`), and unknown files fall back to a reading of the file name that keeps acronyms (`GigaAM`, `RNNT`, `E2E`) and the quantization spelling (`Q8_0`, `Q4_K_M`) instead of title-casing every token.
 
 ## Risks / Trade-offs
 

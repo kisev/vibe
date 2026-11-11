@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/u
 import { Switch } from '~/components/ui/switch'
 import { openSettingsSection } from '~/lib/app'
 import { useModelGates } from '~/providers/model-gates'
-import { getFriendlyModelName, hidesStableTimestamps } from '~/lib/model'
+import { getModelDisplayName, hidesStableTimestamps } from '~/lib/model'
 import { usePreferenceProvider } from '~/providers/preference'
 
 function OptionRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
@@ -38,7 +38,7 @@ export default function RetranscribeDialog({
 	const modelGates = useModelGates()
 	// Renamed models keep their custom label; otherwise fall back to the file's friendly name.
 	const modelPath = preference.modelPath
-	const modelName = modelPath ? (preference.modelDisplayNames[modelPath] ?? getFriendlyModelName(modelPath.split(/[/\\]/).pop() ?? '')) : m.selectModel()
+	const modelName = modelPath ? (preference.modelDisplayNames[modelPath] ?? getModelDisplayName(modelPath.split(/[/\\]/).pop() ?? '')) : m.selectModel()
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>

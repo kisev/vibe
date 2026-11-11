@@ -11,13 +11,13 @@ import { m } from '~/paraglide/messages.js'
 import { openPath } from '~/lib/app'
 import { sizeMb } from '~/lib/catalog'
 import * as config from '~/lib/config'
-import { downloadModel, getFriendlyModelName, isModelFileUsable } from '~/lib/model'
+import { downloadModel, getModelDisplayName, isModelFileUsable } from '~/lib/model'
 import { IconAction, SettingsGroup, SettingsRow } from './shared'
 
 type SpeakerModelState = 'checking' | 'installed' | 'missing' | 'downloading'
 
 /** Human name of the bundled speaker-separation model, the same on every install. */
-const speakerModelName = getFriendlyModelName(config.diarizeModelFilename)
+const speakerModelName = getModelDisplayName(config.diarizeModelFilename)
 /** The published size, as the catalog labels its files (whole MB). */
 const speakerModelSize = config.diarizeModelIntegrity.size ? `${sizeMb(config.diarizeModelIntegrity.size)} MB` : null
 
