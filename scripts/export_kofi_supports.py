@@ -1,11 +1,3 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "bs4==0.0.2",
-#     "curl-cffi>=0.7",
-#     "pyperclip>=1.9",
-# ]
-# ///
 import json
 import subprocess
 from curl_cffi import requests

@@ -1,7 +1,4 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.12"
-# ///
+#!/usr/bin/env -S uv run
 """Write `website/public/updater/dev.json` from the newest complete dev release.
 
 The website build runs this before `pnpm build`. A dev release is complete when

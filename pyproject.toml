@@ -1,0 +1,20 @@
+[project]
+name = "vibe-scripts"
+version = "0.0.0"
+description = "One uv project for the repository's standalone Python scripts"
+requires-python = ">=3.12"
+dependencies = [
+  "bs4>=0.0.2",
+  "curl-cffi>=0.7",
+  "flask>=3.1",
+  "httpx>=0.28",
+  "pandas>=3.0",
+  "pyarrow>=23",
+  "pyjwt>=2.11",
+  "pyperclip>=1.9",
+  "python-dotenv>=1.2.1",
+]
+
+[tool.uv]
+# The scripts are run from the tree, not installed; uv only manages their environment.
+package = false

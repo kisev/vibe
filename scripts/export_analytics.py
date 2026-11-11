@@ -1,14 +1,4 @@
 #!/usr/bin/env -S uv run
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "httpx==0.28.1",
-#     "pandas==3.0.0",
-#     "pyarrow==23.0.0",
-#     "pyjwt==2.11.0",
-#     "python-dotenv==1.0.1",
-# ]
-# ///
 
 """
 Export Aptabase events to CSV or Parquet.

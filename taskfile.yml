@@ -223,6 +223,81 @@ tasks:
       - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E pyproject.toml -E desktop/project.inlang -E website/project.inlang -X tombi format --check
       - mise exec -- fd -H -e css -e html -E node_modules -X prettier --check
 
+  deps:check:
+    desc: Report outdated dependencies across Cargo, pnpm and uv (read-only)
+    cmds:
+      - |
+        status=0
+        for manifest in Cargo.toml server/Cargo.toml handoff/wasm/Cargo.toml handoff/probe/Cargo.toml; do
+          echo
+          echo "== cargo: $manifest =="
+          mise exec -- cargo outdated --workspace --manifest-path "$manifest" || status=1
+        done
+        for dir in desktop website handoff/pwa; do
+          echo
+          echo "== pnpm: $dir =="
+          rc=0
+          pnpm --dir "$dir" outdated || rc=$?
+          # pnpm exits 1 when it found outdated packages; anything higher is a failure.
+          [ "$rc" -le 1 ] || status=$rc
+        done
+        echo
+        echo "== uv: vibe-scripts =="
+        uv sync --locked --quiet && uv pip list --outdated || status=1
+        exit "$status"
+
+  deps:update:
+    desc: Update dependencies within their declared ranges (lockfiles unless a range blocks)
+    cmds:
+      - |
+        for manifest in Cargo.toml server/Cargo.toml handoff/wasm/Cargo.toml handoff/probe/Cargo.toml; do
+          echo
+          echo "== cargo update: $manifest =="
+          cargo update --manifest-path "$manifest"
+        done
+        for dir in desktop website handoff/pwa; do
+          echo
+          echo "== pnpm update: $dir =="
+          pnpm --dir "$dir" update
+        done
+        echo
+        echo "== uv lock --upgrade =="
+        uv lock --upgrade
+
+  deps:update:major:
+    desc: Upgrade across major versions (review the diff; never run automatically)
+    prompt: This crosses major versions in every ecosystem. Review the resulting diff before merging. Continue?
+    cmds:
+      - |
+        for manifest in Cargo.toml server/Cargo.toml handoff/wasm/Cargo.toml handoff/probe/Cargo.toml; do
+          echo
+          echo "== cargo upgrade --incompatible: $manifest =="
+          mise exec -- cargo upgrade --incompatible --manifest-path "$manifest"
+        done
+        for dir in desktop website handoff/pwa; do
+          echo
+          echo "== pnpm update --latest: $dir =="
+          pnpm --dir "$dir" update --latest
+        done
+
+  deps:renovate:dry:
+    desc: Show the updates Renovate would apply locally (no token, touches nothing)
+    cmds:
+      - |
+        RENOVATE_CONFIG_FILE=renovate.json LOG_LEVEL=info \
+          mise exec -- renovate --platform=local --dry-run
+
+  deps:renovate:
+    desc: Apply Renovate's updates to the working tree (review the diff, then commit)
+    cmds:
+      - |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "the working tree is dirty; commit or stash your changes before applying dependency updates" >&2
+          exit 1
+        fi
+        RENOVATE_CONFIG_FILE=renovate.json LOG_LEVEL=info \
+          mise exec -- renovate --platform=local
+
   ci:vulkan-deps:
     desc: Install the Vulkan build prerequisites on the lint runner (3 bounded attempts)
     cmds:

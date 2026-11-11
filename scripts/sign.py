@@ -1,11 +1,3 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "httpx==0.28.1",
-#     "flask==3.1.2",
-#     "python-dotenv==1.2.1",
-# ]
-# ///
 """
 Windows code signing over a YubiKey, in two halves of one script.
 

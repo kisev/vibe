@@ -1,8 +1,4 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = []
-# ///
+#!/usr/bin/env -S uv run
 """Serve the *built* Vibe Phone PWA (`handoff/pwa/dist/`) over HTTP.
 
 For development use Vite instead: `pnpm -C handoff/pwa dev` (port 8088). This script is

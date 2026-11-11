@@ -1,10 +1,4 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "httpx==0.28.1",
-# ]
-# ///
+#!/usr/bin/env -S uv run
 
 """Point an update channel at a release. See docs/UPDATER.md.
 
