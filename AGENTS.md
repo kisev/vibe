@@ -3,6 +3,7 @@
 ## Tooling
 
 - Tasks: `task` — see `task --list`; toolchain pins in `mise.toml`, git gates via `task hooks`
+- Upstream: `task upstream:fetch` (branches only); tags under `refs/upstream-tags/*` via `task upstream:tags` — see `docs/UPSTREAM.md`
 - JS: `pnpm` only; Python: `uv` standalone scripts (`uv run`)
 
 ## Validation

@@ -9,6 +9,26 @@ tasks:
     cmds:
       - mise exec -- lefthook install
 
+  setup:remotes:
+    desc: Isolate upstream tags so fetches never collide with the fork's own history
+    cmds:
+      - |
+        git config --unset-all remote.upstream.fetch 2>/dev/null || true
+        git config --add remote.upstream.fetch '+refs/heads/*:refs/remotes/upstream/*'
+        git config --add remote.upstream.fetch '^refs/tags/*'
+        git config remote.upstream.tagOpt --no-tags
+        echo "upstream now fetches branches only; fetch tags with: task upstream:tags"
+
+  upstream:fetch:
+    desc: Fetch upstream branches only - tags never collide with the fork's own
+    cmds:
+      - git fetch upstream --prune
+
+  upstream:tags:
+    desc: Fetch upstream tags into refs/upstream-tags for comparison (never refs/tags)
+    cmds:
+      - git fetch upstream '+refs/tags/*:refs/upstream-tags/*'
+
   i18n:generate:
     desc: Compile paraglide messages for desktop and website
     cmds:
