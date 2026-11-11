@@ -1,4 +1,4 @@
-//! Stable and beta update channels. See `docs/UPDATER.md`.
+//! Stable, beta, and dev update channels. See `docs/UPDATER.md`.
 //!
 //! The app reads `updater/<channel>.json` from the website rather than GitHub's latest release.
 //! Each file is the `latest.json` a release build produced. The plugin's own `check()` can only use
@@ -13,11 +13,13 @@ const CHANNELS_URL: &str = "https://kisev.github.io/vibe/updater";
 
 const PROGRESS_EVENT: &str = "updater-progress";
 
+/// One manifest per line: release (`vX.Y.Z`), beta (`vX.Y.Z-rc.<n>`), dev (`dev.<n>`).
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Channel {
     Stable,
     Beta,
+    Dev,
 }
 
 impl Channel {
@@ -25,6 +27,7 @@ impl Channel {
         let name = match self {
             Channel::Stable => "stable",
             Channel::Beta => "beta",
+            Channel::Dev => "dev",
         };
         format!("{CHANNELS_URL}/{name}.json")
     }
@@ -120,4 +123,25 @@ pub async fn update_install(pending: State<'_, PendingUpdate>) -> Result<(), Str
         return Err("no downloaded update to install".into());
     };
     update.install(bytes).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Channel, CHANNELS_URL};
+
+    fn from_json(name: &str) -> Channel {
+        serde_json::from_value(serde_json::Value::String(name.into())).unwrap()
+    }
+
+    #[test]
+    fn every_channel_reads_its_own_manifest() {
+        assert_eq!(from_json("stable").url(), format!("{CHANNELS_URL}/stable.json"));
+        assert_eq!(from_json("beta").url(), format!("{CHANNELS_URL}/beta.json"));
+        assert_eq!(from_json("dev").url(), format!("{CHANNELS_URL}/dev.json"));
+    }
+
+    #[test]
+    fn an_unknown_channel_does_not_deserialize() {
+        assert!(serde_json::from_value::<Channel>(serde_json::Value::String("nightly".into())).is_err());
+    }
 }

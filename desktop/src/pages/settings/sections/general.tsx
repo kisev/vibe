@@ -1,7 +1,7 @@
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Moon, Sun } from 'lucide-react'
-import { useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { m } from '~/paraglide/messages.js'
 import { ReactComponent as DiscordIcon } from '~/icons/discord.svg'
@@ -11,8 +11,8 @@ import { ReactComponent as LinkIcon } from '~/icons/link.svg'
 import * as config from '~/lib/config'
 import { DisplayLanguageInput } from '~/components/display-language-input'
 import { Switch } from '~/components/ui/switch'
-import { UpdaterContext } from '~/providers/updater'
 import { SettingsGroup, SettingsRow, type SettingsViewModel } from './shared'
+import { UpdateControls } from './updater-controls'
 
 /**
  * The OS owns this setting, not our config: the user can remove the login item from
@@ -65,7 +65,6 @@ function LaunchAtStartupSwitch() {
 export function GeneralSection({ vm }: { vm: SettingsViewModel }) {
 	const themeLabels = { light: m.light, dark: m.dark } as const
 	const themeIcons = { light: Sun, dark: Moon } as const
-	const { channel, setChannel } = useContext(UpdaterContext)
 
 	return (
 		<div className="space-y-5">
@@ -99,6 +98,8 @@ export function GeneralSection({ vm }: { vm: SettingsViewModel }) {
 				</SettingsRow>
 			</SettingsGroup>
 
+			<UpdateControls />
+
 			<SettingsGroup title={m.generalBehavior()}>
 				<SettingsRow label={m.closeToTray()} description={m.generalTrayInfo()}>
 					<Switch checked={vm.preference.closeToTray} onCheckedChange={vm.preference.setCloseToTray} />
@@ -108,9 +109,6 @@ export function GeneralSection({ vm }: { vm: SettingsViewModel }) {
 				</SettingsRow>
 				<SettingsRow label={m.preventSleep()} description={m.generalAwakeInfo()}>
 					<Switch checked={vm.preference.preventSleep} onCheckedChange={vm.preference.setPreventSleep} />
-				</SettingsRow>
-				<SettingsRow label={m.betaUpdates()} description={m.betaUpdatesInfo()}>
-					<Switch checked={channel === 'beta'} onCheckedChange={(on) => setChannel(on ? 'beta' : 'stable')} />
 				</SettingsRow>
 			</SettingsGroup>
 

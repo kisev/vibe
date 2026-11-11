@@ -1,7 +1,7 @@
 import * as dialog from '@tauri-apps/plugin-dialog'
 import * as process from '@tauri-apps/plugin-process'
 import { listen } from '@tauri-apps/api/event'
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { m } from '~/paraglide/messages.js'
 import { ErrorModalContext } from './error-modal'
 import { ModifyState } from '~/lib/types'
@@ -14,8 +14,14 @@ import { usePersisted } from '~/lib/config-store'
 export const FAKE_UPDATE_KEY = 'vibe_fake_update'
 export const devToolsEnabled = import.meta.env.DEV
 
-/** Which `updater/<channel>.json` the app follows. See docs/UPDATER.md. */
-export type UpdateChannel = 'stable' | 'beta'
+/**
+ * Which `updater/<channel>.json` the app follows. See docs/UPDATER.md:
+ * release tags `vX.Y.Z` on main, beta tags `vX.Y.Z-rc.<n>` on main, dev tags `dev.<n>` on dev.
+ */
+export type UpdateChannel = 'stable' | 'beta' | 'dev'
+
+/** Every user-visible phase of one update check and install. */
+export type CheckState = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'installing' | 'error'
 
 /** A newer version `update_check` found on the channel. */
 export interface Update {
@@ -28,7 +34,7 @@ interface DownloadProgress {
 	percent: number
 }
 
-type UpdaterContextType = {
+export type UpdaterContextType = {
 	availableUpdate: boolean
 	setAvailableUpdate: ModifyState<boolean>
 	updating: boolean
@@ -36,6 +42,13 @@ type UpdaterContextType = {
 	manifest?: Update
 	setManifest: ModifyState<Update | undefined>
 	updateApp: () => Promise<void>
+	/** Check the selected channel again without waiting for the next launch. */
+	checkNow: () => Promise<void>
+	checkState: CheckState
+	/** Why the last check failed; cleared when a later check starts. */
+	checkError: string | null
+	/** Epoch milliseconds of the last finished check, or null before the first one. */
+	lastCheckedAt: number | null
 	progress: number | null
 	/** Dev-only switch that fakes `availableUpdate`; always false in release builds. */
 	fakeUpdate: boolean
@@ -52,6 +65,10 @@ export const UpdaterContext = createContext<UpdaterContextType>({
 	setUpdating: () => {},
 	setManifest: () => {},
 	updateApp: async () => {},
+	checkNow: async () => {},
+	checkState: 'idle',
+	checkError: null,
+	lastCheckedAt: null,
 	progress: null,
 	fakeUpdate: false,
 	setFakeUpdate: () => {},
@@ -65,7 +82,13 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 	const [updating, setUpdating] = useState(false)
 	const { setState: setErrorModal } = useContext(ErrorModalContext)
 	const [progress, setProgress] = useState<number | null>(null)
+	const [checkState, setCheckState] = useState<CheckState>('idle')
+	const [checkError, setCheckError] = useState<string | null>(null)
+	const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null)
 	const [channel, setChannel] = usePersisted<UpdateChannel>(CONFIG_KEYS.updateChannel, 'stable')
+	// A slow check on the previous channel must not overwrite the result of the new one.
+	const channelRef = useRef(channel)
+	channelRef.current = channel
 	const [fakeUpdate, setFakeUpdateState] = useState(() => {
 		if (!devToolsEnabled) return false
 		try {
@@ -84,20 +107,33 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 		}
 	}
 
-	// Checked again on a channel switch, so moving to beta offers its build right away.
-	useEffect(() => {
-		let cancelled = false
-		invoke<Update | null>('update_check', { channel })
-			.then((found) => {
-				if (cancelled) return
-				setAvailableUpdate(found !== null)
-				setUpdate(found ?? undefined)
-			})
-			.catch((error) => console.error(error))
-		return () => {
-			cancelled = true
+	/**
+	 * One pass over the selected channel. The automatic check and the settings
+	 * button share it, so both report through the same state.
+	 */
+	const checkNow = useCallback(async () => {
+		setCheckState('checking')
+		setCheckError(null)
+		try {
+			const found = await invoke<Update | null>('update_check', { channel })
+			if (channelRef.current !== channel) return
+			setAvailableUpdate(found !== null)
+			setUpdate(found ?? undefined)
+			setCheckState(found !== null ? 'available' : 'current')
+		} catch (error) {
+			if (channelRef.current !== channel) return
+			console.error(error)
+			setCheckError(String(error))
+			setCheckState('error')
+		} finally {
+			if (channelRef.current === channel) setLastCheckedAt(Date.now())
 		}
 	}, [channel])
+
+	// Checked on startup and on a channel switch, so moving to another line offers its build right away.
+	useEffect(() => {
+		void checkNow()
+	}, [checkNow])
 
 	async function askForRelaunch() {
 		const shouldRelaunch = await dialog.ask(m.askForRelaunchBody(), {
@@ -115,6 +151,7 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 	async function downloadAndInstall() {
 		setUpdating(true)
 		setProgress(0)
+		setCheckState('downloading')
 		console.info(`Installing update ${update?.version}, ${update?.body}`)
 		const unlisten = await listen<DownloadProgress>('updater-progress', ({ payload }) => {
 			setProgress(payload.percent)
@@ -127,11 +164,13 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 		// Windows cannot replace the bundled server.exe while it is running. Stop it
 		// only after the update has downloaded so transcription remains available
 		// while the (potentially long) download is in progress.
+		setCheckState('installing')
 		await invoke('stop_api_server')
 		await invoke('update_install')
 		// Progress is left at 100 rather than reset: the dialog fades out after this, and a reset
 		// would show the bar sliding back to empty. The next download starts it at 0.
 		setUpdating(false)
+		setCheckState('available')
 		await askForRelaunch()
 		setAvailableUpdate(false)
 	}
@@ -153,6 +192,8 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 			} catch (e) {
 				console.error(e)
 				setUpdating(false)
+				setCheckError(String(e))
+				setCheckState('error')
 				setErrorModal?.({ open: true, log: String(e) })
 			}
 		}
@@ -172,6 +213,10 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 				updating,
 				setUpdating,
 				updateApp,
+				checkNow,
+				checkState,
+				checkError,
+				lastCheckedAt,
 				progress,
 			}}>
 			{children}
