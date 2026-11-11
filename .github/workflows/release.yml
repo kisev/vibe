@@ -42,8 +42,19 @@ jobs:
                       target_triple: "x86_64-pc-windows-msvc"
 
         runs-on: ${{ matrix.platform }}
+        env:
+            # Setup mise installs only `task`; do not let `mise exec` pull the
+            # rest of the toolchain into every matrix cell.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - uses: actions/checkout@v4
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  install: true
+                  install_args: task
+                  cache: true
 
             # A candidate is the same build as a release, only its version and
             # tag differ: `X.Y.Z-rc.N` sorts below `X.Y.Z`, which is what keeps
@@ -53,22 +64,7 @@ jobs:
               shell: bash
               env:
                   VERSION: ${{ inputs.version }}
-              run: |
-                  if [[ "$GITHUB_REF" != refs/heads/main ]]; then
-                      echo "::error::release overrides are cut from main only (on $GITHUB_REF)"
-                      exit 1
-                  fi
-                  if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
-                      echo "::error::version must be X.Y.Z or X.Y.Z-rc.N, got $VERSION"
-                      exit 1
-                  fi
-                  python3 - <<'PY'
-                  import json, os, pathlib
-                  path = pathlib.Path("desktop/src-tauri/tauri.conf.json")
-                  config = json.loads(path.read_text())
-                  config["version"] = os.environ["VERSION"]
-                  path.write_text(json.dumps(config, indent=2) + "\n")
-                  PY
+              run: mise exec -- task release:set-version
 
             - name: setup pnpm
               uses: pnpm/action-setup@v4
@@ -109,9 +105,7 @@ jobs:
 
             - name: Require release notes for this version
               shell: bash
-              run: |
-                  version=$(python3 -c 'import json; print(json.load(open("desktop/src-tauri/tauri.conf.json"))["version"])')
-                  test -f "i18n/changelog/$version.md" || { echo "::error::i18n/changelog/$version.md is missing; write the release notes before releasing"; exit 1; }
+              run: mise exec -- task ci:changelog-gate
             - name: Fetch the sidecars for ${{ matrix.target_triple }}
               run: chore setup ${{ matrix.target_triple }}
 
@@ -120,44 +114,27 @@ jobs:
             # The pin is read from server/libs so a bump never rots this step.
             - name: Fetch the prebuilt ggml libraries
               shell: bash
-              run: |
-                  triple="${{ matrix.target_triple }}"
-                  case "$triple" in
-                    aarch64-apple-darwin) asset=darwin-arm64 ;;
-                    x86_64-apple-darwin) asset=darwin-x86_64 ;;
-                    x86_64-unknown-linux-gnu) asset=linux-x86_64 ;;
-                    aarch64-unknown-linux-gnu) asset=linux-aarch64 ;;
-                    x86_64-pc-windows-msvc) asset=windows-amd64-msvc ;;
-                    *) echo "no ggml libraries asset for $triple" >&2; exit 1 ;;
-                  esac
-                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
-                  curl --location --fail --retry 3 -o /tmp/ggml-libs.tar.gz \
-                    "https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-$asset.tar.gz"
-                  tar -xzf /tmp/ggml-libs.tar.gz -C /tmp
-                  mv /tmp/lib server/libs/lib
+              env:
+                  TRIPLE: ${{ matrix.target_triple }}
+              run: mise exec -- task ci:ggml-libs
 
             - name: Build the native diarization helper
               shell: bash
-              run: |
-                  triple="${{ matrix.target_triple }}"
-                  exe=""
-                  if [[ "$triple" == *windows* ]]; then exe=".exe"; fi
-                  cd server
-                  cargo build -p vibe-diarize-native --release --target "$triple"
-                  cp "target/$triple/release/vibe-diarize-native$exe" \
-                    "../desktop/src-tauri/binaries/vibe-diarize-native-$triple$exe"
+              env:
+                  TRIPLE: ${{ matrix.target_triple }}
+                  EXE: ${{ contains(matrix.target_triple, 'windows') && '.exe' || '' }}
+              run: mise exec -- task ci:diarize-helper
 
             - name: Setup macOS signing env
               if: matrix.platform == 'macos-latest' && inputs.sign-macos
-              run: |
-                  {
-                      echo "APPLE_CERTIFICATE=${{ secrets.APPLE_CERTIFICATE }}"
-                      echo "APPLE_CERTIFICATE_PASSWORD=${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
-                      echo "APPLE_SIGNING_IDENTITY=${{ secrets.APPLE_SIGNING_IDENTITY }}"
-                      echo "APPLE_ID=${{ secrets.APPLE_ID }}"
-                      echo "APPLE_PASSWORD=${{ secrets.APPLE_PASSWORD }}"
-                      echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
-                  } >> "$GITHUB_ENV"
+              env:
+                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+                  APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+                  APPLE_ID: ${{ secrets.APPLE_ID }}
+                  APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+                  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+              run: mise exec -- task ci:macos-signing-env
 
             - name: Build
               uses: tauri-apps/tauri-action@v0

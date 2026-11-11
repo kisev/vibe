@@ -32,22 +32,23 @@ jobs:
         # Dev builds belong to the dev branch: a dev tag cut anywhere else is a
         # mistake, and so is a manual dispatch on another branch.
         runs-on: ubuntu-latest
+        env:
+            # Setup mise installs only `task`; do not let `mise exec` pull the
+            # rest of the toolchain into jobs that do not lint or format.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - uses: actions/checkout@v4
               with:
                   fetch-depth: 0
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  install: true
+                  install_args: task
+                  cache: true
             - name: The dev tag lives on the dev branch
               shell: bash
-              run: |
-                  git fetch --no-tags origin dev
-                  if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF_NAME" != "dev" ]]; then
-                      echo "Dev builds are cut from the dev branch; this dispatch ran on $GITHUB_REF_NAME" >&2
-                      exit 1
-                  fi
-                  if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
-                      echo "dev tags are cut on the dev branch only; $GITHUB_REF_NAME is not contained in dev" >&2
-                      exit 1
-                  fi
+              run: mise exec -- task dev:guard
 
     build:
         needs: guard
@@ -61,6 +62,9 @@ jobs:
         env:
             CARGO_PROFILE_RELEASE_LTO: "false"
             CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+            # Setup mise installs only `task`; do not let `mise exec` pull the
+            # rest of the toolchain into every matrix cell.
+            MISE_EXEC_AUTO_INSTALL: "false"
         strategy:
             fail-fast: false
             matrix:
@@ -93,6 +97,13 @@ jobs:
         runs-on: ${{ matrix.runner }}
         steps:
             - uses: actions/checkout@v4
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  install: true
+                  install_args: task
+                  cache: true
 
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
@@ -127,67 +138,12 @@ jobs:
 
             - name: Install Linux build dependencies
               if: runner.os == 'Linux'
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-                      pkg-config build-essential libglib2.0-dev libgtk-3-dev \
-                      libwebkit2gtk-4.1-dev clang cmake libssl-dev libasound2-dev \
-                      libxdo-dev libayatana-appindicator3-dev rpm
+              run: mise exec -- task ci:linux-build-deps
 
             - name: Compute the dev version
               id: dev-version
               shell: bash
-              run: |
-                  base=$(jq -r .version desktop/src-tauri/tauri.conf.json)
-                  short=${GITHUB_SHA:0:7}
-                  if [[ "$GITHUB_REF" == refs/tags/dev.* ]]; then
-                      # A pushed tag started this run: reuse it, never mint a
-                      # second one, and let its number order the release.
-                      tag="$GITHUB_REF_NAME"
-                      n="${GITHUB_REF_NAME#dev.}"
-                  else
-                      # Manual dispatch has no tag; the run number keeps the
-                      # scheme and still shares one release across re-runs.
-                      n="${{ github.run_number }}"
-                      tag="dev.$n"
-                  fi
-                  version="$base-dev.$n.$short"
-                  # One no-space JSON: tauri-action splits args on whitespace.
-                  # Dev builds carry signed updater artifacts so the Dev channel
-                  # can move them forward; the endpoints stay empty because the
-                  # channel file is chosen at runtime (see docs/UPDATER.md).
-                  config=$(jq -cn --arg v "$version" '{
-                      version: $v,
-                      bundle: { createUpdaterArtifacts: true },
-                      plugins: { updater: { endpoints: [] } }
-                  }')
-                  # The release body leads with the full commit SHA — the release
-                  # must identify its revision without the tag (the name carries
-                  # only 7 chars) — then the permanent dev changelog alias, which
-                  # outlives this release after cleanup, followed by the
-                  # accumulated unreleased changelog entry, so a dev install
-                  # shows what it carries; GitHub renders the sections as-is,
-                  # only the frontmatter drops.
-                  if [ -f i18n/changelog/unreleased.md ]; then
-                      changelog=$(awk 'c==2{print} /^---$/{c++}' i18n/changelog/unreleased.md | sed '/./,$!d' | head -c 60000)
-                  else
-                      changelog=""
-                  fi
-                  # One line, no literal newlines: a continuation at column 0
-                  # would end the YAML block scalar.
-                  notes="[Read the latest dev notes](https://kisev.github.io/vibe/changelog/dev)."
-                  body="Dev build of main at ${GITHUB_SHA}."$'\n\n'"${notes}"$'\n\n'"${changelog}"
-                  {
-                      echo "version=$version"
-                      echo "tag=$tag"
-                      echo "config=$config"
-                  } >> "$GITHUB_OUTPUT"
-                  # Multiline output; tauri-action publishes it as the release body.
-                  {
-                      echo "body<<CHANGELOG_EOF"
-                      echo "$body"
-                      echo "CHANGELOG_EOF"
-                  } >> "$GITHUB_OUTPUT"
+              run: mise exec -- task dev:prepare
 
             # ggml's Vulkan backend needs headers + glslc + glslangValidator +
             # SPIRV-Headers cmake config at build time only; the loader comes
@@ -195,64 +151,41 @@ jobs:
             # apt, jammy (kept for the older glibc floor) needs the LunarG repo.
             - name: Install Vulkan build prerequisites (noble)
               if: runner.os == 'Linux' && matrix.triple == 'aarch64-unknown-linux-gnu'
-              run: sudo apt-get update && sudo apt-get install -y libvulkan-dev glslc glslang-tools spirv-headers
+              run: mise exec -- task ci:vulkan-noble
 
             - name: Install Vulkan SDK (jammy)
               if: matrix.triple == 'x86_64-unknown-linux-gnu'
-              run: |
-                  wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc >/dev/null
-                  sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
-                  sudo apt-get update && sudo apt-get install -y vulkan-sdk
+              run: mise exec -- task ci:vulkan-jammy
 
             - name: Install Vulkan SDK (Windows)
               if: runner.os == 'Windows'
-              shell: pwsh
               timeout-minutes: 8
               env:
                   VULKAN_VERSION: 1.4.357.0
-              run: |
-                  # Same headless invocation as llama.cpp's build-vulkan CI: the
-                  # QtIFW flags --accept-licenses --default-answer --confirm-command
-                  # are the only silent form this installer accepts (/S and
-                  # --mode unattended hang a headless runner); it lands in
-                  # C:\VulkanSDK\<version> in well under a minute.
-                  curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
-                  & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
-                  if (-not (Test-Path "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin\glslc.exe")) { throw 'glslc.exe not found after the SDK install' }
-                  "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}" | Out-File -FilePath $env:GITHUB_ENV -Append
-                  "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
-                  # cmake links the loader by absolute path, but the rust crate links
-                  # vulkan-1 by name, so link.exe also needs the SDK lib dir on LIB.
-                  $vulkanLib = (Get-ChildItem "C:\VulkanSDK\${env:VULKAN_VERSION}" -Recurse -Filter vulkan-1.lib | Select-Object -First 1).DirectoryName
-                  if (-not $vulkanLib) { throw 'vulkan-1.lib not found in the SDK install' }
-                  "LIB=$vulkanLib;${env:LIB}" | Out-File -FilePath $env:GITHUB_ENV -Append
+              run: mise exec -- task ci:vulkan-sdk-windows
 
             - name: Build vibe-server
               shell: bash
               env:
+                  TRIPLE: ${{ matrix.triple }}
+                  EXE: ${{ matrix.exe }}
                   VIBE_SERVER_VERSION: ${{ steps.dev-version.outputs.version }}
                   VIBE_SERVER_COMMIT: ${{ github.sha }}
                   # Empty on the arm64 and macOS cells; the sys crate pins its
                   # own portable floors there. An empty value is a no-op.
                   TRANSCRIBE_CMAKE_ARGS: ${{ matrix.cmake_args }}
-              run: |
-                  exe="${{ matrix.exe }}"
-                  cd server
-                  cargo build -p vibe-server --release --target "${{ matrix.triple }}"
-                  mkdir -p ../desktop/src-tauri/binaries
-                  cp "target/${{ matrix.triple }}/release/vibe-server$exe" \
-                      "../desktop/src-tauri/binaries/vibe-server-${{ matrix.triple }}$exe"
+              run: mise exec -- task ci:build-server
 
             # The version proves the build env reached the crate; the commit is
             # printed by `serve` at startup, so check it is embedded instead of
             # starting a server on every runner.
             - name: Check the server sidecar
               shell: bash
-              run: |
-                  exe="${{ matrix.exe }}"
-                  binary="desktop/src-tauri/binaries/vibe-server-${{ matrix.triple }}$exe"
-                  "$binary" --version
-                  grep -aq "${{ github.sha }}" "$binary"
+              env:
+                  TRIPLE: ${{ matrix.triple }}
+                  EXE: ${{ matrix.exe }}
+                  GITHUB_SHA: ${{ github.sha }}
+              run: mise exec -- task ci:check-server
 
             # vibe-diarize-native statically links the prebuilt GGML the native
             # stack is built against (the same libraries lint.yml fetches for
@@ -260,68 +193,28 @@ jobs:
             # pin is read from server/libs so a bump never rots this step.
             - name: Fetch the prebuilt ggml libraries
               shell: bash
-              run: |
-                  triple="${{ matrix.triple }}"
-                  case "$triple" in
-                    aarch64-apple-darwin) asset=darwin-arm64 ;;
-                    x86_64-apple-darwin) asset=darwin-x86_64 ;;
-                    x86_64-unknown-linux-gnu) asset=linux-x86_64 ;;
-                    aarch64-unknown-linux-gnu) asset=linux-aarch64 ;;
-                    x86_64-pc-windows-msvc) asset=windows-amd64-msvc ;;
-                    *) echo "no ggml libraries asset for $triple" >&2; exit 1 ;;
-                  esac
-                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
-                  curl --location --fail --retry 3 -o /tmp/ggml-libs.tar.gz \
-                    "https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-$asset.tar.gz"
-                  tar -xzf /tmp/ggml-libs.tar.gz -C /tmp
-                  mv /tmp/lib server/libs/lib
+              env:
+                  TRIPLE: ${{ matrix.triple }}
+              run: mise exec -- task ci:ggml-libs
 
             - name: Build the native diarization helper
               shell: bash
-              run: |
-                  exe="${{ matrix.exe }}"
-                  cd server
-                  cargo build -p vibe-diarize-native --release --target "${{ matrix.triple }}"
-                  cp "target/${{ matrix.triple }}/release/vibe-diarize-native$exe" \
-                    "../desktop/src-tauri/binaries/vibe-diarize-native-${{ matrix.triple }}$exe"
+              env:
+                  TRIPLE: ${{ matrix.triple }}
+                  EXE: ${{ matrix.exe }}
+              run: mise exec -- task ci:diarize-helper
 
             # Linux takes a system ffmpeg; the other platforms bundle one as a
             # sidecar, but only where the model needs it, so this has to match
             # what tauri.*.windows.conf.json and the macOS build expect.
-            # Python because the runners' tar differs: macOS has bsdtar, which
-            # reads zip; the Windows runner's GNU tar does not.
             - name: Fetch ffmpeg
               if: matrix.ffmpeg != ''
-              shell: python
               env:
                   FFMPEG_URL: ${{ matrix.ffmpeg }}
                   TRIPLE: ${{ matrix.triple }}
                   EXE: ${{ matrix.exe }}
-              run: |
-                  import os
-                  import pathlib
-                  import urllib.request
-                  import zipfile
-
-                  url = os.environ["FFMPEG_URL"]
-                  triple = os.environ["TRIPLE"]
-                  exe = os.environ["EXE"]
-                  tmp = pathlib.Path(os.environ["RUNNER_TEMP"]) / "ffmpeg-download"
-                  tmp.mkdir(parents=True, exist_ok=True)
-                  archive = tmp / "ffmpeg.zip"
-                  urllib.request.urlretrieve(url, archive)
-                  with zipfile.ZipFile(archive) as bundle:
-                      member = next(
-                          name
-                          for name in bundle.namelist()
-                          if pathlib.PurePosixPath(name).name == "ffmpeg" + exe
-                      )
-                      bundle.extract(member, tmp / "out")
-                  target = pathlib.Path("desktop/src-tauri/binaries") / f"ffmpeg-{triple}{exe}"
-                  target.parent.mkdir(parents=True, exist_ok=True)
-                  os.replace(tmp / "out" / member, target)
-                  os.chmod(target, 0o755)
-                  print(f"installed {target}")
+                  RUNNER_TEMP: ${{ runner.temp }}
+              run: mise exec -- task ci:fetch-ffmpeg
 
             - name: Install frontend dependencies
               run: pnpm install --frozen-lockfile
@@ -348,7 +241,6 @@ jobs:
                   projectPath: ./desktop
                   tauriScript: pnpm exec tauri
 
-    # One dev release at a time: the tags carry the history, the releases page
     # Bounded retention, not a one-release sweep: the newest five dev releases
     # always stay, anything from the last 24 hours stays, and only releases
     # created before this run started are considered at all — a healed older
@@ -359,40 +251,27 @@ jobs:
         if: success()
         timeout-minutes: 5
         runs-on: ubuntu-latest
+        env:
+            # Setup mise installs only `task`; the cleanup does not need the
+            # lint/format tools.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  install: true
+                  install_args: task
+                  cache: true
+
             - name: Prune old dev releases, keeping the recent ones
               env:
                   GH_TOKEN: ${{ github.token }}
                   KEEP: ${{ needs.build.outputs.tag }}
                   KEEP_COUNT: "5"
                   KEEP_HOURS: "24"
-              run: |
-                  set -euo pipefail
-                  # A green cleanup must mean the sweep actually ran: an empty
-                  # KEEP or a failed query is an error, not a silent no-op.
-                  [ -n "$KEEP" ] || { echo "no tag came from the build outputs"; exit 1; }
-                  STARTED=""
-                  STARTED=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
-                  CUTOFF=""
-                  CUTOFF=$(date -u -d "$KEEP_HOURS hours ago" +%Y-%m-%dT%H:%M:%SZ)
-                  export STARTED CUTOFF KEEP KEEP_COUNT
-                  releases=$(mktemp)
-                  gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp > "$releases"
-                  # Dev prereleases only (tag pattern and prerelease flag must both
-                  # match), by id — duplicate releases on one tag must all go. Sort
-                  # newest first, drop the protected head, then delete only what is
-                  # older than this run and outside the 24-hour window.
-                  jq -r '[.[] | .[]] | [.[] | select(.prerelease and (.tag_name | test("^dev\\.")))]
-                      | sort_by(.created_at) | reverse
-                      | .[env.KEEP_COUNT | tonumber:]
-                      | map(select(.tag_name != env.KEEP and .created_at < env.STARTED and .created_at < env.CUTOFF))
-                      | .[].id' "$releases" \
-                  | while read -r rid; do
-                        if [ -z "$rid" ]; then continue; fi
-                        gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$rid"
-                        echo "deleted dev release $rid (tag kept)"
-                    done
-                  echo "cleanup done: newest $KEEP_COUNT and the last $KEEP_HOURS hours kept"
+              run: mise exec -- task dev:cleanup
 
     # The dev channel manifest is generated at website build time from the
     # newest complete dev prerelease (scripts/dev_manifest.py). Dispatching the
@@ -405,6 +284,9 @@ jobs:
         permissions:
             actions: write
         steps:
+            # Kept inline: extracting this to `task dev:deploy-website` would
+            # need a checkout, which this job's actions-only permissions do not
+            # grant.
             - name: Refresh the website and its dev manifest
               env:
                   GH_TOKEN: ${{ github.token }}

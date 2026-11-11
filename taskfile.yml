@@ -3,6 +3,14 @@
 # through mise; `task hooks` installs the git gates once per checkout.
 version: "3"
 
+# CI helper tasks read their inputs from documented environment variables;
+# workflows pass them through `env:` rather than as arguments, so values with
+# spaces or newlines never reach a shell argument.
+vars:
+  # The new dev-build script is not tied to an old interpreter name; Windows
+  # images expose `python`, while Unix runners use `python3`.
+  PYTHON: '{{if eq OS "windows"}}python{{else}}python3{{end}}'
+
 tasks:
   hooks:
     desc: Install the lefthook git gates once per checkout
@@ -214,6 +222,108 @@ tasks:
       - mise exec -- fd -H -e sh -E node_modules -X shfmt -i 4 -d
       - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E pyproject.toml -E desktop/project.inlang -E website/project.inlang -X tombi format --check
       - mise exec -- fd -H -e css -e html -E node_modules -X prettier --check
+
+  ci:vulkan-deps:
+    desc: Install the Vulkan build prerequisites on the lint runner (3 bounded attempts)
+    cmds:
+      - bash scripts/ci/vulkan-deps.sh
+
+  ci:vulkan-noble:
+    desc: Install Vulkan build prerequisites from noble apt (Ubuntu arm build)
+    cmds:
+      - bash scripts/ci/vulkan-noble.sh
+
+  ci:vulkan-jammy:
+    desc: Install the LunarG Vulkan SDK on jammy (Ubuntu x86_64 build)
+    cmds:
+      - bash scripts/ci/vulkan-jammy.sh
+
+  ci:vulkan-sdk-windows:
+    desc: Install the Vulkan SDK on a Windows runner (VULKAN_VERSION)
+    cmds:
+      - pwsh -NoProfile -File scripts/ci/vulkan-sdk-windows.ps1
+
+  ci:linux-build-deps:
+    desc: Install the Linux desktop build dependencies
+    cmds:
+      - bash scripts/ci/linux-build-deps.sh
+
+  ci:ggml-libs:
+    desc: Fetch the pinned prebuilt ggml libraries (TRIPLE)
+    cmds:
+      - bash scripts/ci/ggml-libs.sh
+
+  ci:diarize-helper:
+    desc: Build the native diarization helper and stage it as a sidecar (TRIPLE, EXE)
+    cmds:
+      - bash scripts/ci/diarize-helper.sh
+
+  ci:fetch-ffmpeg:
+    desc: Fetch the bundled ffmpeg sidecar (FFMPEG_URL, TRIPLE, EXE, RUNNER_TEMP)
+    cmds:
+      # `python` is what the old Actions `shell: python` used on every platform.
+      - python scripts/ci/fetch_ffmpeg.py
+
+  ci:build-server:
+    desc: Build vibe-server and stage it as the desktop sidecar (TRIPLE, EXE, VIBE_SERVER_VERSION, VIBE_SERVER_COMMIT, TRANSCRIBE_CMAKE_ARGS)
+    cmds:
+      - bash scripts/ci/build-server.sh
+
+  ci:check-server:
+    desc: Check the server sidecar reports its version and embeds the commit (TRIPLE, EXE, GITHUB_SHA)
+    cmds:
+      - bash scripts/ci/check-server.sh
+
+  ci:macos-signing-env:
+    desc: Export the Apple signing secrets into GITHUB_ENV (APPLE_*)
+    cmds:
+      - bash scripts/ci/macos-signing-env.sh
+
+  ci:changelog-gate:
+    desc: Require i18n/changelog/<version>.md for the version being released
+    cmds:
+      - bash scripts/ci/changelog-gate.sh
+
+  ci:frontend-deps:
+    desc: Install the desktop and website frontend dependencies
+    cmds:
+      - pnpm --dir desktop install --frozen-lockfile
+      - pnpm --dir website install --frozen-lockfile
+
+  ci:desktop-build-deps:
+    desc: Install the desktop crate's build prerequisites on Ubuntu
+    cmds:
+      - bash scripts/ci/desktop-build-deps.sh
+
+  ci:desktop-check:
+    desc: Type-check the desktop crate with placeholder sidecars (Ubuntu)
+    cmds:
+      - bash scripts/ci/desktop-check.sh
+
+  dev:guard:
+    desc: Fail unless this dev build's commit is contained in the dev branch
+    cmds:
+      - '{{.PYTHON}} scripts/dev_build.py guard'
+
+  dev:prepare:
+    desc: Compute the dev version, tag, tauri config and release body into GITHUB_OUTPUT
+    cmds:
+      - '{{.PYTHON}} scripts/dev_build.py prepare'
+
+  dev:cleanup:
+    desc: Prune old dev releases with bounded retention (KEEP, KEEP_COUNT, KEEP_HOURS, GH_TOKEN, GITHUB_RUN_ID, GITHUB_REPOSITORY)
+    cmds:
+      - '{{.PYTHON}} scripts/dev_build.py cleanup'
+
+  dev:deploy-website:
+    desc: Dispatch the website deploy so the dev manifest refreshes (GH_TOKEN, GITHUB_REPOSITORY)
+    cmds:
+      - gh workflow run website.yml --ref main --repo "$GITHUB_REPOSITORY"
+
+  release:set-version:
+    desc: Validate and apply the release version override to tauri.conf.json (VERSION, GITHUB_REF)
+    cmds:
+      - python3 scripts/release_set_version.py
 
   dev:tag:
     desc: Cut a dev build - tag dev.<next> on the dev branch and push the tag

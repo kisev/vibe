@@ -39,29 +39,16 @@ jobs:
             # apt call has failed whole lints; retry the pair, but bound every
             # call so a hanging resolver cannot eat the job's 30 minutes.
             - name: Install Vulkan build prerequisites
-              run: |
-                  for attempt in 1 2 3; do
-                    if timeout 150 sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 update \
-                        && timeout 180 sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 install -y libvulkan-dev glslc glslang-tools spirv-headers; then
-                      exit 0
-                    fi
-                    echo "apt attempt $attempt failed; retrying in 10s"
-                    sleep 10
-                  done
-                  echo "::error::could not install the Vulkan build prerequisites after 3 attempts"
-                  exit 1
+              run: mise exec -- task ci:vulkan-deps
 
             # Clippy covers the whole server workspace, including the dormant
             # upstream crates: ggml-rs-sys's build script wants the prebuilt
             # ggml libraries (upstream's `chore setup` fetches these; the pin
             # is read from server/libs so a bump never rots this step).
             - name: Fetch the prebuilt ggml libraries
-              run: |
-                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
-                  curl --location --fail --retry 3 -o /tmp/ggml-libs.tar.gz \
-                    "https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-linux-x86_64.tar.gz"
-                  tar -xzf /tmp/ggml-libs.tar.gz -C /tmp
-                  mv /tmp/lib server/libs/lib
+              env:
+                  TRIPLE: x86_64-unknown-linux-gnu
+              run: mise exec -- task ci:ggml-libs
 
             - name: Lint the tree
               run: mise exec -- task lint format:check
@@ -102,9 +89,7 @@ jobs:
                       website/pnpm-lock.yaml
 
             - name: Install frontend dependencies
-              run: |
-                  pnpm --dir desktop install --frozen-lockfile
-                  pnpm --dir website install --frozen-lockfile
+              run: mise exec -- task ci:frontend-deps
 
             - name: Frontend unit tests
               run: mise exec -- task desktop:test website:test
@@ -116,8 +101,19 @@ jobs:
     helper-link-check:
         timeout-minutes: 20
         runs-on: windows-latest
+        env:
+            # Setup mise installs only `task`; this job does not need the
+            # lint/format toolchain.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - uses: actions/checkout@v4
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  install: true
+                  install_args: task
+                  cache: true
 
             - name: Setup Rust stable
               uses: dtolnay/rust-toolchain@stable
@@ -131,12 +127,9 @@ jobs:
 
             - name: Fetch the prebuilt ggml libraries
               shell: bash
-              run: |
-                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
-                  curl --location --fail --retry 3 -o /tmp/ggml-libs.tar.gz \
-                    "https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-windows-amd64-msvc.tar.gz"
-                  tar -xzf /tmp/ggml-libs.tar.gz -C /tmp
-                  mv /tmp/lib server/libs/lib
+              env:
+                  TRIPLE: x86_64-pc-windows-msvc
+              run: mise exec -- task ci:ggml-libs
 
             - name: Link the native diarization helper
               shell: bash
@@ -149,8 +142,19 @@ jobs:
     desktop-check:
         timeout-minutes: 25
         runs-on: ubuntu-24.04
+        env:
+            # Setup mise installs only `task`; this job does not need the
+            # lint/format toolchain.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - uses: actions/checkout@v4
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  install: true
+                  install_args: task
+                  cache: true
 
             - name: Setup Rust stable
               uses: dtolnay/rust-toolchain@stable
@@ -161,20 +165,7 @@ jobs:
                   workspaces: desktop/src-tauri
 
             - name: Install desktop build prerequisites
-              run: >
-                  sudo apt-get update && sudo apt-get install -y --no-install-recommends
-                  pkg-config build-essential libglib2.0-dev libgtk-3-dev
-                  libwebkit2gtk-4.1-dev clang cmake libssl-dev libasound2-dev
-                  libxdo-dev libayatana-appindicator3-dev
+              run: mise exec -- task ci:desktop-build-deps
 
             - name: Type-check the desktop crate
-              run: |
-                  # tauri's build script wants the frontend dist and the sidecar
-                  # binaries to exist; both are only real in a release build. The
-                  # sidecars are matched with their target-triple suffix.
-                  mkdir -p desktop/dist desktop/src-tauri/binaries
-                  triple="$(rustc -vV | sed -n 's/host: //p')"
-                  touch "desktop/src-tauri/binaries/vibe-server-$triple" \
-                    "desktop/src-tauri/binaries/vibe-diarize-native-$triple"
-                  chmod +x desktop/src-tauri/binaries/*
-                  cargo check --manifest-path desktop/src-tauri/Cargo.toml --all-targets
+              run: mise exec -- task ci:desktop-check
