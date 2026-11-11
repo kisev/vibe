@@ -158,7 +158,7 @@ export default function Cta({ onOpenKofi }: CtaProps) {
 						<span
 							dir="ltr"
 							className="ms-2 inline-flex items-center rounded-full border border-rose-500/40 bg-rose-500/10 px-1.5 py-px align-middle font-mono text-[9px] font-semibold tracking-[0.1em] text-rose-500 uppercase">
-							Beta
+							{m['beta']()}
 						</span>
 					)}
 				</span>

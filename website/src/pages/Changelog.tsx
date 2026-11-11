@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { cn } from '~/lib/style'
-import { findRelease, hasTranslations, loadReleases, releases, sections, type Release, type Section } from '~/lib/changelog'
+import {
+	findDevRelease,
+	findRelease,
+	hasTranslations,
+	isDevVersion,
+	loadReleases,
+	releases,
+	sections,
+	type Release,
+	type Section,
+} from '~/lib/changelog'
 import { m } from '~/paraglide/messages.js'
 import { getLocale, getTextDirection, type Locale } from '~/paraglide/runtime.js'
 
@@ -23,6 +33,9 @@ const inline = [
 	'[&_code]:rounded [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[13px] [&_code]:text-foreground',
 ].join(' ')
 
+/** The permanent address of the dev line, under whatever basename the site is deployed at. */
+const devPath = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/changelog/dev`
+
 /** One formatter per locale — building an Intl.DateTimeFormat is the expensive part, not using it. */
 const formatters = new Map<string, Intl.DateTimeFormat>()
 
@@ -36,9 +49,11 @@ function formatDate(date: string, locale: string) {
 	return formatter.format(new Date(`${date}T00:00:00Z`))
 }
 
-function Entry({ release, single }: { release: Release; single: boolean }) {
+function Entry({ release, single, dev }: { release: Release; single: boolean; dev: boolean }) {
 	// The unreleased entry has no version number yet — it is the dev line in progress.
 	const id = release.version === 'unreleased' ? 'Unreleased' : `v${release.version}`
+	// The unreleased entry is the dev line, so its heading opens the permanent alias.
+	const href = release.version === 'unreleased' ? '/changelog/dev' : `/changelog/${release.version}`
 	return (
 		<article
 			id={id}
@@ -46,9 +61,16 @@ function Entry({ release, single }: { release: Release; single: boolean }) {
 			dir={getTextDirection(release.locale as Locale)}>
 			{/* The version and date stay put while the entry's notes scroll past. */}
 			<div className="lg:sticky lg:top-24 lg:self-start">
-				<Link to={`/changelog/${release.version}`} className="text-[15px] font-medium text-foreground transition-colors hover:text-primary">
-					{id}
-				</Link>
+				<div className="flex items-baseline gap-2">
+					<Link to={href} className="text-[15px] font-medium text-foreground transition-colors hover:text-primary">
+						{id}
+					</Link>
+					{dev && (
+						<span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+							{m.changelogDevLine()}
+						</span>
+					)}
+				</div>
 				{release.date && (
 					<time dateTime={release.date} className="mt-1 block text-[13px] text-muted-foreground">
 						{formatDate(release.date, release.locale)}
@@ -87,11 +109,20 @@ function Entry({ release, single }: { release: Release; single: boolean }) {
 
 export default function Changelog() {
 	const { version } = useParams()
+	// A dev link — the alias or a swept `-dev.` version — always resolves to the dev line.
+	const dev = isDevVersion(version)
 	// A locale with translations waits for them instead of painting English first: swapping
 	// English for, say, Hebrew a moment later flips direction and reflows the whole page.
 	const [list, setList] = useState<Release[] | null>(() => (hasTranslations(getLocale()) ? null : releases))
-	const one = version && list ? findRelease(version, list) : undefined
-	const shown = one ? [one] : (list ?? [])
+	const devEntry = dev && list ? findDevRelease(list) : undefined
+	const one = !dev && version && list ? findRelease(version, list) : undefined
+	const shown = dev ? (devEntry ? [devEntry.release] : []) : one ? [one] : (list ?? [])
+
+	// A versioned dev URL keeps working, but the address bar gives back the permanent alias.
+	useEffect(() => {
+		if (!dev || window.location.pathname === devPath) return
+		window.history.replaceState(window.history.state, '', `${devPath}${window.location.search}${window.location.hash}`)
+	}, [dev])
 
 	useEffect(() => {
 		if (list) return
@@ -116,12 +147,13 @@ export default function Changelog() {
 			<header dir={getTextDirection(getLocale())}>
 				<p className="eyebrow">Vibe</p>
 				<h1 className="mt-4 text-[2rem] font-semibold leading-[1.08] tracking-[-0.03em] text-foreground lg:text-[2.5rem]">{m.changelog()}</h1>
-				{version && list && !one && <p className="mt-4 text-muted-foreground">{m.changelogUnknownVersion({ version })}</p>}
+				{devEntry?.fallback && <p className="mt-4 text-muted-foreground">{m.changelogDevFallback()}</p>}
+				{!dev && version && list && !one && <p className="mt-4 text-muted-foreground">{m.changelogUnknownVersion({ version })}</p>}
 			</header>
 			{/* Holds the page's height while translations load, so the footer does not jump up and back. */}
 			<div className={cn('mt-6', !list && 'min-h-[100vh]')}>
 				{shown.map((release) => (
-					<Entry key={release.version} release={release} single={Boolean(one)} />
+					<Entry key={release.version} release={release} single={Boolean(one) || Boolean(devEntry)} dev={dev} />
 				))}
 			</div>
 		</main>

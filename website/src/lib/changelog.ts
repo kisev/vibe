@@ -100,3 +100,34 @@ export function findRelease(version: string | undefined, list: Release[] = relea
 	const wanted = (version ?? '').replace(/^v/, '')
 	return list.find((r) => r.version === wanted)
 }
+
+/** The stable URL for the dev line. Dev releases are swept, so a versioned dev link must not be the address people keep. */
+export const devAlias = 'dev'
+
+/**
+ * Whether a route param names the dev line: the alias itself or a version carrying
+ * the `-dev.` prerelease marker. Detection is by the marker rather than by looking
+ * the version up, because that version may be exactly what cleanup removed.
+ */
+export function isDevVersion(version: string | undefined): boolean {
+	const wanted = (version ?? '').replace(/^v/, '')
+	return wanted === devAlias || wanted.includes('-dev.')
+}
+
+export interface DevRelease {
+	release: Release
+	/** True when the unreleased entry has no bullets, so the newest release stands in for it. */
+	fallback: boolean
+}
+
+/**
+ * The entry the dev alias renders: the `unreleased` entry while it has notes, and
+ * otherwise the newest released entry, so the permanent URL never shows an empty
+ * page or an unknown-version state.
+ */
+export function findDevRelease(list: Release[] = releases): DevRelease | undefined {
+	const unreleased = list.find((r) => r.version === 'unreleased')
+	if (unreleased && unreleased.items.length > 0) return { release: unreleased, fallback: false }
+	const newest = list.filter((r) => r.version !== 'unreleased').sort((a, b) => compareVersions(a.version, b.version))[0]
+	return newest ? { release: newest, fallback: true } : undefined
+}

@@ -45,7 +45,7 @@ export default function Docs() {
 	return (
 		<main className="mx-auto w-full max-w-[1065px] px-5 pb-24 pt-14 lg:pt-20" dir={getTextDirection(locale)}>
 			<header>
-				<p className="eyebrow">Documentation</p>
+				<p className="eyebrow">{m['docs-eyebrow']()}</p>
 				<h1 className="mt-4 text-[2rem] font-semibold leading-[1.08] tracking-[-0.03em] text-foreground lg:text-[2.5rem]">{m.vibeDocumentation()}</h1>
 			</header>
 

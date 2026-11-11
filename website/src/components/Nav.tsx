@@ -37,20 +37,20 @@ export default function Nav({ locale, availableLocales, onLocaleChange }: NavPro
 					</Link>
 				</nav>
 
-				<ul className="ms-auto flex items-center gap-4">
+				<ul className="ms-auto flex items-center gap-2 sm:gap-4">
 					{import.meta.env.DEV && (
 						<button
 							type="button"
-							aria-label="Toggle theme (dev)"
+							aria-label={m['toggle-theme-dev']()}
 							onClick={() => document.documentElement.classList.toggle('dark')}
 							className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
 							<Sun className="size-4 dark:hidden" />
 							<Moon className="hidden size-4 dark:block" />
 						</button>
 					)}
-					{import.meta.env.DEV && (
-						<LanguageSelector locale={locale} availableLocales={availableLocales} onLocaleChange={onLocaleChange} showDevBadge />
-					)}
+					{/* The same selector at both breakpoints: compact in the small-screen header, full in the desktop nav. */}
+					<LanguageSelector compact className="sm:hidden" locale={locale} availableLocales={availableLocales} onLocaleChange={onLocaleChange} />
+					<LanguageSelector className="hidden sm:block" locale={locale} availableLocales={availableLocales} onLocaleChange={onLocaleChange} />
 					<li>
 						<Button size="sm" asChild>
 							<a href="#download" onClick={onDownloadClick}>

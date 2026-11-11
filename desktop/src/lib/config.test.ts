@@ -1,8 +1,31 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { gigaamModelFilename, gigaamModelUrl, vadModelFilename, vadModelUrl } from './config'
+import { changelogURL, gigaamModelFilename, gigaamModelUrl, vadModelFilename, vadModelUrl } from './config'
 import { getFilenameFromUrl, isAuxiliaryModelFile, isModelFile } from './model'
+
+describe('changelogURL', () => {
+	const base = 'https://kisev.github.io/vibe/changelog'
+
+	it('keeps stable versions on their own entry', () => {
+		expect(changelogURL('1.0.0')).toBe(`${base}/1.0.0`)
+		expect(changelogURL('v1.0.0')).toBe(`${base}/v1.0.0`)
+		expect(changelogURL('1.1.0-rc.1')).toBe(`${base}/1.1.0-rc.1`)
+	})
+
+	it('maps every dev input to the permanent alias, never a versioned dev path', () => {
+		expect(changelogURL('dev')).toBe(`${base}/dev`)
+		expect(changelogURL('unreleased')).toBe(`${base}/dev`)
+		expect(changelogURL('1.0.0-dev.72')).toBe(`${base}/dev`)
+		expect(changelogURL('v1.0.0-dev.72')).toBe(`${base}/dev`)
+		expect(changelogURL('1.0.0-dev.72')).not.toContain('-dev.')
+	})
+
+	it('opens the whole list without a version, as before', () => {
+		expect(changelogURL()).toBe(base)
+		expect(changelogURL('')).toBe(base)
+	})
+})
 
 describe('GigaAM model catalog entry', () => {
 	it('uses a direct GGUF download that the settings URL flow can install', async () => {

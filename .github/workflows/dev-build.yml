@@ -163,9 +163,11 @@ jobs:
                   }')
                   # The release body leads with the full commit SHA — the release
                   # must identify its revision without the tag (the name carries
-                  # only 7 chars) — followed by the accumulated unreleased
-                  # changelog entry, so a dev install shows what it carries;
-                  # GitHub renders the sections as-is, only the frontmatter drops.
+                  # only 7 chars) — then the permanent dev changelog alias, which
+                  # outlives this release after cleanup, followed by the
+                  # accumulated unreleased changelog entry, so a dev install
+                  # shows what it carries; GitHub renders the sections as-is,
+                  # only the frontmatter drops.
                   if [ -f i18n/changelog/unreleased.md ]; then
                       changelog=$(awk 'c==2{print} /^---$/{c++}' i18n/changelog/unreleased.md | sed '/./,$!d' | head -c 60000)
                   else
@@ -173,7 +175,8 @@ jobs:
                   fi
                   # One line, no literal newlines: a continuation at column 0
                   # would end the YAML block scalar.
-                  body="Dev build of main at ${GITHUB_SHA}."$'\n\n'"${changelog}"
+                  notes="[Read the latest dev notes](https://kisev.github.io/vibe/changelog/dev)."
+                  body="Dev build of main at ${GITHUB_SHA}."$'\n\n'"${notes}"$'\n\n'"${changelog}"
                   {
                       echo "version=$version"
                       echo "tag=$tag"
