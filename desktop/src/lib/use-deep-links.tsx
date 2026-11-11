@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import * as os from '@tauri-apps/plugin-os'
 import { invoke } from '@tauri-apps/api/core'
+import { handOffMeetingUrl, parseBrowserDeepLink } from './meeting-browser'
 
 interface UseDeepLinksProps {
 	setFiles: ModifyState<NamedPath[]>
@@ -19,6 +20,12 @@ export function useDeepLinks({ setFiles }: UseDeepLinksProps) {
 	async function processURLs(urls: string[]): Promise<void> {
 		const newFiles: NamedPath[] = []
 		for (let url of urls) {
+			// vibe://open/?url=… hands a link to the in-app browser; the command validates it.
+			const openLink = parseBrowserDeepLink(url)
+			if (openLink) {
+				await handOffMeetingUrl(openLink.url)
+				continue
+			}
 			if (url.startsWith('vibe://download/?url=')) {
 				const downloadURL = url.replace('vibe://download/?url=', '')
 				const host = new URL(downloadURL).hostname

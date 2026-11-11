@@ -11,6 +11,7 @@ import type { PermissionStatus } from '~/lib/permissions'
 import { m } from '~/paraglide/messages.js'
 import { useRecordingShortcut } from '~/providers/recording-shortcut'
 import { usePreferenceProvider } from '~/providers/preference'
+import { MeetingBrowserSettings } from './meeting-browser'
 import { SettingsGroup, SettingsRow } from './shared'
 
 type PermissionKind = 'microphone' | 'system_audio'
@@ -153,6 +154,8 @@ export function RecordingSection() {
 
 	return (
 		<div className="space-y-6">
+			<MeetingBrowserSettings />
+
 			<SettingsGroup title={m.meetingDetection()}>
 				<SettingsRow label={<MeetingServiceIcons label={m.supportedMeetingServices()} />} description={m.meetingDetectionInfo()}>
 					<Switch checked={meetingDetectionEnabled} onCheckedChange={setMeetingDetectionEnabled} aria-label={m.meetingDetection()} />

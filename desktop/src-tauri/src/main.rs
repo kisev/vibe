@@ -14,6 +14,7 @@ mod ffmpeg;
 mod handoff;
 mod keepawake;
 mod logging;
+mod meeting_browser;
 mod meeting_prompt;
 mod server;
 mod setup;
@@ -133,6 +134,7 @@ async fn main() -> Result<()> {
             cmd::files::get_default_projects_path,
             cmd::audio::get_audio_devices,
             cmd::audio::start_record,
+            cmd::audio::recording_active,
             cmd::app::get_models_folder,
             cmd::app::get_logs_folder,
             cmd::app::show_log_path,
@@ -159,6 +161,14 @@ async fn main() -> Result<()> {
             dictation_indicator::get_dictation_indicator_state,
             dictation_indicator::dictation_indicator_ready,
             dictation_indicator::hide_dictation_indicator,
+            meeting_browser::open_meeting_browser,
+            meeting_browser::meeting_browser_session,
+            meeting_browser::meeting_browser_navigate,
+            meeting_browser::meeting_browser_open_external,
+            meeting_browser::meeting_browser_close,
+            meeting_browser::meeting_browser_confirm_close,
+            meeting_browser::meeting_hosts,
+            meeting_browser::set_meeting_hosts,
             meeting_prompt::get_meeting_detection_enabled,
             meeting_prompt::set_meeting_detection_enabled,
             meeting_prompt::get_meeting_prompt_state,

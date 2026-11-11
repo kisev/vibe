@@ -18,11 +18,23 @@ Custom skills live in `.claude/skills/<name>/SKILL.md`.
 
 Agent mode: parallel moves, instant iteration, speed by default. Split heavy work until obvious. Estimate by output size — 300 lines = minutes. Correct over easy: rework is slower than doing it right once. Plan resolved → execute, don't re-analyze.
 
+## OpenSpec first
+
+Practically everything goes through an OpenSpec change: if a request does not map to an existing `openspec/changes/<name>/`, create or update one before touching code. Proposal, spec delta, design, and tasks come first; implementation follows the tasks. The only exceptions are a production hotfix, a typo, or a pure translation refresh — and even those leave a note in the nearest change or a new one the same day. Never build a feature, a refactor of behavior, or a CI/process change "outside openspec".
+
+## Thin workflows, thick tasks
+
+GitHub workflows are thin: checkout, toolchain setup, and a call to a `task` target. All logic — version computation, release bodies, cleanup rules, manifest generation, guards, retries — lives in `taskfile.yml` tasks or standalone scripts under `scripts/`. A YAML file holds `run: task <name>` and env/inputs, nothing else. If a step grows past a couple of lines of shell or jq, it becomes a task before it lands.
+
 ## Release discipline
 
 A `dev.<n>` tag publishes a release — it is never a validation vehicle. Code that needs a compile/CI check goes to main and is validated by the Lint run it triggers (server clippy + desktop cargo check + tests), which has no release side effects. Tag only from a green Lint run on that exact revision; never tag "to see if it builds".
 
-Dev builds live on the `dev` branch: `main` carries the release line, and every `dev.<n>` tag is cut on `dev` only — `task dev:tag` refuses off `dev`, and the Dev Build workflow fails a tag whose commit is not contained in `dev`. Later dev builds clean up older `dev.<n>` tags and their releases; that is expected — dev builds are a moving channel, not history.
+Dev builds live on the `dev` branch: `main` carries the release line, and every `dev.<n>` tag is cut on `dev` only — `task dev:tag` refuses off `dev`, and the Dev Build workflow fails a tag whose commit is not contained in `dev`.
+
+Dev builds are tag-only: a push to `dev` builds nothing, and a `dev.<n>` tag (or an explicit dispatch on `dev`) is the only trigger. Never rerun a whole dev matrix to "check" something — that is five platform builds and a website deploy.
+
+Cleanup is bounded retention, not a one-release sweep: the newest **5** dev releases always stay, anything created in the last **24 hours** stays, and only releases created before the running build started are considered at all. So a late-healed older run can never delete a release a newer build is filling. Tags are never deleted — they are the history.
 
 ## Working in parallel
 

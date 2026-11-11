@@ -7,7 +7,7 @@ use serde_json::json;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Listener};
@@ -16,6 +16,23 @@ use crate::error::LogError;
 use crate::ffmpeg::{get_local_time, random_string};
 
 type WavWriterHandle = Arc<Mutex<Option<hound::WavWriter<BufWriter<File>>>>>;
+
+/// True from the moment `start_record` has all of its streams until its stop closure returns.
+static RECORDING: AtomicBool = AtomicBool::new(false);
+
+/// Clears the flag even if the stop closure exits early (or unwinds).
+struct RecordingFlagGuard;
+
+impl Drop for RecordingFlagGuard {
+    fn drop(&mut self) {
+        RECORDING.store(false, Ordering::SeqCst);
+    }
+}
+
+#[tauri::command]
+pub fn recording_active() -> bool {
+    RECORDING.load(Ordering::SeqCst)
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -193,9 +210,11 @@ pub async fn start_record(app_handle: AppHandle, devices: Vec<AudioDevice>, reco
         stream_handles.push(stream_handle.clone());
         tracing::debug!("Stream handle created");
     }
+    RECORDING.store(true, Ordering::SeqCst);
 
     let app_handle_clone = app_handle.clone();
     let stop = std::sync::Mutex::new(Some(move || {
+        let _recording_flag = RecordingFlagGuard;
         for (i, stream_handle) in stream_handles.iter().enumerate() {
             let stream_handle = stream_handle.lock().map_err(|e| eyre!("{:?}", e)).log_error();
             if let Some(mut stream_handle) = stream_handle {
