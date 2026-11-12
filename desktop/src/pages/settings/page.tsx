@@ -143,7 +143,7 @@ export default function SettingsPage({ setVisible, scrollTo }: SettingsPageProps
 				<div className="flex w-56 shrink-0 flex-col border-r border-border/55 bg-muted/40 p-3">
 					<div className="mb-2 flex items-center justify-between px-1 pb-1">
 						<span className="text-sm font-semibold">{m.settings()}</span>
-						<Button onMouseDown={() => setVisible(false)} variant="ghost" size="iconSm" className="h-7 w-7 rounded-lg">
+						<Button onMouseDown={() => setVisible(false)} variant="ghost" size="iconSm" className="h-7 w-7 rounded-lg" aria-label={m.modalClose()}>
 							<X className="h-4 w-4" />
 						</Button>
 					</div>

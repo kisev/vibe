@@ -1,9 +1,9 @@
 // Core runtime of the browser-mode Tauri mock: installs the IPC bridge, the window/webview
 // surface and the few globals the app touches directly.
 import { mockConvertFileSrc, mockIPC, mockWindows } from '@tauri-apps/api/mocks'
-import { handleEventPluginCommand } from './event-bus'
+import { emitMockEvent, handleEventPluginCommand } from './event-bus'
 import { mockArch, mockPlatform } from './state'
-import type { CommandHandlerMap } from './types'
+import type { CommandHandler, CommandHandlerMap } from './types'
 
 // Commands sent by `@tauri-apps/api/window`, `/webview` and `/webviewWindow`.
 // The app only uses show/setFocus/unminimize plus window scoped `listen()`, so a
@@ -13,6 +13,32 @@ const WINDOW_SURFACE_PREFIXES = ['plugin:window|', 'plugin:webview|', 'plugin:we
 interface RuntimeState {
 	handlers: CommandHandlerMap
 	installed: boolean
+	// Test-only knobs: a Playwright spec can inspect the IPC log, replace one command's
+	// return value, and deliver an event the Rust side would emit.
+	overrides: CommandHandlerMap
+	calls: MockInvocation[]
+}
+
+/** One frontend -> backend command, as the mock saw it. */
+export interface MockInvocation {
+	cmd: string
+	args: Record<string, unknown>
+}
+
+/** The browser-mock test surface exposed as `window.__vibeMockTauri`. */
+export interface MockTauriControls {
+	/** Every command received so far, in order. */
+	calls(): MockInvocation[]
+	/** The commands with this exact name, in order. */
+	callsFor(cmd: string): MockInvocation[]
+	clearCalls(): void
+	/** Replace a command's return value until `restore` or `reset`. */
+	override(cmd: string, handler: CommandHandler): void
+	restore(cmd: string): void
+	/** Drop overrides and the call log between tests. */
+	reset(): void
+	/** Deliver an event to every frontend `listen()` callback, like the Rust side. */
+	emit(event: string, payload?: unknown): void
 }
 
 const STATE_KEY = '__vibeMockTauriRuntime__'
@@ -20,9 +46,13 @@ const STATE_KEY = '__vibeMockTauriRuntime__'
 function getState(): RuntimeState {
 	const holder = globalThis as typeof globalThis & { [STATE_KEY]?: RuntimeState }
 	if (!holder[STATE_KEY]) {
-		holder[STATE_KEY] = { handlers: {}, installed: false }
+		holder[STATE_KEY] = { handlers: {}, installed: false, overrides: {}, calls: [] }
 	}
-	return holder[STATE_KEY]
+	const state = holder[STATE_KEY]
+	// An HMR reload can reuse the holder created before the test knobs existed.
+	state.overrides ??= {}
+	state.calls ??= []
+	return state
 }
 
 // A ~1s silent 8-bit mono wav, so `new Audio(convertFileSrc(path))` loads and plays.
@@ -68,11 +98,19 @@ function isWindowSurfaceCommand(cmd: string): boolean {
 }
 
 async function route(cmd: string, args: Record<string, unknown>): Promise<unknown> {
+	const state = getState()
+	state.calls.push({ cmd, args })
+
 	if (cmd.startsWith('plugin:event|')) {
 		return handleEventPluginCommand(cmd, args)
 	}
 
-	const handler = getState().handlers[cmd]
+	const override = state.overrides[cmd]
+	if (override) {
+		return override(args)
+	}
+
+	const handler = state.handlers[cmd]
 	if (handler) {
 		return handler(args)
 	}
@@ -118,6 +156,36 @@ function installGlobalTauri(): void {
 	}
 }
 
+// Browser-mode E2E hooks. They only exist when the mock is installed, so a real build
+// never carries them; specs use them to observe IPC, stub a command and deliver events.
+function installTestControls(): void {
+	const state = getState()
+	const target = window as Window & { __vibeMockTauri?: MockTauriControls }
+	if (target.__vibeMockTauri) {
+		return
+	}
+	target.__vibeMockTauri = {
+		calls: () => state.calls.map((call) => ({ ...call })),
+		callsFor: (cmd) => state.calls.filter((call) => call.cmd === cmd).map((call) => ({ ...call })),
+		clearCalls: () => {
+			state.calls.length = 0
+		},
+		override: (cmd, handler) => {
+			state.overrides[cmd] = handler
+		},
+		restore: (cmd) => {
+			delete state.overrides[cmd]
+		},
+		reset: () => {
+			state.calls.length = 0
+			for (const cmd of Object.keys(state.overrides)) {
+				delete state.overrides[cmd]
+			}
+		},
+		emit: (event, payload) => emitMockEvent(event, payload),
+	}
+}
+
 export function installRuntime(handlers: CommandHandlerMap): void {
 	const state = getState()
 	// Always refresh the map so an HMR reload picks up edited handlers.
@@ -159,6 +227,7 @@ export function installRuntime(handlers: CommandHandlerMap): void {
 	installOsPluginInternals()
 	installGlobalTauri()
 	installMockToolbar()
+	installTestControls()
 }
 
 // Tiny floating control for mock-only knobs. Plain DOM so it never touches app code.

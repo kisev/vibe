@@ -85,7 +85,7 @@ export function UpdateControls() {
 			</SettingsField>
 
 			<SettingsRow
-				label={statusText(checkState, manifest?.version, lastCheckedAt)}
+				label={checkState === 'current' && channel === 'beta' ? m.updateNoCandidate() : statusText(checkState, manifest?.version, lastCheckedAt)}
 				description={checkState === 'error' ? checkError : undefined}
 				clampDescription={false}>
 				{busy && checkState !== 'available' && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}

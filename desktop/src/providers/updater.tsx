@@ -117,9 +117,12 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 		try {
 			const found = await invoke<Update | null>('update_check', { channel })
 			if (channelRef.current !== channel) return
-			setAvailableUpdate(found !== null)
-			setUpdate(found ?? undefined)
-			setCheckState(found !== null ? 'available' : 'current')
+			// A manifest without a version is a line with nothing on it, not an
+			// update whose version happens to be blank.
+			const candidate = found && typeof found.version === 'string' && found.version.trim() !== '' ? found : null
+			setAvailableUpdate(candidate !== null)
+			setUpdate(candidate ?? undefined)
+			setCheckState(candidate ? 'available' : 'current')
 		} catch (error) {
 			if (channelRef.current !== channel) return
 			console.error(error)

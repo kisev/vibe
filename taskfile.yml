@@ -300,10 +300,8 @@ tasks:
 
   ci:e2e:
     desc: Run the desktop browser-mode end-to-end suite
-    dir: desktop
     cmds:
-      - pnpm exec playwright install --with-deps chromium
-      - pnpm exec playwright test
+      - bash scripts/ci/e2e.sh
 
   ci:vulkan-deps:
     desc: Install the Vulkan build prerequisites on the lint runner (3 bounded attempts)
