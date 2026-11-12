@@ -21,7 +21,9 @@ export default defineConfig({
 		// `url` polls 127.0.0.1, and a cold paraglide compile is slow there too.
 		command: `pnpm dev --port ${PORT} --strictPort --host 127.0.0.1`,
 		url: `http://127.0.0.1:${PORT}`,
-		reuseExistingServer: !process.env.CI,
+		// Never reuse: a server left on the port by an older run serves a stale
+		// module graph, and the whole suite fails at boot for no visible reason.
+		reuseExistingServer: false,
 		timeout: 240_000,
 		stdout: 'pipe',
 		stderr: 'pipe',
