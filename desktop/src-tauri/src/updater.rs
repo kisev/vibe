@@ -80,7 +80,7 @@ pub async fn update_check(
     pending: State<'_, PendingUpdate>,
     channel: Channel,
 ) -> Result<Option<AvailableUpdate>, String> {
-    let url = channel.url().parse().map_err(|e| format!("{e:?}"))?;
+    let url = tauri::Url::parse(&channel.url()).map_err(|error| format!("{error}"))?;
     let found = app
         .updater_builder()
         .endpoints(vec![url.clone()])

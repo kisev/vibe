@@ -29,7 +29,8 @@ mod dock;
 #[cfg(target_os = "macos")]
 mod system_audio;
 
-#[cfg(windows)]
+// The meeting window asks this module where scheme registration stands on every
+// platform; the implementations themselves are per-OS with a stubbed fallback.
 mod custom_protocol;
 
 use eyre::{eyre, Result};

@@ -1,4 +1,3 @@
-use eyre::ContextCompat;
 use eyre::Result;
 
 /// The other applications' URL schemes Vibe can answer for. Each carries a web
@@ -14,6 +13,7 @@ pub const MEETING_SCHEMES_SUPPORTED: bool = cfg!(any(windows, target_os = "linux
 #[cfg(windows)]
 mod imp {
     use super::*;
+    use eyre::ContextCompat;
     use winreg::enums::*;
     use winreg::RegKey;
 
@@ -125,6 +125,10 @@ pub fn unregister_meeting_schemes() -> Result<()> {
 
 #[cfg(windows)]
 pub fn register() -> Result<()> {
+    use eyre::ContextCompat;
+    use winreg::enums::*;
+    use winreg::RegKey;
+
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let classes = hkcu.open_subkey_with_flags("Software\\Classes", KEY_ALL_ACCESS)?;
 
