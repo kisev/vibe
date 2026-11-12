@@ -425,6 +425,7 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
     // main window instead, so the user gets retry and close rather than a silent white window.
     {
         let watchdog_app = app.clone();
+        let watchdog_url = info.url.clone();
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(LOAD_TIMEOUT).await;
             let unloaded = RUNTIME
@@ -435,7 +436,7 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
             if !unloaded {
                 return;
             }
-            tracing::warn!(session, url = %info.url, "meeting browser page did not finish loading");
+            tracing::warn!(session, url = %watchdog_url, "meeting browser page did not finish loading");
             if let Err(error) = watchdog_app.emit_to("main", LOAD_FAILED_EVENT, serde_json::json!({ "session": session })) {
                 tracing::warn!("could not emit meeting browser load failure: {error}");
             }
