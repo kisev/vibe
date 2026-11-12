@@ -98,7 +98,9 @@ fetch_libs() {
     gh release download "$tag" --repo "$repo" \
         --pattern "ggml-libs-$platform.tar.gz" --dir "$ROOT/target" --clobber
     mkdir -p "$stage"
-    tar -xzf "$ROOT/target/ggml-libs-$platform.tar.gz" -C "$stage"
+    # Relative names on purpose: under Git Bash a `D:/...` archive path reads as
+    # `host D` to tar, which then tries to connect to a machine named D.
+    (cd "$ROOT/target" && tar -xzf "ggml-libs-$platform.tar.gz" -C ggml-libs)
     # Only lib/ is taken: the archive also carries include/, and the headers the
     # build uses are the checked-in server/libs/include from the same ggml tag.
     rm -rf "${LIBS:?}/lib"
@@ -215,7 +217,8 @@ build_libs() {
     done
 
     # lib/ and include/ are the archive's top-level entries; fetch relies on that layout.
-    tar -czf "$ROOT/ggml-libs-$platform.tar.gz" -C "$pkg" lib include
+    # Relative on purpose, for the reason given in fetch_libs.
+    (cd "$pkg" && tar -czf "../ggml-libs-$platform.tar.gz" lib include)
     echo "packaged $ROOT/ggml-libs-$platform.tar.gz"
 }
 
