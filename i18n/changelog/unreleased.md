@@ -9,7 +9,7 @@ title: "What's next"
 - 🧪 **Model comparison, side by side** — Settings → Models runs one clip or file through every installed model you pick and opens full-window results: a column per model with its time and word count, independent scrolling, a baseline picker, and word-level highlighting that strikes out missed words and marks extras
 - 🗣️ **Speaker separation in the comparison** — one switch adds voice labels to every model's transcript, so the same run shows which model heard the words and who said them
 - 🔄 **Three update channels** — follow Release, Beta or Dev, see the current version and when the last check ran, and start a check yourself with one button instead of waiting for the next launch
-- 🌐 **Meetings open inside Vibe** — meeting links open in an embedded browser with back, forward and reload, a record-ready bar, and an editable meeting-host list; a detected call prompts you to record it with your microphone and system audio
+- 🌐 **Meetings open inside Vibe** — meeting links open in an embedded browser with its own menu (back, forward, reload, open in the system browser, close) and an editable meeting-host list; Vibe can register itself as the handler for Zoom, Teams and Webex links when you ask it to, and a detected call prompts you to record it with your microphone and system audio
 - 🌍 **The website speaks your language** — a language selector in the header switches the page in place, keeps `?lang=` in the URL so shared links carry the choice, and applies right-to-left layout. `/changelog/dev` is now the permanent address for the dev notes
 
 ## Improved
@@ -22,3 +22,7 @@ title: "What's next"
 
 - 🎙️ **Every model can run the comparison** — GigaAM and Parakeet no longer refuse a run for a missing VAD model; the lab supplies its bundled detector so results differ only by the model
 - 📍 **The comparison sits first** — the lab moved above the long model catalog on Settings → Models so it is the first thing you see
+- 🔍 **Long transcripts are still highlighted** — the diff no longer gives up above a thousand words and reports zero differences; when a text is genuinely too long the column says so instead
+- 🔁 **Update channels keep their names and their line** — the selector reads Release, Beta and Dev in every language, and Beta offers only release candidates instead of mirroring the stable build
+- 🔌 **The API server switch stays off** — the Agents switch is your choice and survives a restart; reading model metadata at launch no longer leaves a server running behind it
+- 🪟 **The meeting window can be closed** — its controls live in the window itself, so a page that fails to load no longer leaves a window with no way out
