@@ -67,9 +67,19 @@ The dev build MUST run without any repository secret and MUST NOT require an ext
 - **WHEN** a dev build finishes
 - **THEN** its bundles carry no updater artifacts and require no signing key
 
-### Requirement: One dev release at a time
+### Requirement: Dev releases are pruned with bounded retention
 
-The repository SHALL hold exactly one dev prerelease: the newest dev run that completed. Each green run SHALL publish its bundles to a prerelease tagged `dev.<run-number>` — the number grows monotonically — and SHALL then delete every other `dev.*` release. Deleting a dev release SHALL NOT delete its tag, and stable releases SHALL never be touched. The release name SHALL carry the application version with its `-dev.<short-commit>` suffix and the release body SHALL name the full commit SHA, so the surviving build remains identifiable as a complete snapshot of one revision.
+The dev sweep SHALL be bounded retention: the newest five dev prereleases survive, every dev prerelease created within the last 24 hours survives, and only releases created before the running dev build started are considered at all.
+
+#### Scenario: A normal green run
+
+- **WHEN** a dev run completes and prunes older releases
+- **THEN** the newest five dev releases stay, and so does anything published in the last 24 hours
+
+#### Scenario: A late-healed older run
+
+- **WHEN** an older dev run finishes after a newer one
+- **THEN** it never deletes a release created after it started, so the build a newer run is filling survives
 
 #### Scenario: New commit
 
@@ -89,7 +99,7 @@ The repository SHALL hold exactly one dev prerelease: the newest dev run that co
 #### Scenario: Later builds
 
 - **WHEN** a later commit is built and completes
-- **THEN** its release becomes the only dev release — earlier dev releases are deleted with their tags left in place, so the tag numbers keep growing monotonically
+- **THEN** earlier dev releases outside the retention window are deleted while their `dev.<n>` tags stay, so tag numbers keep growing monotonically and the deleted build stays identifiable in history
 
 #### Scenario: Commit identity survives the tag change
 
@@ -100,6 +110,11 @@ The repository SHALL hold exactly one dev prerelease: the newest dev run that co
 
 - **WHEN** a dev release exists
 - **THEN** it does not become the repository's latest release
+
+#### Scenario: Stable releases
+
+- **WHEN** the sweep runs
+- **THEN** no stable release is touched
 
 ### Requirement: Dev version is identifiable
 
