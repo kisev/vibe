@@ -8,6 +8,7 @@ import { ToastProvider } from '~/providers/toast'
 import { m } from '~/paraglide/messages.js'
 import * as config from '~/lib/config'
 import type { InstalledModel } from '~/lib/model'
+import { MAX_DIFF_TOKENS } from '~/lib/text-diff'
 import type { SettingsViewModel } from './shared'
 import { ModelsComparisonSection } from './models-comparison'
 
@@ -256,6 +257,36 @@ describe('models comparison section', () => {
 		expect(await screen.findByText(m.compareBaseline())).toBeTruthy()
 		expect(screen.getByText(m.compareHighlight())).toBeTruthy()
 		expect(screen.getAllByText(/2 words/)).toHaveLength(2)
+	})
+
+	it('says highlighting is unavailable instead of showing +0 −0 for an overlong transcript', async () => {
+		const longText = Array.from({ length: MAX_DIFF_TOKENS + 1 }, (_, index) => `w${index}`).join(' ')
+		mocks.runComparison.mockResolvedValue([
+			{
+				model: { name: 'Alpha', path: '/models/alpha.gguf' },
+				status: 'done',
+				seconds: 3,
+				outputPath: '/out/Alpha.md',
+				segments: [{ start: 0, stop: 1, text: 'hello world' }],
+			},
+			{
+				model: { name: 'Beta', path: '/models/beta.gguf' },
+				status: 'done',
+				seconds: 5,
+				outputPath: '/out/Beta.md',
+				segments: [{ start: 0, stop: 1, text: longText }],
+			},
+		])
+		const user = userEvent.setup()
+		renderSection([model('alpha.gguf'), model('beta.gguf')])
+		await chooseFile(user)
+		await user.click(screen.getByRole('button', { name: 'alpha.gguf' }))
+		await user.click(screen.getByRole('button', { name: 'beta.gguf' }))
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+		await user.click(await screen.findByRole('button', { name: m.compareResults() }))
+
+		expect(await screen.findByText(m.compareTooLongNote())).toBeTruthy()
+		expect(screen.queryByText('+0')).toBeNull()
 	})
 
 	it('does not offer corrupt model files', () => {

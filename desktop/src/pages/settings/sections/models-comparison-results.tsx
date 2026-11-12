@@ -110,9 +110,9 @@ export function ModelsComparisonResults({ input, runs, open, onOpenChange }: Com
 							const isBaseline = run.model.path === baseline?.model.path
 							const text = transcriptText(run.segments ?? [])
 							const words = tokenize(text).length
-							const parts = isBaseline ? null : diffWords(baselineText, text)
-							const added = parts ? wordCount(parts, 'added') : 0
-							const removed = parts ? wordCount(parts, 'removed') : 0
+							const diff = isBaseline ? null : diffWords(baselineText, text)
+							const added = diff?.complete ? wordCount(diff.parts, 'added') : 0
+							const removed = diff?.complete ? wordCount(diff.parts, 'removed') : 0
 							return (
 								<section
 									key={run.model.path}
@@ -122,12 +122,17 @@ export function ModelsComparisonResults({ input, runs, open, onOpenChange }: Com
 											<span className="truncate text-sm font-semibold">{run.model.name}</span>
 											<span className="text-xs text-muted-foreground">
 												{run.seconds ?? 0}s · {m.compareWordCount({ count: words })}
-												{!isBaseline && (
-													<span className="ms-2 tabular-nums">
-														<span className="text-emerald-600 dark:text-emerald-400">+{added}</span>{' '}
-														<span className="text-red-600 dark:text-red-400">−{removed}</span>
-													</span>
-												)}
+												{!isBaseline &&
+													(diff?.complete ? (
+														<span className="ms-2 tabular-nums">
+															<span className="text-emerald-600 dark:text-emerald-400">+{added}</span>{' '}
+															<span className="text-red-600 dark:text-red-400">−{removed}</span>
+														</span>
+													) : (
+														<span className="ms-2 text-amber-600 dark:text-amber-400">
+															{m.compareTooLongNote()}
+														</span>
+													))}
 											</span>
 										</div>
 										<div className="flex items-center gap-2">
@@ -144,7 +149,7 @@ export function ModelsComparisonResults({ input, runs, open, onOpenChange }: Com
 										</div>
 									</div>
 									<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
-										{highlight && parts ? <DiffText parts={parts} /> : text}
+										{highlight && diff?.complete ? <DiffText parts={diff.parts} /> : text}
 									</div>
 								</section>
 							)
