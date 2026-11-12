@@ -216,7 +216,7 @@
   "modalErrorBody": "קרתה שגיאה לא צפויה",
   "modeText": "טקסט",
   "modelOptions": "אפשרויות מודל",
-  "modelsFolder": "תקיית המודלים",
+  "modelsFolder": "תיקיית המודלים",
   "modelFileCorrupt": "קובץ המודל הזה חלקי או פגום",
   "modelFileCorruptDescription": "‏{name} נכשל בבדיקת התקינות. הורידו מחדש כדי להחליף אותו.",
   "longRecordings": "הקלטות ארוכות",
