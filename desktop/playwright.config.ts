@@ -17,9 +17,13 @@ export default defineConfig({
 		launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } : {},
 	},
 	webServer: {
-		command: `pnpm dev --port ${PORT} --strictPort`,
+		// Bind explicitly: the runner resolves `localhost` to IPv6 first, while
+		// `url` polls 127.0.0.1, and a cold paraglide compile is slow there too.
+		command: `pnpm dev --port ${PORT} --strictPort --host 127.0.0.1`,
 		url: `http://127.0.0.1:${PORT}`,
 		reuseExistingServer: !process.env.CI,
-		timeout: 120_000,
+		timeout: 240_000,
+		stdout: 'pipe',
+		stderr: 'pipe',
 	},
 })
