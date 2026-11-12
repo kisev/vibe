@@ -5,6 +5,7 @@
 //! the endpoint in `tauri.conf.json`, so picking the channel at runtime happens here.
 
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 use tokio::sync::Mutex;
@@ -12,6 +13,9 @@ use tokio::sync::Mutex;
 const CHANNELS_URL: &str = "https://kisev.github.io/vibe/updater";
 
 const PROGRESS_EVENT: &str = "updater-progress";
+
+/// How long to wait when asking whether a channel file exists.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// One manifest per line: release (`vX.Y.Z`), beta (`vX.Y.Z-rc.<n>`), dev (`dev.<n>`).
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -52,6 +56,24 @@ struct Progress {
     percent: u64,
 }
 
+/// Only 404/410 mean the channel file was never published; every other failure is a real error.
+fn absent_status(status: Option<reqwest::StatusCode>) -> bool {
+    matches!(status, Some(status) if status == reqwest::StatusCode::NOT_FOUND || status == reqwest::StatusCode::GONE)
+}
+
+/// Ask the channel URL directly, because the updater plugin reports every non-2xx as the same
+/// `ReleaseNotFound` error. A missing manifest means "nothing on this line", not a failed check.
+async fn channel_absent(url: &str) -> bool {
+    let status = reqwest::Client::new()
+        .get(url)
+        .timeout(PROBE_TIMEOUT)
+        .send()
+        .await
+        .map(|response| response.status())
+        .ok();
+    absent_status(status)
+}
+
 #[tauri::command]
 pub async fn update_check(
     app: AppHandle,
@@ -59,19 +81,30 @@ pub async fn update_check(
     channel: Channel,
 ) -> Result<Option<AvailableUpdate>, String> {
     let url = channel.url().parse().map_err(|e| format!("{e:?}"))?;
-    let update = app
+    let found = app
         .updater_builder()
-        .endpoints(vec![url])
+        .endpoints(vec![url.clone()])
         .map_err(|e| e.to_string())?
         .build()
         .map_err(|e| e.to_string())?
         .check()
-        .await
-        .map_err(|e| e.to_string())?;
+        .await;
+
+    let found = match found {
+        Ok(found) => found,
+        Err(err @ tauri_plugin_updater::Error::ReleaseNotFound) => {
+            if channel_absent(url.as_str()).await {
+                None
+            } else {
+                return Err(err.to_string());
+            }
+        }
+        Err(err) => return Err(err.to_string()),
+    };
 
     let mut guard = pending.0.lock().await;
     *guard = None;
-    let Some(update) = update else {
+    let Some(update) = found else {
         return Ok(None);
     };
     let available = AvailableUpdate {
@@ -127,7 +160,7 @@ pub async fn update_install(pending: State<'_, PendingUpdate>) -> Result<(), Str
 
 #[cfg(test)]
 mod tests {
-    use super::{Channel, CHANNELS_URL};
+    use super::{absent_status, Channel, CHANNELS_URL};
 
     fn from_json(name: &str) -> Channel {
         serde_json::from_value(serde_json::Value::String(name.into())).unwrap()
@@ -143,5 +176,16 @@ mod tests {
     #[test]
     fn an_unknown_channel_does_not_deserialize() {
         assert!(serde_json::from_value::<Channel>(serde_json::Value::String("nightly".into())).is_err());
+    }
+
+    #[test]
+    fn only_a_missing_manifest_counts_as_an_empty_line() {
+        use reqwest::StatusCode;
+
+        assert!(absent_status(Some(StatusCode::NOT_FOUND)));
+        assert!(absent_status(Some(StatusCode::GONE)));
+        assert!(!absent_status(Some(StatusCode::INTERNAL_SERVER_ERROR)));
+        assert!(!absent_status(Some(StatusCode::OK)));
+        assert!(!absent_status(None));
     }
 }

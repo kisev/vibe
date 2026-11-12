@@ -9,10 +9,11 @@ import { m } from '~/paraglide/messages.js'
 import { UpdaterContext, type CheckState, type UpdateChannel } from '~/providers/updater'
 import { SettingsField, SettingsGroup, SettingsRow } from './shared'
 
-const channels: { value: UpdateChannel; label: () => string }[] = [
-	{ value: 'stable', label: m.channelRelease },
-	{ value: 'beta', label: m.channelBeta },
-	{ value: 'dev', label: m.channelDev },
+// Channel names are product names, not copy: they read the same in every language.
+const channels: { value: UpdateChannel; label: string }[] = [
+	{ value: 'stable', label: 'Release' },
+	{ value: 'beta', label: 'Beta' },
+	{ value: 'dev', label: 'Dev' },
 ]
 
 /** One sentence for the last check, whatever the phase. */
@@ -76,7 +77,7 @@ export function UpdateControls() {
 								className={`flex h-8 cursor-pointer items-center justify-center rounded-md px-3 text-xs transition-colors ${
 									selected ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
 								}`}>
-								{label()}
+								{label}
 							</button>
 						)
 					})}

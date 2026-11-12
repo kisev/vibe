@@ -46,9 +46,6 @@
   "changeFile": "Change File",
   "changeFiles": "Change Files",
   "changeModelsFolder": "Change Models Folder",
-  "channelBeta": "Beta",
-  "channelDev": "Dev",
-  "channelRelease": "Release",
   "characters": "characters",
   "checkError": "Check failed",
   "checkForUpdates": "Check for updates",
@@ -802,5 +799,9 @@
   "phoneRevokeDeviceNamed": "Revoke {name}",
   "whatsNew": "What's new",
   "diarizationMigrateQuestion": "The diarization model changed format with the new engine. Download the new model (~108MB) now?",
-  "diarizationMigratedOff": "Speaker detection is off until the new model is downloaded."
+  "diarizationMigratedOff": "Speaker detection is off until the new model is downloaded.",
+  "compareTooLongNote": "Too long to highlight differences",
+  "meetingHandlers": "Open meeting links in Vibe",
+  "meetingHandlersInfo": "Register Vibe as the handler for Zoom, Teams and Webex links, so they open in the meeting window instead of the browser.",
+  "meetingHandlersUnavailable": "This system does not support registering link handlers."
 }

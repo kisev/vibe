@@ -3,10 +3,12 @@
 Vibe updates from one of three channel files on the website, not from GitHub's latest release:
 
 - `https://kisev.github.io/vibe/updater/stable.json` — Release
-- `https://kisev.github.io/vibe/updater/beta.json` — Beta (release candidates)
+- `https://kisev.github.io/vibe/updater/beta.json` — Beta (release candidates; absent while none is published)
 - `https://kisev.github.io/vibe/updater/dev.json` — Dev
 
-Each is the `latest.json` a release build produced. Settings → General → Updates carries the
+Each is the `latest.json` a release build produced. A channel with no file is a line with
+nothing on it: the app reports "up to date" rather than falling back to another channel or
+treating the missing file as a failed check. Settings → General → Updates carries the
 channel selector, the current version, a "Check for updates" action, the last check time, and the
 outcome. The app side is `desktop/src-tauri/src/updater.rs`.
 
@@ -43,12 +45,13 @@ few minutes. Candidate notes live in `i18n/changelog/1.1.0-rc.1.md`, next to the
 
 ```console
 # after release.yml finished (the GitHub release is a prerelease)
-uv run scripts/channel.py 1.0.0 --channel beta     # beta users first
-uv run scripts/channel.py 1.0.0 --channel stable   # once beta looks fine
+uv run scripts/channel.py 1.0.0 --channel stable   # once the candidate looks fine
 gh release edit v1.0.0 --prerelease=false --latest # last: older apps read GitHub
 ```
 
-Promoting to stable also moves beta forward, so beta is never behind stable. `scripts/channel.py`
+Promoting to stable does not move Beta: `channel.py` writes `beta.json` only for an
+`X.Y.Z-rc.<n>` version, so a plain release is rejected there. An install on Beta moves to the
+final by switching to Release, where `X.Y.Z` sorts above its candidates. `scripts/channel.py`
 refuses to move a channel backwards and understands `-rc.<n>` ordering.
 
 ## Dev builds

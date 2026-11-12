@@ -381,9 +381,6 @@
   "transcription": "Транскрипция",
   "translateToEnglish": "Перевести на английский",
   "tryAgain": "Попробуйте снова",
-  "channelBeta": "Beta",
-  "channelDev": "Dev",
-  "channelRelease": "Релиз",
   "checkForUpdates": "Проверить обновления",
   "updateAvailableVersion": "Доступна версия {version}",
   "updateChannel": "Канал обновлений",
@@ -802,5 +799,9 @@
   "compareResults": "Сравнить результаты",
   "compareRun": "Запустить сравнение",
   "compareStopRecording": "Остановить запись",
-  "compareWordCount": "{count} слов"
+  "compareWordCount": "{count} слов",
+  "compareTooLongNote": "Текст слишком длинный для подсветки различий",
+  "meetingHandlers": "Открывать ссылки встреч в Vibe",
+  "meetingHandlersInfo": "Регистрирует Vibe обработчиком ссылок Zoom, Teams и Webex, чтобы они открывались в окне встречи, а не в браузере.",
+  "meetingHandlersUnavailable": "Эта система не поддерживает регистрацию обработчиков ссылок."
 }

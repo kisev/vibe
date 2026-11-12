@@ -50,12 +50,12 @@ describe('update controls', () => {
 		const { value } = renderWith()
 
 		expect(await screen.findByText('1.0.0')).toBeTruthy()
-		for (const label of [m.channelRelease(), m.channelBeta(), m.channelDev()]) {
+		for (const label of ['Release', 'Beta', 'Dev']) {
 			expect(screen.getByRole('radio', { name: label })).toBeTruthy()
 		}
-		expect(screen.getByRole('radio', { name: m.channelRelease() }).getAttribute('aria-checked')).toBe('true')
+		expect(screen.getByRole('radio', { name: 'Release' }).getAttribute('aria-checked')).toBe('true')
 
-		await user.click(screen.getByRole('radio', { name: m.channelDev() }))
+		await user.click(screen.getByRole('radio', { name: 'Dev' }))
 		expect(value.setChannel).toHaveBeenCalledWith('dev')
 	})
 
