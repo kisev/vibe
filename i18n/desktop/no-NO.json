@@ -401,6 +401,7 @@
   "updateFailed": "Den siste oppdateringssjekken mislyktes",
   "updateInstalling": "Installerer oppdateringen…",
   "updateLastChecked": "Sist sjekket {time}",
+  "updateNoCandidate": "Ingen utgivelseskandidat på denne linjen",
   "updateNotChecked": "Ikke sjekket ennå",
   "updateNow": "oppdatering nå",
   "updateUpToDate": "Oppdatert",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "Trekk tilbake {name}",
   "whatsNew": "Hva er nytt",
   "diarizationMigrateQuestion": "Talergjenkjenningsmodellen har byttet format med den nye motoren. Vil du laste ned den nye modellen (~108 MB) nå?",
-  "diarizationMigratedOff": "Talergjenkjenning er av til den nye modellen er lastet ned."
+  "diarizationMigratedOff": "Talergjenkjenning er av til den nye modellen er lastet ned.",
+  "compareTooLongNote": "For langt til å utheve forskjeller",
+  "meetingHandlers": "Åpne møtelenker i Vibe",
+  "meetingHandlersInfo": "Registrer Vibe som behandler for Zoom-, Teams- og Webex-lenkene, slik at de åpnes i møtevinduet i stedet for nettleseren.",
+  "meetingHandlersUnavailable": "Dette systemet støtter ikke registrering av lenkebehandlere.",
+  "meetingBrowserLoadFailedTitle": "Siden åpnet seg ikke",
+  "meetingBrowserLoadFailedBody": "Siden kunne ikke lastes. Vil du prøve igjen, eller lukke vinduet?",
+  "meetingBrowserRetry": "Prøv igjen"
 }

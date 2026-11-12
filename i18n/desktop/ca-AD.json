@@ -401,6 +401,7 @@
   "updateFailed": "La darrera comprovació d'actualitzacions ha fallat",
   "updateInstalling": "Instal·lant l'actualització…",
   "updateLastChecked": "Darrera comprovació: {time}",
+  "updateNoCandidate": "Cap versió candidata en aquesta línia",
   "updateNotChecked": "Encara no s'ha comprovat",
   "updateNow": "actualitzar ara",
   "updateUpToDate": "Al dia",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "Revoca {name}",
   "whatsNew": "Novetats",
   "diarizationMigrateQuestion": "El model de diarització ha canviat de format amb el motor nou. Vols descarregar ara el model nou (~108MB)?",
-  "diarizationMigratedOff": "La detecció de parlants està desactivada fins que es descarregui el model nou."
+  "diarizationMigratedOff": "La detecció de parlants està desactivada fins que es descarregui el model nou.",
+  "compareTooLongNote": "Massa llarg per destacar les diferències",
+  "meetingHandlers": "Obre els enllaços de reunions a Vibe",
+  "meetingHandlersInfo": "Registra Vibe com a aplicació predeterminada per als enllaços de Zoom, Teams i Webex, perquè s'obrin a la finestra de la reunió en lloc del navegador.",
+  "meetingHandlersUnavailable": "Aquest sistema no permet registrar aplicacions predeterminades per als enllaços.",
+  "meetingBrowserLoadFailedTitle": "La pàgina no s'ha obert",
+  "meetingBrowserLoadFailedBody": "No s'ha pogut carregar la pàgina. Vols tornar-ho a provar o tancar la finestra?",
+  "meetingBrowserRetry": "Torna-ho a provar"
 }

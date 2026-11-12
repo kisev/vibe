@@ -401,6 +401,7 @@
   "updateFailed": "Последната проверка за актуализации е неуспешна",
   "updateInstalling": "Инсталиране на актуализацията…",
   "updateLastChecked": "Последна проверка: {time}",
+  "updateNoCandidate": "Няма кандидат-версия в тази линия",
   "updateNotChecked": "Все още не е проверявано",
   "updateNow": "актуализирай сега",
   "updateUpToDate": "Най-нова версия",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "Отмени {name}",
   "whatsNew": "Какво ново",
   "diarizationMigrateQuestion": "Моделът за диаризация промени формата си с новия двигател. Да изтегля ли новия модел (~108MB) сега?",
-  "diarizationMigratedOff": "Откриването на говорещи е изключено, докато не се изтегли новият модел."
+  "diarizationMigratedOff": "Откриването на говорещи е изключено, докато не се изтегли новият модел.",
+  "compareTooLongNote": "Твърде дълго за открояване на разликите",
+  "meetingHandlers": "Отваряне на връзките към срещи във Vibe",
+  "meetingHandlersInfo": "Регистрирайте Vibe като програма по подразбиране за връзките на Zoom, Teams и Webex, така че да се отварят в прозореца на срещата вместо в браузъра.",
+  "meetingHandlersUnavailable": "Тази система не поддържа регистриране на обработчици на връзки.",
+  "meetingBrowserLoadFailedTitle": "Страницата не се отвори",
+  "meetingBrowserLoadFailedBody": "Страницата не можа да бъде заредена. Да опитате отново или да затворите прозореца?",
+  "meetingBrowserRetry": "Опитайте отново"
 }

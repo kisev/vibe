@@ -401,6 +401,7 @@
   "updateFailed": "Lần kiểm tra cập nhật gần nhất đã thất bại",
   "updateInstalling": "Đang cài đặt bản cập nhật…",
   "updateLastChecked": "Kiểm tra lần cuối: {time}",
+  "updateNoCandidate": "Dòng này không có bản ứng viên",
   "updateNotChecked": "Chưa kiểm tra",
   "updateNow": "cập nhật ngay bây giờ",
   "updateUpToDate": "Đã là phiên bản mới nhất",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "Thu hồi {name}",
   "whatsNew": "Có gì mới",
   "diarizationMigrateQuestion": "Mô hình phân tách người nói đã đổi định dạng với công cụ mới. Tải mô hình mới (~108MB) ngay bây giờ?",
-  "diarizationMigratedOff": "Nhận diện người nói sẽ tắt cho đến khi tải xong mô hình mới."
+  "diarizationMigratedOff": "Nhận diện người nói sẽ tắt cho đến khi tải xong mô hình mới.",
+  "compareTooLongNote": "Quá dài để đánh dấu khác biệt",
+  "meetingHandlers": "Mở liên kết cuộc họp trong Vibe",
+  "meetingHandlersInfo": "Đăng ký Vibe làm trình xử lý cho liên kết Zoom, Teams và Webex, để chúng mở trong cửa sổ cuộc họp thay vì trình duyệt.",
+  "meetingHandlersUnavailable": "Hệ thống này không hỗ trợ đăng ký trình xử lý liên kết.",
+  "meetingBrowserLoadFailedTitle": "Trang không mở được",
+  "meetingBrowserLoadFailedBody": "Không thể tải trang. Thử lại, hay đóng cửa sổ?",
+  "meetingBrowserRetry": "Thử lại"
 }

@@ -401,6 +401,7 @@
   "updateFailed": "पिछली अपडेट जाँच विफल रही",
   "updateInstalling": "अपडेट इंस्टॉल हो रहा है…",
   "updateLastChecked": "अंतिम जाँच {time}",
+  "updateNoCandidate": "इस लाइन में कोई रिलीज़ कैंडिडेट नहीं",
   "updateNotChecked": "अभी तक जाँच नहीं हुई",
   "updateNow": "अभी अद्यतन करें",
   "updateUpToDate": "अद्यतित",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "{name} रद्द करें",
   "whatsNew": "नया क्या है",
   "diarizationMigrateQuestion": "नए इंजन के साथ वक्ता पहचान मॉडल का प्रारूप बदल गया है। नया मॉडल (~108MB) अभी डाउनलोड करें?",
-  "diarizationMigratedOff": "नया मॉडल डाउनलोड होने तक वक्ता पहचान बंद रहेगी।"
+  "diarizationMigratedOff": "नया मॉडल डाउनलोड होने तक वक्ता पहचान बंद रहेगी।",
+  "compareTooLongNote": "अंतर हाइलाइट करने के लिए बहुत लंबा",
+  "meetingHandlers": "Vibe में मीटिंग लिंक खोलें",
+  "meetingHandlersInfo": "Vibe को Zoom, Teams और Webex लिंक के हैंडलर के रूप में पंजीकृत करें, ताकि वे ब्राउज़र के बजाय मीटिंग विंडो में खुलें।",
+  "meetingHandlersUnavailable": "यह सिस्टम लिंक हैंडलर पंजीकृत करने का समर्थन नहीं करता।",
+  "meetingBrowserLoadFailedTitle": "पेज नहीं खुला",
+  "meetingBrowserLoadFailedBody": "पेज लोड नहीं हो सका। फिर से कोशिश करें, या विंडो बंद करें?",
+  "meetingBrowserRetry": "फिर से कोशिश करें"
 }

@@ -401,6 +401,7 @@
   "updateFailed": "The last update check failed",
   "updateInstalling": "Installing the update…",
   "updateLastChecked": "Last checked {time}",
+  "updateNoCandidate": "No candidate on this line",
   "updateNotChecked": "Not checked yet",
   "updateNow": "update now",
   "updateUpToDate": "Up to date",

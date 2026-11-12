@@ -401,6 +401,7 @@
   "updateFailed": "前回のアップデート確認に失敗しました",
   "updateInstalling": "アップデートをインストール中…",
   "updateLastChecked": "最終確認: {time}",
+  "updateNoCandidate": "このラインにリリース候補はありません",
   "updateNotChecked": "まだ確認していません",
   "updateNow": "今すぐアップデート",
   "updateUpToDate": "最新です",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "{name} を解除",
   "whatsNew": "更新内容",
   "diarizationMigrateQuestion": "新しいエンジンで話者分離モデルの形式が変わりました。新しいモデル（約108MB）を今すぐダウンロードしますか？",
-  "diarizationMigratedOff": "新しいモデルをダウンロードするまで、話者認識はオフです。"
+  "diarizationMigratedOff": "新しいモデルをダウンロードするまで、話者認識はオフです。",
+  "compareTooLongNote": "差分を強調表示するには長すぎます",
+  "meetingHandlers": "Vibe で会議リンクを開く",
+  "meetingHandlersInfo": "Vibe を Zoom、Teams、Webex のリンクのハンドラーとして登録し、ブラウザの代わりに会議ウィンドウで開くようにします。",
+  "meetingHandlersUnavailable": "このシステムはリンクハンドラーの登録に対応していません。",
+  "meetingBrowserLoadFailedTitle": "ページを開けませんでした",
+  "meetingBrowserLoadFailedBody": "ページを読み込めませんでした。もう一度試すか、ウィンドウを閉じますか？",
+  "meetingBrowserRetry": "もう一度試す"
 }

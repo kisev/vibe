@@ -401,6 +401,7 @@
   "updateFailed": "L'ultimo controllo degli aggiornamenti non è riuscito",
   "updateInstalling": "Installazione dell'aggiornamento in corso…",
   "updateLastChecked": "Ultimo controllo {time}",
+  "updateNoCandidate": "Nessun release candidate su questa linea",
   "updateNotChecked": "Non ancora controllato",
   "updateNow": "Aggiorna ora",
   "updateUpToDate": "Già aggiornato",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "Revoca {name}",
   "whatsNew": "Novità",
   "diarizationMigrateQuestion": "Il modello di diarizzazione ha cambiato formato con il nuovo motore. Scaricare ora il nuovo modello (~108 MB)?",
-  "diarizationMigratedOff": "Il rilevamento degli interlocutori è disattivato finché non viene scaricato il nuovo modello."
+  "diarizationMigratedOff": "Il rilevamento degli interlocutori è disattivato finché non viene scaricato il nuovo modello.",
+  "compareTooLongNote": "Troppo lungo per evidenziare le differenze",
+  "meetingHandlers": "Apri i link delle riunioni in Vibe",
+  "meetingHandlersInfo": "Registra Vibe come gestore dei link Zoom, Teams e Webex, così si aprono nella finestra della riunione invece che nel browser.",
+  "meetingHandlersUnavailable": "Questo sistema non supporta la registrazione dei gestori di link.",
+  "meetingBrowserLoadFailedTitle": "La pagina non si è aperta",
+  "meetingBrowserLoadFailedBody": "Impossibile caricare la pagina. Vuoi riprovare o chiudere la finestra?",
+  "meetingBrowserRetry": "Riprova"
 }

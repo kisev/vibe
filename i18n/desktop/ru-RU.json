@@ -388,6 +388,7 @@
   "updateFailed": "Последняя проверка обновлений не удалась",
   "updateInstalling": "Установка обновления…",
   "updateLastChecked": "Последняя проверка: {time}",
+  "updateNoCandidate": "Нет релиз-кандидата в этой ветке",
   "updateNotChecked": "Ещё не проверялось",
   "updateNow": "обновить сейчас",
   "updateUpToDate": "Обновлений нет",

@@ -401,6 +401,7 @@
   "updateFailed": "Den senaste uppdateringskontrollen misslyckades",
   "updateInstalling": "Installerar uppdateringen…",
   "updateLastChecked": "Senast kontrollerad {time}",
+  "updateNoCandidate": "Ingen releasekandidat i denna linje",
   "updateNotChecked": "Inte kontrollerad ännu",
   "updateNow": "uppdatera nu",
   "updateUpToDate": "Uppdaterad",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "Återkalla {name}",
   "whatsNew": "Nyheter",
   "diarizationMigrateQuestion": "Talarigenkänningsmodellen har bytt format med den nya motorn. Vill du ladda ner den nya modellen (~108 MB) nu?",
-  "diarizationMigratedOff": "Talarigenkänning är avstängd tills den nya modellen har laddats ner."
+  "diarizationMigratedOff": "Talarigenkänning är avstängd tills den nya modellen har laddats ner.",
+  "compareTooLongNote": "För långt för att markera skillnader",
+  "meetingHandlers": "Öppna möteslänkar i Vibe",
+  "meetingHandlersInfo": "Registrera Vibe som hanterare för Zoom-, Teams- och Webex-länkar så att de öppnas i mötesfönstret i stället för i webbläsaren.",
+  "meetingHandlersUnavailable": "Det här systemet stöder inte registrering av länkhanterare.",
+  "meetingBrowserLoadFailedTitle": "Sidan öppnades inte",
+  "meetingBrowserLoadFailedBody": "Det gick inte att läsa in sidan. Försök igen eller stäng fönstret?",
+  "meetingBrowserRetry": "Försök igen"
 }

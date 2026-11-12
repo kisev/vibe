@@ -407,6 +407,7 @@
   "updateInstalling": "Installation de la mise à jour…",
   "updateFailed": "La dernière recherche de mise à jour a échoué",
   "updateLastChecked": "Dernière vérification {time}",
+  "updateNoCandidate": "Aucune candidate sur cette ligne",
   "updatingModalBody": "Mise à jour de Vibe vers la version {version}",
   "updatingModalTitle": "Mise à jour en cours…",
   "useGpu": "Utiliser le GPU",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "Révoquer {name}",
   "whatsNew": "Nouveautés",
   "diarizationMigrateQuestion": "Le modèle de diarisation a changé de format avec le nouveau moteur. Télécharger le nouveau modèle (~108 Mo) maintenant ?",
-  "diarizationMigratedOff": "La détection des locuteurs est désactivée jusqu'au téléchargement du nouveau modèle."
+  "diarizationMigratedOff": "La détection des locuteurs est désactivée jusqu'au téléchargement du nouveau modèle.",
+  "compareTooLongNote": "Trop long pour surligner les différences",
+  "meetingHandlers": "Ouvrir les liens de réunion dans Vibe",
+  "meetingHandlersInfo": "Enregistrer Vibe comme gestionnaire des liens Zoom, Teams et Webex, afin qu'ils s'ouvrent dans la fenêtre de réunion plutôt que dans le navigateur.",
+  "meetingHandlersUnavailable": "Ce système ne permet pas d'enregistrer des gestionnaires de liens.",
+  "meetingBrowserLoadFailedTitle": "La page ne s'est pas ouverte",
+  "meetingBrowserLoadFailedBody": "Impossible de charger la page. Réessayer, ou fermer la fenêtre ?",
+  "meetingBrowserRetry": "Réessayer"
 }

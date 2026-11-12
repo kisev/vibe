@@ -401,6 +401,7 @@
   "updateFailed": "Ostatnie sprawdzenie aktualizacji nie powiodło się",
   "updateInstalling": "Instalowanie aktualizacji…",
   "updateLastChecked": "Ostatnio sprawdzono {time}",
+  "updateNoCandidate": "Brak wersji kandydującej w tej linii",
   "updateNotChecked": "Jeszcze nie sprawdzono",
   "updateNow": "aktualizuj teraz",
   "updateUpToDate": "Aktualne",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "Odwołaj {name}",
   "whatsNew": "Co nowego",
   "diarizationMigrateQuestion": "Model rozpoznawania mówców zmienił format wraz z nowym silnikiem. Pobrać nowy model (~108 MB) teraz?",
-  "diarizationMigratedOff": "Rozpoznawanie mówców jest wyłączone, dopóki nie zostanie pobrany nowy model."
+  "diarizationMigratedOff": "Rozpoznawanie mówców jest wyłączone, dopóki nie zostanie pobrany nowy model.",
+  "compareTooLongNote": "Zbyt długi tekst, by podświetlić różnice",
+  "meetingHandlers": "Otwieraj linki do spotkań w Vibe",
+  "meetingHandlersInfo": "Zarejestruj Vibe jako program obsługujący linki Zoom, Teams i Webex, aby otwierały się w oknie spotkania zamiast w przeglądarce.",
+  "meetingHandlersUnavailable": "Ten system nie umożliwia rejestrowania programów obsługujących linki.",
+  "meetingBrowserLoadFailedTitle": "Strona nie została otwarta",
+  "meetingBrowserLoadFailedBody": "Nie udało się wczytać strony. Spróbować ponownie czy zamknąć okno?",
+  "meetingBrowserRetry": "Spróbuj ponownie"
 }

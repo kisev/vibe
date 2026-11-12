@@ -401,6 +401,7 @@
   "updateFailed": "上次更新檢查失敗",
   "updateInstalling": "正在安裝更新…",
   "updateLastChecked": "上次檢查：{time}",
+  "updateNoCandidate": "此發行線暫無候選版本",
   "updateNotChecked": "尚未檢查",
   "updateNow": "立即更新",
   "updateUpToDate": "已是最新版本",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "撤銷 {name}",
   "whatsNew": "更新內容",
   "diarizationMigrateQuestion": "發言者分離模型已隨新引擎更改格式。現在下載新模型（約 108MB）嗎？",
-  "diarizationMigratedOff": "在新模型下載完成之前，發言者識別將保持關閉。"
+  "diarizationMigratedOff": "在新模型下載完成之前，發言者識別將保持關閉。",
+  "compareTooLongNote": "內容過長，無法標示差異",
+  "meetingHandlers": "在 Vibe 中開啟會議連結",
+  "meetingHandlersInfo": "將 Vibe 註冊為 Zoom、Teams 和 Webex 連結的處理程式，讓它們在會議視窗中開啟，而非在瀏覽器中開啟。",
+  "meetingHandlersUnavailable": "此系統不支援註冊連結處理程式。",
+  "meetingBrowserLoadFailedTitle": "頁面未能開啟",
+  "meetingBrowserLoadFailedBody": "無法載入頁面。要再試一次，還是關閉視窗？",
+  "meetingBrowserRetry": "再試一次"
 }

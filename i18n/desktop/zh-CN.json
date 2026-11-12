@@ -401,6 +401,7 @@
   "updateFailed": "上次检查更新失败",
   "updateInstalling": "正在安装更新…",
   "updateLastChecked": "上次检查：{time}",
+  "updateNoCandidate": "此线路暂无候选版本",
   "updateNotChecked": "尚未检查",
   "updateNow": "立即更新",
   "updateUpToDate": "已是最新版本",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "撤销 {name}",
   "whatsNew": "更新内容",
   "diarizationMigrateQuestion": "新引擎改变了发言者分离模型的格式。现在下载新模型（约 108MB）吗？",
-  "diarizationMigratedOff": "在新模型下载完成之前，发言者识别将保持关闭。"
+  "diarizationMigratedOff": "在新模型下载完成之前，发言者识别将保持关闭。",
+  "compareTooLongNote": "内容过长，无法高亮差异",
+  "meetingHandlers": "在 Vibe 中打开会议链接",
+  "meetingHandlersInfo": "将 Vibe 注册为 Zoom、Teams 和 Webex 链接的处理程序，让它们在会议窗口中打开，而不是在浏览器中打开。",
+  "meetingHandlersUnavailable": "此系统不支持注册链接处理程序。",
+  "meetingBrowserLoadFailedTitle": "页面未能打开",
+  "meetingBrowserLoadFailedBody": "无法加载页面。要重试，还是关闭窗口？",
+  "meetingBrowserRetry": "重试"
 }

@@ -401,6 +401,7 @@
   "updateFailed": "La última comprobación de actualizaciones falló",
   "updateInstalling": "Instalando la actualización…",
   "updateLastChecked": "Última comprobación: {time}",
+  "updateNoCandidate": "Sin candidata en esta línea",
   "updateNotChecked": "Aún no se ha comprobado",
   "updateNow": "actualización ahora",
   "updateUpToDate": "Actualizado",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "Revocar {name}",
   "whatsNew": "Novedades",
   "diarizationMigrateQuestion": "El modelo de diarización cambió de formato con el nuevo motor. ¿Descargar el nuevo modelo (~108 MB) ahora?",
-  "diarizationMigratedOff": "La detección de hablantes está desactivada hasta que se descargue el nuevo modelo."
+  "diarizationMigratedOff": "La detección de hablantes está desactivada hasta que se descargue el nuevo modelo.",
+  "compareTooLongNote": "Demasiado largo para resaltar las diferencias",
+  "meetingHandlers": "Abrir enlaces de reuniones en Vibe",
+  "meetingHandlersInfo": "Registra Vibe como gestor de los enlaces de Zoom, Teams y Webex para que se abran en la ventana de la reunión en lugar del navegador.",
+  "meetingHandlersUnavailable": "Este sistema no permite registrar gestores de enlaces.",
+  "meetingBrowserLoadFailedTitle": "La página no se abrió",
+  "meetingBrowserLoadFailedBody": "No se pudo cargar la página. ¿Intentar de nuevo o cerrar la ventana?",
+  "meetingBrowserRetry": "Intentar de nuevo"
 }

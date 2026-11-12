@@ -401,6 +401,7 @@
   "updateFailed": "Die letzte Update-Prüfung ist fehlgeschlagen",
   "updateInstalling": "Update wird installiert…",
   "updateLastChecked": "Zuletzt geprüft: {time}",
+  "updateNoCandidate": "Kein Release Candidate in dieser Linie",
   "updateNotChecked": "Noch nicht geprüft",
   "updateNow": "jetzt aktualisieren",
   "updateUpToDate": "Auf dem neuesten Stand",
@@ -796,5 +797,12 @@
   "phoneRevokeDeviceNamed": "{name} widerrufen",
   "whatsNew": "Neuerungen",
   "diarizationMigrateQuestion": "Das Diarisierungsmodell hat mit der neuen Engine sein Format geändert. Das neue Modell (~108MB) jetzt herunterladen?",
-  "diarizationMigratedOff": "Die Sprechererkennung ist deaktiviert, bis das neue Modell heruntergeladen ist."
+  "diarizationMigratedOff": "Die Sprechererkennung ist deaktiviert, bis das neue Modell heruntergeladen ist.",
+  "compareTooLongNote": "Zu lang, um Unterschiede hervorzuheben",
+  "meetingHandlers": "Besprechungslinks in Vibe öffnen",
+  "meetingHandlersInfo": "Registrieren Sie Vibe als Standardanwendung für Zoom-, Teams- und Webex-Links, damit sie im Besprechungsfenster statt im Browser geöffnet werden.",
+  "meetingHandlersUnavailable": "Dieses System unterstützt die Registrierung von Link-Handlern nicht.",
+  "meetingBrowserLoadFailedTitle": "Seite wurde nicht geöffnet",
+  "meetingBrowserLoadFailedBody": "Die Seite konnte nicht geladen werden. Erneut versuchen oder das Fenster schließen?",
+  "meetingBrowserRetry": "Erneut versuchen"
 }
