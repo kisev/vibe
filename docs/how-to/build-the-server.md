@@ -3,15 +3,15 @@
 The engine lives in `server/` and ships as the `vibe-server` sidecar. To run the app against a build from the tree instead of the pinned release:
 
 ```console
-chore setup            # fetch the released server and ffmpeg once
-chore server-build     # build server/ and stage it as the sidecar
-chore dev
+task setup            # fetch the released server and ffmpeg once
+task server:build     # build server/ and stage it as the sidecar
+task dev
 ```
 
-`chore server-build` builds `vibe-server` in release mode and copies it to `desktop/src-tauri/binaries/vibe-server-<triple>`, where `tauri dev` and `tauri build` look for it. An explicit target triple works the same way for a cross-compile:
+`task server:build` builds `vibe-server` in release mode and copies it to `desktop/src-tauri/binaries/vibe-server-<triple>`, where `tauri dev` and `tauri build` look for it. An explicit target triple works the same way for a cross-compile:
 
 ```console
-chore server-build x86_64-pc-windows-msvc
+task server:build -- x86_64-pc-windows-msvc
 ```
 
 The sidecar name and location come from Tauri's `externalBin` configuration, so no app-side change is needed when the server build changes.

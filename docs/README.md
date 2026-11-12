@@ -37,7 +37,7 @@ Repository documentation is organized by [Diátaxis](https://diataxis.fr/): ever
 | --- | --- |
 | [Architecture](reference/architecture.md) | Components, the engine, the server sidecar, and the build flow |
 | [Repository layout](reference/repository-layout.md) | Top-level directories and what each one holds |
-| [Tooling](reference/tooling.md) | The `task` and `chore` facades, mise pins, and git hooks |
+| [Tooling](reference/tooling.md) | The `task` groups, mise pins, and git hooks |
 | [Update channels](reference/update-channels.md) | Channel URLs, tag and version rules, manifests, and settings |
 | [Meeting browser](reference/meeting-browser.md) | URL schemes, default hosts, platform webviews, and settings |
 

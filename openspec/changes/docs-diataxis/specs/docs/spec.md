@@ -51,11 +51,11 @@ Repository documentation is organized by Diátaxis, so each page either teaches 
 
 ### Requirement: Docs describe the current tree
 
-Documented commands, paths, versions, defaults, and workflows SHALL be verified against `taskfile.yml`, `chorefile`, `scripts/`, and `.github/workflows/` rather than carried over from an older state. Documentation for removed features SHALL be deleted.
+Documented commands, paths, versions, defaults, and workflows SHALL be verified against `taskfile.yml`, `scripts/`, and `.github/workflows/` rather than carried over from an older state. Documentation for removed features SHALL be deleted.
 
 #### Scenario: A command is documented
 
-- **WHEN** a page names a `task` or `chore` target, a script, a path, or a workflow input
+- **WHEN** a page names a `task` target, a script, a path, or a workflow input
 - **THEN** the target, script, path, or input exists in the tree and does what the page says
 
 #### Scenario: A removed feature is described

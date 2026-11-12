@@ -12,7 +12,7 @@ All third-party Python dependencies SHALL be declared in a single root `pyprojec
 
 #### Scenario: Running a script
 
-- **WHEN** a task or chore runs `uv run scripts/<name>.py`
+- **WHEN** a task runs `uv run scripts/<name>.py`
 - **THEN** dependencies resolve from the root uv project and its lockfile, with no per-script pins
 
 #### Scenario: Adding a dependency

@@ -38,7 +38,7 @@ export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 Then build:
 
 ```console
-chore build
+task app:build
 ```
 
 Tauri signs every binary with `codesign` and applies the hardened runtime. Verify:

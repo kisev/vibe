@@ -66,4 +66,4 @@ git push <fork-url>
 
 ## Run the task facade
 
-`task --list` is the index of every facade task. [Tooling](../reference/tooling.md) explains the split between `task` and `chore` and which one to use for what.
+`task --list` is the index of every facade task. [Tooling](../reference/tooling.md) lists the task groups and what each one covers.

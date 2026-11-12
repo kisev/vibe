@@ -1,6 +1,6 @@
 # Tooling
 
-Two task facades coexist. `task` is the CI and check facade; `chore` owns the local desktop build loop and the sidecars. Use the one whose task you need; do not reimplement either by hand.
+The project's task scheme is `taskfile.yml` and `lefthook`; `task --list` is the entry surface.
 
 ## `task` (`taskfile.yml`)
 
@@ -9,34 +9,34 @@ Two task facades coexist. `task` is the CI and check facade; `chore` owns the lo
 | Prefix | Covers |
 | --- | --- |
 | `hooks` | Install the lefthook git gates once per checkout |
+| `setup`, `dev`, `dev:web`, `app:*` | Local setup, sidecars, the desktop dev loop, production bundles |
+| `server:*` | Build the engine sidecar, fetch pinned headers, package a release archive, and run its tests, clippy, deny, machete |
+| `linux-deps` | Install the Linux build packages with apt, zypper or dnf |
+| `libs:*` | ggml library fetch/build/upload, tree id, release tag, platform id |
+| `website:dev`, `website:build`, `phone:*` | Website dev/build and the phone handoff |
 | `upstream:*` | Remote isolation, branch fetches, namespaced tag fetches |
-| `i18n:*` | Paraglide generation, source-hash stamping, coverage audit |
+| `i18n:*`, `stamp-translations` | Paraglide generation, source-hash stamping, coverage audit |
 | `docs:models*` | Regenerate or check the generated models page |
 | `sync:catalog*` | Refresh or check the vendored model catalog |
-| `desktop:*`, `website:*`, `server:*` | Per-area tests, type checks, clippy, deny, machete |
-| `test`, `lint`, `format`, `format:check` | Whole-tree gates |
+| `desktop:*`, `website:test`, `website:typecheck` | Per-area tests and type checks |
+| `test`, `lint`, `format`, `format:check`, `check-types` | Whole-tree gates |
 | `deps:*` | Outdated report, in-range updates, majors, Renovate |
 | `ci:*` | Build and release helpers that workflows call |
 | `dev:*`, `release:*` | Dev build guard/prepare/cleanup/tag and release version override |
 
 Every `task` resolves its tools through `mise exec`, so local runs use the versions pinned in `mise.toml`.
 
-## `chore` (`chorefile`)
-
-Install it from <https://getchore.github.io/chore/>. `chore list` is the index for this facade.
+## Local development tasks
 
 | Task | Effect |
 | --- | --- |
-| `chore linux-deps` | Install the apt packages for a Linux desktop build |
-| `chore setup [triple]` | Download the `vibe-server` (and `ffmpeg`) sidecars for this machine or an explicit target |
-| `chore server-build [triple]` | Build `server/` and stage it as the sidecar |
-| `chore install` | `pnpm install` in `desktop/` |
-| `chore dev` | `setup`, then `tauri dev` |
-| `chore dev-web` | Run only the frontend in a browser, with Tauri mocked |
-| `chore build` | `setup`, then `tauri build` |
-| `chore upgrade` | macOS only: rebuild `vibe.app`, replace the installed copy, relaunch |
-
-The `chorefile` includes `handoff/handoff.chore` and `website/website.chore`, so phone and website tasks appear in the same list. `server/chorefile` holds the engine workspace's own tasks.
+| `task setup` | Download the `vibe-server` (and `ffmpeg`) sidecars for this machine; pass `-- <triple>` for an explicit target |
+| `task server:build` | Build `server/` and stage it as the sidecar; pass `-- <triple>` to cross-compile |
+| `task linux-deps` | Install the Linux build packages with the host package manager |
+| `task dev` | `setup`, then `tauri dev` |
+| `task dev:web` | Run only the frontend in a browser, with Tauri mocked |
+| `task app:build` | `setup`, then `tauri build` |
+| `task app:upgrade` | macOS only: rebuild `vibe.app`, replace the installed copy, relaunch |
 
 ## Package managers
 
@@ -54,4 +54,4 @@ Installs the lefthook gates defined in `lefthook.yml`. The pre-commit and pre-pu
 
 ## CI
 
-Workflows are thin by design: checkout, toolchain setup, then a `task` or `chore` call. If a workflow step grows past a couple of lines of shell, it belongs in a task or a script under `scripts/`. See [Check your change](../how-to/check-your-change.md) for the local equivalents.
+Workflows are thin by design: checkout, toolchain setup, then a `task` call. If a workflow step grows past a couple of lines of shell, it belongs in a task or a script under `scripts/`. See [Check your change](../how-to/check-your-change.md) for the local equivalents.

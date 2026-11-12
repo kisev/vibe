@@ -97,7 +97,7 @@ re-running an agent.
 ## 4. Stamp and audit
 
 ```bash
-chore stamp-translations            # writes the source hash into each translation
+task stamp-translations            # writes the source hash into each translation
 uv run scripts/check_i18n.py        # must end "i18n audit passed"
 ```
 

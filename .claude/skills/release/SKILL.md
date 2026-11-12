@@ -36,9 +36,9 @@ git log --oneline "server-${pin#v}"..main -- server/ 2>/dev/null ||
 - **Only docs/comments** → say so and ask whether to skip.
 - **Code changed** → release the server first:
   - If anything under `server/libs/` changed (`ggml-version`, `patches/`,
-    `libs.chore`, `include/`), bump `server/libs/revision` in the same commit and
-    run `server-libs.yml` **first** (~9 min); `upload-libs` refuses a tag that
-    exists for another tree.
+    `include/`) or `scripts/ggml_libs.sh` changed, bump `server/libs/revision` in
+    the same commit and run `server-libs.yml` **first** (~9 min); `task libs:upload`
+    refuses a tag that exists for another tree.
   - `git tag server-vX.Y.Z && git push origin server-vX.Y.Z` on main.
   - **Gate:** `server-release.yml` green (~8 min) and all 5 assets uploaded — the
     Intel Mac asset lands last. It publishes as a *prerelease* on purpose; leave
@@ -73,7 +73,7 @@ locale over the new file and stamps the hashes. Untranslated is not fatal — th
 page falls back to English per entry — but the notes are the one page every user
 opens on update day, so translate them unless the user says otherwise.
 
-**Gate:** `uv run scripts/check_i18n.py` passes and `chore check-types` is clean.
+**Gate:** `uv run scripts/check_i18n.py` passes and `task check-types` is clean.
 
 ## 3. PR and squash merge
 

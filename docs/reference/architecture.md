@@ -18,7 +18,7 @@ Vibe is a desktop transcription app built with Tauri (Rust plus a TypeScript/Rea
 - Every ASR family (whisper, gigaam, parakeet, nemotron, canary, qwen3, voxtral) plus Silero VAD and Sortformer diarization runs through the one ggml — exactly one `ggml_*` symbol set links into the binary.
 - **Native diarization helper**: `vibe-diarize-native` runs Nemotron-3 diarization beside the server, because the native stack's prebuilt ggml cannot share a binary with transcribe.cpp's ggml.
 - **Build**: cmake compiles the transcribe.cpp C++ sources during `cargo build`; there are no prebuilt engine libraries. `server-release.yml` publishes `server-v*` prereleases; `server-test.yml` runs a release across platforms.
-- **Distribution**: the app downloads the release named by `.server-version` at build time through the `setup` task in the root `chorefile`. `chore server-build` stages an in-tree build instead. See [Build the server](../how-to/build-the-server.md).
+- **Distribution**: the app downloads the release named by `.server-version` at build time through the `setup` target in `taskfile.yml`. `task server:build` stages an in-tree build instead. See [Build the server](../how-to/build-the-server.md).
 
 ### Other crates
 
@@ -33,7 +33,7 @@ Vibe is a desktop transcription app built with Tauri (Rust plus a TypeScript/Rea
 
 ## Build flow
 
-1. The release workflow runs `chore setup <target-triple>`.
+1. The release workflow runs `task setup -- <target-triple>`.
 1. `setup` downloads the prebuilt `vibe-server` (and `ffmpeg` where the platform bundles it) from the `server-v*` release named in `.server-version`.
 1. The binaries land in `desktop/src-tauri/binaries/` with the target triple in the name.
 1. Tauri bundles the sidecars named by `externalBin` into the final app.

@@ -8,23 +8,13 @@ This tutorial takes you from a fresh checkout to a local build that transcribes 
 - [Rust](https://www.rust-lang.org/tools/install) through `rustup`
 - [Node.js](https://nodejs.org/) 22 and [pnpm](https://pnpm.io/)
 - [uv](https://docs.astral.sh/uv/) for the Python scripts
-- [mise](https://mise.jdx.dev/) for the pinned lint and format tools (`mise install`)
-- [chore](https://getchore.github.io/chore/) for the desktop build loop
+- [mise](https://mise.jdx.dev/) for the `task` runner and the pinned lint and format tools (`mise install`)
 - Platform build dependencies (below)
-
-Install `chore` once:
-
-```console
-# macOS / Linux
-curl -fsSL https://getchore.github.io/chore/install.sh | sh
-# Windows
-irm https://getchore.github.io/chore/install.ps1 | iex
-```
 
 **Linux**
 
 ```console
-chore linux-deps
+task linux-deps
 ```
 
 That installs the packages from [Tauri's Linux prerequisites](https://v2.tauri.app/start/prerequisites/#linux) plus what Vibe adds: ALSA for audio, `xdo` for the global shortcut, and the appindicator bindings for the tray icon. The release workflow runs the same task, so CI and your machine get the same packages.
@@ -42,17 +32,17 @@ Install the WebView2 runtime if it is not already present, and the Visual Studio
 Fetch the sidecars for this machine, install the frontend dependencies, and start the app:
 
 ```console
-chore setup
-chore install
-chore dev
+task setup
+pnpm --dir desktop install
+task dev
 ```
 
-`chore setup` downloads the `vibe-server` sidecar (and `ffmpeg` on macOS and Windows) from the server release pinned by `.server-version` into `desktop/src-tauri/binaries/`. `chore dev` then runs `tauri dev`.
+`task setup` downloads the `vibe-server` sidecar (and `ffmpeg` on macOS and Windows) from the server release pinned by `.server-version` into `desktop/src-tauri/binaries/`. `task dev` then runs `tauri dev`.
 
 The same steps by hand:
 
 ```console
-chore setup
+task setup
 pnpm --dir desktop install
 cd desktop
 pnpm exec tauri dev
@@ -61,10 +51,10 @@ pnpm exec tauri dev
 For a production bundle instead of the dev server:
 
 ```console
-chore build
+task app:build
 ```
 
-The bundle lands under `target/release/bundle/`. On macOS, `chore upgrade` builds the app, replaces `/Applications/vibe.app`, and relaunches it.
+The bundle lands under `target/release/bundle/`. On macOS, `task app:upgrade` builds the app, replaces `/Applications/vibe.app`, and relaunches it.
 
 ## Confirm the setup
 
