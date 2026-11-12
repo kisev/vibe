@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_MEETING_HOSTS, normalizeMeetingHost, parseBrowserDeepLink } from './meeting-browser'
+import { DEFAULT_MEETING_HOSTS, isMeetingLaunchArg, normalizeMeetingHost } from './meeting-browser'
 
 describe('meeting host normalization', () => {
 	it('lowercases a bare host and drops the trailing dot', () => {
@@ -19,20 +19,25 @@ describe('meeting host normalization', () => {
 	})
 })
 
-describe('vibe://open deep links', () => {
-	it('reads the url query parameter', () => {
-		expect(parseBrowserDeepLink('vibe://open/?url=https%3A%2F%2Ftelemost.yandex.ru%2Fj%2F123')).toEqual({
-			url: 'https://telemost.yandex.ru/j/123',
-		})
+describe('meeting launch arguments', () => {
+	it('accepts the schemes other applications register', () => {
+		for (const value of [
+			'zoommtg://zoom.us/join?confno=123',
+			'msteams://teams.microsoft.com/l/meetup-join/19%3ameeting',
+			'teams://teams.microsoft.com/l/meetup-join/19%3ameeting',
+			'webex://example.webex.com/meet/room',
+		]) {
+			expect(isMeetingLaunchArg(value)).toBe(true)
+		}
 	})
 
-	it('accepts path variants and reports a missing target', () => {
-		expect(parseBrowserDeepLink('vibe://open/join?url=https://stream.wb.ru/room')).toEqual({ url: 'https://stream.wb.ru/room' })
-		expect(parseBrowserDeepLink('vibe://open/')).toEqual({ url: null })
+	it('accepts plain https links', () => {
+		expect(isMeetingLaunchArg('https://stream.wb.ru/room')).toBe(true)
 	})
 
-	it('leaves other schemes to the download and file paths', () => {
-		expect(parseBrowserDeepLink('vibe://download/?url=https://example.com/model.gguf')).toBeNull()
-		expect(parseBrowserDeepLink('https://example.com')).toBeNull()
+	it('leaves the app’s own scheme, files and other protocols alone', () => {
+		for (const value of ['vibe://download/?url=https://example.com/model.gguf', 'vibe://open/?url=https://x', '/tmp/a.wav', 'mailto:a@b.c']) {
+			expect(isMeetingLaunchArg(value)).toBe(false)
+		}
 	})
 })

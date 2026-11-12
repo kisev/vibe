@@ -16,6 +16,7 @@ mod keepawake;
 mod logging;
 mod meeting_browser;
 mod meeting_prompt;
+mod meeting_schemes;
 mod server;
 mod setup;
 mod transcript;
@@ -120,8 +121,10 @@ async fn main() -> Result<()> {
             cmd::server_cmd::get_gpu_devices,
             cmd::server_cmd::get_model_metadata,
             cmd::server_cmd::get_api_base_url,
+            cmd::server_cmd::api_server_enabled,
             cmd::server_cmd::start_api_server,
             cmd::server_cmd::stop_api_server,
+            cmd::server_cmd::stop_api_server_process,
             cmd::app::track_analytics_event,
             cmd::app::get_commit_hash,
             cmd::app::is_avx2_enabled,
@@ -169,6 +172,11 @@ async fn main() -> Result<()> {
             meeting_browser::meeting_browser_confirm_close,
             meeting_browser::meeting_hosts,
             meeting_browser::set_meeting_hosts,
+            meeting_browser::open_meeting_link,
+            meeting_browser::meeting_browser_retry,
+            meeting_browser::meeting_schemes_supported,
+            meeting_browser::meeting_schemes_enabled,
+            meeting_browser::set_meeting_schemes_enabled,
             meeting_prompt::get_meeting_detection_enabled,
             meeting_prompt::set_meeting_detection_enabled,
             meeting_prompt::get_meeting_prompt_state,

@@ -9,6 +9,8 @@ use tauri::{AppHandle, Emitter, Manager, Url, WebviewUrl, WebviewWindowBuilder, 
 use tauri_plugin_store::StoreExt;
 
 const HOSTS_KEY: &str = "meeting.browserHosts";
+/// Opt-in registration as the system handler for other applications' meeting schemes.
+const SCHEMES_KEY: &str = "meeting.schemesEnabled";
 const DEFAULT_HOSTS: [&str; 2] = ["telemost.yandex.ru", "stream.wb.ru"];
 const SESSION_EVENT: &str = "meeting-browser-session";
 const CLOSED_EVENT: &str = "meeting-browser-closed";
@@ -17,8 +19,10 @@ const CLOSE_REQUESTED_EVENT: &str = "meeting-browser-close-requested";
 const PROFILE_DIR: &str = "browser-profile";
 const CONTENT_WIDTH: f64 = 1100.0;
 const CONTENT_HEIGHT: f64 = 760.0;
-const BAR_WIDTH: f64 = 960.0;
-const BAR_HEIGHT: f64 = 64.0;
+/// Menu ids carry the session so one handler serves every window.
+const MENU_PREFIX: &str = "meeting-browser";
+/// How long a page may stay unloaded before the window offers a retry instead of white.
+const LOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -62,8 +66,65 @@ fn content_label(session: u64) -> String {
     format!("browser-{session}")
 }
 
-fn bar_label(session: u64) -> String {
-    format!("browser-bar-{session}")
+/// The window's own menu: the controls survive any page, including one that fails to load,
+/// so a white webview can never leave the user without a way to reload or close it.
+fn menu_id(session: u64, action: &str) -> String {
+    format!("{MENU_PREFIX}:{session}:{action}")
+}
+
+fn build_menu(app: &AppHandle, session: u64, can_back: bool, can_forward: bool) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{Menu, MenuItem};
+    let back = MenuItem::with_id(app, menu_id(session, "back"), "←", can_back, None::<&str>)?;
+    let forward = MenuItem::with_id(app, menu_id(session, "forward"), "→", can_forward, None::<&str>)?;
+    let reload = MenuItem::with_id(app, menu_id(session, "reload"), "⟳", true, None::<&str>)?;
+    let external = MenuItem::with_id(app, menu_id(session, "external"), "↗", true, None::<&str>)?;
+    let close = MenuItem::with_id(app, menu_id(session, "close"), "✕", true, None::<&str>)?;
+    Menu::with_items(app, &[&back, &forward, &reload, &external, &close])
+}
+
+fn refresh_menu(app: &AppHandle, info: &BrowserSessionInfo) {
+    if let Some(window) = app.get_webview_window(&content_label(info.session)) {
+        if let Ok(menu) = build_menu(app, info.session, info.can_back, info.can_forward) {
+            if let Err(error) = window.set_menu(menu) {
+                tracing::warn!("could not refresh the meeting window menu: {error}");
+            }
+        }
+    }
+}
+
+/// One handler for every meeting window; the id carries the session and the action.
+fn ensure_menu_handler(app: &AppHandle) {
+    static HANDLER: std::sync::Once = std::sync::Once::new();
+    HANDLER.call_once(|| {
+        app.on_menu_event(|app, event| {
+            let id = event.id().as_ref();
+            let Some(rest) = id.strip_prefix(MENU_PREFIX) else {
+                return;
+            };
+            let mut parts = rest.trim_start_matches(':').splitn(2, ':');
+            let session = parts.next().and_then(|value| value.parse::<u64>().ok());
+            let action = parts.next();
+            let (Some(session), Some(action)) = (session, action) else {
+                return;
+            };
+            let result = match action {
+                "back" | "forward" | "reload" => meeting_browser_navigate(app.clone(), session, action.to_string()),
+                "external" => meeting_browser_open_external(session),
+                "close" => meeting_browser_close(app.clone(), session),
+                _ => Ok(()),
+            };
+            if let Err(error) = result {
+                tracing::warn!("meeting window menu action {action} failed: {error}");
+            }
+        });
+    });
+}
+
+fn attach_menu(app: &AppHandle, window: &tauri::WebviewWindow, session: u64) -> Result<(), String> {
+    ensure_menu_handler(app);
+    let menu = build_menu(app, session, false, false).map_err(|error| error.to_string())?;
+    window.set_menu(menu).map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 fn default_hosts() -> Vec<String> {
@@ -184,11 +245,12 @@ fn handle_page_load(app: &AppHandle, session: u64, url: &Url) {
     };
     if let Some(info) = changed {
         emit_session(app, &info);
+        refresh_menu(app, &info);
     }
     sync_meeting_suppression(count);
 }
 
-/// Remove a session after its content window is gone, close the bar, and notify listeners.
+/// Remove a session after its content window is gone and notify listeners.
 fn finalize_session(app: &AppHandle, session: u64) {
     let (removed, count) = {
         let Ok(mut runtime) = RUNTIME.lock() else {
@@ -199,9 +261,6 @@ fn finalize_session(app: &AppHandle, session: u64) {
     };
     if !removed {
         return;
-    }
-    if let Some(bar) = app.get_webview_window(&bar_label(session)) {
-        let _ = bar.close();
     }
     sync_meeting_suppression(count);
     if let Err(error) = app.emit(CLOSED_EVENT, serde_json::json!({ "session": session })) {
@@ -329,12 +388,12 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
                 .lock()
                 .map(|runtime| runtime.sessions.get(&session).map_or(true, |state| state.force_close))
                 .unwrap_or(true);
-            // A recording somewhere in Vibe may cover this call: let the bar decide.
+            // A recording somewhere in Vibe may cover this call: let the main window decide.
             if force_close || !crate::cmd::audio::recording_active() {
                 return;
             }
             api.prevent_close();
-            if let Err(error) = handler_app.emit(CLOSE_REQUESTED_EVENT, serde_json::json!({ "session": session })) {
+            if let Err(error) = handler_app.emit_to("main", CLOSE_REQUESTED_EVENT, serde_json::json!({ "session": session })) {
                 tracing::warn!("could not emit meeting browser close request: {error}");
             }
         }
@@ -342,21 +401,10 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
         _ => {}
     });
 
-    let bar_url = format!("index.html?window=meeting-bar&session={session}");
-    let bar = WebviewWindowBuilder::new(&app, bar_label(session), WebviewUrl::App(bar_url.into()))
-        .title("Vibe meeting")
-        .inner_size(BAR_WIDTH, BAR_HEIGHT)
-        .decorations(false)
-        .always_on_top(true)
-        .resizable(true)
-        .skip_taskbar(false)
-        .visible(true)
-        .focused(false)
-        .build();
-    if let Err(error) = bar {
+    if let Err(error) = attach_menu(&app, &content, session) {
         let _ = content.destroy();
         finalize_session(&app, session);
-        return Err(format!("Could not open the meeting bar: {error}"));
+        return Err(format!("Could not build the meeting window menu: {error}"));
     }
 
     let (info, count) = {
@@ -472,6 +520,66 @@ pub fn meeting_browser_confirm_close(app: AppHandle, session: u64, stop_recordin
         }
     }
     close_session(&app, session)
+}
+
+#[tauri::command]
+pub fn meeting_schemes_supported() -> bool {
+    crate::custom_protocol::MEETING_SCHEMES_SUPPORTED
+}
+
+#[tauri::command]
+pub fn meeting_schemes_enabled(app: AppHandle) -> bool {
+    schemes_enabled(&app)
+}
+
+pub(crate) fn schemes_enabled(app: &AppHandle) -> bool {
+    app.store(STORE_FILENAME)
+        .ok()
+        .and_then(|store| store.get(SCHEMES_KEY))
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+pub fn set_meeting_schemes_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
+    if enabled && !crate::custom_protocol::MEETING_SCHEMES_SUPPORTED {
+        return Err("registering meeting schemes is not supported on this platform".to_string());
+    }
+    if enabled {
+        crate::custom_protocol::register_meeting_schemes()
+    } else {
+        crate::custom_protocol::unregister_meeting_schemes()
+    }
+    .map_err(|error| format!("Could not update the system link handlers: {error}"))?;
+    let store = app.store(STORE_FILENAME).map_err(|error| error.to_string())?;
+    store.set(SCHEMES_KEY, serde_json::json!(enabled));
+    store.save().map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+/// A scheme or web link from the system: mapped to https, then either the meeting window
+/// (configured host) or the system browser, so the handler never traps an ordinary link.
+#[tauri::command]
+pub fn open_meeting_link(app: AppHandle, raw: String) -> Result<Option<BrowserSessionInfo>, String> {
+    let url = if raw.starts_with("https://") {
+        raw
+    } else {
+        crate::meeting_schemes::meeting_url(&raw)
+            .ok_or_else(|| format!("This link is not a meeting link Vibe can open: {raw:?}"))?
+    };
+    let hosts = load_hosts(&app);
+    if is_meeting_url(&url, &hosts) {
+        open_meeting_browser(app, url).map(Some)
+    } else {
+        tauri_plugin_opener::open_url(url, None::<&str>)
+            .map_err(|error| format!("Could not open the URL in the system browser: {error}"))?;
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub fn meeting_browser_retry(app: AppHandle, session: u64) -> Result<(), String> {
+    meeting_browser_navigate(app, session, "reload".to_string())
 }
 
 #[tauri::command]

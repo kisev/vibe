@@ -56,19 +56,37 @@ export function normalizeMeetingHost(value: string): string | null {
 }
 
 /**
- * `vibe://open/?url=…` (and the path variants the deep-link plugin may hand over).
- * Returns null for anything that is not an open link; `url` is null when the link carries no
- * target, so the caller can tell "not ours" apart from "ours but malformed".
+ * Whether a launch argument is a URL a meeting window could load at all: either an
+ * `https://` link or one of the schemes other applications register (Zoom, Teams,
+ * Webex). The Rust side maps the scheme and decides between the meeting window and
+ * the system browser; nothing here guesses.
  */
-export function parseBrowserDeepLink(raw: string): { url: string | null } | null {
-	let parsed: URL
+export function isMeetingLaunchArg(raw: string): boolean {
+	if (raw.startsWith('https://')) return true
+	return /^(zoommtg|zoomus|msteams|teams|webex|wbx):/i.test(raw)
+}
+
+/** Hand a scheme or web link to the Rust side, which maps it and picks the window. */
+export const openMeetingLink = (raw: string) => invoke<BrowserSessionInfo | null>('open_meeting_link', { raw })
+
+/** Reload the page a meeting window failed to show. */
+export const retryMeetingBrowser = (session: number) => invoke<void>('meeting_browser_retry', { session })
+
+/** Whether the app is registered as the system handler for Zoom/Teams/Webex links. */
+export const getMeetingSchemesEnabled = () => invoke<boolean>('meeting_schemes_enabled')
+
+export const setMeetingSchemesEnabled = (enabled: boolean) => invoke<void>('set_meeting_schemes_enabled', { enabled })
+
+/** False on platforms where taking a scheme from its owner is not supported. */
+export const meetingSchemesSupported = () => invoke<boolean>('meeting_schemes_supported')
+
+/** A launch argument that is a meeting link: mapped and opened, with the failure reported. */
+export async function handOffMeetingLink(raw: string): Promise<void> {
 	try {
-		parsed = new URL(raw)
-	} catch {
-		return null
+		await openMeetingLink(raw)
+	} catch (error) {
+		await message(m.meetingBrowserInvalidLink({ reason: String(error) }), { title: m.meetingBrowserTitle(), kind: 'error' })
 	}
-	if (parsed.protocol !== 'vibe:' || parsed.hostname !== 'open') return null
-	return { url: parsed.searchParams.get('url') }
 }
 
 /**

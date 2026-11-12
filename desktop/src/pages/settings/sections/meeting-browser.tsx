@@ -3,12 +3,16 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { Switch } from '~/components/ui/switch'
 import {
 	DEFAULT_MEETING_HOSTS,
 	getMeetingHosts,
+	getMeetingSchemesEnabled,
+	meetingSchemesSupported,
 	normalizeMeetingHost,
 	openMeetingBrowser,
 	setMeetingHosts,
+	setMeetingSchemesEnabled,
 } from '~/lib/meeting-browser'
 import { m } from '~/paraglide/messages.js'
 import { IconAction, SettingsField, SettingsGroup, SettingsRow } from './shared'
@@ -27,6 +31,29 @@ export function MeetingBrowserSettings() {
 	const [error, setError] = useState<string | null>(null)
 	const [link, setLink] = useState('')
 	const [opening, setOpening] = useState(false)
+	const [handlers, setHandlers] = useState<{ enabled: boolean; supported: boolean } | null>(null)
+
+	useEffect(() => {
+		let cancelled = false
+		Promise.all([getMeetingSchemesEnabled(), meetingSchemesSupported()])
+			.then(([enabled, supported]) => {
+				if (!cancelled) setHandlers({ enabled, supported })
+			})
+			.catch((reason) => console.error('Failed to read the meeting link handlers:', reason))
+		return () => {
+			cancelled = true
+		}
+	}, [])
+
+	async function toggleHandlers(next: boolean) {
+		setHandlers((current) => (current ? { ...current, enabled: next } : current))
+		try {
+			await setMeetingSchemesEnabled(next)
+		} catch (reason) {
+			setHandlers((current) => (current ? { ...current, enabled: !next } : current))
+			toast.error(errorText(reason))
+		}
+	}
 
 	useEffect(() => {
 		let cancelled = false
@@ -80,6 +107,20 @@ export function MeetingBrowserSettings() {
 
 	return (
 		<div className="space-y-6">
+			{/* Taking a scheme from the application that owns it is opt-in and reversible. */}
+			<SettingsGroup
+				title={m.meetingHandlers()}
+				description={handlers && !handlers.supported ? m.meetingHandlersUnavailable() : m.meetingHandlersInfo()}>
+				<SettingsRow label={m.meetingHandlers()}>
+					<Switch
+						checked={handlers?.enabled ?? false}
+						disabled={!handlers?.supported}
+						onCheckedChange={(checked) => void toggleHandlers(checked)}
+						aria-label={m.meetingHandlers()}
+					/>
+				</SettingsRow>
+			</SettingsGroup>
+
 			<SettingsGroup title={m.meetingHosts()} description={m.meetingHostsInfo()}>
 				{hosts.map((host) => (
 					<SettingsRow

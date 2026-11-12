@@ -69,6 +69,21 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         Err(error) => tracing::error!("could not start config watcher: {:?}", error),
     }
 
+    // The local API is a persisted intent, not a side effect: only a user who left the switch on
+    // gets a server at launch. The spawn handshakes with the sidecar, so it runs in the background
+    // rather than delaying the window; a failure is logged and retried on the next launch.
+    if crate::cmd::config::api_server_enabled(app.handle()) {
+        let app_handle = app.app_handle().clone();
+        let unload_timeout_minutes = crate::cmd::config::unload_timeout_minutes(&app_handle);
+        tauri::async_runtime::spawn(async move {
+            let state = app_handle.state::<Mutex<ServerState>>();
+            let mut guard = state.lock().await;
+            if let Err(error) = crate::cmd::server_cmd::start_process(&app_handle, &mut guard, unload_timeout_minutes) {
+                tracing::error!("could not start the local API server at launch: {:#}", error);
+            }
+        });
+    }
+
     // Crash handler
 
     let _handler = crash_handler::CrashHandler::attach(unsafe {
@@ -112,6 +127,14 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     {
         if let Err(error) = crate::custom_protocol::register() {
             tracing::error!("{:?}", error);
+        }
+    }
+
+    // An update moves the executable, so an opted-in scheme handler has to be re-pointed at
+    // the new path on every launch; the registration itself stays off unless the user chose it.
+    if crate::meeting_browser::schemes_enabled(app.handle()) {
+        if let Err(error) = crate::custom_protocol::register_meeting_schemes() {
+            tracing::warn!("could not refresh the meeting link handlers: {error}");
         }
     }
 
