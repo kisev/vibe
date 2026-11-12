@@ -7,7 +7,7 @@ Small repository chores that do not deserve their own page. Dependency updates l
 The models table on the site is generated from the vendored catalog:
 
 ```console
-task docs:models          # regenerate i18n/docs/en-US/models.md
+task docs:models          # regenerate i18n/docs/en-US/reference/models.md
 task docs:models:check    # fail when the generated page is stale
 ```
 

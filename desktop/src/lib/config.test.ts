@@ -37,12 +37,12 @@ describe('GigaAM model catalog entry', () => {
 	})
 
 	it('is the same URL the model catalog documents', () => {
-		const catalog = readFileSync(join(__dirname, '../../../i18n/docs/en-US/models.md'), 'utf8')
+		const catalog = readFileSync(join(__dirname, '../../../i18n/docs/en-US/reference/models.md'), 'utf8')
 		expect(catalog).toContain(gigaamModelUrl)
 	})
 
 	it('keeps the documented GigaAM limitations in the app strings', () => {
-		const catalog = readFileSync(join(__dirname, '../../../i18n/docs/en-US/models.md'), 'utf8').toLowerCase()
+		const catalog = readFileSync(join(__dirname, '../../../i18n/docs/en-US/reference/models.md'), 'utf8').toLowerCase()
 		for (const limitation of ['russian only', 'silero vad', '25 seconds', 'translation', 'stable timestamps', 'auto-detect']) {
 			expect(catalog).toContain(limitation)
 		}

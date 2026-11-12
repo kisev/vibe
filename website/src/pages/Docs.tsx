@@ -1,24 +1,26 @@
 import { useEffect, useState } from 'react'
 import DocViewer from '~/components/DocViewer'
 import { cn } from '~/lib/style'
-import { docs as englishDocs, loadDocs, slugs, type Doc, type Slug } from '~/lib/docs'
+import { categories, docs as englishDocs, loadDocs, type Category, type Doc } from '~/lib/docs'
 import { m } from '~/paraglide/messages.js'
 import { getLocale, getTextDirection, type Locale } from '~/paraglide/runtime.js'
 
-const label: Record<Slug, () => string> = {
-	install: () => m.docsInstall(),
-	models: () => m.docsModels(),
+const categoryLabel: Record<Category, () => string> = {
+	tutorials: () => m.docsTutorials(),
+	'how-to': () => m.docsHowTo(),
+	reference: () => m.docsReference(),
+	explanation: () => m.docsExplanation(),
 }
 
-function slugFromHash(hash: string): Slug {
-	const wanted = hash.replace('#', '').toLowerCase()
-	return slugs.find((slug) => slug === wanted) ?? slugs[0]
+function slugFromHash(hash: string) {
+	const wanted = decodeURIComponent(hash.replace(/^#/, '')).toLowerCase()
+	return englishDocs.find((doc) => doc.slug === wanted)?.slug ?? englishDocs[0].slug
 }
 
 export default function Docs() {
 	// The English pages paint immediately; this locale's translations swap in once fetched.
 	const [pages, setPages] = useState<Doc[]>(englishDocs)
-	const [slug, setSlug] = useState<Slug>(slugs[0])
+	const [slug, setSlug] = useState(englishDocs[0].slug)
 	const shown = pages.find((doc) => doc.slug === slug) ?? pages[0]
 	// The language switcher changes locale without a reload, so refetch when it does.
 	const locale = getLocale()
@@ -42,6 +44,11 @@ export default function Docs() {
 		return () => window.removeEventListener('hashchange', onHashChange)
 	}, [])
 
+	function open(next: Doc['slug']) {
+		setSlug(next)
+		window.location.hash = next
+	}
+
 	return (
 		<main className="mx-auto w-full max-w-[1065px] px-5 pb-24 pt-14 lg:pt-20" dir={getTextDirection(locale)}>
 			<header>
@@ -50,22 +57,30 @@ export default function Docs() {
 			</header>
 
 			<div className="mt-10 flex flex-col gap-10 lg:flex-row lg:gap-14">
-				<nav className="flex shrink-0 flex-row flex-wrap gap-1 border-b border-border pb-4 lg:sticky lg:top-24 lg:h-fit lg:max-h-[calc(100dvh-8rem)] lg:w-44 lg:flex-col lg:overflow-y-auto lg:border-b-0 lg:border-s lg:pb-0 lg:ps-4">
-					{slugs.map((entry) => (
-						<button
-							key={entry}
-							type="button"
-							onClick={() => {
-								setSlug(entry)
-								window.location.hash = entry
-							}}
-							className={cn(
-								'cursor-pointer rounded-full px-3 py-1.5 text-start text-[13px] transition-colors lg:rounded-md',
-								entry === slug ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
-							)}>
-							{label[entry]()}
-						</button>
-					))}
+				<nav className="flex shrink-0 flex-row flex-wrap gap-x-6 gap-y-3 border-b border-border pb-4 lg:sticky lg:top-24 lg:h-fit lg:max-h-[calc(100dvh-8rem)] lg:w-52 lg:flex-col lg:gap-y-0 lg:overflow-y-auto lg:border-b-0 lg:border-s lg:pb-0 lg:ps-4">
+					{categories.map((category) => {
+						const entries = pages.filter((doc) => doc.category === category)
+						if (entries.length === 0) return null
+						return (
+							<div key={category} className="flex min-w-0 flex-col lg:mb-4">
+								<p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground/70">
+									{categoryLabel[category]()}
+								</p>
+								{entries.map((entry) => (
+									<button
+										key={entry.slug}
+										type="button"
+										onClick={() => open(entry.slug)}
+										className={cn(
+											'cursor-pointer rounded-full px-3 py-1.5 text-start text-[13px] transition-colors lg:rounded-md',
+											entry.slug === slug ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+										)}>
+										{entry.title}
+									</button>
+								))}
+							</div>
+						)
+					})}
 				</nav>
 
 				{/* An untranslated page stays English, so the article follows its own direction. */}

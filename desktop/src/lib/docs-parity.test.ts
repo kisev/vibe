@@ -8,7 +8,7 @@ import { asrCatalog } from './catalog'
 // scripts/generate-models-docs.mjs. This test pins the rendered page to
 // asrCatalog(): every catalog file must appear as a download link and every
 // download link must come from the catalog, so the docs can never drift.
-const docsPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'i18n', 'docs', 'en-US', 'models.md')
+const docsPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'i18n', 'docs', 'en-US', 'reference', 'models.md')
 
 // Download links look like https://huggingface.co/{owner}/{repo}/resolve/{revision}/{filename}?download=true
 const DOWNLOAD_LINK = /https:\/\/huggingface\.co\/([^/\s)"']+)\/([^/\s)"']+)\/resolve\/[^/\s)"']+\/([^/\s)"']+)\?download=true/g

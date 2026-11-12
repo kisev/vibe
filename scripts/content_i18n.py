@@ -5,10 +5,11 @@ translation under a locale directory, carrying a `source` hash of the English
 file it was made from:
 
     i18n/changelog/<version>.md       i18n/changelog/<locale>/<version>.md
-    i18n/docs/en-US/<slug>.md         i18n/docs/<locale>/<slug>.md
+    i18n/docs/en-US/<category>/<slug>.md
+    i18n/docs/<locale>/<category>/<slug>.md
 
 Only the newest RECENT releases are worth translating; anything older stays
-English and nobody is asked about it. Both docs pages are expected everywhere.
+English and nobody is asked about it. Every docs page is expected everywhere.
 
     uv run scripts/content_i18n.py          report coverage and staleness
     uv run scripts/content_i18n.py stamp    refresh every `source` hash
@@ -31,8 +32,29 @@ CHANGELOG = ROOT / "i18n/changelog"
 DOCS = ROOT / "i18n/docs"
 # How many of the newest releases are expected in every website locale.
 RECENT = 75
-# The pages shown on /docs, expected in every website locale.
-DOC_SLUGS = ("install", "models")
+# The pages shown on /docs, expected in every website locale. Paths are relative
+# to the locale directory, so a page's Diátaxis category is part of its identity.
+DOC_PAGES = (
+    ("tutorials", "install"),
+    ("tutorials", "first-transcription"),
+    ("how-to", "record-audio"),
+    ("how-to", "transcribe-a-link"),
+    ("how-to", "use-a-custom-model"),
+    ("how-to", "transcribe-from-a-phone"),
+    ("how-to", "summarize-transcripts"),
+    ("how-to", "switch-update-channels"),
+    ("how-to", "use-the-meeting-browser"),
+    ("reference", "models"),
+    ("reference", "formats"),
+    ("reference", "cli"),
+    ("reference", "settings"),
+    ("reference", "update-channels"),
+    ("explanation", "privacy"),
+    ("explanation", "engine"),
+    ("explanation", "meeting-browser"),
+    ("explanation", "update-channels-design"),
+)
+DOC_RELATIVE = tuple(f"{category}/{slug}.md" for category, slug in DOC_PAGES)
 DOC_STAMP = re.compile(r"^<!--\s*source:\s*([0-9a-f]+)\s*-->\n*")
 
 
@@ -107,24 +129,25 @@ def docs_audit() -> tuple[list[str], list[str]]:
     """Same contract as changelog_audit: only structural breakage is an issue."""
     issues: list[str] = []
     warnings: list[str] = []
-    for slug in DOC_SLUGS:
-        if not (DOCS / "en-US" / f"{slug}.md").exists():
-            issues.append(f"docs: i18n/docs/en-US/{slug}.md is missing")
+    for relative in DOC_RELATIVE:
+        if not (DOCS / "en-US" / relative).exists():
+            issues.append(f"docs: i18n/docs/en-US/{relative} is missing")
 
     for locale in website_locales():
         directory = DOCS / locale
-        missing = [slug for slug in DOC_SLUGS if not (directory / f"{slug}.md").exists()]
+        translated = sorted(path.relative_to(directory).as_posix() for path in directory.rglob("*.md")) if directory.is_dir() else []
+        missing = [relative for relative in DOC_RELATIVE if relative not in translated]
         stale = []
-        for path in sorted(directory.glob("*.md")) if directory.is_dir() else []:
-            if path.stem not in DOC_SLUGS:
-                issues.append(f"docs: {locale}/{path.name} is not a page the site shows")
+        for relative in translated:
+            if relative not in DOC_RELATIVE:
+                issues.append(f"docs: {locale}/{relative} is not a page the site shows")
                 continue
-            english = DOCS / "en-US" / path.name
-            match = DOC_STAMP.match(path.read_text())
+            english = DOCS / "en-US" / relative
+            match = DOC_STAMP.match((directory / relative).read_text())
             if not match or match.group(1) != source_hash(english):
-                stale.append(path.stem)
+                stale.append(relative)
         if missing:
-            warnings.append(f"docs {locale}: {', '.join(missing)} not translated, using fallback")
+            warnings.append(f"docs {locale}: {len(missing)} of the {len(DOC_RELATIVE)} pages not translated, using fallback")
         if stale:
             warnings.append(f"docs {locale}: {', '.join(sorted(stale))} translated from an older English page")
     return issues, warnings
@@ -156,8 +179,9 @@ def stamp() -> int:
                 path.write_text(updated)
                 stamped += 1
     for locale in website_locales():
-        for path in sorted((DOCS / locale).glob("*.md")) if (DOCS / locale).is_dir() else []:
-            english = DOCS / "en-US" / path.name
+        for path in sorted((DOCS / locale).rglob("*.md")) if (DOCS / locale).is_dir() else []:
+            relative = path.relative_to(DOCS / locale).as_posix()
+            english = DOCS / "en-US" / relative
             if not english.exists():
                 continue
             text = path.read_text()

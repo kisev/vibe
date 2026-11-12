@@ -27,7 +27,7 @@ Do not edit these by hand:
 
 - `desktop/src/paraglide/` — compiled i18n messages (`task i18n:generate`)
 - `desktop/src-tauri/gen/` — Tauri-generated schemas
-- `i18n/docs/en-US/models.md` — generated from the model catalog (`task docs:models`)
+- `i18n/docs/en-US/reference/models.md` — generated from the model catalog (`task docs:models`)
 - `server/libs/` — vendored ggml inputs and patches, upstream-owned
 - `desktop/src-tauri/binaries/` — sidecars fetched by `chore setup` or built by `chore server-build`
 
@@ -40,4 +40,4 @@ The root `.markdownlint-cli2.jsonc` and `.mdformat.toml` exclude the generated M
 - `docs/reference/` — facts and tables
 - `docs/explanation/` — design decisions and trade-offs
 
-Site docs (`i18n/docs/<locale>/`) are separate from this folder; they are served on `/docs`.
+Site docs mirror this split under `i18n/docs/<locale>/{tutorials,how-to,reference,explanation}/`. The English source lives in `i18n/docs/en-US/`; the site serves the pages on `/docs`.

@@ -38,7 +38,7 @@ pre-commit:
         - ".opencode/**"
         - ".agents/**"
         - "i18n/changelog/**"
-        - "i18n/docs/*/models.md"
+        - "i18n/docs/*/reference/models.md"
       run: mise exec -- markdownlint-cli2 --no-globs {staged_files}
     markdown-format:
       glob: "**/*.md"
@@ -52,7 +52,7 @@ pre-commit:
         - ".opencode/**"
         - ".agents/**"
         - "i18n/changelog/**"
-        - "i18n/docs/*/models.md"
+        - "i18n/docs/*/reference/models.md"
       run: mise exec -- mdformat --check {staged_files}
     json:
       glob: "**/*.json"

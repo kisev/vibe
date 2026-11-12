@@ -6,7 +6,7 @@ Catalogs live under `i18n/`:
 i18n/desktop/{locale}.json     desktop UI strings
 i18n/website/{locale}.json     website strings
 i18n/changelog/{version}.md    release notes, one page per version
-i18n/docs/{locale}/{slug}.md   user-facing docs pages served on /docs
+i18n/docs/{locale}/{category}/{slug}.md   user-facing docs pages served on /docs
 ```
 
 Use a [BCP 47 locale code](https://gist.github.com/thewh1teagle/c8877e5c4c5e2780754ddd065ae2592e), such as `pt-BR`.
@@ -41,6 +41,6 @@ Changelog entries and docs pages carry a `source` hash of the English file they 
 task i18n:stamp
 ```
 
-The content audit (`scripts/check_i18n.py`) fails when a translated page is missing or its source hash no longer matches. A page without a translation falls back to English whole; there is no paragraph-level mixing.
+The content audit (`scripts/check_i18n.py`) fails when a translated page is not one of the pages the site shows. A missing translation, or one whose source hash no longer matches, is a warning: the page falls back to English whole, with no paragraph-level mixing.
 
 For a bulk pass across locales, the `translate` project skill runs the catalogs and content through parallel agents and then runs the audit.

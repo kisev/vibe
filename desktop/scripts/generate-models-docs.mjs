@@ -1,4 +1,4 @@
-// Generate ../i18n/docs/en-US/models.md from the vendored model catalogs.
+// Generate ../i18n/docs/en-US/reference/models.md from the vendored model catalogs.
 //
 //   node scripts/generate-models-docs.mjs        render the models page
 //   node scripts/generate-models-docs.mjs check  fail unless the page is current
@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const docsPath = join(root, '..', 'i18n', 'docs', 'en-US', 'models.md')
+const docsPath = join(root, '..', 'i18n', 'docs', 'en-US', 'reference', 'models.md')
 
 // --- catalog helpers, mirrored from src/lib/catalog.ts (the source of truth) ---
 
@@ -98,7 +98,7 @@ const FAMILY_EMOJI = {
 }
 
 const AVAILABLE_HEADING = '## Available Models'
-const TAIL_MARKER = 'Enjoy exploring these models'
+const TAIL_MARKER = '## More models'
 const GIGAAM_ANCHOR = 'handy-computer/gigaam-v3-e2e-rnnt-gguf'
 const GIGAAM_DETAILS_PATTERN = /<details>\n<summary>GigaAM limitations and command-line examples<\/summary>[\s\S]*?\n<\/details>/
 
