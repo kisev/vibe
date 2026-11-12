@@ -1,4 +1,4 @@
-//! Stable, beta, and dev update channels. See `docs/UPDATER.md`.
+//! Stable, beta, and dev update channels. See `docs/reference/update-channels.md`.
 //!
 //! The app reads `updater/<channel>.json` from the website rather than GitHub's latest release.
 //! Each file is the `latest.json` a release build produced. The plugin's own `check()` can only use

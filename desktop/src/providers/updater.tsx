@@ -15,7 +15,7 @@ export const FAKE_UPDATE_KEY = 'vibe_fake_update'
 export const devToolsEnabled = import.meta.env.DEV
 
 /**
- * Which `updater/<channel>.json` the app follows. See docs/UPDATER.md:
+ * Which `updater/<channel>.json` the app follows. See docs/reference/update-channels.md:
  * release tags `vX.Y.Z` on main, beta tags `vX.Y.Z-rc.<n>` on main, dev tags `dev.<n>` on dev.
  */
 export type UpdateChannel = 'stable' | 'beta' | 'dev'

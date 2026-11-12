@@ -76,7 +76,7 @@ The fork's own version line starts at 1.0.0. Builds from the earlier `3.3.0-dev.
 
 ## Developers
 
-Get started with local development in [the building guide](docs/BUILDING.md).
+Get started with local development in [the build-and-run tutorial](docs/tutorials/build-and-run.md).
 
 Ideas, bug reports and translation fixes are welcome — please [open an issue](https://github.com/kisev/vibe/issues).
 Pull requests are limited to a few collaborators. See [CONTRIBUTE.md](CONTRIBUTE.md).
@@ -93,11 +93,11 @@ Release notes live at [kisev.github.io/vibe/changelog](https://kisev.github.io/v
 
 # Add translation 🌐
 
-See the [translation guide](docs/TRANSLATIONS.md).
+See the [translation guide](docs/how-to/add-a-translation.md).
 
 # Docs 📄
 
-see [Vibe Docs](https://github.com/kisev/vibe/tree/main/docs)
+see [Vibe Docs](docs/README.md)
 
 # I want to know more
 
@@ -105,7 +105,7 @@ The original project's background: Medium [post](https://medium.com/@thewh1teagl
 
 # Issue report
 
-You can open [new issue](https://github.com/kisev/vibe/issues/new?assignees=octocat&labels=bug&projects=&template=bug_report.yaml&title=%5BShort+title%5D) and it's recommend to check [DEBUG.md](docs/DEBUG.md) first.
+You can open [new issue](https://github.com/kisev/vibe/issues/new?assignees=octocat&labels=bug&projects=&template=bug_report.yaml&title=%5BShort+title%5D) and it's recommend to check the [crash troubleshooting guide](docs/how-to/troubleshoot-a-crash.md) first.
 
 # Privacy Policy 🔒
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run
 
-"""Point an update channel at a release. See docs/UPDATER.md.
+"""Point an update channel at a release. See docs/reference/update-channels.md.
 
     uv run scripts/channel.py 1.1.0-rc.1 --channel beta
     uv run scripts/channel.py 1.0.0 --channel stable

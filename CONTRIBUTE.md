@@ -20,4 +20,4 @@ Please don't open a PR. Describe your change in an issue instead. If it's a good
 
 ## Developers
 
-To build and run Vibe locally, see [docs/BUILDING.md](docs/BUILDING.md).
+To build and run Vibe locally, see [the build-and-run tutorial](docs/tutorials/build-and-run.md).
