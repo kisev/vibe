@@ -99,6 +99,38 @@ tasks:
     cmds:
       - cargo test -p vibe-server
 
+  rust:fmt-check:
+    desc: Format check over the root workspace (desktop app, CLI, server)
+    cmds:
+      - mise exec -- cargo fmt --all -- --check
+
+  # The mirror of lint_rust.yml's clippy job: the desktop workspace is where a
+  # warning reaches CI as an error, and nothing else lints it locally.
+  rust:clippy:
+    desc: Clippy the desktop and CLI workspace, warnings fatal
+    # The desktop crate links GTK/WebKit: without the Linux build packages the
+    # compile dies inside gdk-sys minutes in, which looks like a code failure.
+    preconditions:
+      - sh: 'test "$(uname -s)" != Linux || pkg-config --exists gtk+-3.0'
+        msg: "The desktop crate needs the Linux build dependencies: run `chore linux-deps` once (needs sudo)."
+    cmds:
+      - mise exec -- bash scripts/ci/clippy.sh --manifest-path Cargo.toml --all-targets -- -D warnings
+
+  verify:
+    desc: Every gate a push or PR runs that can run locally - the last step before pushing or tagging
+    cmds:
+      - task: lint
+      - task: format:check
+      - task: rust:fmt-check
+      - task: server:clippy
+      - task: server:deny
+      - task: server:machete
+      - task: test
+      - task: ci:e2e
+      # Last: it is the one step that needs host build packages the others
+      # never touch, so a host that lacks them still runs every other gate.
+      - task: rust:clippy
+
   server:fmt:
     desc: rustfmt the server workspace
     cmds:
@@ -124,7 +156,7 @@ tasks:
       # cleanliness is upstream's CI (upstream never lints server/ — its root
       # workspace excludes it). New fork-owned crates join -p here; ggml-rs-sys
       # carries the one fork-side allow line for its generated bindings.
-      - cargo clippy -p vibe-server -p vibe-diarize-native --all-targets -- -D warnings
+      - bash ../scripts/ci/clippy.sh -p vibe-server -p vibe-diarize-native --all-targets -- -D warnings
 
   test:
     desc: All unit suites

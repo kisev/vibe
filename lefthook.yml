@@ -76,8 +76,15 @@ pre-commit:
     rust-format:
       # rustfmt needs no compilation, so every commit checks it; the lint
       # workflow runs the same command tree-wide
-      glob: "desktop/src-tauri/**/*.rs"
+      glob: "**/*.rs"
       run: cargo fmt --all -- --check
+
+    prettier:
+      # The pages and style sheets had no pre-commit formatter, so an
+      # unformatted index.html reached CI and failed the whole Lint run.
+      glob: "**/*.{css,html}"
+      exclude: "{node_modules,desktop/src/paraglide,website/dist}/**"
+      run: mise exec -- prettier --check {staged_files}
 
     workflows:
       glob: ".github/workflows/*.{yml,yaml}"
@@ -85,8 +92,10 @@ pre-commit:
 
 pre-push:
   commands:
-    test:
-      run: task test
+    # The same set the workflows run: lint, format:check, rustfmt, clippy over
+    # both workspaces, the dependency gates, the unit suites and the E2E suite.
+    verify:
+      run: task verify
 
 commit-msg:
   commands:

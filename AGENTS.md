@@ -18,6 +18,8 @@ Two Renovate paths share `renovate.json`: `task deps:renovate:dry` previews what
 
 ## Validation
 
+`task verify` is the gate: the lint matrix, `format:check`, rustfmt over the root workspace, clippy over the desktop/CLI workspace and the server, the dependency gates, the unit suites and the browser E2E suite — everything a push or pull request triggers that can run locally. Nothing is pushed, and no `dev.<n>` or release tag is created, before it is green on that revision; the pre-push hook runs the same command. CI is the backstop, never the first check.
+
 Plan validation scripts: `plans/<name>/<name>_001.py` (+ `.md`), standalone `uv` scripts.
 
 ## Skills

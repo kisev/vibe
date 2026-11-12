@@ -49,4 +49,12 @@ task website:typecheck   # runs the website build
 
 ## Before you push
 
-The git hooks installed by `task hooks` run the staged-file gates. Running `task lint` and `task test` before a push is the same check CI performs, so a red CI run should be rare.
+```console
+task verify
+```
+
+`task verify` runs everything a push or pull request triggers that can run locally: `task lint`, `task format:check`, `cargo fmt --all -- --check`, clippy over the desktop/CLI workspace and the server, `cargo-deny` and `cargo-machete`, the three unit suites, and the browser E2E suite. The pre-push hook runs the same command, so a push that would go red is refused on the machine that made it.
+
+On Linux the desktop clippy step needs the build packages from [the build tutorial](../tutorials/build-and-run.md) (`chore linux-deps`, once, with sudo). Without them `task verify` stops at that step and says so instead of failing inside `gdk-sys`.
+
+Nothing is pushed, and no `dev.<n>` or release tag is created, before `task verify` is green on that revision. CI is the backstop: the individual commands above stay available for a fast loop while working, but the check that counts before a push is the whole set — several defects (an unformatted page, a clippy warning in the desktop workspace, an E2E server that could not start) were each found in CI while every narrower local check was green.
