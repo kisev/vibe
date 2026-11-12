@@ -51,7 +51,7 @@ function formatDate(date: string, locale: string) {
 
 function Entry({ release, single, dev }: { release: Release; single: boolean; dev: boolean }) {
 	// The unreleased entry has no version number yet — it is the dev line in progress.
-	const id = release.version === 'unreleased' ? 'Unreleased' : `v${release.version}`
+	const id = release.version === 'unreleased' ? m.changelogUnreleased() : `v${release.version}`
 	// The unreleased entry is the dev line, so its heading opens the permanent alias.
 	const href = release.version === 'unreleased' ? '/changelog/dev' : `/changelog/${release.version}`
 	return (
@@ -85,7 +85,9 @@ function Entry({ release, single, dev }: { release: Release; single: boolean; de
 				)}
 			</div>
 			<div className="max-w-[68ch]">
-				<h2 className="text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-foreground">{release.title}</h2>
+				<h2 className="text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-foreground">
+					{release.version === 'unreleased' ? m.changelogUnreleasedTitle() : release.title}
+				</h2>
 				{sections.map((section) => {
 					const items = release.items.filter((item) => item.section === section)
 					if (items.length === 0) return null

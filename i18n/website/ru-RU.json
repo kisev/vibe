@@ -101,5 +101,7 @@
   "mock-file-name": "подкаст-эпизод.mp3",
   "mock-file-path": "Документы/Vibe",
   "changelogDevLine": "Dev",
-  "changelogDevFallback": "Заметок о dev-сборках пока нет — показан последний выпуск."
+  "changelogDevFallback": "Заметок о dev-сборках пока нет — показан последний выпуск.",
+  "changelogUnreleased": "Не выпущено",
+  "changelogUnreleasedTitle": "Что дальше"
 }
