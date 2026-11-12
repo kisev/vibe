@@ -19,7 +19,6 @@ elif ! pnpm exec playwright install --with-deps chromium; then
     export PLAYWRIGHT_CHROMIUM_PATH="$system_chromium"
 fi
 
-# Compile the catalogs once: the Vite plugin otherwise pays for it inside the
-# webServer timeout, which is where a cold CI runner used to give up.
-pnpm i18n:generate
+# The suite builds the app itself (see playwright.config.ts); catalogs are part
+# of that build.
 pnpm exec playwright test

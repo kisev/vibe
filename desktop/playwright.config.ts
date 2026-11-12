@@ -7,13 +7,11 @@ const PORT = 5199
 export default defineConfig({
 	testDir: './e2e',
 	timeout: 60_000,
-	// One retry, not zero: headless Chromium on a WSL host intermittently drops
-	// module fetches (ERR_NETWORK_CHANGED) while the first page of a worker
-	// loads, which fails a spec at boot with no application fault behind it.
-	retries: 1,
-	// Four browsers at once, not one per core: seven simultaneous first loads is
-	// what pushes a WSL host into dropping module fetches.
-	workers: 4,
+	// No retries: the suite serves a built bundle, so a worker's first page is a
+	// handful of requests instead of hundreds of dev-server module fetches. The
+	// retry that used to hide `ERR_NETWORK_CHANGED` at boot came out once this
+	// change proved repeated clean runs without it.
+	retries: 0,
 	expect: { timeout: 10_000 },
 	reporter: [['list']],
 	use: {
@@ -24,9 +22,10 @@ export default defineConfig({
 		launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } : {},
 	},
 	webServer: {
-		// Bind explicitly: the runner resolves `localhost` to IPv6 first, while
-		// `url` polls 127.0.0.1, and a cold paraglide compile is slow there too.
-		command: `pnpm dev --port ${PORT} --strictPort --host 127.0.0.1`,
+		// A built bundle, not the dev server: one request graph instead of hundreds
+		// of on-demand module fetches, which is what made this host's Chromium drop
+		// module loads (ERR_NETWORK_CHANGED) at a worker's first page.
+		command: `pnpm build:e2e && pnpm exec vite preview --port ${PORT} --strictPort --host 127.0.0.1`,
 		url: `http://127.0.0.1:${PORT}`,
 		// Never reuse: a server left on the port by an older run serves a stale
 		// module graph, and the whole suite fails at boot for no visible reason.
