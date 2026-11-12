@@ -150,8 +150,3 @@ pub fn register() -> Result<()> {
     tracing::debug!("Protocol handler registered successfully.");
     Ok(())
 }
-
-#[cfg(not(windows))]
-pub fn register() -> Result<()> {
-    Ok(())
-}

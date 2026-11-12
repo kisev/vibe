@@ -400,7 +400,7 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
         WindowEvent::CloseRequested { api, .. } => {
             let force_close = RUNTIME
                 .lock()
-                .map(|runtime| runtime.sessions.get(&session).map_or(true, |state| state.force_close))
+                .map(|runtime| runtime.sessions.get(&session).is_none_or(|state| state.force_close))
                 .unwrap_or(true);
             // A recording somewhere in Vibe may cover this call: let the main window decide.
             if force_close || !crate::cmd::audio::recording_active() {

@@ -29,7 +29,7 @@ fn zoom_url(rest: &str) -> Option<String> {
     let mut url = format!("https://{host}/j/{confno}");
     if let Some(pwd) = form_value(query, "pwd") {
         url.push_str("?pwd=");
-        url.push_str(&pwd);
+        url.push_str(pwd);
     }
     Some(url)
 }
