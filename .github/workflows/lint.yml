@@ -8,6 +8,10 @@ on:
     push:
         branches: [main]
     pull_request:
+    # A dev revision is linted in place before it is tagged: `gh workflow run
+    # lint.yml --ref dev`. Nothing is built or published on a dev push, so this
+    # is the only way to compile that revision in CI.
+    workflow_dispatch:
 
 concurrency:
     group: lint-${{ github.ref }}
