@@ -339,7 +339,7 @@
   "skipIfTranscriptExists": "Пропустить, существует ли транскрипт",
   "speakerPrefix": "Говорящий",
   "speakerRecognition": "Распознавание говорящих",
-  "speakers": "Говорящие",
+  "speakers": "Динамики",
   "start": "Запустить",
   "startRecord": "Записать",
   "stop": "Остановить",

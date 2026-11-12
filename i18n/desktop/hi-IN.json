@@ -353,7 +353,7 @@
   "skipIfTranscriptExists": "यदि प्रतिलेख मौजूद है तो छोड़ दें",
   "speakerPrefix": "वक्ता",
   "speakerRecognition": "वक्ता की मान्यता",
-  "speakers": "वक्ता",
+  "speakers": "स्पीकर",
   "start": "शुरू करें",
   "startRecord": "रिकॉर्ड करें",
   "stop": "रोकें",

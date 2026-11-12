@@ -353,7 +353,7 @@
   "skipIfTranscriptExists": "文字起こしが存在する場合はスキップ",
   "speakerPrefix": "話者",
   "speakerRecognition": "話者認識",
-  "speakers": "話者",
+  "speakers": "スピーカー",
   "start": "開始",
   "startRecord": "録音",
   "stop": "停止",

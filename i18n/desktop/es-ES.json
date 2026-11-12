@@ -352,7 +352,7 @@
   "skipIfTranscriptExists": "Omitir si ya existe la transcripción",
   "speakerPrefix": "Hablante",
   "speakerRecognition": "Reconocimiento del hablante",
-  "speakers": "Hablantes",
+  "speakers": "Altavoces",
   "start": "Iniciar",
   "startRecord": "Grabar",
   "stop": "Detener",

@@ -352,7 +352,7 @@
   "skipIfTranscriptExists": "跳过成绩单存在",
   "speakerPrefix": "发言者",
   "speakerRecognition": "说话人识别",
-  "speakers": "发言者",
+  "speakers": "扬声器",
   "start": "启动",
   "startRecord": "录音",
   "stop": "停止",

@@ -353,7 +353,7 @@
   "skipIfTranscriptExists": "Ometre si la transcripció ja existeix",
   "speakerPrefix": "Parlant",
   "speakerRecognition": "Reconeixement de parlants",
-  "speakers": "Parlants",
+  "speakers": "Altaveus",
   "start": "Iniciar",
   "startRecord": "Gravar",
   "stop": "Aturar",

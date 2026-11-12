@@ -353,7 +353,7 @@
   "skipIfTranscriptExists": "Pomiń, jeśli transkrypcja istnieje",
   "speakerPrefix": "Mówca",
   "speakerRecognition": "Rozpoznawanie mówcy",
-  "speakers": "Mówcy",
+  "speakers": "Głośniki",
   "start": "Uruchom",
   "startRecord": "Nagraj",
   "stop": "Zatrzymaj",

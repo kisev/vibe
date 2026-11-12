@@ -353,7 +353,7 @@
   "skipIfTranscriptExists": "Přeskočit, pokud přepis existuje",
   "speakerPrefix": "Mluvčí",
   "speakerRecognition": "Rozpoznávání mluvčích",
-  "speakers": "Mluvčí",
+  "speakers": "Reproduktory",
   "start": "Spustit",
   "startRecord": "Nahrát",
   "stop": "Zastavit",

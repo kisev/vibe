@@ -353,7 +353,7 @@
   "skipIfTranscriptExists": "Hopp over hvis transkript eksisterer",
   "speakerPrefix": "Taler",
   "speakerRecognition": "Taleridentifikasjon",
-  "speakers": "Talere",
+  "speakers": "Høyttalere",
   "start": "Start",
   "startRecord": "Ta opp",
   "stop": "Stopp",
