@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { createElement } from 'react'
+import { createElement, type ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import * as ts from 'typescript'
 import { getLocale, locales } from '../paraglide/runtime.js'
 import Layout from '../components/Layout'
+import Changelog from '../pages/Changelog'
+import Features from '../pages/Features'
 import { localeFromSearch, safeTranslate, supportedWebsiteLocales, urlWithLocale, writeLocaleToUrl } from './i18n'
 
 const pageSources = import.meta.glob('../pages/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
@@ -112,7 +114,7 @@ function scanSource(path: string, source: string, violations: string[]) {
 	visit(file)
 }
 
-function renderLayout(url: string) {
+function renderLayout(url: string, page: ReactElement = createElement('div')) {
 	window.history.replaceState({}, '', url)
 	return render(
 		createElement(
@@ -121,7 +123,7 @@ function renderLayout(url: string) {
 			createElement(
 				Routes,
 				null,
-				createElement(Route, { element: createElement(Layout) }, createElement(Route, { index: true, element: createElement('div') }), createElement(Route, { path: 'features', element: createElement('div') })),
+				createElement(Route, { element: createElement(Layout) }, createElement(Route, { index: true, element: page }), createElement(Route, { path: 'features', element: createElement('div') })),
 			),
 		),
 	)
@@ -222,6 +224,30 @@ describe('layout document attributes', () => {
 		expect(document.documentElement.getAttribute('dir')).toBe('rtl')
 		expect(window.location.search).toBe('?foo=1&lang=he-IL')
 		expect(window.location.hash).toBe('#docs')
+	})
+
+	it('re-renders the page body, not just the header, when the locale changes', () => {
+		renderLayout('/vibe/', createElement(Features))
+		expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Features')
+
+		fireEvent.click(screen.getAllByRole('button', { name: 'Language' })[0])
+		fireEvent.click(document.querySelector('[data-locale="fr-FR"]') as HTMLElement)
+
+		expect(getLocale()).toBe('fr-FR')
+		expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Caractéristiques')
+		expect(screen.queryByRole('heading', { level: 1, name: 'Features' })).toBeNull()
+	})
+
+	it('reloads changelog entries that were cached in state for the previous locale', async () => {
+		renderLayout('/vibe/', createElement(Changelog))
+		expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Changelog')
+
+		fireEvent.click(screen.getAllByRole('button', { name: 'Language' })[0])
+		fireEvent.click(document.querySelector('[data-locale="fr-FR"]') as HTMLElement)
+
+		expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Journal des modifications')
+		// The release list is fetched per locale once the page knows which locale it is in.
+		await waitFor(() => expect(screen.getByText(/Un seul moteur, un seul catalogue de modèles/)).toBeTruthy())
 	})
 
 	it('keeps the choice in the URL across in-site navigation', async () => {

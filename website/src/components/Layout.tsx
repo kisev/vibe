@@ -56,7 +56,8 @@ export default function Layout() {
 		<div dir={direction} className="flex min-h-dvh flex-col bg-background text-foreground">
 			<Nav locale={locale} availableLocales={availableLocales} onLocaleChange={onLocaleChange} />
 			<main className="flex-1">
-				<Outlet />
+				{/* Paraglide reads the locale at call time, so a language switch remounts the page. */}
+				<Outlet key={locale} />
 			</main>
 			<Footer onOpenPrivacyPolicy={onOpenPrivacyPolicy} />
 			<PrivacyPolicy open={privacyOpen} onOpenChange={setPrivacyOpen} />
