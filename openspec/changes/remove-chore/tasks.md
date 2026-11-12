@@ -9,4 +9,4 @@
 - [x] 7. `release.yml`, `lint_rust.yml`, `server-release.yml` and `website.yml` call `mise exec -- task …`, have no `getchore/setup-chore` step, and pass `GH_TOKEN` where the sidecar and ggml downloads need it; the site workflow's path filter names `taskfile.yml`.
 - [x] 8. Deleted all five files.
 - [x] 9. The prose sweep covered 13 files (docs/reference, how-to, tutorials, handoff and server READMEs, both skills); code comments in `handoff/pwa` and `ggml-rs-sys` and the two active change records that named chore commands were corrected too.
-- [ ] 10. Run `task verify` (minus the desktop clippy this host cannot run) and `openspec validate remove-chore --strict`; confirm `grep -ri chore` finds only archived history.
+- [x] 10. `task verify` is green through the E2E suite (21 specs) and stops only at `rust:clippy`, whose precondition names `task linux-deps`; `openspec validate --all --strict` passes 35/35. The only remaining `chore` mentions are English "chores" in one page's prose, the archived records, and the completed-task evidence in four older active changes.
