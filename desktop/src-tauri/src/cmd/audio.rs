@@ -1,7 +1,7 @@
 use crate::ffmpeg::get_vibe_temp_folder;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, FromSample, Sample, SizedSample, Stream, SupportedStreamConfig};
-use eyre::{bail, eyre, Context, ContextCompat, Result};
+use eyre::{eyre, Context, ContextCompat, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs::File;

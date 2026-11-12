@@ -4,8 +4,16 @@
 # ci:ggml-libs. Requires TRIPLE and EXE (empty or ".exe").
 set -euo pipefail
 
-triple="${TRIPLE:?TRIPLE is required}"
+triple="${TRIPLE:-}"
+if [ -z "$triple" ]; then
+    triple="$(rustc -vV | sed -n 's/^host: //p')"
+fi
 exe="${EXE:-}"
+if [ -z "${EXE+x}" ]; then
+    case "$triple" in
+    *windows*) exe=".exe" ;;
+    esac
+fi
 
 cd server
 cargo build -p vibe-diarize-native --release --target "$triple"

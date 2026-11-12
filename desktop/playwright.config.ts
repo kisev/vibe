@@ -7,6 +7,13 @@ const PORT = 5199
 export default defineConfig({
 	testDir: './e2e',
 	timeout: 60_000,
+	// One retry, not zero: headless Chromium on a WSL host intermittently drops
+	// module fetches (ERR_NETWORK_CHANGED) while the first page of a worker
+	// loads, which fails a spec at boot with no application fault behind it.
+	retries: 1,
+	// Four browsers at once, not one per core: seven simultaneous first loads is
+	// what pushes a WSL host into dropping module fetches.
+	workers: 4,
 	expect: { timeout: 10_000 },
 	reporter: [['list']],
 	use: {

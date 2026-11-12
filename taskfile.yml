@@ -247,6 +247,13 @@ tasks:
       - sh: 'test "$(uname -s)" != Linux || pkg-config --exists gtk+-3.0'
         msg: "The desktop crate needs the Linux build dependencies: run `task linux-deps` once (needs sudo)."
     cmds:
+      # The crate embeds the web assets through generate_context!: without
+      # desktop/dist the compile fails on a missing frontendDist, which the
+      # lint workflow avoids by building the frontend first.
+      - pnpm --dir desktop build
+      # tauri.conf names both sidecars in externalBin, so the crate refuses to
+      # compile until the diarization helper is staged as well.
+      - mise exec -- task ci:diarize-helper
       - mise exec -- bash scripts/ci/clippy.sh --manifest-path Cargo.toml --all-targets -- -D warnings
 
   verify:

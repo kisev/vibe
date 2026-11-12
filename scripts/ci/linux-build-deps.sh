@@ -14,11 +14,26 @@ if command -v apt-get >/dev/null; then
         libwebkit2gtk-4.1-dev clang cmake libssl-dev libasound2-dev \
         libxdo-dev libayatana-appindicator3-dev rpm
 elif command -v zypper >/dev/null; then
+    # openSUSE names differ from Debian's: libsoup's 3.x headers ship in
+    # libsoup-devel (libsoup2-devel is the 2.4 line) and libxdo's in
+    # xdotool-devel. The WebKitGTK 4.1 development package is
+    # webkit2gtk-4_1-devel where the distribution publishes it and
+    # webkitgtk4-devel on releases that only carry the 4.0 split, so both are
+    # tried and the pkg-config check afterwards decides.
     sudo zypper install -y --no-recommends \
-        pkg-config gcc gcc-c++ glib2-devel gtk3-devel \
-        webkit2gtk-4_1-devel javascriptcoregtk-4_1-devel libsoup-3_0-devel \
-        clang cmake libopenssl-devel alsa-devel libxdo-devel \
-        libayatana-appindicator3-devel rpm
+        pkgconf gcc gcc-c++ glib2-devel gtk3-devel libsoup-devel \
+        xdotool-devel alsa-devel libayatana-appindicator3-devel \
+        libopenssl-devel clang cmake rpm
+    # openSUSE publishes the 4.1 development files as webkitgtk3-devel (the
+    # source is shared with the 4.0 line, whose headers come from
+    # webkitgtk4-devel); the capability `pkgconfig(webkit2gtk-4.1)` is the
+    # authority, and `zypper se --provides` names the same package.
+    sudo zypper install -y --no-recommends webkitgtk3-devel ||
+        sudo zypper install -y --no-recommends webkit2gtk-4_1-devel
+    pkg-config --exists webkit2gtk-4.1 || {
+        echo "webkit2gtk-4.1.pc is still missing; the desktop crate cannot build" >&2
+        exit 1
+    }
 elif command -v dnf >/dev/null; then
     sudo dnf install -y gcc gcc-c++ glib2-devel gtk3-devel \
         webkit2gtk4.1-devel clang cmake openssl-devel alsa-lib-devel \
