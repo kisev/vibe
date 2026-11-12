@@ -14,5 +14,5 @@
 
 ## 3. Validation
 
-- [ ] 3.1 `rg -i "aptabase|analytics|kofi|ko-fi"` returns only history/archive mentions
+- [x] 3.1 `rg -i "aptabase|analytics|kofi|ko-fi"` returns only history/archive mentions — the only hits are `openspec/changes/archive/**`, this change's own notes, the privacy policy's statement that there is none, and the unreleased entry announcing the removal
 - [ ] 3.2 Desktop tests, type-check, clippy and the website suite are green; a dev build is cut

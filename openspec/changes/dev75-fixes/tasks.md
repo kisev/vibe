@@ -2,8 +2,8 @@
 
 ## 1. Comparison diff
 
-- [ ] 1.1 Replace the LCS table with a linear-space diff and raise the token budget; when the budget is still exceeded, return a marker the view renders as a note
-- [ ] 1.2 Render the note in the column header (translated) instead of `+0 −0`, with tests covering long and pathological inputs
+- [x] 1.1 Replace the LCS table with a linear-space diff and raise the token budget; when the budget is still exceeded, return a marker the view renders as a note — `desktop/src/lib/text-diff.ts` is a Myers diff with prefix/suffix trimming, `MAX_DIFF_TOKENS = 20_000`, `MAX_DIFF_EDITS = 2_000`, and `complete: false` carrying the whole candidate as `same`
+- [x] 1.2 Render the note in the column header (translated) instead of `+0 −0`, with tests covering long and pathological inputs — `models-comparison-results.tsx` shows `+N −M` only when `diff.complete` and `compareTooLongNote()` otherwise; 12 cases in `text-diff.test.ts`
 - [ ] 1.3 Verify on a real 10+ minute comparison that counts are non-zero and the highlights match the visible differences
 
 ## 2. Update channels
