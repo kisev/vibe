@@ -5,8 +5,16 @@ A `dev.<n>` tag publishes a release. It is never a validation vehicle: do not ta
 ## Before tagging
 
 - The commit is on `dev`, not `main` or a feature branch.
-- The Lint run for that exact revision is green. A code change that needs a compile check goes to `main` first and is validated there; that run has no release side effects.
-- You are prepared for five platform builds and a website deploy. Do not rerun a whole dev matrix to "check" something.
+
+- The Lint run for that exact revision is green. Lint is dispatchable, so a dev revision is checked in place:
+
+  ```console
+  gh workflow run lint.yml --ref dev
+  ```
+
+  Nothing is built or published on a dev push, so this run is the only compile check the tag will get. A `main` push still triggers Lint for work that must live on the release line.
+
+- You are prepared for five platform builds. Do not rerun a whole dev matrix to "check" something. The tag does not deploy the site itself; the build dispatches the site deploy from `main` so the dev manifest refreshes.
 
 ## Tag
 
