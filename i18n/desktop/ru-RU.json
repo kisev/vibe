@@ -803,5 +803,8 @@
   "compareTooLongNote": "Текст слишком длинный для подсветки различий",
   "meetingHandlers": "Открывать ссылки встреч в Vibe",
   "meetingHandlersInfo": "Регистрирует Vibe обработчиком ссылок Zoom, Teams и Webex, чтобы они открывались в окне встречи, а не в браузере.",
-  "meetingHandlersUnavailable": "Эта система не поддерживает регистрацию обработчиков ссылок."
+  "meetingHandlersUnavailable": "Эта система не поддерживает регистрацию обработчиков ссылок.",
+  "meetingBrowserLoadFailedTitle": "Страница не открылась",
+  "meetingBrowserLoadFailedBody": "Не удалось загрузить страницу. Повторить или закрыть окно?",
+  "meetingBrowserRetry": "Повторить"
 }

@@ -1,0 +1,35 @@
+# Browser-mode end-to-end suite for the desktop UI: the app runs on Vite with the
+# mock Tauri layer, so React surfaces are exercised without a native webview.
+name: Desktop E2E
+
+on:
+    pull_request:
+        paths:
+            - "desktop/**"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    e2e:
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        steps:
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
+            - name: Install dependencies
+              working-directory: ./desktop
+              run: pnpm install --frozen-lockfile
+            - name: Run the suite
+              run: mise exec -- task ci:e2e

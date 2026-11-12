@@ -15,6 +15,9 @@ const DEFAULT_HOSTS: [&str; 2] = ["telemost.yandex.ru", "stream.wb.ru"];
 const SESSION_EVENT: &str = "meeting-browser-session";
 const CLOSED_EVENT: &str = "meeting-browser-closed";
 const CLOSE_REQUESTED_EVENT: &str = "meeting-browser-close-requested";
+/// Emitted to the main window when a page never finished loading: a blank webview with no
+/// explanation is the worst outcome, so the user gets a retry/close question instead.
+const LOAD_FAILED_EVENT: &str = "meeting-browser-load-failed";
 /// The content webviews get their own data partition, separate from the app's storage.
 const PROFILE_DIR: &str = "browser-profile";
 const CONTENT_WIDTH: f64 = 1100.0;
@@ -42,6 +45,8 @@ struct BrowserSession {
     index: usize,
     /// Set before a programmatic close so `CloseRequested` does not prompt a second time.
     force_close: bool,
+    /// A page load finished in this window at least once.
+    loaded: bool,
 }
 
 #[derive(Default)]
@@ -235,6 +240,7 @@ fn handle_page_load(app: &AppHandle, session: u64, url: &Url) {
                 }
             }
             state.info.url = normalized;
+            state.loaded = true;
             state.info.host = host_of(&state.info.url);
             state.info.is_meeting = is_meeting_url(&state.info.url, &hosts);
             state.info.can_back = state.index > 0;
@@ -346,9 +352,11 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
                 history: vec![normalized],
                 index: 0,
                 force_close: false,
+                loaded: false,
             },
         );
     }
+    tracing::info!(session, url = %info.url, host = %info.host, meeting = info.is_meeting, profile = %profile.display(), "opening meeting browser");
     // Suppress external detection as soon as the meeting session exists, before the webview
     // has loaded enough to fire its first page event.
     let initial_count = lock_runtime()?.meeting_count();
@@ -360,6 +368,12 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
         .data_directory(profile)
         .focused(true)
         .on_page_load(move |window, payload| {
+            tracing::info!(
+                session,
+                url = %payload.url(),
+                event = ?payload.event(),
+                "meeting browser page load"
+            );
             if payload.event() == PageLoadEvent::Finished {
                 handle_page_load(window.app_handle(), session, payload.url());
             }
@@ -405,6 +419,27 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
         let _ = content.destroy();
         finalize_session(&app, session);
         return Err(format!("Could not build the meeting window menu: {error}"));
+    }
+
+    // A webview that never finishes loading shows a blank surface with no explanation. Ask the
+    // main window instead, so the user gets retry and close rather than a silent white window.
+    {
+        let watchdog_app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(LOAD_TIMEOUT).await;
+            let unloaded = RUNTIME
+                .lock()
+                .ok()
+                .and_then(|runtime| runtime.sessions.get(&session).map(|state| !state.loaded))
+                .unwrap_or(false);
+            if !unloaded {
+                return;
+            }
+            tracing::warn!(session, url = %info.url, "meeting browser page did not finish loading");
+            if let Err(error) = watchdog_app.emit_to("main", LOAD_FAILED_EVENT, serde_json::json!({ "session": session })) {
+                tracing::warn!("could not emit meeting browser load failure: {error}");
+            }
+        });
     }
 
     let (info, count) = {

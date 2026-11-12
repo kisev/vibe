@@ -66,6 +66,14 @@ export function isMeetingLaunchArg(raw: string): boolean {
 	return /^(zoommtg|zoomus|msteams|teams|webex|wbx):/i.test(raw)
 }
 
+/** A pasted address may be a bare domain; https is the only web scheme the window loads. */
+export function normalizeMeetingUrl(raw: string): string {
+	const trimmed = raw.trim()
+	if (!trimmed) return ''
+	const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || /^(zoommtg|zoomus|msteams|teams|webex|wbx):/i.test(trimmed)
+	return hasScheme ? trimmed : `https://${trimmed}`
+}
+
 /** Hand a scheme or web link to the Rust side, which maps it and picks the window. */
 export const openMeetingLink = (raw: string) => invoke<BrowserSessionInfo | null>('open_meeting_link', { raw })
 

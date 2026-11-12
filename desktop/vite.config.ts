@@ -31,6 +31,8 @@ export default defineConfig(async () => ({
 	clearScreen: false,
 	test: {
 		setupFiles: ['./src/vitest.setup.ts'],
+		// The end-to-end suite is Playwright's; vitest would collect it and fail on its imports.
+		exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
 	},
 	server: {
 		port: 1420,

@@ -10,6 +10,7 @@ import {
 	getMeetingSchemesEnabled,
 	meetingSchemesSupported,
 	normalizeMeetingHost,
+	normalizeMeetingUrl,
 	openMeetingBrowser,
 	setMeetingHosts,
 	setMeetingSchemesEnabled,
@@ -91,7 +92,7 @@ export function MeetingBrowserSettings() {
 	}
 
 	async function openLink() {
-		const url = link.trim()
+		const url = normalizeMeetingUrl(link)
 		if (!url || opening) return
 		setOpening(true)
 		try {

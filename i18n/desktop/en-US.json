@@ -803,5 +803,8 @@
   "compareTooLongNote": "Too long to highlight differences",
   "meetingHandlers": "Open meeting links in Vibe",
   "meetingHandlersInfo": "Register Vibe as the handler for Zoom, Teams and Webex links, so they open in the meeting window instead of the browser.",
-  "meetingHandlersUnavailable": "This system does not support registering link handlers."
+  "meetingHandlersUnavailable": "This system does not support registering link handlers.",
+  "meetingBrowserLoadFailedTitle": "Page did not open",
+  "meetingBrowserLoadFailedBody": "The page could not be loaded. Try again, or close the window?",
+  "meetingBrowserRetry": "Try again"
 }

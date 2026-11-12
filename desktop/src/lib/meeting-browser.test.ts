@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_MEETING_HOSTS, isMeetingLaunchArg, normalizeMeetingHost } from './meeting-browser'
+import { DEFAULT_MEETING_HOSTS, isMeetingLaunchArg, normalizeMeetingHost, normalizeMeetingUrl } from './meeting-browser'
 
 describe('meeting host normalization', () => {
 	it('lowercases a bare host and drops the trailing dot', () => {
@@ -39,5 +39,21 @@ describe('meeting launch arguments', () => {
 		for (const value of ['vibe://download/?url=https://example.com/model.gguf', 'vibe://open/?url=https://x', '/tmp/a.wav', 'mailto:a@b.c']) {
 			expect(isMeetingLaunchArg(value)).toBe(false)
 		}
+	})
+})
+
+describe('pasted meeting addresses', () => {
+	it('adds https to a bare domain', () => {
+		expect(normalizeMeetingUrl('stream.wb.ru/room')).toBe('https://stream.wb.ru/room')
+		expect(normalizeMeetingUrl('  telemost.yandex.ru  ')).toBe('https://telemost.yandex.ru')
+	})
+
+	it('keeps an explicit scheme and meeting schemes', () => {
+		expect(normalizeMeetingUrl('https://meet.example.com/j/1')).toBe('https://meet.example.com/j/1')
+		expect(normalizeMeetingUrl('zoommtg://zoom.us/join?confno=1')).toBe('zoommtg://zoom.us/join?confno=1')
+	})
+
+	it('leaves an empty input empty', () => {
+		expect(normalizeMeetingUrl('   ')).toBe('')
 	})
 })
