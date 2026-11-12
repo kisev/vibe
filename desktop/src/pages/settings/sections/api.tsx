@@ -15,11 +15,7 @@ export function ApiSection({ vm }: { vm: SettingsViewModel }) {
 		<div className="space-y-6">
 			<SettingsGroup description={m.apiAgentsDescription()}>
 				<SettingsRow label={vm.apiBaseUrl ? m.apiServerRunning() : m.apiServerOff()} description={statusDescription}>
-					<Switch
-						checked={Boolean(vm.apiBaseUrl)}
-						disabled={serverActionBusy}
-						onCheckedChange={(checked) => (checked ? vm.startApiServer() : vm.stopApiServer())}
-					/>
+					<Switch checked={vm.apiEnabled} disabled={serverActionBusy} onCheckedChange={(checked) => (checked ? vm.startApiServer() : vm.stopApiServer())} />
 				</SettingsRow>
 				{/* The docs live on the server, so the link belongs with the switch that starts it. */}
 				<ActionRow

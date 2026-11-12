@@ -85,8 +85,10 @@ export const CONFIG_KEYS = {
 	legacyLlmConfig: 'summarize.llm',
 	legacyAutoSummarizeOnFinish: 'summarize.autoOnFinish',
 
-	// Local API. Written by the app while the server runs so agents can find the per-run port;
-	// removed on stop and on exit. Not a user setting.
+	// Local API. The intent is the user setting the Agents switch reads; the base URL is written
+	// by the app while a shared process runs so agents can find the per-run port, and removed on
+	// stop and on exit.
+	apiEnabled: 'api.enabled',
 	apiBaseUrl: 'api.baseUrl',
 
 	// Tools

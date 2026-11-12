@@ -163,9 +163,10 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 		}
 		// Windows cannot replace the bundled server.exe while it is running. Stop it
 		// only after the update has downloaded so transcription remains available
-		// while the (potentially long) download is in progress.
+		// while the (potentially long) download is in progress. This releases the
+		// process without recording it as the user turning the API off.
 		setCheckState('installing')
-		await invoke('stop_api_server')
+		await invoke('stop_api_server_process')
 		await invoke('update_install')
 		// Progress is left at 100 rather than reset: the dialog fades out after this, and a reset
 		// would show the bar sliding back to empty. The next download starts it at 0.

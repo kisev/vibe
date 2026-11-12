@@ -71,6 +71,23 @@ pub fn resolve_ffmpeg_path(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     None
 }
 
+fn spawn_process(
+    app_handle: &tauri::AppHandle,
+    unload_timeout_minutes: u32,
+    cpu_variant: crate::cmd::config::CpuVariant,
+) -> Result<crate::server::ServerProcess> {
+    let binary_path = resolve_server_binary(app_handle)?;
+    let ffmpeg_path = resolve_ffmpeg_path(app_handle);
+    let cache_dir = transcription_cache_dir(app_handle);
+    crate::server::ServerProcess::spawn(
+        &binary_path,
+        ffmpeg_path.as_deref(),
+        unload_timeout_minutes,
+        cpu_variant,
+        cache_dir.as_deref(),
+    )
+}
+
 #[tauri::command]
 pub async fn load_model(
     app_handle: tauri::AppHandle,
@@ -106,18 +123,8 @@ pub async fn load_model(
         state_guard.process = None;
     }
 
-    let spawn_server = |cpu_variant: crate::cmd::config::CpuVariant| -> Result<crate::server::ServerProcess> {
-        let binary_path = resolve_server_binary(&app_handle)?;
-        let ffmpeg_path = resolve_ffmpeg_path(&app_handle);
-        let cache_dir = transcription_cache_dir(&app_handle);
-        crate::server::ServerProcess::spawn(
-            &binary_path,
-            ffmpeg_path.as_deref(),
-            unload_timeout_minutes,
-            cpu_variant,
-            cache_dir.as_deref(),
-        )
-    };
+    let spawn_server =
+        |cpu_variant: crate::cmd::config::CpuVariant| spawn_process(&app_handle, unload_timeout_minutes, cpu_variant);
 
     // Spawn server if not running
     if state_guard.process.is_none() {
@@ -221,26 +228,79 @@ fn cache_dir_under(root: std::path::PathBuf) -> std::path::PathBuf {
 pub async fn get_model_metadata(app_handle: tauri::AppHandle, model_path: String) -> CommandResult<crate::server::ModelMetadata> {
     let server_state: State<'_, Mutex<ServerState>> = app_handle.state();
     let mut state = server_state.lock().await;
-    if state.process.as_mut().is_none_or(|process| !process.is_alive()) {
-        let binary_path = resolve_server_binary(&app_handle)?;
-        let ffmpeg_path = resolve_ffmpeg_path(&app_handle);
-        let cpu_variant = crate::cmd::config::cpu_variant(&app_handle);
-        let cache_dir = transcription_cache_dir(&app_handle);
-        state.process = Some(crate::server::ServerProcess::spawn(
-            &binary_path,
-            ffmpeg_path.as_deref(),
-            5,
-            cpu_variant,
-            cache_dir.as_deref(),
-        )?);
+    // A server that is already up (the API was asked for, or a transcription is running) serves
+    // the read and keeps running.
+    if state.process.as_mut().is_some_and(|process| process.is_alive()) {
+        return Ok(state.process.as_ref().unwrap().model_metadata(&model_path).await?);
     }
-    Ok(state.process.as_ref().unwrap().model_metadata(&model_path).await?)
+    state.process = None;
+    // Otherwise read through a short-lived process. The model is read whenever the app starts, and
+    // leaving the shared server up for that would make the API run behind the user's back.
+    let mut probe = spawn_process(
+        &app_handle,
+        crate::cmd::config::unload_timeout_minutes(&app_handle),
+        crate::cmd::config::cpu_variant(&app_handle),
+    )?;
+    let metadata = probe.model_metadata(&model_path).await;
+    probe.kill();
+    Ok(metadata?)
 }
 
 #[tauri::command]
 pub async fn get_api_base_url(server_state: State<'_, Mutex<ServerState>>) -> CommandResult<Option<String>> {
-    let state = server_state.lock().await;
+    let mut state = server_state.lock().await;
+    // A cached process that has died must not keep advertising a port that no longer answers.
+    if !state.process.as_mut().is_some_and(|process| process.is_alive()) {
+        return Ok(None);
+    }
     Ok(state.process.as_ref().map(|process| process.base_url()))
+}
+
+/// Whether the user wants the local API server running. This is the intent the Settings
+/// switch reads; [`get_api_base_url`] only reports whether a shared process is alive.
+#[tauri::command]
+pub fn api_server_enabled(app_handle: tauri::AppHandle) -> bool {
+    crate::cmd::config::api_server_enabled(&app_handle)
+}
+
+/// Bring the shared server up with the current settings and publish its URL.
+///
+/// This never records the user's intent: startup calls it when the intent is already on, and a
+/// model load for transcription has its own spawn path. Only the commands below change the intent.
+pub fn start_process(app_handle: &tauri::AppHandle, state: &mut ServerState, unload_timeout_minutes: u32) -> Result<String> {
+    let cpu_variant = crate::cmd::config::cpu_variant(app_handle);
+    let process_is_alive = state.process.as_mut().is_some_and(|process| process.is_alive());
+    if !process_is_alive {
+        state.process = None;
+    }
+    if state
+        .process
+        .as_ref()
+        .is_some_and(|process| process.unload_timeout_minutes() != unload_timeout_minutes || process.cpu_variant() != cpu_variant)
+    {
+        tracing::debug!(unload_timeout_minutes, ?cpu_variant, "restarting server to apply settings");
+        // Dropping ServerProcess kills and waits for its child process via its Drop implementation.
+        state.process = None;
+    }
+    if state.process.is_none() {
+        state.process = Some(spawn_process(app_handle, unload_timeout_minutes, cpu_variant)?);
+    }
+    let base_url = state.process.as_ref().context("API server process missing")?.base_url();
+    // Best-effort: an agent losing the hint is not a reason to fail starting the server.
+    crate::cmd::config::set_api_base_url(app_handle, Some(&base_url)).log_error();
+    Ok(base_url)
+}
+
+/// Stop the shared process and clear the published URL, leaving the user's intent alone.
+pub fn stop_process(app_handle: &tauri::AppHandle, state: &mut ServerState) -> bool {
+    // The port dies with the process, so the hint in the config file has to go with it.
+    crate::cmd::config::set_api_base_url(app_handle, None).log_error();
+    if let Some(mut process) = state.process.take() {
+        process.kill();
+        true
+    } else {
+        false
+    }
 }
 
 #[tauri::command]
@@ -250,46 +310,29 @@ pub async fn start_api_server(
     unload_timeout_minutes: u32,
 ) -> CommandResult<String> {
     let mut state_guard = server_state.lock().await;
-    let cpu_variant = crate::cmd::config::cpu_variant(&app_handle);
-    if state_guard
-        .process
-        .as_ref()
-        .is_some_and(|process| process.unload_timeout_minutes() != unload_timeout_minutes || process.cpu_variant() != cpu_variant)
-    {
-        tracing::debug!(unload_timeout_minutes, ?cpu_variant, "restarting server to apply settings");
-        // Dropping ServerProcess kills and waits for its child process via its Drop implementation.
-        state_guard.process = None;
-    }
-    if state_guard.process.is_none() {
-        let binary_path = resolve_server_binary(&app_handle)?;
-        let ffmpeg_path = resolve_ffmpeg_path(&app_handle);
-        let cache_dir = transcription_cache_dir(&app_handle);
-        let process = crate::server::ServerProcess::spawn(
-            &binary_path,
-            ffmpeg_path.as_deref(),
-            unload_timeout_minutes,
-            cpu_variant,
-            cache_dir.as_deref(),
-        )?;
-        state_guard.process = Some(process);
-    }
-    let process = state_guard.process.as_ref().context("API server process missing")?;
-    let base_url = process.base_url();
-    // Best-effort: an agent losing the hint is not a reason to fail starting the server.
-    crate::cmd::config::set_api_base_url(&app_handle, Some(&base_url)).log_error();
+    let base_url = start_process(&app_handle, &mut state_guard, unload_timeout_minutes)?;
+    // Record the intent only once the server is up, so a failed start leaves the switch off
+    // rather than promising a server that is not there.
+    crate::cmd::config::set_api_server_enabled(&app_handle, true).log_error();
     Ok(base_url)
 }
 
 #[tauri::command]
 pub async fn stop_api_server(app_handle: tauri::AppHandle, server_state: State<'_, Mutex<ServerState>>) -> CommandResult<bool> {
     let mut state_guard = server_state.lock().await;
-    // The port dies with the process, so the hint in the config file has to go with it.
-    crate::cmd::config::set_api_base_url(&app_handle, None).log_error();
-    if let Some(mut process) = state_guard.process.take() {
-        process.kill();
-        return Ok(true);
-    }
-    Ok(false)
+    crate::cmd::config::set_api_server_enabled(&app_handle, false).log_error();
+    Ok(stop_process(&app_handle, &mut state_guard))
+}
+
+/// Release the server binary for an update install without recording it as the user turning the
+/// API off: the intent stays on, so the server comes back after the relaunch.
+#[tauri::command]
+pub async fn stop_api_server_process(
+    app_handle: tauri::AppHandle,
+    server_state: State<'_, Mutex<ServerState>>,
+) -> CommandResult<bool> {
+    let mut state_guard = server_state.lock().await;
+    Ok(stop_process(&app_handle, &mut state_guard))
 }
 
 #[cfg(test)]

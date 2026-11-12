@@ -119,6 +119,9 @@ export function viewModel() {
 	const listenersRef = useRef<UnlistenFn[]>([])
 	const [downloadURL, setDownloadURL] = useState('')
 	const [apiBaseUrl, setApiBaseUrl] = useState<string | null>(null)
+	// The user's persisted choice, not the shared process: transcription loads its model into
+	// that same process, so whether it happens to be alive says nothing about the switch.
+	const [apiEnabled, setApiEnabled] = useState(false)
 	const [isStartingApiServer, setIsStartingApiServer] = useState(false)
 	const [isStoppingApiServer, setIsStoppingApiServer] = useState(false)
 	const [gpuDevices, setGpuDevices] = useState<GpuDevice[]>([])
@@ -290,10 +293,15 @@ export function viewModel() {
 
 	async function refreshApiServerStatus() {
 		try {
-			const baseUrl = await invoke<string | null>('get_api_base_url')
+			const [enabled, baseUrl] = await Promise.all([
+				invoke<boolean>('api_server_enabled'),
+				invoke<string | null>('get_api_base_url'),
+			])
+			setApiEnabled(enabled)
 			setApiBaseUrl(baseUrl)
 		} catch (error) {
 			console.error(error)
+			setApiEnabled(false)
 			setApiBaseUrl(null)
 		}
 	}
@@ -302,6 +310,7 @@ export function viewModel() {
 		try {
 			setIsStartingApiServer(true)
 			const baseUrl = await invoke<string>('start_api_server', { unloadTimeoutMinutes: preference.unloadTimeoutMinutes })
+			setApiEnabled(true)
 			setApiBaseUrl(baseUrl)
 		} catch (error) {
 			console.error(error)
@@ -348,6 +357,7 @@ export function viewModel() {
 		try {
 			setIsStoppingApiServer(true)
 			await invoke<boolean>('stop_api_server')
+			setApiEnabled(false)
 			setApiBaseUrl(null)
 		} catch (error) {
 			console.error(error)
@@ -414,6 +424,7 @@ export function viewModel() {
 		downloadURL,
 		setDownloadURL,
 		apiBaseUrl,
+		apiEnabled,
 		isStartingApiServer,
 		isStoppingApiServer,
 		startApiServer,
