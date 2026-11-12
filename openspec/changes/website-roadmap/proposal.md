@@ -9,7 +9,7 @@ The fork's plans already live in `openspec/changes/*/proposal.md`. Maintaining a
 ## What Changes
 
 - `scripts/roadmap.py` reads every unarchived `openspec/changes/<name>/proposal.md`, skips `archive/`, takes the first sentence of the `## Why` section, strips Markdown, and writes `website/public/roadmap.json` sorted by change name. A proposal without a readable `## Why` fails the run instead of silently dropping a change.
-- `website/website.chore` runs the generator before `pnpm build`, next to the existing `website_links.py` and `dev_manifest.py` steps.
+- `scripts/website_build.sh` (the body of `task website:build`) runs the generator before `pnpm build`, next to the existing `website_links.py` and `dev_manifest.py` steps.
 - The site gains a `/roadmap` route and a nav entry. It lists the planned changes with a note that they are planned, not shipped, and states where the list comes from.
 - The Features page is refreshed against the fork's settings surfaces and message catalogs: the existing copy is corrected where it no longer describes the app, and the fork's own capabilities are added as new cards. The page stays data-driven through `features.json`.
 - New UI copy lands in `i18n/website/en-US.json` only; other locales fall back to English until the normal translation pass.

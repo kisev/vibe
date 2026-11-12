@@ -24,7 +24,7 @@ Each entry SHALL carry the change name, a title taken from the proposal's H1 or 
 
 #### Scenario: Build wiring
 
-- **WHEN** the website is built with `website/website.chore`
+- **WHEN** the website is built with `task website:build`
 - **THEN** `roadmap.json` is written into `website/public/` before `pnpm build`
 
 ### Requirement: A malformed proposal fails the roadmap build
