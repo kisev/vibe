@@ -407,6 +407,11 @@ tasks:
     cmds:
       - python3 scripts/release_set_version.py
 
+  release:notes:
+    desc: Assemble the GitHub release body - English notes under the website changelog link (VERSION, RELEASE_NOTES; stdout when unset)
+    cmds:
+      - '{{.PYTHON}} scripts/release_notes.py'
+
   dev:tag:
     desc: Cut a dev build - tag dev.<next> on the dev branch and push the tag
     cmds:

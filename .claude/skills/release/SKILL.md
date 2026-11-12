@@ -107,14 +107,15 @@ state.
 ## 5. Promote
 
 ```
-awk 'c==2{print} /^---$/{c++}' i18n/changelog/<version>.md > /tmp/notes.md
+VERSION=<version> RELEASE_NOTES=/tmp/notes.md task release:notes
 gh release edit vX.Y.Z --prerelease=false --latest --notes-file /tmp/notes.md
 ```
 
-The release body carries the same content as the versioned entry, so GitHub and
-the website never disagree; the reader's-language version lives at
-`https://kisev.github.io/vibe/changelog/<version>`. Dev releases pick the body up
-from `unreleased.md` automatically.
+The body is the versioned English entry, so GitHub and the website never
+disagree, under `Read this changelog in your language:
+https://kisev.github.io/vibe/changelog/<version>` — the same entry in the
+reader's own language. Dev releases pick the body up from `unreleased.md`
+automatically and link to `/changelog/dev` instead.
 
 ## 6. Deploy the website
 

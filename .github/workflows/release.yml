@@ -58,7 +58,7 @@ jobs:
 
             # A candidate is the same build as a release, only its version and
             # tag differ: `X.Y.Z-rc.N` sorts below `X.Y.Z`, which is what keeps
-            # Dev → Beta → Release moving forward. See docs/UPDATER.md.
+            # Dev → Beta → Release moving forward. See docs/reference/update-channels.md.
             - name: Apply the version override
               if: inputs.version != ''
               shell: bash
@@ -150,7 +150,9 @@ jobs:
               with:
                   tagName: v__VERSION__ # the action automatically replaces __VERSION__ with the app version.
                   releaseName: "v__VERSION__"
-                  releaseBody: "Release notes: https://kisev.github.io/vibe/changelog/__VERSION__"
+                  # The promotion step replaces this with the English notes plus
+                  # the same line; until then, it is the only body a reader sees.
+                  releaseBody: "Read this changelog in your language: https://kisev.github.io/vibe/changelog/__VERSION__"
                   prerelease: true
                   args: ${{ matrix.args }} ${{ matrix.platform == 'windows-latest' && inputs.sign-windows && '--config src-tauri/tauri.windows.signing.conf.json' || '' }}
                   projectPath: "./desktop"
