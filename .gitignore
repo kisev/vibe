@@ -48,3 +48,6 @@ whisper.cpp/
 
 # Scratch artifacts for the engine/whisper output comparison (includes a 47MB binary).
 plans/
+
+# Generated at website build time from the active OpenSpec changes
+website/public/roadmap.json

@@ -9,6 +9,8 @@
 task website {
     cd website
     pnpm install
+    # The Roadmap page fetches this at runtime; the build task writes it too.
+    uv run ../scripts/roadmap.py
     pnpm dev
 }
 
@@ -22,6 +24,9 @@ task website-build {
     # Points updater/dev.json at the newest complete dev build. Keeps the
     # previous file when that release is partial or the API fails.
     uv run ../scripts/dev_manifest.py
+    # Publishes the unarchived OpenSpec changes as the site's roadmap. A
+    # malformed proposal fails the build instead of shipping a partial list.
+    uv run ../scripts/roadmap.py
     # The docs are served from the site, so they are copied in rather than
     # linked. Removed first so a deleted page does not survive in dist.
     remove public/docs

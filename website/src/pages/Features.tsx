@@ -1,5 +1,23 @@
 import type { LucideIcon } from 'lucide-react'
-import { Bot, Cpu, FileAudio, FileDown, Languages, Link2, Mic, Radio, Settings2, ShieldCheck, Sparkles } from 'lucide-react'
+import {
+	AppWindow,
+	Bot,
+	Cpu,
+	FileAudio,
+	FileDown,
+	FlaskConical,
+	Globe,
+	Languages,
+	Link2,
+	Mic,
+	Radio,
+	RefreshCw,
+	Settings2,
+	ShieldCheck,
+	Smartphone,
+	Sparkles,
+	Terminal,
+} from 'lucide-react'
 import FeatureCard from '~/components/FeatureCard'
 import features from '~/lib/features.json'
 import { m } from '~/paraglide/messages.js'
@@ -21,6 +39,12 @@ const content: Record<string, { icon: LucideIcon; title: () => string; descripti
 	gpu: { icon: Cpu, title: m['feature-gpu-title'], description: m['feature-gpu-description'] },
 	privacy: { icon: ShieldCheck, title: m['feature-privacy-title'], description: m['feature-privacy-description'] },
 	customize: { icon: Settings2, title: m['feature-customize-title'], description: m['feature-customize-description'] },
+	'model-comparison': { icon: FlaskConical, title: m['feature-model-comparison-title'], description: m['feature-model-comparison-description'] },
+	'update-channels': { icon: RefreshCw, title: m['feature-update-channels-title'], description: m['feature-update-channels-description'] },
+	'meeting-browser': { icon: AppWindow, title: m['feature-meeting-browser-title'], description: m['feature-meeting-browser-description'] },
+	'api-agents': { icon: Terminal, title: m['feature-api-agents-title'], description: m['feature-api-agents-description'] },
+	'phone-handoff': { icon: Smartphone, title: m['feature-phone-handoff-title'], description: m['feature-phone-handoff-description'] },
+	'site-language': { icon: Globe, title: m['feature-site-language-title'], description: m['feature-site-language-description'] },
 }
 
 export default function Features() {
