@@ -53,7 +53,7 @@ mod imp {
 #[cfg(target_os = "linux")]
 mod imp {
     use super::*;
-    use eyre::ContextCompat;
+    use eyre::{ContextCompat, WrapErr};
     use std::fs;
     use std::path::PathBuf;
 
