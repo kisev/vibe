@@ -1,15 +1,9 @@
 import { useCallback, useRef } from 'react'
-import { useOutletContext } from 'react-router-dom'
 import { Copy, Download, Languages, Layers, Pause, Plus, Search, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react'
 import { requestDownload } from '~/lib/download-intent'
 import { m } from '../paraglide/messages.js'
 import Cta from '~/components/Cta'
-import WallOfLove from '~/components/WallOfLove'
 import { Button } from '~/components/ui/button'
-
-interface LayoutContext {
-	onOpenKofi: () => void
-}
 
 const highlights = [
 	{
@@ -207,7 +201,6 @@ function AppMock() {
 }
 
 export default function Home() {
-	const { onOpenKofi } = useOutletContext<LayoutContext>()
 	const ctaRef = useRef<HTMLDivElement>(null)
 
 	const scrollToCta = useCallback(() => {
@@ -225,7 +218,7 @@ export default function Home() {
 				<p className="mt-5 max-w-[52ch] text-base leading-7 text-muted-foreground">{m.description()}</p>
 
 				<div ref={ctaRef} className="mt-9 flex scroll-mt-24 flex-col items-center">
-					<Cta onOpenKofi={onOpenKofi} />
+					<Cta />
 				</div>
 			</section>
 
@@ -250,8 +243,6 @@ export default function Home() {
 					))}
 				</div>
 			</section>
-
-			<WallOfLove />
 
 			{/* Closing band */}
 			<section className="mt-20 lg:mt-28">

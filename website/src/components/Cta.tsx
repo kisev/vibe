@@ -13,7 +13,6 @@ import { onDownloadRequest } from '~/lib/download-intent'
 import linuxInstallOptions from '~/lib/linux_install_options.json'
 import CopyButton from './CopyButton'
 import PostDownload from './PostDownload'
-import SupportButton from './SupportButton'
 
 type Platform = 'macos' | 'windows' | 'linux'
 
@@ -30,11 +29,7 @@ function getOS(): Platform {
 	return 'macos'
 }
 
-interface CtaProps {
-	onOpenKofi: () => void
-}
-
-export default function Cta({ onOpenKofi }: CtaProps) {
+export default function Cta() {
 	const [currentPlatform, setCurrentPlatform] = useState<Platform>('macos')
 	const [macModalOpen, setMacModalOpen] = useState(false)
 	const [mobileModalOpen, setMobileModalOpen] = useState(false)
@@ -225,14 +220,11 @@ export default function Cta({ onOpenKofi }: CtaProps) {
 								</div>
 							</div>
 						))}
-						<div className="mt-10 flex items-center justify-center">
-							<SupportButton onOpenKofi={onOpenKofi} />
-						</div>
 					</div>
 				</DialogContent>
 			</Dialog>
 
-			<PostDownload open={postDownloadOpen} onOpenChange={setPostDownloadOpen} onOpenKofi={onOpenKofi} />
+			<PostDownload open={postDownloadOpen} onOpenChange={setPostDownloadOpen} />
 		</>
 	)
 }

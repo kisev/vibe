@@ -5,7 +5,6 @@ import Github from '~/icons/Github'
 import Logo from '~/icons/Logo'
 
 interface FooterProps {
-	onOpenKofi: () => void
 	onOpenPrivacyPolicy: () => void
 }
 
@@ -13,7 +12,7 @@ const linkClass = 'text-sm text-start text-muted-foreground transition-colors ho
 const iconClass =
 	'inline-flex size-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
 
-export default function Footer({ onOpenKofi, onOpenPrivacyPolicy }: FooterProps) {
+export default function Footer({ onOpenPrivacyPolicy }: FooterProps) {
 	return (
 		<footer className="mt-24 border-t border-border">
 			<div className="site-container flex flex-col gap-10 py-12 md:flex-row md:items-start md:justify-between md:gap-16">
@@ -54,9 +53,6 @@ export default function Footer({ onOpenKofi, onOpenPrivacyPolicy }: FooterProps)
 						</Link>
 					</div>
 					<div className="flex flex-col items-start gap-3">
-						<button className={linkClass} onClick={onOpenKofi}>
-							{m['support-vibe']()}
-						</button>
 						<button className={linkClass} onClick={onOpenPrivacyPolicy}>
 							{m['privacy-policy']()}
 						</button>

@@ -19,8 +19,7 @@
   <a target="_blank" href="https://kisev.github.io/vibe/">
     🔗 Download Vibe
   </a>
-    &nbsp; | &nbsp; Give it a Star ⭐ | &nbsp;
-    <a target="_blank" href="https://thewh1teagle.github.io/vibe/?action=support-vibe">Support the original project 🤝</a>
+    &nbsp; | &nbsp; Give it a Star ⭐
 </p>
 
 <hr />
