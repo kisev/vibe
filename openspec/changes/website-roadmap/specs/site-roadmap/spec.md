@@ -8,22 +8,33 @@ The public site describes this fork rather than the upstream project, and its ro
 
 ### Requirement: The roadmap is generated from unarchived changes
 
-`scripts/roadmap.py` SHALL read `openspec/changes/*/proposal.md`, skip the `archive` directory, and write `website/public/roadmap.json` as a JSON array sorted by change name. Each entry SHALL carry the change name, a title derived from the proposal's H1 or the prettified change name, and the first sentence of the `## Why` section with Markdown removed. The output SHALL be byte-identical for identical input. A change without a readable proposal or `## Why` section SHALL fail the run with a message naming the file.
+`scripts/roadmap.py` SHALL read `openspec/changes/*/proposal.md`, skip the `archive` directory, and write `website/public/roadmap.json` as a JSON array sorted by change name. The output SHALL be byte-identical for identical input.
+
+Each entry SHALL carry the change name, a title taken from the proposal's H1 or the prettified change name, and the first sentence of the `## Why` section with Markdown removed.
 
 #### Scenario: Two active changes and an archive
 
 - **WHEN** the changes directory holds two active proposals and an `archive/` tree
 - **THEN** the output contains exactly the two active changes, ordered by name, and no archived one
 
-#### Scenario: Malformed proposal
+#### Scenario: Re-running changes nothing
 
-- **WHEN** an active change has no `proposal.md`, or its proposal has no `## Why` text
-- **THEN** the generator exits non-zero and names the offending path instead of writing a partial roadmap
+- **WHEN** the generator runs twice over the same tree
+- **THEN** the second output is byte-identical to the first
 
 #### Scenario: Build wiring
 
 - **WHEN** the website is built with `website/website.chore`
 - **THEN** `roadmap.json` is written into `website/public/` before `pnpm build`
+
+### Requirement: A malformed proposal fails the roadmap build
+
+A change without `proposal.md`, or whose proposal has no readable `## Why` sentence, SHALL stop the generator with a non-zero exit naming that file. The generator SHALL NOT publish a partial roadmap.
+
+#### Scenario: Malformed proposal
+
+- **WHEN** an active change has no `proposal.md`, or its proposal has no `## Why` text
+- **THEN** the generator exits non-zero and names the offending path instead of writing a partial roadmap
 
 ### Requirement: The site shows planned work as planned
 
