@@ -101,5 +101,7 @@
   "mock-file-name": "podcast-episode.mp3",
   "mock-file-path": "Documents/Vibe",
   "changelogDevLine": "Dev",
-  "changelogDevFallback": "No dev notes yet — showing the latest release."
+  "changelogDevFallback": "No dev notes yet — showing the latest release.",
+  "changelogUnreleased": "Unreleased",
+  "changelogUnreleasedTitle": "What's next"
 }
