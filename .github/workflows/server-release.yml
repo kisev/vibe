@@ -68,8 +68,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Setup chore
-        uses: getchore/setup-chore@v1
+      - uses: jdx/mise-action@v2
+        with:
+          install: true
+          install_args: aqua:go-task/task
+          cache: true
       # Build-time only: headers + glslc + glslangValidator + SPIRV-Headers
       # cmake config for the ggml Vulkan backend; runtime uses the GPU driver.
       - name: Install Vulkan build prerequisites (Linux)
@@ -118,7 +121,7 @@ jobs:
         if: matrix.archive != ''
         shell: bash
         run: |
-          chore package-release "${{ matrix.binary }}" "${{ matrix.package_os }}" "${{ matrix.package_arch }}" "${{ matrix.archive }}"
+          mise exec -- task server:package-release -- "${{ matrix.binary }}" "${{ matrix.package_os }}" "${{ matrix.package_arch }}" "${{ matrix.archive }}"
       - name: Upload packaged archive to release
         if: matrix.archive != ''
         shell: pwsh

@@ -56,7 +56,7 @@ pre-commit:
       run: mise exec -- mdformat --check {staged_files}
     json:
       glob: "**/*.json"
-      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,desktop/project.inlang,website/project.inlang}/**,desktop/src/data/handy-catalog.json"
+      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,desktop/project.inlang,website/project.inlang}/**,desktop/src/data/handy-catalog.json,website/src/lib/latest_release.json"
       run: mise exec -- oxfmt --check {staged_files}
     js:
       glob: "**/*.{ts,tsx,js,mjs}"

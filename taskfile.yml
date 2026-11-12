@@ -17,6 +17,139 @@ tasks:
     cmds:
       - mise exec -- lefthook install
 
+  # The development loop: sidecars, the app, the site and the phone handoff.
+  # The logic is in scripts/; these targets only name it.
+  setup:
+    desc: Fetch the vibe-server and ffmpeg sidecars for a target triple (default - this machine)
+    cmds:
+      - bash scripts/setup_sidecars.sh {{.CLI_ARGS}}
+
+  server:build:
+    desc: Build vibe-server from server/ and stage it as the desktop sidecar
+    cmds:
+      - bash scripts/server_build.sh {{.CLI_ARGS}}
+
+  server:fetch-headers:
+    desc: Fetch the pinned ggml headers into server/libs/include
+    cmds:
+      - bash scripts/ggml_libs.sh fetch-headers
+
+  server:package-release:
+    desc: Package a built vibe-server with ffmpeg - arguments, goos, goarch and the archive path
+    cmds:
+      - bash scripts/package_server_release.sh {{.CLI_ARGS}}
+
+  linux-deps:
+    desc: Install the Linux build dependencies with the host package manager
+    cmds:
+      - bash scripts/ci/linux-build-deps.sh
+
+  dev:
+    desc: Run the app in development mode
+    cmds:
+      - task: setup
+      - pnpm --dir desktop exec tauri dev
+
+  dev:web:
+    desc: Run only the desktop frontend in a browser, with Tauri mocked
+    cmds:
+      - pnpm --dir desktop dev
+
+  app:build:
+    desc: Build the app for production
+    cmds:
+      - task: setup
+      - pnpm --dir desktop exec tauri build
+
+  app:upgrade:
+    desc: Rebuild vibe.app, replace the installed one and relaunch it (macOS)
+    cmds:
+      - bash scripts/upgrade_app.sh
+
+  website:dev:
+    desc: Run the website locally
+    cmds:
+      - uv run scripts/roadmap.py
+      - pnpm --dir website dev
+
+  website:build:
+    desc: Build the site into website/dist the way the deploy workflow does
+    cmds:
+      - bash scripts/website_build.sh
+
+  phone:wasm:
+    desc: Build the phone handoff's browser client into handoff/pwa/public/wasm
+    cmds:
+      - bash scripts/phone_wasm.sh
+
+  phone:pwa:
+    desc: Build the phone PWA - the base path it will be served under, default /
+    cmds:
+      - task: phone:wasm
+      - bash scripts/phone_pwa.sh {{.CLI_ARGS}}
+
+  phone:dev:
+    desc: Run the phone PWA on http://localhost:8088
+    cmds:
+      - task: phone:wasm
+      - bash scripts/phone_pwa.sh --dev
+
+  phone:tunnel:
+    desc: Serve the phone PWA over an HTTPS tunnel so a real phone can load it
+    cmds:
+      - bash scripts/phone_tunnel.sh
+
+  phone:probe:
+    desc: Send an audio file to a running Vibe - arguments, pairing URL and file
+    cmds:
+      - bash scripts/phone_probe.sh {{.CLI_ARGS}}
+
+  phone:caps:
+    desc: Ask a running Vibe what it supports - argument, pairing URL
+    cmds:
+      - bash scripts/phone_probe.sh --capabilities {{.CLI_ARGS}}
+
+  stamp-translations:
+    desc: Refresh the source hash on every translated changelog entry and docs page
+    cmds:
+      - uv run scripts/content_i18n.py stamp
+
+  check-types:
+    desc: Type-check the desktop app and the website
+    cmds:
+      - task: desktop:typecheck
+      - task: website:typecheck
+
+  libs:id:
+    desc: Print the short tree hash of server/libs at HEAD
+    cmds:
+      - bash scripts/ggml_libs.sh id
+
+  libs:tag:
+    desc: Print the GitHub release tag the current libs inputs are published under
+    cmds:
+      - bash scripts/ggml_libs.sh tag
+
+  libs:platform:
+    desc: Print the platform id used in the library archive names
+    cmds:
+      - bash scripts/ggml_libs.sh platform
+
+  libs:fetch:
+    desc: Download the prebuilt ggml static libraries for this platform
+    cmds:
+      - bash scripts/ggml_libs.sh fetch
+
+  libs:build:
+    desc: Build the ggml static libraries and package them into an archive
+    cmds:
+      - bash scripts/ggml_libs.sh build
+
+  libs:upload:
+    desc: Build the ggml libraries and upload the archive to its release
+    cmds:
+      - bash scripts/ggml_libs.sh upload
+
   setup:remotes:
     desc: Isolate upstream tags so fetches never collide with the fork's own history
     cmds:
@@ -112,7 +245,7 @@ tasks:
     # compile dies inside gdk-sys minutes in, which looks like a code failure.
     preconditions:
       - sh: 'test "$(uname -s)" != Linux || pkg-config --exists gtk+-3.0'
-        msg: "The desktop crate needs the Linux build dependencies: run `chore linux-deps` once (needs sudo)."
+        msg: "The desktop crate needs the Linux build dependencies: run `task linux-deps` once (needs sudo)."
     cmds:
       - mise exec -- bash scripts/ci/clippy.sh --manifest-path Cargo.toml --all-targets -- -D warnings
 
@@ -194,7 +327,7 @@ tasks:
     cmds:
       - >-
         mise exec -- fd -H -e json -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
-        -E desktop/project.inlang -E website/project.inlang -X
+        -E desktop/project.inlang -E website/project.inlang -E website/src/lib/latest_release.json -X
         oxfmt --check
 
   lint:js:
@@ -240,7 +373,7 @@ tasks:
     cmds:
       - >-
         mise exec -- fd -H -e json -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
-        -E desktop/project.inlang -E website/project.inlang -X
+        -E desktop/project.inlang -E website/project.inlang -E website/src/lib/latest_release.json -X
         oxfmt
 
   format:check:
@@ -249,7 +382,7 @@ tasks:
       - mise exec -- fd -H -e md -E node_modules -E desktop/src/paraglide -E .claude -E .opencode -E .agents -E models.md -E i18n/changelog -X mdformat --check
       - >-
         mise exec -- fd -H -e json -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
-        -E desktop/project.inlang -E website/project.inlang -X
+        -E desktop/project.inlang -E website/project.inlang -E website/src/lib/latest_release.json -X
         oxfmt --check
       - mise exec -- fd -H -e sh -E node_modules -X shfmt -i 4 -d
       - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E pyproject.toml -E desktop/project.inlang -E website/project.inlang -X tombi format --check

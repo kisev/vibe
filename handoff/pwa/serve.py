@@ -7,7 +7,7 @@ for checking a production build without a bundler in the loop:
     pnpm -C handoff/pwa build && uv run handoff/pwa/serve.py     # http://localhost:8088
 
 With --tunnel it also runs `cloudflared` against the same port, so a real phone can
-load the PWA over HTTPS -- the microphone needs a secure origin. `chore phone-tunnel`
+load the PWA over HTTPS -- the microphone needs a secure origin. `task phone:tunnel`
 builds and then calls this.
 
 Sets the MIME types browsers require for `.wasm` and `.webmanifest`, disables

@@ -81,11 +81,6 @@ jobs:
             - name: setup uv
               uses: astral-sh/setup-uv@v5
 
-            - name: setup chore
-              uses: getchore/setup-chore@v1
-              with:
-                  version: v1.6.0
-
             - name: Rust cache
               uses: swatinem/rust-cache@v2
 
@@ -101,13 +96,15 @@ jobs:
 
             - name: Install Linux build dependencies
               if: runner.os == 'Linux'
-              run: chore linux-deps
+              run: mise exec -- task linux-deps
 
             - name: Require release notes for this version
               shell: bash
               run: mise exec -- task ci:changelog-gate
             - name: Fetch the sidecars for ${{ matrix.target_triple }}
-              run: chore setup ${{ matrix.target_triple }}
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: mise exec -- task setup -- ${{ matrix.target_triple }}
 
             # vibe-diarize-native statically links the prebuilt GGML the native
             # stack is built against; vibe-server stays on transcribe.cpp's GGML.
@@ -116,6 +113,7 @@ jobs:
               shell: bash
               env:
                   TRIPLE: ${{ matrix.target_triple }}
+                  GH_TOKEN: ${{ github.token }}
               run: mise exec -- task ci:ggml-libs
 
             - name: Build the native diarization helper

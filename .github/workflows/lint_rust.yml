@@ -55,13 +55,17 @@ jobs:
                   cache: pnpm
                   cache-dependency-path: desktop/pnpm-lock.yaml
 
-            - name: setup chore
-              uses: getchore/setup-chore@v1
+            - name: setup mise
+              uses: jdx/mise-action@v2
               with:
-                  version: v1.6.0
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
 
             - name: Fetch the sidecars
-              run: chore setup
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: mise exec -- task setup
 
             - name: install node deps
               run: pnpm install

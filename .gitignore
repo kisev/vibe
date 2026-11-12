@@ -51,3 +51,7 @@ plans/
 
 # Generated at website build time from the active OpenSpec changes
 website/public/roadmap.json
+# copied in by the site build (task website:build)
+website/public/docs
+# written by the site build from the newest complete dev release
+website/public/updater/dev.json

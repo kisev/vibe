@@ -10,7 +10,7 @@ on:
             - "scripts/website_links.py"
             - "handoff/pwa/**"
             - "handoff/wasm/**"
-            - "chorefile"
+            - "taskfile.yml"
             - ".github/workflows/website.yml"
     # No `release` trigger: the github-pages environment's branch policy admits
     # branches, so a tag ref fails the deploy job before its first step, and a dev
@@ -73,13 +73,15 @@ jobs:
                 curl -sSfL https://github.com/WebAssembly/binaryen/releases/download/version_132/binaryen-version_132-x86_64-linux.tar.gz | tar xz
                 echo "$PWD/binaryen-version_132/bin" >> "$GITHUB_PATH"
 
-            - name: setup chore
-              uses: getchore/setup-chore@v1
+            - name: setup mise
+              uses: jdx/mise-action@v2
               with:
-                  version: v1.6.0
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
 
             - name: Build
-              run: chore pwa /vibe/phone/
+              run: mise exec -- task phone:pwa -- /vibe/phone/
 
             - name: Upload phone PWA
               uses: actions/upload-artifact@v4
@@ -110,13 +112,15 @@ jobs:
             - name: setup uv
               uses: astral-sh/setup-uv@v5
 
-            - name: setup chore
-              uses: getchore/setup-chore@v1
+            - name: setup mise
+              uses: jdx/mise-action@v2
               with:
-                  version: v1.6.0
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
 
             - name: Build
-              run: chore website-build
+              run: mise exec -- task website:build
               env:
                   GH_TOKEN: ${{ github.token }}
 

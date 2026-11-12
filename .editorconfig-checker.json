@@ -12,7 +12,6 @@
     "handoff/",
     "\\.rs$",
     "Cargo\\.lock",
-    "chorefile$",
     "\\.md$",
     "\\.(css|html|sh|toml|json|jsonc|jsonld)$",
     "project\\.inlang/"

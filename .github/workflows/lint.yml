@@ -47,7 +47,7 @@ jobs:
 
             # Clippy covers the whole server workspace, including the dormant
             # upstream crates: ggml-rs-sys's build script wants the prebuilt
-            # ggml libraries (upstream's `chore setup` fetches these; the pin
+            # ggml libraries (upstream's setup step fetches these; the pin
             # is read from server/libs so a bump never rots this step).
             - name: Fetch the prebuilt ggml libraries
               env:
