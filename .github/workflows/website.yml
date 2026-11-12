@@ -12,8 +12,10 @@ on:
             - "handoff/wasm/**"
             - "chorefile"
             - ".github/workflows/website.yml"
-    release:
-        types: [published]
+    # No `release` trigger: the github-pages environment's branch policy admits
+    # branches, so a tag ref fails the deploy job before its first step, and a dev
+    # tag would publish the dev branch. A release's content reaches the site
+    # through the main push that precedes it; workflow_dispatch covers the rest.
     workflow_dispatch:
 
 # Allow this job to clone the repo and create a page deployment
