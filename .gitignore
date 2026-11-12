@@ -43,8 +43,6 @@ desktop/src-tauri/binaries/
 # The engine lives in server/ now; an old nested sona checkout may still sit here.
 /sona/
 whisper.cpp/
-aptabase-python/
-tauri-plugin-aptabase/
 **/project.inlang/cache/
 **/project.inlang/project_id
 

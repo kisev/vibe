@@ -15,7 +15,6 @@ export const changelogURL = (version?: string) => {
 	return `https://kisev.github.io/vibe/changelog/${version}`
 }
 export const discordURL = 'https://discord.gg/EcxWSstQN8'
-export const supportVibeURL = 'https://thewh1teagle.github.io/vibe/?action=support-vibe'
 export const privacyPolicyURL = 'https://kisev.github.io/vibe/?action=open-privacy-policy'
 export const storeFilename = 'app_config.json'
 

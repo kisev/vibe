@@ -1,8 +1,6 @@
 {
   "aborting": "रद्द कर रहा है",
   "advanced": "उन्नत",
-  "analyticsEnabled": "गुमनाम आँकड़े",
-  "analyticsDisabledWarning": "इसे चालू रखने की सलाह दी जाती है, ताकि हम समस्याएँ जल्दी ढूँढ़कर ठीक कर सकें।",
   "apiAgentsDescription": "Vibe के लोकल API से स्क्रिप्ट, CLI टूल या AI एजेंट के ज़रिए ट्रांसक्रिप्शन चलाएँ।",
   "apiAndAgents": "API और एजेंट",
   "apiServerOff": "API सर्वर बंद है",
@@ -371,7 +369,6 @@
   "summaryFailed": "सारांश नहीं बनाया जा सका",
   "retrySummary": "फिर से कोशिश करें",
   "summaryTab": "सारांश",
-  "supportTheProject": "वाइब का समर्थन करें",
   "supportsFormats": "ऑडियो और वीडियो फ़ाइलें समर्थित हैं",
   "swaggerDocs": "Swagger दस्तावेज़",
   "tempFolder": "अस्थायी फ़ाइलें",

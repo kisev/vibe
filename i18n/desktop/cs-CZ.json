@@ -1,8 +1,6 @@
 {
   "aborting": "Rušení",
   "advanced": "Pokročilé",
-  "analyticsEnabled": "Anonymní analytika",
-  "analyticsDisabledWarning": "Důrazně doporučujeme ponechat tuto možnost povolenou, abychom mohli rychleji nacházet a opravovat chyby.",
   "apiAgentsDescription": "Spouštějte transkripci ze skriptů, nástrojů příkazového řádku (CLI) nebo AI agentů pomocí lokálního API aplikace Vibe.",
   "apiAndAgents": "API a agenti",
   "apiServerOff": "API server je vypnutý",
@@ -371,7 +369,6 @@
   "summaryFailed": "Shrnutí se nepodařilo vytvořit",
   "retrySummary": "Zkusit znovu",
   "summaryTab": "Shrnutí",
-  "supportTheProject": "Podpořit Vibe",
   "supportsFormats": "Podporuje audio a video soubory",
   "swaggerDocs": "Dokumentace Swagger",
   "tempFolder": "Dočasné soubory",

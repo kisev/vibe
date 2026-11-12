@@ -1,8 +1,6 @@
 {
   "aborting": "Abortando",
   "advanced": "Avançado",
-  "analyticsEnabled": "Análises anônimas",
-  "analyticsDisabledWarning": "Recomendamos manter isso ativado para encontrarmos e corrigirmos problemas mais rápido.",
   "apiAgentsDescription": "Execute transcrições a partir de scripts, ferramentas de linha de comando ou agentes de IA usando a API local do Vibe.",
   "apiAndAgents": "API e agentes",
   "apiServerOff": "Servidor da API desligado",
@@ -370,7 +368,6 @@
   "summaryFailed": "Não foi possível criar o resumo",
   "retrySummary": "Tentar novamente",
   "summaryTab": "Resumo",
-  "supportTheProject": "Apoie o projeto",
   "supportsFormats": "Compatível com arquivos de áudio e vídeo",
   "swaggerDocs": "Documentação Swagger",
   "tempFolder": "Arquivos temporários",

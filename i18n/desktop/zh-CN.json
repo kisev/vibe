@@ -1,8 +1,6 @@
 {
   "aborting": "正在中止操作",
   "advanced": "高级设置",
-  "analyticsEnabled": "匿名使用统计",
-  "analyticsDisabledWarning": "强烈建议保持开启，以便我们更快地发现并修复问题。",
   "apiAgentsDescription": "通过 Vibe 的本地 API，在脚本、命令行工具或 AI 智能体中调用转录。",
   "apiAndAgents": "API 与智能体",
   "apiServerOff": "API 服务已关闭",
@@ -370,7 +368,6 @@
   "summaryFailed": "无法创建摘要",
   "retrySummary": "重试",
   "summaryTab": "概括",
-  "supportTheProject": "支持项目",
   "supportsFormats": "支持音频和视频文件",
   "swaggerDocs": "Swagger 文档",
   "tempFolder": "临时文件",

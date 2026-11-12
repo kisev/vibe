@@ -1,8 +1,6 @@
 {
   "aborting": "Stoppando",
   "advanced": "Avanza",
-  "analyticsEnabled": "Statistiche anonime",
-  "analyticsDisabledWarning": "Consigliamo vivamente di lasciarla attiva per individuare e correggere i problemi più rapidamente.",
   "apiAgentsDescription": "Esegui trascrizioni da script, strumenti a riga di comando o agenti IA tramite l'API locale di Vibe.",
   "apiAndAgents": "API e agenti",
   "apiServerOff": "Il server API è spento",
@@ -371,7 +369,6 @@
   "summaryFailed": "Impossibile creare il riepilogo",
   "retrySummary": "Riprova",
   "summaryTab": "Riepilogo",
-  "supportTheProject": "Supporta Vibe",
   "supportsFormats": "Supporta file audio e video",
   "swaggerDocs": "Documentazione Swagger",
   "tempFolder": "File temporanei",

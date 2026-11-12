@@ -13,7 +13,6 @@ export const CONFIG_KEYS = {
 	skippedSetup: 'general.skippedSetup',
 	closeToTray: 'general.closeToTray',
 	preventSleep: 'general.preventSleep',
-	analyticsEnabled: 'analytics_enabled',
 	/** `stable`, `beta` or `dev`: which website channel file the updater follows. */
 	updateChannel: 'general.updateChannel',
 

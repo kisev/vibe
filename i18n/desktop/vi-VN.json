@@ -1,8 +1,6 @@
 {
   "aborting": "Hủy bỏ",
   "advanced": "Nâng cao",
-  "analyticsEnabled": "Dữ liệu ẩn danh",
-  "analyticsDisabledWarning": "Chúng tôi khuyến khích bạn giữ tùy chọn này để phát hiện và khắc phục sự cố nhanh hơn.",
   "apiAgentsDescription": "Chạy phiên âm từ script, công cụ CLI hoặc AI agent bằng API cục bộ của Vibe.",
   "apiAndAgents": "API và Agent",
   "apiServerOff": "Máy chủ API đang tắt",
@@ -371,7 +369,6 @@
   "summaryFailed": "Không thể tạo bản tóm tắt",
   "retrySummary": "Thử lại",
   "summaryTab": "Tóm tắt",
-  "supportTheProject": "Hỗ trợ Vibe",
   "supportsFormats": "Hỗ trợ tệp âm thanh và video",
   "swaggerDocs": "Tài liệu Swagger",
   "tempFolder": "Tệp Tạm Thời",

@@ -1,8 +1,6 @@
 {
   "aborting": "iptal ediliyor",
   "advanced": "Gelişmiş",
-  "analyticsEnabled": "Anonim analiz",
-  "analyticsDisabledWarning": "Sorunları daha hızlı bulup düzeltebilmemiz için bunu açık bırakmanızı önemle öneririz.",
   "apiAgentsDescription": "Vibe'ın yerel API'sini kullanarak betiklerden, CLI araçlarından veya yapay zekâ ajanlarından transkripsiyon çalıştırın.",
   "apiAndAgents": "API ve Ajanlar",
   "apiServerOff": "API sunucusu kapalı",
@@ -370,7 +368,6 @@
   "summaryFailed": "Özet oluşturulamadı",
   "retrySummary": "Tekrar dene",
   "summaryTab": "Özet",
-  "supportTheProject": "Vibe'yi desktekle",
   "supportsFormats": "Ses ve video dosyalarını destekler",
   "swaggerDocs": "Swagger belgeleri",
   "tempFolder": "Geçici dosyalar",

@@ -36,7 +36,7 @@
     <true/>
 
     <!--
-        Outbound network access: model downloads, update checks, analytics.
+        Outbound network access: model downloads and update checks.
     -->
     <key>com.apple.security.network.client</key>
     <true/>

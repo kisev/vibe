@@ -1,8 +1,6 @@
 {
   "aborting": "Wird abgebrochen",
   "advanced": "Erweitert",
-  "analyticsEnabled": "Anonyme Analysedaten",
-  "analyticsDisabledWarning": "Wir empfehlen dringend, diese Option aktiviert zu lassen, damit wir Probleme schneller finden und beheben können.",
   "apiAgentsDescription": "Führen Sie Transkriptionen aus Skripten, CLI-Tools oder KI-Agenten über die lokale API von Vibe aus.",
   "apiAndAgents": "API & Agenten",
   "apiServerOff": "API-Server ist aus",
@@ -371,7 +369,6 @@
   "summaryFailed": "Zusammenfassung konnte nicht erstellt werden",
   "retrySummary": "Erneut versuchen",
   "summaryTab": "Zusammenfassung",
-  "supportTheProject": "Vibe unterstützen",
   "supportsFormats": "Unterstützt Audio- und Videodateien",
   "swaggerDocs": "Swagger-Dokumentation",
   "tempFolder": "Temporäre Dateien",

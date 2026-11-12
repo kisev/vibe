@@ -1,8 +1,6 @@
 {
   "aborting": "Przerywanie",
   "advanced": "Zaawansowane",
-  "analyticsEnabled": "Anonimowe statystyki",
-  "analyticsDisabledWarning": "Zalecamy pozostawienie tej opcji włączonej — dzięki temu szybciej znajdujemy i naprawiamy błędy.",
   "apiAgentsDescription": "Uruchamiaj transkrypcję ze skryptów, narzędzi CLI lub agentów AI przez lokalne API Vibe.",
   "apiAndAgents": "API i agenci",
   "apiServerOff": "Serwer API wyłączony",
@@ -371,7 +369,6 @@
   "summaryFailed": "Nie udało się utworzyć podsumowania",
   "retrySummary": "Spróbuj ponownie",
   "summaryTab": "Podsumowanie",
-  "supportTheProject": "Wesprzyj Vibe",
   "supportsFormats": "Obsługuje pliki audio i wideo",
   "swaggerDocs": "Dokumentacja Swagger",
   "tempFolder": "Pliki tymczasowe",

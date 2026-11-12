@@ -1,8 +1,6 @@
 {
   "aborting": "Avbryter",
   "advanced": "Avansert",
-  "analyticsEnabled": "Anonym statistikk",
-  "analyticsDisabledWarning": "Vi anbefaler sterkt å la dette være på, slik at vi kan finne og fikse feil raskere.",
   "apiAgentsDescription": "Kjør transkribering fra skript, kommandolinjeverktøy eller AI-agenter med Vibes lokale API.",
   "apiAndAgents": "API og agenter",
   "apiServerOff": "API-serveren er av",
@@ -371,7 +369,6 @@
   "summaryFailed": "Kunne ikke opprette sammendraget",
   "retrySummary": "Prøv igjen",
   "summaryTab": "Oppsummering",
-  "supportTheProject": "Støtt Vibe",
   "supportsFormats": "Støtter lyd- og videofiler",
   "swaggerDocs": "Swagger-dokumentasjon",
   "tempFolder": "Midlertidige filer",

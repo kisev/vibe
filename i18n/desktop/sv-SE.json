@@ -1,8 +1,6 @@
 {
   "aborting": "Avbryter",
   "advanced": "Avancerat",
-  "analyticsEnabled": "Anonym statistik",
-  "analyticsDisabledWarning": "Vi rekommenderar starkt att du låter detta vara på så att vi kan hitta och åtgärda problem snabbare.",
   "apiAgentsDescription": "Kör transkribering från skript, CLI-verktyg eller AI-agenter via Vibes lokala API.",
   "apiAndAgents": "API och agenter",
   "apiServerOff": "API-servern är av",
@@ -370,7 +368,6 @@
   "summaryFailed": "Det gick inte att skapa sammanfattningen",
   "retrySummary": "Försök igen",
   "summaryTab": "Sammanfattning",
-  "supportTheProject": "Stöd projektet",
   "supportsFormats": "Stöder ljud- och videofiler",
   "swaggerDocs": "Swagger-dokumentation",
   "tempFolder": "Tillfälliga filer",

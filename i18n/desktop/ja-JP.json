@@ -1,8 +1,6 @@
 {
   "aborting": "中止しています",
   "advanced": "詳細設定",
-  "analyticsEnabled": "匿名の利用状況データ",
-  "analyticsDisabledWarning": "問題をより早く発見・修正できるよう、有効のままにしておくことを強くおすすめします。",
   "apiAgentsDescription": "Vibeのローカル APIを使って、スクリプトやCLIツール、AIエージェントから文字起こしを実行できます。",
   "apiAndAgents": "APIとエージェント",
   "apiServerOff": "APIサーバーは停止中です",
@@ -371,7 +369,6 @@
   "summaryFailed": "要約を作成できませんでした",
   "retrySummary": "もう一度試す",
   "summaryTab": "要約",
-  "supportTheProject": "Vibeを支援",
   "supportsFormats": "音声・動画ファイルに対応",
   "swaggerDocs": "Swaggerドキュメント",
   "tempFolder": "一時ファイル",

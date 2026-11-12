@@ -1,8 +1,6 @@
 {
   "aborting": "Прерывание процесса",
   "advanced": "Расширенные",
-  "analyticsEnabled": "Анонимная аналитика",
-  "analyticsDisabledWarning": "Настоятельно рекомендуем оставить включённым — так мы быстрее находим и исправляем ошибки.",
   "apiAgentsDescription": "Запускайте транскрипцию из скриптов, CLI и ИИ-агентов через локальный API Vibe.",
   "apiAndAgents": "API и агенты",
   "apiServerOff": "Сервер API выключен",
@@ -357,7 +355,6 @@
   "summaryFailed": "Не удалось создать сводку",
   "retrySummary": "Повторить",
   "summaryTab": "Саммари",
-  "supportTheProject": "Поддержать Vibe",
   "supportsFormats": "Поддерживает аудио- и видеофайлы",
   "swaggerDocs": "Документация Swagger",
   "tempFolder": "Временные файлы",
