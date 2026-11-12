@@ -8,7 +8,9 @@ One development-tooling contract for the fork: a single task facade over three t
 
 ### Requirement: One task facade
 
-The repository SHALL expose its developer commands through a root Taskfile so `task --list` is the complete entry surface — i18n generate/stamp/audit, docs generation and check, catalog sync, desktop tests and typecheck, server tests, lint, format, and hook installation — each delegating to the underlying pnpm/uv/cargo invocation rather than duplicating logic.
+The repository SHALL expose every developer command through the root Taskfile, so `task --list` is the complete entry surface, each target delegating to the underlying pnpm/uv/cargo/script invocation rather than duplicating logic.
+
+No second task runner SHALL exist in the repository: a `chorefile`, a `*.chore` file, or a workflow step that installs another task runner is a defect.
 
 #### Scenario: Discovering commands
 
@@ -17,12 +19,22 @@ The repository SHALL expose its developer commands through a root Taskfile so `t
 
 #### Scenario: Delegation, not duplication
 
-- **WHEN** a task wraps an existing package script
+- **WHEN** a task wraps an existing package script or a helper under `scripts/`
 - **THEN** the task invokes that script, so a change to the script needs no task edit
+
+#### Scenario: One runner
+
+- **WHEN** a workflow or a document tells someone how to build, test or release
+- **THEN** it names a `task` target, and no `chore` command, `chorefile`, `*.chore` file or `getchore/setup-chore` step remains in the tree
+
+#### Scenario: Local package manager
+
+- **WHEN** the Linux build dependencies are installed on a host that is not Debian-based
+- **THEN** the task uses that host's package manager instead of failing on `apt-get`
 
 ### Requirement: Local gates via git hooks
 
-The repository SHALL install lefthook hooks once per checkout (`task hooks`) with three gates: pre-commit runs fast, file-scoped checks in parallel over the staged set; pre-push runs the test suites; commit-msg enforces the commit message convention.
+The repository SHALL install lefthook hooks once per checkout (`task hooks`) with three gates: pre-commit runs fast, file-scoped checks in parallel over the staged set; pre-push runs `task verify`, the local mirror of the CI gate set; commit-msg enforces the commit message convention.
 
 #### Scenario: Fast pre-commit
 
@@ -31,13 +43,13 @@ The repository SHALL install lefthook hooks once per checkout (`task hooks`) wit
 
 #### Scenario: Broken formatting blocked
 
-- **WHEN** a staged file fails its format check
+- **WHEN** a staged file fails its format check, including a style sheet or an HTML page
 - **THEN** the commit is rejected with the tool's own diff or message
 
 #### Scenario: Pre-push tests
 
 - **WHEN** a push happens
-- **THEN** desktop and server tests run first and a failure blocks the push
+- **THEN** `task verify` runs first and a failure blocks the push
 
 #### Scenario: Conventional messages
 
@@ -55,7 +67,7 @@ Every lint/format tool SHALL be pinned by exact version in `mise.toml` and resol
 
 ### Requirement: Lint and format matrix
 
-Each file type SHALL have exactly one linter and at most one formatter, following the user's shared stack: yaml → yamllint; toml → tombi; markdown → markdownlint-cli2 (rules) + mdformat (format); json/jsonc → oxfmt; js/ts → oxlint; md/json/css → prettier where already configured; shell → shellcheck + shfmt; editorconfig → editorconfig-checker; secrets → gitleaks (staged and full-tree) + trivy (secret scanner over manifests); GitHub workflows → actionlint. Generated trees are excluded explicitly.
+Each file type SHALL have exactly one linter and at most one formatter, following the user's shared stack: yaml → yamllint; toml → tombi; markdown → markdownlint-cli2 (rules) + mdformat (format); json/jsonc → oxfmt; js/ts → oxlint; md/json/css → prettier; shell → shellcheck + shfmt; editorconfig → editorconfig-checker; secrets → gitleaks (staged and full-tree) + trivy; GitHub workflows → actionlint. Generated trees are excluded explicitly.
 
 #### Scenario: Whole-tree check
 
@@ -99,3 +111,46 @@ CI SHALL run the same lint and format tasks the hooks run, so a gate that passes
 
 - **WHEN** the lint matrix changes
 - **THEN** CI behavior changes with it, because CI invokes the tasks rather than re-stating the commands
+
+### Requirement: One command mirrors the CI gate set
+
+`task verify` SHALL run every gate a push or pull request triggers that can run locally: the lint matrix, `format:check`, `cargo fmt --all -- --check`, clippy over the desktop/CLI workspace with `-D warnings`, the server clippy and dependency gates, the unit suites, and the browser E2E suite. A green `task verify` on a revision SHALL mean every local-capable CI job is expected to pass on it.
+
+#### Scenario: A warning in the desktop workspace
+
+- **WHEN** the desktop Rust code has a clippy warning that CI treats as an error
+- **THEN** `task verify` fails locally, before any push
+
+#### Scenario: An unformatted page
+
+- **WHEN** an HTML or CSS file does not match the formatter
+- **THEN** `task verify` fails locally at the same step CI runs
+
+#### Scenario: A broken E2E start
+
+- **WHEN** the browser suite cannot start its web server
+- **THEN** `task verify` reports it locally with the server's own output
+
+#### Scenario: Tagging
+
+- **WHEN** a `dev.<n>` or release tag is about to be created
+- **THEN** the tag is only created on a revision where `task verify` was green
+
+### Requirement: Sidecars come from the task facade
+
+The desktop app's sidecars — `vibe-server` and `ffmpeg` for the target triple — SHALL be fetched by `task setup [triple]`, and a locally built server SHALL be staged by `task server:build [triple]`. Both SHALL be callable from CI and from a workstation with the same arguments.
+
+#### Scenario: A release build needs its sidecars
+
+- **WHEN** the release workflow builds a target
+- **THEN** it runs `task setup <triple>` and gets `vibe-server-<triple>` and, outside Linux, `ffmpeg-<triple>` in `desktop/src-tauri/binaries`
+
+#### Scenario: Iterating on the engine
+
+- **WHEN** a contributor runs `task server:build <triple>`
+- **THEN** the server is built from `server/` and staged under the same sidecar name `task setup` would have produced
+
+#### Scenario: Sidecars already in place
+
+- **WHEN** the sidecar files for the requested triple exist
+- **THEN** `task setup` leaves them alone and reports that they are in place
