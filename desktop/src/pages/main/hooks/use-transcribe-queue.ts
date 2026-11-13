@@ -160,7 +160,15 @@ export async function buildSharedOptions(preference: Preference) {
 	// A preference can be on while the model is not on disk yet (it is the default, and the
 	// download is a separate step); sending a missing path would fail the whole transcription.
 	const diarizePath = preference.diarizeEnabled && modelsFolder ? `${modelsFolder}/${config.diarizeModelFilename}` : null
-	const diarizeUsable = diarizePath !== null && (await isModelFileUsable(diarizePath))
+	let diarizeUsable = diarizePath !== null
+	if (diarizePath) {
+		try {
+			diarizeUsable = await isModelFileUsable(diarizePath)
+		} catch {
+			// The check is a guard, not a gate: if it cannot run, behave as before and send it.
+			diarizeUsable = true
+		}
+	}
 	return {
 		...(diarizeUsable ? { diarize_model: diarizePath } : {}),
 		...(stableTimestamps || requiresVad ? { vad_model: `${modelsFolder}/${config.vadModelFilename}` } : {}),

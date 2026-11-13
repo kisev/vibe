@@ -14,6 +14,15 @@ import BrowserWindow from './windows/browser-window'
  * time, so setting it before the first render is what makes the labels match the app.
  */
 function applyAppearance() {
+	try {
+		applyAppearanceUnsafe()
+	} catch (error) {
+		// Cosmetic only: a bad config value must not keep the window from opening.
+		console.error('could not apply the saved appearance:', error)
+	}
+}
+
+function applyAppearanceUnsafe() {
 	// Only a stored preference wins: with none, Paraglide's own resolved locale (the persisted
 	// Paraglide key, then the browser) is already right, and forcing a default would override it.
 	const stored = readConfig<string | null>(CONFIG_KEYS.displayLanguage, null)

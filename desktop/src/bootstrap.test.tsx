@@ -20,7 +20,7 @@ vi.mock('./lib/config-store', () => ({
 	readConfig: (_key: string, fallback: unknown) => fallback,
 }))
 // First paint applies the configured locale and theme, so bootstrap reads these at module level.
-vi.mock('./paraglide/runtime.js', () => ({ setLocale: vi.fn(), getTextDirection: () => 'ltr' }))
+vi.mock('./paraglide/runtime.js', () => ({ setLocale: vi.fn(), getLocale: () => 'en-US', getTextDirection: () => 'ltr' }))
 vi.mock('./lib/migrations', () => ({ runMigrations: mocks.runMigrations }))
 vi.mock('./root', () => ({ default: () => null }))
 vi.mock('react-dom/client', () => ({ default: { createRoot: () => ({ render: mocks.render }) } }))
