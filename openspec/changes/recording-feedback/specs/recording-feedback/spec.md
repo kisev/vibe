@@ -20,3 +20,12 @@ While a recording runs, the app SHALL show the elapsed time and a level meter pe
 
 - **WHEN** the embedded browser is open during a recording
 - **THEN** its chrome shows the recording indicator and both source levels, read from the same events as the main window
+
+### Requirement: A long silence is escalated
+
+A source that stays silent for five minutes SHALL be surfaced as an alert: the main window comes to the front and shows a message naming the silent source, so a wrong device is caught during the call.
+
+#### Scenario: Five minutes of silence
+
+- **WHEN** one source has been silent for five minutes while recording
+- **THEN** the main window is focused and a message names that source, once per recording

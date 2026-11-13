@@ -3,3 +3,4 @@
 - [ ] 1. Device list and selection reachable from the chrome-only webview without booting the app's providers.
 - [ ] 2. Pickers in the chrome, shared config with the main window, disabled while recording.
 - [ ] 3. Tests for selection persistence and the disabled state.
+- [ ] 4. The chrome's pickers use a rendering that is not clipped by the page webview.

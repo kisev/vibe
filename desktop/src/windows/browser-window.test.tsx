@@ -142,8 +142,8 @@ describe('browser chrome', () => {
 		render(<BrowserWindow session={7} />)
 		const microphone = await screen.findByRole('combobox', { name: m.microphone() })
 
-		await userEvent.click(microphone)
-		await userEvent.click(await screen.findByRole('option', { name: 'USB Mic' }))
+		// A native select: its options are drawn by the platform, not by a popup inside the chrome.
+		await userEvent.selectOptions(microphone, 'USB Mic')
 
 		await waitFor(() => expect(mocks.writeConfig).toHaveBeenCalledWith(CONFIG_KEYS.inputDeviceName, 'USB Mic'))
 		await waitFor(() => expect(screen.getByRole('combobox', { name: m.microphone() }).textContent).toContain('USB Mic'))

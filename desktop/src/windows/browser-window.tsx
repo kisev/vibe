@@ -12,7 +12,6 @@ import { ArrowLeft, ArrowRight, ExternalLink, Mic, RotateCw, Square, X } from 'l
 import RecordingIndicator from '~/components/recording-feedback'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import type { AudioDevice } from '~/lib/audio'
 import { deviceMenuEntries, type DeviceMenuEntry } from '~/lib/device-selection'
 import {
@@ -70,37 +69,27 @@ function DevicePicker({
 	const triggerLabel = device?.name ?? (unavailableName ? m.deviceUnavailable({ name: unavailableName }) : m.noRecord())
 
 	return (
-		<Select
+		// A native select on purpose: its popup is drawn by the platform, so the device list is not
+		// clipped by the 104-pixel chrome webview, which sits above the page.
+		<select
+			aria-label={label}
+			title={disabled ? m.recordingDevicesLocked() : triggerLabel}
 			value={value}
 			disabled={disabled}
-			onValueChange={(next) => {
-				const entry = entries.find((candidate) => candidate.value === next)
+			onChange={(event) => {
+				const entry = entries.find((candidate) => candidate.value === event.target.value)
 				if (entry) onPick(entry)
-			}}>
-			<SelectTrigger
-				aria-label={label}
-				title={disabled ? m.recordingDevicesLocked() : triggerLabel}
-				className={cn('h-8 w-36 shrink-0 rounded-lg border-input/60 bg-muted/40 px-2.5 text-xs', disabled && 'opacity-60')}>
-				<SelectValue placeholder={m.noRecord()}>{triggerLabel}</SelectValue>
-			</SelectTrigger>
-			<SelectContent>
-				{entries
-					.filter((entry) => entry.kind !== 'hidden')
-					.map((entry) => (
-						<SelectItem key={entry.value} value={entry.value} disabled={entry.kind === 'unavailable'}>
-							{entry.kind === 'none' ? m.noRecord() : entry.kind === 'unavailable' ? m.deviceUnavailable({ name: entry.label }) : entry.label}
-						</SelectItem>
-					))}
-				{/* A hidden device comes back by picking it here, like the main picker. */}
-				{entries
-					.filter((entry) => entry.kind === 'hidden')
-					.map((entry) => (
-						<SelectItem key={entry.value} value={entry.value} className="text-muted-foreground">
-							{entry.label}
-						</SelectItem>
-					))}
-			</SelectContent>
-		</Select>
+			}}
+			className={cn('h-8 w-36 shrink-0 truncate rounded-lg border border-input/60 bg-muted/40 px-2 text-xs text-foreground', disabled && 'opacity-60')}>
+			{entries
+				.filter((entry) => entry.kind !== 'hidden')
+				.map((entry) => (
+					<option key={entry.value} value={entry.value}>
+						{entry.label}
+					</option>
+				))}
+			{value !== 'none' && !entries.some((entry) => entry.value === value) && <option value={value}>{triggerLabel}</option>}
+		</select>
 	)
 }
 
@@ -230,7 +219,11 @@ export default function BrowserWindow({ session }: { session: number }) {
 							onChange={(event) => setAddress(event.target.value)}
 						/>
 					</form>
-					<Button variant="ghost" size="icon" aria-label={m.meetingBarOpenExternal()} onClick={() => void run(() => openMeetingBrowserExternal(session))}>
+					<Button
+						variant="ghost"
+						size="icon"
+						aria-label={m.meetingBarOpenExternal()}
+						onClick={() => void run(() => openMeetingBrowserExternal(session))}>
 						<ExternalLink className="h-4 w-4" />
 					</Button>
 					<Button variant="ghost" size="icon" aria-label={m.meetingBarClose()} onClick={() => void run(() => closeMeetingBrowser(session))}>
@@ -238,7 +231,8 @@ export default function BrowserWindow({ session }: { session: number }) {
 					</Button>
 				</div>
 				<div className="flex min-w-0 items-center gap-2" dir="ltr">
-					{info?.isMeeting && (
+					{/* Every page is recordable; the host list only classifies meetings. */}
+					{
 						<>
 							<div role="group" aria-label={m.recordingDevices()} className="flex min-w-0 items-center gap-2">
 								<DevicePicker
@@ -275,8 +269,10 @@ export default function BrowserWindow({ session }: { session: number }) {
 							)}
 							{recording && <RecordingIndicator compact startedAt={recordingStartedAt} microphoneName={microphoneName} systemName={systemName} />}
 						</>
-					)}
-					<span className={error ? 'min-w-0 truncate text-xs text-destructive' : 'min-w-0 truncate text-xs text-muted-foreground'}>{error ?? info?.host ?? ''}</span>
+					}
+					<span className={error ? 'min-w-0 truncate text-xs text-destructive' : 'min-w-0 truncate text-xs text-muted-foreground'}>
+						{error ?? info?.host ?? ''}
+					</span>
 				</div>
 			</div>
 			{/* Native page webview covers this area; it is only a neutral backdrop while it loads. */}

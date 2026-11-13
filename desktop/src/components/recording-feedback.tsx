@@ -2,8 +2,10 @@
 // same app-wide `record_level` events: one payload per captured source, ~10 times a second, with
 // level 0 when that source is open but silent. Nothing here captures audio or owns the recorder.
 import { listen } from '@tauri-apps/api/event'
-import { Mic, Volume2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { message } from '@tauri-apps/plugin-dialog'
+import { AlertTriangle, Mic, Volume2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { m } from '~/paraglide/messages.js'
 import { cn } from '~/lib/style'
 
@@ -136,7 +138,14 @@ function SourceMeter({ label, name, feedback }: { label: string; name: string; f
 			<div className="flex min-w-0 items-baseline justify-between gap-2">
 				<span className="shrink-0 text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">{label}</span>
 				<span className="min-w-0 flex-1 truncate text-end text-xs text-foreground/80">{name}</span>
-				{feedback.silent && <span className="shrink-0 text-[11px] text-muted-foreground">{m.recordingSilent()}</span>}
+				{feedback.silent && (
+					<span
+						role="status"
+						className="flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+						<AlertTriangle className="h-3 w-3" aria-hidden />
+						{m.recordingSilent()}
+					</span>
+				)}
 			</div>
 			<div
 				role="meter"
@@ -185,11 +194,50 @@ interface RecordingIndicatorProps {
 	compact?: boolean
 }
 
+/** Five minutes of flat line is a wrong device, not a quiet room. */
+const LONG_SILENCE_MS = 5 * 60 * 1000
+
+/**
+ * Escalate a source that has stayed silent for five minutes: bring the main window forward and
+ * say which device heard nothing. Once per source per recording, and never in the chrome.
+ */
+function useLongSilenceAlert(active: boolean, feedback: Record<RecordLevelDevice, SourceFeedback>, names: Record<RecordLevelDevice, string>, enabled: boolean) {
+	const silentSince = useRef<Record<RecordLevelDevice, number | null>>({ microphone: null, system: null })
+	const alerted = useRef<Record<RecordLevelDevice, boolean>>({ microphone: false, system: false })
+
+	useEffect(() => {
+		if (!active) {
+			silentSince.current = { microphone: null, system: null }
+			alerted.current = { microphone: false, system: false }
+			return
+		}
+		const timer = window.setInterval(() => {
+			const now = Date.now()
+			for (const device of DEVICES) {
+				if (!feedback[device].silent) {
+					silentSince.current[device] = null
+					continue
+				}
+				silentSince.current[device] ??= now
+				if (!enabled || alerted.current[device] || now - (silentSince.current[device] ?? now) < LONG_SILENCE_MS) continue
+				alerted.current[device] = true
+				void getCurrentWindow()
+					.setFocus()
+					.catch(() => undefined)
+				void message(m.recordingLongSilence({ name: names[device] }), { title: m.recordingSilent(), kind: 'warning' }).catch(() => undefined)
+			}
+		}, 15_000)
+		return () => window.clearInterval(timer)
+	}, [active, enabled, feedback, names])
+}
+
 /** Elapsed time and one meter per source — the same indicator in the main window and the chrome. */
 export default function RecordingIndicator({ startedAt, microphoneName, systemName, compact = false }: RecordingIndicatorProps) {
 	const elapsed = useElapsedSeconds(startedAt)
 	const feedback = useSourceFeedback(startedAt !== null, startedAt)
 	const time = formatElapsed(elapsed)
+	const names = { microphone: microphoneName, system: systemName }
+	useLongSilenceAlert(startedAt !== null, feedback, names, !compact)
 
 	return (
 		<div className={cn('flex min-w-0 items-center gap-3', !compact && 'w-full flex-col gap-4')}>

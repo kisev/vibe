@@ -27,17 +27,17 @@ The application SHALL open links in a Vibe-hosted Chromium webview window with a
 
 ### Requirement: Meeting hosts are configurable
 
-Settings SHALL list meeting hosts with a default set (`telemost.yandex.ru`, `stream.wb.ru`) and SHALL let the user add and remove hosts. Host matching SHALL be by host name over https.
+Settings SHALL list meeting hosts with a default set (`telemost.yandex.ru`, `stream.wb.ru`) and SHALL let the user add and remove hosts. Host matching SHALL be by host name over https. The list SHALL only decide when Vibe counts a link as a meeting and suppresses its external call prompt; the browser chrome SHALL show its recording controls on every page.
 
 #### Scenario: Adding a host
 
 - **WHEN** the user adds a host
-- **THEN** links on that host show the meeting bar
+- **THEN** links on that host count as meetings and suppress Vibe's external call prompt
 
 #### Scenario: Removing a host
 
 - **WHEN** the user removes a host
-- **THEN** its links still open in the browser but without the meeting bar
+- **THEN** its links still open in the browser with the same recording controls, and only the meeting classification is gone
 
 ### Requirement: Recording is one click away in a meeting
 
