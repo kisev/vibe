@@ -1,4 +1,4 @@
-<!-- source: 42d301759b1a -->
+<!-- source: 7770d2556ea9 -->
 
 # Warum der Besprechungsbrowser so funktioniert
 
@@ -21,18 +21,24 @@ Das Inhaltsfenster ist eine gewöhnliche Webview mit einem eigenen Datenverzeich
 
 Die Leiste bietet Adresse, Zurück, Vorwärts, Neu laden, Schließen und **Im Systembrowser öffnen**. Die letzte Aktion ist der Ausweg für einen Dienst, der sich weigert, in der eingebetteten Webview zu laufen.
 
+## Warum der Browser eine Allowlist ist
+
+Der eingebettete Browser lud ursprünglich, was auch immer eine Seite anforderte; die Besprechungs-Host-Liste entschied nur, welche Links die Aufnahmeleiste erhielten. Jetzt ist er eine echte Grenze. Nur Domains, die der Nutzer zugelassen hat, und ihre Subdomains über https dürfen geladen werden – Top-Level-Seiten und jede Ressource, die die Seite anfordert. Eine abgelehnte Ressource wird mit einer Fehlerantwort beantwortet, damit die Seite diesen Ursprung als nicht verfügbar behandelt, statt endlos erneut zu versuchen.
+
+Strenge ist der Sinn, und sie hat einen Preis: Eine Seite, die Schriftarten oder Skripte von einem CDN lädt, bricht, bis dieses CDN zugelassen ist. Die Liste der blockierten Hosts ist das Gegenmittel – eindeutige Hosts, neueste zuerst, jeweils mit einer Aktion **Zulassen**, die die Domain hinzufügt und die Seite neu lädt. Die Browserleiste macht dasselbe Angebot, wenn sie eine Navigation ablehnt.
+
 ## Warum die Aufnahme manuell bleibt
 
-Hosts in der Besprechungsliste machen das Fenster zu einer Besprechungssitzung: Die Leiste zeigt **Diese Besprechung aufnehmen**. Die Aufnahme bleibt manuell — drücken Sie die Schaltfläche vor oder während des Anrufs und stoppen Sie über die Leiste oder das Hauptfenster. Ein automatischer Start würde Anrufe aufnehmen, die der Nutzer nicht aufnehmen wollte, und den Mikrofonindikator ohne ausdrückliche Aktion erscheinen lassen.
+Jede Seite im Browserfenster zeigt **Diese Besprechung aufnehmen**, und solange ein Browserfenster geöffnet ist, unterdrückt Vibe seine eigene Abfrage für externe Anrufe. Die Aufnahme bleibt manuell – drücken Sie die Schaltfläche vor oder während des Anrufs, stoppen Sie über die Browserleiste oder das Hauptfenster. Ein automatischer Start würde Anrufe aufnehmen, die der Nutzer nicht aufnehmen wollte, und den Mikrofonindikator ohne eine ausdrückliche Aktion erscheinen lassen.
 
-Das Schließen des Fensters während einer Aufnahme fragt, ob beendet oder im Hintergrund weiter aufgenommen werden soll, sodass ein Verlassen des Anrufs eine Aufnahme nicht still verwerfen oder fortsetzen kann.
+Das Schließen des Fensters während einer Aufnahme fragt, ob beendet oder im Hintergrund weiter aufgenommen werden soll, sodass das Verlassen eines Anrufs eine Aufnahme nicht still verwerfen oder fortsetzen kann.
 
 ## Grenzen
 
 - Nur `vibe://open/`-Links öffnen automatisch. Ein `https`-Klick braucht die Standardbrowser-Entscheidung, die Vibe nicht trifft.
 - DRM-lastige oder WebRTC-feindliche Seiten funktionieren möglicherweise besser im Systembrowser; **Im Systembrowser öffnen** ist der unterstützte Ausweichweg.
-- Windows wird zuerst validiert. Die anderen Plattformen nutzen ihre eigenen Webviews und weichen auf den Systembrowser aus, wenn das Fenster den Anruf nicht hosten kann.
-- Die Registrierung von Zoom-, Teams- und Webex-Schemas ist optional und unter Windows und Linux verfügbar, nicht unter macOS.
+- Windows wird zuerst validiert. Das Blockieren von Ressourcen nutzt den eigenen Mechanismus jeder Engine: WebView2 `WebResourceRequested` unter Windows; Linux und macOS blockieren derzeit nur die Top-Level-Navigation und werden noch fertiggestellt.
+- Die Registrierung der Schemas für Zoom, Teams und Webex ist optional und unter Windows und Linux verfügbar, nicht unter macOS.
 
 ## Verwandte Seiten
 

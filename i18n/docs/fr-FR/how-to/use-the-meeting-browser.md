@@ -1,4 +1,4 @@
-<!-- source: fa863fbcee4b -->
+<!-- source: cc4651e4e37d -->
 
 # Utiliser le navigateur de réunion
 
@@ -14,20 +14,21 @@ Utilisez l’un de ces chemins :
 
 Cliquer sur un lien https dans Chrome, Edge ou Firefox ouvre toujours ce navigateur. Vibe ne s’enregistre pas comme navigateur par défaut.
 
-## Obtenir la barre d’enregistrement
+## Autoriser les sites que vous utilisez
 
-**Paramètres → Enregistrement → Hôtes de réunion** liste les hôtes qui reçoivent la barre de réunion. Les valeurs par défaut sont `telemost.yandex.ru` et `stream.wb.ru`.
+**Paramètres → Enregistrement → Domaines autorisés** est la liste d’autorisation du navigateur. Elle démarre vide : ajoutez chaque domaine que vous voulez ouvrir, et ses sous-domaines sont inclus automatiquement. La correspondance se fait par nom d’hôte en https — une URL `http` ne se charge jamais.
 
-- Ajoutez un hôte pour faire de ses liens des sessions enregistrables.
-- Retirez un hôte pour perdre la barre ; ses liens s’ouvrent toujours dans la fenêtre de navigateur.
+La liste est une frontière, pas un filtre. Un lien vers un hôte hors de celle-ci est refusé, tout comme un script, une police ou une image qu’une page autorisée demande à une origine non listée. Chaque hôte refusé apparaît sous **Bloqués** avec une action **Autoriser** ; l’autoriser ajoute le domaine et recharge la page pour que les ressources refusées soient réessayées.
 
-La correspondance se fait par nom d’hôte en https, si bien que `sub.telemost.yandex.ru` correspond à une entrée `telemost.yandex.ru` alors qu’une URL `http` non. La liste est un filtre de commodité, pas une frontière de sécurité : chaque lien https s’ouvre dans la fenêtre, mais seuls les hôtes listés reçoivent la barre.
+Une liste stricte peut casser une page dont les ressources viennent d’un CDN tant que ce CDN n’est pas autorisé. La liste Bloqués est le remède, et la barre du navigateur propose la même chose lorsqu’elle refuse une navigation. Tant qu’une fenêtre de navigateur est ouverte, Vibe supprime sa propre invite d’appel.
 
 ## Enregistrer un appel
 
+Les commandes d’enregistrement de la barre du navigateur sont présentes sur chaque page autorisée, pas seulement sur une liste d’hôtes.
+
 1. Ouvrez la réunion dans Vibe.
 1. Appuyez sur **Enregistrer cet appel** avant ou pendant l’appel.
-1. Arrêtez depuis la barre ou depuis la fenêtre principale.
+1. Arrêtez depuis la barre du navigateur ou depuis la fenêtre principale.
 
 L’enregistrement est manuel ; une fenêtre de réunion ne démarre jamais l’enregistrement d’elle-même. L’enregistreur capture le microphone configuré et, lorsqu’il est activé, la boucle d’audio du système, si bien que les deux côtés de l’appel sont enregistrés.
 
@@ -39,5 +40,5 @@ Si un service refuse de fonctionner dans la webview intégrée, utilisez **Ouvri
 
 ## Étapes suivantes
 
-- [Pourquoi le navigateur de réunion fonctionne ainsi](/vibe/docs#meeting-browser) explique le schéma d’URL, la webview isolée et la règle de l’enregistrement manuel.
-- [Enregistrer le microphone et l’audio du système](/vibe/docs#record-audio) couvre l’enregistrement hors d’un appel.
+- [Pourquoi le navigateur de réunion fonctionne ainsi](/vibe/docs#meeting-browser) explique le schéma d’URL, la webview isolée, le compromis de la liste d’autorisation et la règle de l’enregistrement manuel.
+- [Enregistrer le microphone et l’audio du système](/vibe/docs#record-audio) couvre l’enregistrement en dehors d’un appel.

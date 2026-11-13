@@ -1,4 +1,4 @@
-<!-- source: fa863fbcee4b -->
+<!-- source: cc4651e4e37d -->
 
 # Korzystanie z przeglądarki spotkań
 
@@ -14,20 +14,21 @@ Użyj jednej z tych ścieżek:
 
 Kliknięcie linku https w Chrome, Edge lub Firefox nadal otwiera tę przeglądarkę. Vibe nie rejestruje się jako domyślna przeglądarka.
 
-## Uzyskaj pasek nagrywania
+## Zezwól na używane witryny
 
-**Ustawienia → Nagrywanie → Hosty spotkań** zawierają listę hostów, które otrzymują pasek spotkania. Domyślne to `telemost.yandex.ru` i `stream.wb.ru`.
+**Ustawienia → Nagrywanie → Dozwolone domeny** to lista dozwolonych przeglądarki. Zaczyna się pusta: dodaj każdą domenę, którą chcesz otwierać, a jej subdomeny zostaną uwzględnione automatycznie. Dopasowanie odbywa się po nazwie hosta przez https — adres `http` nigdy się nie wczyta.
 
-- Dodaj hosta, aby jego linki były sesjami możliwymi do nagrania.
-- Usuń hosta, aby stracić pasek; jego linki nadal otwierają się w oknie przeglądarki.
+Lista to granica, a nie filtr. Link do hosta spoza niej jest odrzucany, podobnie jak każdy skrypt, czcionka lub obraz, którego dozwolona strona żąda z niewymienionego źródła. Każdy odrzucony host pojawia się w sekcji **Zablokowane** z akcją **Zezwól**; zezwolenie dodaje domenę i ponownie wczytuje stronę, aby odrzucone zasoby zostały ponowione.
 
-Dopasowanie odbywa się po nazwie hosta przez https, więc `sub.telemost.yandex.ru` pasuje do wpisu `telemost.yandex.ru`, a adres `http` nie. Lista to filtr wygody, a nie granica bezpieczeństwa: każdy link https otwiera się w oknie, ale tylko wymienione hosty otrzymują pasek.
+Ścisła lista może zepsuć stronę, której zasoby pochodzą z CDN, dopóki ta CDN nie zostanie dozwolona. Lista „Zablokowane“ jest rozwiązaniem, a interfejs przeglądarki pokazuje tę samą propozycję, gdy odmawia nawigacji. Gdy otwarte jest jakiekolwiek okno przeglądarki, Vibe ukrywa własne zapytanie o nagrywanie.
 
 ## Nagraj rozmowę
 
+Kontrolki nagrywania w interfejsie przeglądarki są na każdej dozwolonej stronie, nie tylko na hoście z listy.
+
 1. Otwórz spotkanie w Vibe.
 1. Naciśnij **Nagraj tę rozmowę** przed rozmową lub w jej trakcie.
-1. Zatrzymaj z paska lub z głównego okna.
+1. Zatrzymaj z interfejsu przeglądarki lub z głównego okna.
 
 Nagrywanie jest ręczne; okno spotkania nigdy nie rozpoczyna nagrywania samo. Rejestrator przechwytuje skonfigurowany mikrofon i, gdy włączono, pętlę zwrotną dźwięku systemowego, więc obie strony rozmowy są nagrywane.
 
@@ -39,5 +40,5 @@ Jeśli usługa odmawia działania w osadzonym webview, użyj **Otwórz w przegl�
 
 ## Dalsze kroki
 
-- [Dlaczego przeglądarka spotkań działa w ten sposób](/vibe/docs#meeting-browser) wyjaśnia schemat URL, izolowany webview i zasadę ręcznego nagrywania.
+- [Dlaczego przeglądarka spotkań działa w ten sposób](/vibe/docs#meeting-browser) wyjaśnia schemat URL, izolowany webview, kompromis z listą dozwolonych domen i zasadę ręcznego nagrywania.
 - [Nagrywanie mikrofonu i dźwięku systemowego](/vibe/docs#record-audio) dotyczy nagrywania poza rozmową.

@@ -1,4 +1,4 @@
-<!-- source: 42d301759b1a -->
+<!-- source: 7770d2556ea9 -->
 
 # Por qué el navegador de reuniones funciona así
 
@@ -21,9 +21,15 @@ La ventana de contenido es un webview normal con su propio directorio de datos. 
 
 La barra ofrece dirección, atrás, adelante, recargar, cerrar y **Abrir en el navegador del sistema**. Esa última acción es la salida de emergencia para un servicio que se niega a ejecutarse en el webview integrado.
 
+## Por qué el navegador es una lista de permitidos
+
+El navegador integrado originalmente cargaba todo lo que pedía una página; la lista de hosts de reuniones solo decidía qué enlaces recibían la barra de grabación. Ahora es una verdadera frontera. Solo pueden cargarse los dominios que el usuario permitió, y sus subdominios por https: las páginas de nivel superior y cada recurso que la página solicite. Un recurso rechazado recibe una respuesta de error para que la página trate ese origen como no disponible en lugar de reintentar sin fin.
+
+La rigurosidad es el objetivo, y tiene un costo: una página que toma fuentes o scripts de un CDN se rompe hasta que ese CDN se permita. La lista de bloqueados es el remedio: hosts únicos, los más recientes primero, cada uno con una acción **Permitir** que agrega el dominio y recarga la página. La barra del navegador ofrece lo mismo cuando rechaza una navegación.
+
 ## Por qué la grabación sigue siendo manual
 
-Los hosts de la lista de reuniones convierten la ventana en una sesión de reunión: la barra muestra **Grabar esta llamada**. La grabación sigue siendo manual: presiona el botón antes o durante la llamada, detén desde la barra o desde la ventana principal. El inicio automático grabaría llamadas que el usuario no pidió grabar y haría aparecer el indicador del micrófono sin una acción explícita.
+Cada página de la ventana del navegador muestra **Grabar esta llamada**, y mientras haya una ventana del navegador abierta, Vibe suprime su propia petición de llamada externa. La grabación sigue siendo manual: presiona el botón antes o durante la llamada, detén desde la barra del navegador o desde la ventana principal. El inicio automático grabaría llamadas que el usuario no pidió grabar y haría aparecer el indicador del micrófono sin una acción explícita.
 
 Cerrar la ventana mientras se graba pregunta si detener la grabación o seguir grabando en segundo plano, así que salir de una llamada no puede descartar ni continuar una grabación en silencio.
 
@@ -31,7 +37,7 @@ Cerrar la ventana mientras se graba pregunta si detener la grabación o seguir g
 
 - Solo los enlaces `vibe://open/` se abren automáticamente. Un clic en `https` necesita la decisión de navegador predeterminado que Vibe no toma.
 - Los sitios con mucho DRM o poco amigables con WebRTC pueden funcionar mejor en el navegador del sistema; **Abrir en el navegador del sistema** es el recurso de respaldo admitido.
-- Windows se valida primero. Las otras plataformas usan sus propios webviews y recurren al navegador del sistema si la ventana no puede alojar la llamada.
+- Windows se valida primero. El bloqueo de recursos usa el mecanismo propio de cada motor: WebView2 `WebResourceRequested` en Windows; Linux y macOS actualmente solo bloquean la navegación de nivel superior y se están terminando de implementar.
 - Registrar los esquemas de Zoom, Teams y Webex es opcional y está disponible en Windows y Linux, no en macOS.
 
 ## Páginas relacionadas

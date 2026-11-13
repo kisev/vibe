@@ -1,4 +1,4 @@
-<!-- source: fa863fbcee4b -->
+<!-- source: cc4651e4e37d -->
 
 # Používání prohlížeče schůzek
 
@@ -14,20 +14,21 @@ Použijte jednu z těchto cest:
 
 Kliknutí na odkaz https v Chrome, Edge nebo Firefoxu stále otevře daný prohlížeč. Vibe se neregistruje jako výchozí prohlížeč.
 
-## Získání lišty nahrávání
+## Povolení stránek, které používáte
 
-**Nastavení → Nahrávání → Hostitelé schůzek** uvádí hostitele, kteří dostanou lištu schůzky. Výchozí jsou `telemost.yandex.ru` a `stream.wb.ru`.
+**Nastavení → Nahrávání → Povolené domény** je seznam povolených domén prohlížeče. Zpočátku je prázdný: přidejte každou doménu, kterou chcete otevírat, a její subdomény se zahrnou automaticky. Párování probíhá podle názvu hostitele přes https — URL s `http` se nikdy nenačte.
 
-- Přidejte hostitele, aby se jeho odkazy staly relacemi, které lze nahrávat.
-- Odeberte hostitele a lištu ztratíte; jeho odkazy se však stále otevírají v okně prohlížeče.
+Seznam je hranice, ne filtr. Odkaz na hostitele mimo něj se odmítne, stejně jako každý skript, písmo nebo obrázek, který povolená stránka požaduje z neuvedeného zdroje. Každý odmítnutý hostitel se zobrazí v části **Blokováno** s akcí **Povolit**; povolením se doména přidá a stránka se znovu načte, aby se odmítnuté prostředky zkusily znovu.
 
-Párování probíhá podle názvu hostitele přes https, takže `sub.telemost.yandex.ru` odpovídá položce `telemost.yandex.ru`, zatímco URL s `http` ne. Seznam je pomocný filtr, ne bezpečnostní hranice: každý odkaz https se otevře v okně, ale lištu dostanou jen uvedení hostitelé.
+Striktní seznam může rozbít stránku, jejíž prostředky pocházejí z CDN, dokud tato CDN není povolena. Seznam „Blokováno“ je řešení a rozhraní prohlížeče nabízí totéž, když odmítne navigaci. Dokud je otevřené jakékoli okno prohlížeče, Vibe potlačí vlastní výzvu k nahrávání.
 
 ## Nahrávání hovoru
 
+Ovládací prvky nahrávání v rozhraní prohlížeče jsou na každé povolené stránce, nejen na hostiteli ze seznamu.
+
 1. Otevřete schůzku ve Vibe.
 1. Stiskněte **Nahrávat tento hovor** před hovorem nebo během něj.
-1. Zastavte z lišty nebo z hlavního okna.
+1. Zastavte z rozhraní prohlížeče nebo z hlavního okna.
 
 Nahrávání je ruční; okno schůzky nikdy nezačne nahrávat samo. Nahrávač zachycuje nastavený mikrofon a při zapnutí i loopback systémového zvuku, takže se nahrají obě strany hovoru.
 
@@ -39,5 +40,5 @@ Pokud služba odmítne běžet ve vestavěném webview, použijte na liště **O
 
 ## Další kroky
 
-- [Proč prohlížeč schůzek funguje takto](/vibe/docs#meeting-browser) vysvětluje schéma URL, izolovaný webview a pravidlo ručního nahrávání.
+- [Proč prohlížeč schůzek funguje takto](/vibe/docs#meeting-browser) vysvětluje schéma URL, izolovaný webview, kompromis se seznamem povolených domén a pravidlo ručního nahrávání.
 - [Nahrávání mikrofonu a systémového zvuku](/vibe/docs#record-audio) se věnuje nahrávání mimo hovor.

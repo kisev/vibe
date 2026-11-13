@@ -1,4 +1,4 @@
-<!-- source: 42d301759b1a -->
+<!-- source: 7770d2556ea9 -->
 
 # Hvorfor møtenettleseren fungerer slik
 
@@ -21,9 +21,15 @@ Innholdsvinduet er en vanlig webvisning med sin egen datamappe. Tjenestens infor
 
 Linjen tilbyr adresse, tilbake, fremover, oppdater, lukk og **Åpne i systemnettleseren**. Den siste handlingen er nødutgangen for en tjeneste som nekter å kjøre i den innebygde webvisningen.
 
+## Hvorfor nettleseren er en tillatelsesliste
+
+Den innebygde nettleseren lastet opprinnelig alt en side ba om; møtevertlisten avgjorde bare hvilke lenker som fikk opptakslinjen. Nå er den en reell grense. Bare domener brukeren har tillatt, og underdomenene deres over https, kan lastes — sider på toppnivå og hver ressurs siden ber om. En avvist ressurs besvares med et feilsvar, slik at siden behandler den opprinnelsen som utilgjengelig i stedet for å prøve på nytt i det uendelige.
+
+Strenghet er poenget, og den har en pris: en side som henter skrifttyper eller skript fra et CDN, går i stykker helt til det CDN-et er tillatt. Den blokkerte listen er botemiddelet — unike verter, nyeste først, hver med en **Tillat**-handling som legger til domenet og laster inn siden på nytt. Grensesnittet gir det samme tilbudet når det avviser en navigasjon.
+
 ## Hvorfor opptak forblir manuelt
 
-Verter i møtelisten gjør vinduet til en møteøkt: linjen viser **Ta opp denne samtalen**. Opptak er fortsatt manuelt — trykk på knappen før eller under samtalen, og stopp fra linjen eller hovedvinduet. Automatisk start ville ta opp samtaler brukeren ikke ba om, og ville få mikrofonindikatoren til å vises uten en uttrykkelig handling.
+Hver side i nettleservinduet viser **Ta opp denne samtalen**, og mens et nettleservindu er åpent, undertrykker Vibe sin egen eksterne samtaleforespørsel. Opptak er fortsatt manuelt — trykk på knappen før eller under samtalen, og stopp fra grensesnittet eller hovedvinduet. Automatisk start ville ta opp samtaler brukeren ikke ba om, og ville få mikrofonindikatoren til å vises uten en uttrykkelig handling.
 
 Å lukke vinduet mens du tar opp spør om du vil stoppe eller fortsette opptaket i bakgrunnen, slik at det å forlate en samtale ikke stille kan forkaste eller fortsette et opptak.
 
@@ -31,7 +37,7 @@ Verter i møtelisten gjør vinduet til en møteøkt: linjen viser **Ta opp denne
 
 - Bare `vibe://open/`-lenker åpnes automatisk. Et `https`-klikk trenger standardnettleserbeslutningen Vibe ikke tar.
 - DRM-tunge eller WebRTC-fiendtlige nettsteder kan fungere bedre i systemnettleseren; **Åpne i systemnettleseren** er den støttede fallbacken.
-- Windows valideres først. De andre plattformene bruker sine egne webvisninger og faller tilbake til systemnettleseren hvis vinduet ikke kan være vert for samtalen.
+- Windows valideres først. Ressursblokkering bruker hver motorens egen mekanisme: WebView2 `WebResourceRequested` på Windows; Linux og macOS blokkerer for øyeblikket bare navigasjon på toppnivå og er under ferdigstillelse.
 - Registrering av Zoom-, Teams- og Webex-ordninger er valgfri og tilgjengelig på Windows og Linux, ikke macOS.
 
 ## Relaterte sider

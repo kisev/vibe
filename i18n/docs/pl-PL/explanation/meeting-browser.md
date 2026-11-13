@@ -1,4 +1,4 @@
-<!-- source: 42d301759b1a -->
+<!-- source: 7770d2556ea9 -->
 
 # Dlaczego przeglądarka spotkań działa w ten sposób
 
@@ -21,9 +21,15 @@ Okno treści to zwykły webview z własnym katalogiem danych. Pliki cookie usłu
 
 Pasek oferuje adres, wstecz, dalej, odświeżenie, zamknięcie i **Otwórz w przeglądarce systemowej**. Ostatnia akcja to wyjście awaryjne dla usługi, która odmawia działania w osadzonym webview.
 
+## Dlaczego przeglądarka jest listą dozwolonych domen
+
+Osadzona przeglądarka początkowo wczytywała wszystko, o co poprosiła strona; lista hostów spotkań decydowała tylko, które linki otrzymają pasek nagrywania. Teraz jest to prawdziwa granica. Wczytywać mogą się tylko domeny dozwolone przez użytkownika i ich subdomeny przez https — strony najwyższego poziomu i każdy zasób, którego żąda strona. Na odrzucony zasób odpowiada się odpowiedzią błędu, aby strona traktowała to źródło jako niedostępne, zamiast ponawiać próby w nieskończoność.
+
+Ścisłość jest celem i ma swoją cenę: strona pobierająca czcionki lub skrypty z CDN psuje się, dopóki ta CDN nie zostanie dozwolona. Lista zablokowanych jest rozwiązaniem — unikalne hosty, najnowsze pierwsze, każdy z akcją **Zezwól**, która dodaje domenę i ponownie wczytuje stronę. Interfejs przeglądarki pokazuje tę samą propozycję, gdy odmawia nawigacji.
+
 ## Dlaczego nagrywanie pozostaje ręczne
 
-Hosty z listy spotkań zamieniają okno w sesję spotkania: pasek pokazuje **Nagraj tę rozmowę**. Nagrywanie nadal jest ręczne — naciśnij przycisk przed rozmową lub w jej trakcie, zatrzymaj z paska lub z głównego okna. Automatyczne rozpoczęcie nagrywałoby rozmowy, których użytkownik nie poprosił o nagranie, i powodowałoby pojawienie się wskaźnika mikrofonu bez wyraźnej akcji.
+Każda strona w oknie przeglądarki pokazuje **Nagraj tę rozmowę**, a gdy otwarte jest jakiekolwiek okno przeglądarki, Vibe ukrywa własne zapytanie o nagrywanie połączenia zewnętrznego. Nagrywanie nadal jest ręczne — naciśnij przycisk przed rozmową lub w jej trakcie, zatrzymaj z interfejsu przeglądarki lub z głównego okna. Automatyczne rozpoczęcie nagrywałoby rozmowy, których użytkownik nie poprosił o nagranie, i powodowałoby pojawienie się wskaźnika mikrofonu bez wyraźnej akcji.
 
 Zamknięcie okna podczas nagrywania pyta, czy zatrzymać nagrywanie, czy kontynuować je w tle, więc opuszczenie rozmowy nie może po cichu odrzucić ani kontynuować nagrania.
 
@@ -31,7 +37,7 @@ Zamknięcie okna podczas nagrywania pyta, czy zatrzymać nagrywanie, czy kontynu
 
 - Tylko linki `vibe://open/` otwierają się automatycznie. Kliknięcie `https` wymaga decyzji o domyślnej przeglądarce, której Vibe nie podejmuje.
 - Witryny z dużym DRM lub nieprzyjazne WebRTC mogą działać lepiej w przeglądarce systemowej; **Otwórz w przeglądarce systemowej** to obsługiwany wariant awaryjny.
-- Windows jest sprawdzany jako pierwszy. Inne platformy używają własnych webview i przechodzą do przeglądarki systemowej, jeśli okno nie może hostować rozmowy.
+- Windows jest sprawdzany jako pierwszy. Blokowanie zasobów korzysta z własnego mechanizmu każdego silnika: `WebResourceRequested` WebView2 w Windows; Linux i macOS na razie blokują tylko nawigację najwyższego poziomu i prace nad nimi trwają.
 - Rejestrowanie schematów Zoom, Teams i Webex jest opcjonalne i dostępne w Windows i Linux, nie w macOS.
 
 ## Powiązane strony

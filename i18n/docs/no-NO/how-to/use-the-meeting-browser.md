@@ -1,4 +1,4 @@
-<!-- source: fa863fbcee4b -->
+<!-- source: cc4651e4e37d -->
 
 # Bruk møtenettleseren
 
@@ -14,20 +14,21 @@ Bruk en av disse veiene:
 
 Å klikke en https-lenke i Chrome, Edge eller Firefox åpner fortsatt den nettleseren. Vibe registrerer seg ikke som standardnettleser.
 
-## Få opptakslinjen
+## Tillat nettstedene du bruker
 
-**Innstillinger → Opptak → Møteverter** lister vertene som får møtelinjen. Standardverdiene er `telemost.yandex.ru` og `stream.wb.ru`.
+**Innstillinger → Opptak → Tillatte domener** er nettleserens tillatelsesliste. Den starter tom: legg til hvert domene du vil åpne, og underdomenene tas med automatisk. Samsvar avgjøres etter vertsnavn over https — en `http`-URL lastes aldri.
 
-- Legg til en vert for å gjøre lenkene dens til opptakbare økter.
-- Fjern en vert for å miste linjen; lenkene dens åpnes fortsatt i nettleservinduet.
+Listen er en grense, ikke et filter. En lenke til en vert utenfor den avvises, og det samme gjør ethvert skript, enhver skrifttype eller ethvert bilde som en tillatt side ber om fra en ikke-oppført opprinnelse. Hver avvist vert vises under **Blokkert** med en **Tillat**-handling; å tillate den legger til domenet og laster inn siden på nytt slik at de avviste ressursene prøver igjen.
 
-Samsvar avgjøres etter vertsnavn over https, så `sub.telemost.yandex.ru` samsvarer med en `telemost.yandex.ru`-oppføring, mens en `http`-URL ikke gjør det. Listen er et bekvemmelighetsfilter, ikke en sikkerhetsgrense: hver https-lenke åpnes i vinduet, men bare oppførte verter får linjen.
+En streng liste kan ødelegge en side hvis ressurser kommer fra et CDN, helt til det CDN-et er tillatt. Den blokkerte listen er botemiddelet, og nettleserens eget grensesnitt viser det samme tilbudet når det avviser en navigasjon. Så lenge et nettleservindu er åpent, undertrykker Vibe sin egen samtaleforespørsel.
 
 ## Ta opp en samtale
 
+Opptakskontrollene i grensesnittet finnes på hver tillatte side, ikke bare på en vertsliste.
+
 1. Åpne møtet i Vibe.
 1. Trykk **Ta opp denne samtalen** før eller under samtalen.
-1. Stopp fra linjen eller fra hovedvinduet.
+1. Stopp fra grensesnittet eller fra hovedvinduet.
 
 Opptak er manuelt; et møtevindu starter aldri et opptak av seg selv. Opptakeren fanger den konfigurerte mikrofonen og, når det er slått på, systemlyd-loopbacken, slik at begge sider av samtalen tas opp.
 
@@ -39,5 +40,5 @@ Hvis en tjeneste nekter å kjøre i den innebygde webvisningen, bruk **Åpne i s
 
 ## Neste steg
 
-- [Hvorfor møtenettleseren fungerer slik](/vibe/docs#meeting-browser) forklarer URL-ordningen, den isolerte webvisningen og regelen om manuelt opptak.
+- [Hvorfor møtenettleseren fungerer slik](/vibe/docs#meeting-browser) forklarer URL-ordningen, den isolerte webvisningen, avveiningen med tillatelseslisten og regelen om manuelt opptak.
 - [Ta opp mikrofon og systemlyd](/vibe/docs#record-audio) dekker opptak utenfor en samtale.
