@@ -19,9 +19,15 @@ The content window is an ordinary webview with its own data directory. Service c
 
 The bar offers address, back, forward, reload, close, and **Open in system browser**. That last action is the escape hatch for a service that refuses to run in the embedded webview.
 
+## Why the browser is an allowlist
+
+The embedded browser originally loaded whatever a page asked for; the meeting-host list only decided which links got the record bar. It is now a real boundary. Only domains the user allowed, and their subdomains over https, may load — top-level pages and every resource the page requests. A refused resource is answered with an error response so the page treats that origin as unavailable instead of retrying forever.
+
+Strictness is the point, and it has a cost: a page pulling fonts or scripts from a CDN breaks until that CDN is allowed. The blocked list is the remedy — unique hosts, newest first, each with an **Allow** action that adds the domain and reloads the page. The chrome makes the same offer when it refuses a navigation.
+
 ## Why recording stays manual
 
-Hosts in the meeting list turn the window into a meeting session: the bar shows **Record this call**. Recording is still manual — press the button before or during the call, stop from the bar or the main window. Automatic start would record calls the user did not ask to record, and would make the microphone indicator appear without an explicit action.
+Every page in the browser window shows **Record this call**, and while any browser window is open Vibe suppresses its own external-call prompt. Recording is still manual — press the button before or during the call, stop from the chrome or the main window. Automatic start would record calls the user did not ask to record, and would make the microphone indicator appear without an explicit action.
 
 Closing the window while recording asks whether to stop or keep recording in the background, so leaving a call cannot silently discard or continue a recording.
 
@@ -29,7 +35,7 @@ Closing the window while recording asks whether to stop or keep recording in the
 
 - Only `vibe://open/` links open automatically. An `https` click needs the default-browser decision Vibe does not take.
 - DRM-heavy or WebRTC-hostile sites may work better in the system browser; **Open in system browser** is the supported fallback.
-- Windows is validated first. The other platforms use their own webviews and fall back to the system browser if the window cannot host the call.
+- Windows is validated first. Resource blocking uses each engine's own mechanism: WebView2 `WebResourceRequested` on Windows; Linux and macOS currently block top-level navigation only and are being finished.
 - Registering Zoom, Teams, and Webex schemes is opt-in and available on Windows and Linux, not macOS.
 
 ## Related pages

@@ -22,7 +22,7 @@ Repository documentation is organized by [Diátaxis](https://diataxis.fr/): ever
 | [Update dependencies](how-to/update-dependencies.md) | Check, update, or Renovate Cargo, pnpm, and Python dependencies |
 | [Add a translation](how-to/add-a-translation.md) | Add a locale and keep desktop, website, changelog, and docs catalogs complete |
 | [Troubleshoot a crash](how-to/troubleshoot-a-crash.md) | Collect logs and diagnostics for a bug report |
-| [Use the meeting browser](how-to/use-the-meeting-browser.md) | Open a call in Vibe, record it, and manage meeting hosts |
+| [Use the meeting browser](how-to/use-the-meeting-browser.md) | Open a call in Vibe, record it, and manage the allowlist |
 | [Sync upstream](how-to/sync-upstream.md) | Fetch upstream branches and tags without colliding with the fork's history |
 | [Cut a dev build](how-to/cut-a-dev-build.md) | Tag `dev.<n>` on the `dev` branch and publish the dev release |
 | [Publish a release](how-to/publish-a-release.md) | Cut a release candidate, promote a stable release, and point a channel at it |

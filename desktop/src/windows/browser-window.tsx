@@ -15,6 +15,8 @@ import { Input } from '~/components/ui/input'
 import type { AudioDevice } from '~/lib/audio'
 import { deviceMenuEntries, type DeviceMenuEntry } from '~/lib/device-selection'
 import {
+	allowBrowserHost,
+	BROWSER_NAVIGATION_BLOCKED_EVENT,
 	closeMeetingBrowser,
 	getMeetingBrowserSession,
 	navigateMeetingBrowser,
@@ -27,6 +29,7 @@ import {
 	RECORDING_STATE_REQUEST_EVENT,
 	RECORDING_TOGGLE_EVENT,
 	type BrowserNavigationAction,
+	type BrowserNavigationBlocked,
 	type BrowserSessionInfo,
 	type RecordingDeviceState,
 	type RecordingStatePayload,
@@ -110,6 +113,8 @@ export default function BrowserWindow({ session }: { session: number }) {
 	const [info, setInfo] = useState<BrowserSessionInfo | null>(null)
 	const [address, setAddress] = useState('')
 	const [error, setError] = useState<string | null>(null)
+	/** A host the allowlist refused in this window; the notice offers to allow it. */
+	const [blockedHost, setBlockedHost] = useState<string | null>(null)
 	const [recording, setRecording] = useState(false)
 	const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null)
 	const [recordingDevices, setRecordingDevices] = useState<RecordingDeviceState | null>(null)
@@ -137,6 +142,11 @@ export default function BrowserWindow({ session }: { session: number }) {
 			if (event.payload.session !== session) return
 			setInfo(event.payload)
 			setAddress(event.payload.url)
+			setBlockedHost(null)
+		}).then((fn) => unlisteners.push(fn))
+		listen<BrowserNavigationBlocked>(BROWSER_NAVIGATION_BLOCKED_EVENT, (event) => {
+			if (event.payload.session !== session) return
+			setBlockedHost(event.payload.host)
 		}).then((fn) => unlisteners.push(fn))
 		listen<{ session: number }>('meeting-browser-closed', (event) => {
 			if (event.payload.session !== session) return
@@ -178,6 +188,14 @@ export default function BrowserWindow({ session }: { session: number }) {
 		const url = address.trim()
 		if (!url) return
 		void run(() => loadMeetingBrowserUrl(session, url))
+	}
+
+	/** Allow a refused host; the Rust side persists it and reloads the page webviews. */
+	function allowHost(host: string) {
+		void run(async () => {
+			await allowBrowserHost(host)
+			setBlockedHost(null)
+		})
 	}
 
 	/** A pick is written under the main window's keys; the config store carries it across windows. */
@@ -231,7 +249,6 @@ export default function BrowserWindow({ session }: { session: number }) {
 					</Button>
 				</div>
 				<div className="flex min-w-0 items-center gap-2" dir="ltr">
-					{/* Every page is recordable; the host list only classifies meetings. */}
 					{
 						<>
 							<div role="group" aria-label={m.recordingDevices()} className="flex min-w-0 items-center gap-2">
@@ -270,9 +287,18 @@ export default function BrowserWindow({ session }: { session: number }) {
 							{recording && <RecordingIndicator compact startedAt={recordingStartedAt} microphoneName={microphoneName} systemName={systemName} />}
 						</>
 					}
-					<span className={error ? 'min-w-0 truncate text-xs text-destructive' : 'min-w-0 truncate text-xs text-muted-foreground'}>
-						{error ?? info?.host ?? ''}
-					</span>
+					{blockedHost ? (
+						<div className="flex min-w-0 items-center gap-2">
+							<span className="min-w-0 truncate text-xs text-destructive">{error ?? m.browserNavigationBlocked({ host: blockedHost })}</span>
+							<Button size="sm" variant="outline" onClick={() => allowHost(blockedHost)}>
+								{m.browserBlockedHostAllow()}
+							</Button>
+						</div>
+					) : (
+						<span className={error ? 'min-w-0 truncate text-xs text-destructive' : 'min-w-0 truncate text-xs text-muted-foreground'}>
+							{error ?? info?.host ?? ''}
+						</span>
+					)}
 				</div>
 			</div>
 			{/* Native page webview covers this area; it is only a neutral backdrop while it loads. */}

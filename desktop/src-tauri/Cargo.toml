@@ -94,6 +94,10 @@ windows = { version = "0.62.2", features = [
 # Used to redirect stdout/stderr from c++ to the attached console
 libc = "0.2.180"
 libc-stdhandle = "=0.1.0"
+# WebView2 resource interception for the browser allowlist. Both versions are already in the
+# lockfile through wry; the renamed windows 0.61 matches webview2-com's own windows version.
+webview2-com = "0.38"
+windows061 = { package = "windows", version = "0.61", features = ["Win32_System_Com"] }
 
 # macOS
 [target.'cfg(target_os = "macos")'.dependencies]

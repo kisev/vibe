@@ -12,20 +12,21 @@ Use one of these paths:
 
 Clicking an https link in Chrome, Edge, or Firefox still opens that browser. Vibe does not register as the default browser.
 
-## Get the recording bar
+## Allow the sites you use
 
-**Settings → Recording → Meeting hosts** lists the hosts that get the meeting bar. The defaults are `telemost.yandex.ru` and `stream.wb.ru`.
+**Settings → Recording → Allowed domains** is the browser's allowlist. It starts empty: add each domain you want to open, and its subdomains are included automatically. Matching is by host name over https — an `http` URL never loads.
 
-- Add a host to make its links recordable sessions.
-- Remove a host to lose the bar; its links still open in the browser window.
+The list is a boundary, not a filter. A link to a host outside it is refused, and so is any script, font, or image an allowed page requests from an unlisted origin. Every refused host appears under **Blocked** with an **Allow** action; allowing it adds the domain and reloads the page so the refused assets retry.
 
-Matching is by host name over https, so `sub.telemost.yandex.ru` matches a `telemost.yandex.ru` entry while an `http` URL does not. The list is a convenience filter, not a security boundary: every https link opens in the window, but only listed hosts get the bar.
+A strict list can break a page whose assets come from a CDN until that CDN is allowed. The Blocked list is the remedy, and the browser chrome shows the same offer when it refuses a navigation. While any browser window is open, Vibe suppresses its own call prompt.
 
 ## Record a call
 
+The chrome's recording controls are present on every allowed page, not only on a host list.
+
 1. Open the meeting in Vibe.
 1. Press **Record this call** before or during the call.
-1. Stop from the bar or from the main window.
+1. Stop from the chrome or from the main window.
 
 Recording is manual; a meeting window never starts recording on its own. The recorder captures the configured microphone and, when enabled, the system-audio loopback, so both sides of the call are recorded.
 
@@ -37,5 +38,5 @@ If a service refuses to run in the embedded webview, use **Open in system browse
 
 ## Next steps
 
-- [Why the meeting browser works this way](/vibe/docs#meeting-browser) explains the URL scheme, the isolated webview, and the manual recording rule.
+- [Why the meeting browser works this way](/vibe/docs#meeting-browser) explains the URL scheme, the isolated webview, the allowlist trade-off, and the manual recording rule.
 - [Record microphone and system audio](/vibe/docs#record-audio) covers recording outside a call.

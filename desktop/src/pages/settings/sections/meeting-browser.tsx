@@ -1,3 +1,4 @@
+import { listen } from '@tauri-apps/api/event'
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -5,29 +6,33 @@ import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Switch } from '~/components/ui/switch'
 import {
-	DEFAULT_MEETING_HOSTS,
-	getMeetingHosts,
+	allowBrowserHost,
+	BROWSER_BLOCKED_HOSTS_EVENT,
+	getBrowserAllowedHosts,
+	getBrowserBlockedHosts,
 	getMeetingSchemesEnabled,
 	meetingSchemesSupported,
-	normalizeMeetingHost,
+	normalizeAllowedHost,
 	normalizeMeetingUrl,
 	openMeetingBrowser,
-	setMeetingHosts,
+	removeBrowserAllowedHost,
 	setMeetingSchemesEnabled,
 } from '~/lib/meeting-browser'
 import { m } from '~/paraglide/messages.js'
-import { IconAction, SettingsField, SettingsGroup, SettingsRow } from './shared'
+import { IconAction, SettingsField, SettingsGroup, SettingsNote, SettingsRow } from './shared'
 
 function errorText(error: unknown) {
 	return error instanceof Error ? error.message : String(error)
 }
 
 /**
- * The meeting-host allowlist is a UX filter, not a security boundary: every https link opens in
- * Vibe's browser, but only these hosts get the record-ready meeting bar.
+ * The embedded browser is a real allowlist: only these domains, and their subdomains over https,
+ * may load, and everything else is refused. The blocked list is the remedy: allowing a host there
+ * adds it and reloads the open pages so their refused assets retry.
  */
 export function MeetingBrowserSettings() {
-	const [hosts, setHosts] = useState<string[]>([...DEFAULT_MEETING_HOSTS])
+	const [hosts, setHosts] = useState<string[]>([])
+	const [blocked, setBlocked] = useState<string[]>([])
 	const [draft, setDraft] = useState('')
 	const [error, setError] = useState<string | null>(null)
 	const [link, setLink] = useState('')
@@ -58,37 +63,58 @@ export function MeetingBrowserSettings() {
 
 	useEffect(() => {
 		let cancelled = false
-		getMeetingHosts()
-			.then((stored) => {
-				if (!cancelled) setHosts(stored)
+		let unlisten: (() => void) | undefined
+		Promise.all([getBrowserAllowedHosts(), getBrowserBlockedHosts()])
+			.then(([allowed, blockedHosts]) => {
+				if (cancelled) return
+				setHosts(allowed)
+				setBlocked(blockedHosts)
 			})
-			.catch((reason) => console.error('Failed to read the meeting hosts:', reason))
+			.catch((reason) => console.error('Failed to read the browser allowlist:', reason))
+		// The blocked registry changes from the page webview, not only from this screen.
+		listen<string[]>(BROWSER_BLOCKED_HOSTS_EVENT, (event) => setBlocked(event.payload)).then((fn) => {
+			if (cancelled) fn()
+			else unlisten = fn
+		})
 		return () => {
 			cancelled = true
+			unlisten?.()
 		}
 	}, [])
 
-	async function save(next: string[]) {
+	async function allow(host: string) {
 		const previous = hosts
-		setHosts(next)
+		if (!hosts.includes(host)) setHosts([...hosts, host])
 		try {
-			await setMeetingHosts(next)
+			setHosts(await allowBrowserHost(host))
+			setBlocked((current) => current.filter((item) => item !== host))
 		} catch (reason) {
 			setHosts(previous)
-			toast.error(m.meetingHostSaveFailed(), { description: errorText(reason) })
+			toast.error(m.browserAllowedHostSaveFailed(), { description: errorText(reason) })
+		}
+	}
+
+	async function remove(host: string) {
+		const previous = hosts
+		setHosts(hosts.filter((item) => item !== host))
+		try {
+			setHosts(await removeBrowserAllowedHost(host))
+		} catch (reason) {
+			setHosts(previous)
+			toast.error(m.browserAllowedHostSaveFailed(), { description: errorText(reason) })
 		}
 	}
 
 	function addHost() {
-		const host = normalizeMeetingHost(draft)
+		const host = normalizeAllowedHost(draft)
 		if (!host) {
-			setError(m.meetingHostInvalid())
+			setError(m.browserAllowedHostInvalid())
 			return
 		}
 		setError(null)
 		setDraft('')
 		if (hosts.includes(host)) return
-		void save([...hosts, host])
+		void allow(host)
 	}
 
 	async function openLink() {
@@ -122,17 +148,18 @@ export function MeetingBrowserSettings() {
 				</SettingsRow>
 			</SettingsGroup>
 
-			<SettingsGroup title={m.meetingHosts()} description={m.meetingHostsInfo()}>
+			<SettingsGroup title={m.browserAllowedHosts()} description={m.browserAllowedHostsInfo()}>
 				{hosts.map((host) => (
-					<SettingsRow
-						key={host}
-						label={<span className="font-mono text-sm">{host}</span>}
-						description={DEFAULT_MEETING_HOSTS.includes(host) ? m.meetingHostDefault() : undefined}>
-						<IconAction label={m.meetingHostRemove({ host })} icon={<X className="h-4 w-4" />} onClick={() => void save(hosts.filter((item) => item !== host))} />
+					<SettingsRow key={host} label={<span className="font-mono text-sm">{host}</span>}>
+						<IconAction
+							label={m.browserAllowedHostRemove({ host })}
+							icon={<X className="h-4 w-4" />}
+							onClick={() => void remove(host)}
+						/>
 					</SettingsRow>
 				))}
 				<SettingsField
-					label={m.meetingHostAdd()}
+					label={m.browserAllowedHostAdd()}
 					description={m.infoMeetingHostAdd()}
 					footer={error ? <span className="text-destructive">{error}</span> : undefined}>
 					<div className="flex gap-2">
@@ -140,8 +167,8 @@ export function MeetingBrowserSettings() {
 							type="text"
 							spellCheck={false}
 							autoComplete="off"
-							aria-label={m.meetingHostAdd()}
-							placeholder={m.meetingHostPlaceholder()}
+							aria-label={m.browserAllowedHostAdd()}
+							placeholder={m.browserAllowedHostPlaceholder()}
 							value={draft}
 							onChange={(event) => setDraft(event.target.value)}
 							onKeyDown={(event) => {
@@ -153,10 +180,21 @@ export function MeetingBrowserSettings() {
 							className="h-9 rounded-lg text-sm"
 						/>
 						<Button type="button" variant="outline" size="sm" className="h-9 shrink-0 rounded-lg" onClick={addHost}>
-							{m.meetingHostAddAction()}
+							{m.browserAllowedHostAddAction()}
 						</Button>
 					</div>
 				</SettingsField>
+			</SettingsGroup>
+
+			<SettingsGroup title={m.browserBlockedHosts()} description={m.browserBlockedHostsInfo()}>
+				{blocked.length === 0 && <SettingsNote>{m.browserBlockedHostsEmpty()}</SettingsNote>}
+				{blocked.map((host) => (
+					<SettingsRow key={host} label={<span className="font-mono text-sm">{host}</span>}>
+						<Button type="button" variant="outline" size="sm" className="h-9 rounded-lg" onClick={() => void allow(host)}>
+							{m.browserBlockedHostAllow()}
+						</Button>
+					</SettingsRow>
+				))}
 			</SettingsGroup>
 
 			<SettingsGroup title={m.openInVibe()} description={m.openInVibeInfo()}>

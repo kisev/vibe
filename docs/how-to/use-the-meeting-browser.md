@@ -1,6 +1,6 @@
 # Use the meeting browser
 
-Vibe can host a call in its own Chromium-based window: the app's chrome (address, back, forward, reload, open-external, close and **Record this call**) sits at the top, and the page fills the rest of that same window. There is no separate bar window. See [Meeting browser reference](../reference/meeting-browser.md) for the URL schemes and defaults, and [the explanation](../explanation/meeting-browser.md) for why the mechanism works this way.
+Vibe can host a call in its own Chromium-based window: the app's chrome (address, back, forward, reload, open-external, close and **Record this call**) sits at the top, and the page fills the rest of that same window. There is no separate bar window. See [Meeting browser reference](../reference/meeting-browser.md) for the URL schemes and the allowlist, and [the explanation](../explanation/meeting-browser.md) for why the mechanism works this way.
 
 ## Open a call in Vibe
 
@@ -8,7 +8,7 @@ Use one of these paths:
 
 - From another app, script, or shortcut: `vibe://open/?url=https://…`. Vibe validates that the URL is https and well formed and refuses anything else with a dialog.
 - Inside Vibe: **Settings → Recording → Open in Vibe**, paste the link.
-- Keep the link on a configured meeting host to get the **Record this call** action in the chrome. Any other https link opens in the same single browser window without the record action.
+- The link's host must be in the allowlist; top-level navigation and cross-origin resources outside it are refused. The chrome's recording controls are present on every allowed page.
 
 Clicking an https link in Chrome, Edge, or Firefox still opens that browser. Vibe does not register as the default browser.
 
@@ -22,14 +22,13 @@ Recording is manual; a meeting window never starts recording on its own. The rec
 
 Closing the window while recording asks whether to stop or keep recording in the background.
 
-## Manage meeting hosts
+## Allow the sites you use
 
-**Settings → Recording → Meeting hosts** lists the hosts that get the **Record this call** action. The defaults are `telemost.yandex.ru` and `stream.wb.ru`.
+**Settings → Recording → Allowed domains** is the browser's allowlist; it starts empty. Add each domain you need and its subdomains are included over https.
 
-- Add a host to make its links recordable sessions.
-- Remove a host to lose the record action; its links still open in the browser window.
+Only listed domains may load. A link to another host is refused, and so is any script, font, or image an allowed page pulls from an unlisted origin. Refused hosts appear under **Blocked** with an **Allow** action that adds the domain and reloads the page. The chrome shows the same offer when it refuses a navigation.
 
-Host matching is by host name over https, so `sub.telemost.yandex.ru` matches a `telemost.yandex.ru` entry while an `http` URL does not.
+The strict list can break a page whose assets come from a CDN until that CDN is allowed; that is the intended trade-off, and the Blocked list makes the fix one click.
 
 ## Fall back to the system browser
 

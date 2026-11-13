@@ -155,7 +155,7 @@ function BrowserPanel() {
 					{m.openInVibe()}
 				</Button>
 			</div>
-			<p className={cn('min-h-[18px] text-[12px]', error ? 'text-destructive' : 'text-muted-foreground')}>{error ?? m.meetingHostsInfo()}</p>
+			<p className={cn('min-h-[18px] text-[12px]', error ? 'text-destructive' : 'text-muted-foreground')}>{error ?? m.browserAllowedHostsInfo()}</p>
 		</div>
 	)
 }

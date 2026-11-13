@@ -7,17 +7,31 @@ import { TooltipProvider } from '~/components/ui/tooltip'
 import { m } from '~/paraglide/messages.js'
 import { MeetingBrowserSettings } from './meeting-browser'
 
-const mocks = vi.hoisted(() => ({ invoke: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+	invoke: vi.fn(),
+	listeners: new Map<string, (event: { payload: unknown }) => void>(),
+}))
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }))
+vi.mock('@tauri-apps/api/event', () => ({
+	listen: async (event: string, callback: (event: { payload: unknown }) => void) => {
+		mocks.listeners.set(event, callback)
+		return () => mocks.listeners.delete(event)
+	},
+}))
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 
-const stored = ['telemost.yandex.ru', 'stream.wb.ru']
+const stored = ['meet.example.com']
+const blocked = ['cdn.other.test']
 
 beforeEach(() => {
 	mocks.invoke.mockReset()
-	mocks.invoke.mockImplementation(async (command: string) => {
-		if (command === 'meeting_hosts') return [...stored]
+	mocks.listeners.clear()
+	mocks.invoke.mockImplementation(async (command: string, args?: { host?: string }) => {
+		if (command === 'browser_allowed_hosts') return [...stored]
+		if (command === 'browser_blocked_hosts') return [...blocked]
+		if (command === 'browser_allow_host') return [...new Set([...stored, String(args?.host ?? '')])]
+		if (command === 'browser_remove_allowed_host') return stored.filter((host) => host !== args?.host)
 		return undefined
 	})
 })
@@ -32,54 +46,67 @@ function renderSettings() {
 	)
 }
 
-function savedHosts() {
-	const calls = mocks.invoke.mock.calls.filter(([command]) => command === 'set_meeting_hosts')
-	return calls[calls.length - 1]?.[1]
+function lastCall(command: string) {
+	const calls = mocks.invoke.mock.calls.filter(([name]) => name === command)
+	return calls[calls.length - 1]
 }
 
-describe('meeting host settings', () => {
-	it('adds a normalized host and saves the whole list', async () => {
+describe('browser allowlist settings', () => {
+	it('adds a normalized domain through the allow command', async () => {
 		const user = userEvent.setup()
 		renderSettings()
-		await screen.findByText('telemost.yandex.ru')
+		await screen.findByText('meet.example.com')
 
-		await user.type(screen.getByLabelText(m.meetingHostAdd()), 'Meet.Example.com.')
-		await user.click(screen.getByRole('button', { name: m.meetingHostAddAction() }))
+		await user.type(screen.getByLabelText(m.browserAllowedHostAdd()), 'New.Example.com.')
+		await user.click(screen.getByRole('button', { name: m.browserAllowedHostAddAction() }))
 
-		await waitFor(() => expect(savedHosts()).toEqual({ hosts: [...stored, 'meet.example.com'] }))
-		expect(await screen.findByText('meet.example.com')).toBeTruthy()
+		await waitFor(() => expect(lastCall('browser_allow_host')).toEqual(['browser_allow_host', { host: 'new.example.com' }]))
+		expect(await screen.findByText('new.example.com')).toBeTruthy()
 	})
 
-	it('removes a host and saves the remaining list', async () => {
+	it('removes a domain through the remove command', async () => {
 		const user = userEvent.setup()
 		renderSettings()
-		await screen.findByText('stream.wb.ru')
+		await screen.findByText('meet.example.com')
 
-		await user.click(screen.getByRole('button', { name: m.meetingHostRemove({ host: 'stream.wb.ru' }) }))
+		await user.click(screen.getByRole('button', { name: m.browserAllowedHostRemove({ host: 'meet.example.com' }) }))
 
-		await waitFor(() => expect(savedHosts()).toEqual({ hosts: ['telemost.yandex.ru'] }))
-		await waitFor(() => expect(screen.queryByText('stream.wb.ru')).toBeNull())
+		await waitFor(() => expect(lastCall('browser_remove_allowed_host')).toEqual(['browser_remove_allowed_host', { host: 'meet.example.com' }]))
+		await waitFor(() => expect(screen.queryByText('meet.example.com')).toBeNull())
 	})
 
-	it('refuses a value that is not a bare host name without saving', async () => {
+	it('refuses a value that is not a bare host name without calling the backend', async () => {
 		const user = userEvent.setup()
 		renderSettings()
-		await screen.findByText('telemost.yandex.ru')
+		await screen.findByText('meet.example.com')
 
-		await user.type(screen.getByLabelText(m.meetingHostAdd()), 'https://example.com/path')
-		await user.click(screen.getByRole('button', { name: m.meetingHostAddAction() }))
+		await user.type(screen.getByLabelText(m.browserAllowedHostAdd()), 'https://example.com/path')
+		await user.click(screen.getByRole('button', { name: m.browserAllowedHostAddAction() }))
 
-		expect(screen.getByText(m.meetingHostInvalid())).toBeTruthy()
-		expect(savedHosts()).toBeUndefined()
+		expect(screen.getByText(m.browserAllowedHostInvalid())).toBeTruthy()
+		expect(lastCall('browser_allow_host')).toBeUndefined()
+	})
+
+	it('allows a blocked host in place and drops it from the blocked list', async () => {
+		const user = userEvent.setup()
+		renderSettings()
+		await screen.findByText('cdn.other.test')
+
+		await user.click(screen.getByRole('button', { name: m.browserBlockedHostAllow() }))
+
+		await waitFor(() => expect(lastCall('browser_allow_host')).toEqual(['browser_allow_host', { host: 'cdn.other.test' }]))
+		// It moves to the allowlist: no Allow action or empty-state note remains under Blocked.
+		await waitFor(() => expect(screen.queryByRole('button', { name: m.browserBlockedHostAllow() })).toBeNull())
+		expect(await screen.findByText(m.browserBlockedHostsEmpty())).toBeTruthy()
 	})
 
 	it('opens a pasted link in the in-app browser', async () => {
 		const user = userEvent.setup()
 		renderSettings()
 
-		await user.type(screen.getByLabelText(m.openInVibeUrlLabel()), 'https://telemost.yandex.ru/j/1')
+		await user.type(screen.getByLabelText(m.openInVibeUrlLabel()), 'https://meet.example.com/j/1')
 		await user.click(screen.getByRole('button', { name: m.openInVibeAction() }))
 
-		await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('open_meeting_browser', { url: 'https://telemost.yandex.ru/j/1' }))
+		await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('open_meeting_browser', { url: 'https://meet.example.com/j/1' }))
 	})
 })

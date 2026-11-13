@@ -38,6 +38,11 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
     let store = app.store(STORE_FILENAME)?;
 
+    // The allowlist replaced the meeting-host list; carry over whatever the user had stored.
+    if let Err(error) = crate::browser_policy::migrate(app.handle()) {
+        tracing::warn!("could not migrate the browser allowlist: {error}");
+    }
+
     // Setup logging to terminal
     {
         let mut app_handle = STATIC_APP.lock().expect("lock");

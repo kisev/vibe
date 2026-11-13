@@ -11,15 +11,11 @@ export interface BrowserSessionInfo {
 	session: number
 	url: string
 	host: string
-	isMeeting: boolean
 	canBack: boolean
 	canForward: boolean
 }
 
 export type BrowserNavigationAction = 'back' | 'forward' | 'reload'
-
-/** Hosts the Rust side treats as meetings when the stored list has never been written. */
-export const DEFAULT_MEETING_HOSTS = ['telemost.yandex.ru', 'stream.wb.ru']
 
 export const openMeetingBrowser = (url: string) => invoke<BrowserSessionInfo>('open_meeting_browser', { url })
 
@@ -38,9 +34,27 @@ export const closeMeetingBrowser = (session: number) => invoke<void>('meeting_br
 export const confirmMeetingBrowserClose = (session: number, stopRecording: boolean) =>
 	invoke<void>('meeting_browser_confirm_close', { session, stopRecording })
 
-export const getMeetingHosts = () => invoke<string[]>('meeting_hosts')
+/** The domains the embedded browser may load, with their subdomains, over https only. */
+export const getBrowserAllowedHosts = () => invoke<string[]>('browser_allowed_hosts')
 
-export const setMeetingHosts = (hosts: string[]) => invoke<void>('set_meeting_hosts', { hosts })
+/** Unique hosts the browser refused, newest first; empty until something is blocked. */
+export const getBrowserBlockedHosts = () => invoke<string[]>('browser_blocked_hosts')
+
+/** Allow a host; the Rust side persists it, drops it from the blocked list and reloads pages. */
+export const allowBrowserHost = (host: string) => invoke<string[]>('browser_allow_host', { host })
+
+export const removeBrowserAllowedHost = (host: string) => invoke<string[]>('browser_remove_allowed_host', { host })
+
+/** The full blocked list, emitted whenever a new host is refused. */
+export const BROWSER_BLOCKED_HOSTS_EVENT = 'browser-blocked-hosts'
+
+/** A refused top-level navigation for one session, so its chrome can offer to allow the host. */
+export const BROWSER_NAVIGATION_BLOCKED_EVENT = 'meeting-browser-navigation-blocked'
+
+export interface BrowserNavigationBlocked {
+	session: number
+	host: string
+}
 
 export const isRecordingActive = () => invoke<boolean>('recording_active')
 
@@ -51,7 +65,7 @@ export const isRecordingActive = () => invoke<boolean>('recording_active')
  */
 const HOSTNAME_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 
-export function normalizeMeetingHost(value: string): string | null {
+export function normalizeAllowedHost(value: string): string | null {
 	const host = value.trim().toLowerCase().replace(/\.$/, '')
 	if (!host || host.length > 253) return null
 	if (!host.split('.').every((label) => HOSTNAME_LABEL.test(label))) return null

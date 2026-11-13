@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod browser_policy;
 mod cleaner;
 mod cli;
 mod cmd;
@@ -165,8 +166,10 @@ async fn main() -> Result<()> {
             meeting_browser::meeting_browser_open_external,
             meeting_browser::meeting_browser_close,
             meeting_browser::meeting_browser_confirm_close,
-            meeting_browser::meeting_hosts,
-            meeting_browser::set_meeting_hosts,
+            meeting_browser::browser_allowed_hosts,
+            meeting_browser::browser_blocked_hosts,
+            meeting_browser::browser_allow_host,
+            meeting_browser::browser_remove_allowed_host,
             meeting_browser::open_meeting_link,
             meeting_browser::meeting_browser_retry,
             meeting_browser::meeting_schemes_supported,

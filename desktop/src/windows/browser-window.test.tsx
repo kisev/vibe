@@ -27,9 +27,8 @@ vi.mock('~/lib/config-store', () => ({ readConfig: mocks.readConfig, writeConfig
 
 const session = {
 	session: 7,
-	url: 'https://telemost.yandex.ru/rooms/1',
-	host: 'telemost.yandex.ru',
-	isMeeting: true,
+	url: 'https://meet.example.com/rooms/1',
+	host: 'meet.example.com',
 	canBack: true,
 	canForward: false,
 }
@@ -147,6 +146,18 @@ describe('browser chrome', () => {
 
 		await waitFor(() => expect(mocks.writeConfig).toHaveBeenCalledWith(CONFIG_KEYS.inputDeviceName, 'USB Mic'))
 		await waitFor(() => expect(screen.getByRole('combobox', { name: m.microphone() }).textContent).toContain('USB Mic'))
+	})
+
+	it('offers to allow a host the allowlist refused', async () => {
+		render(<BrowserWindow session={7} />)
+		await screen.findByLabelText(m.meetingBarAddress())
+
+		act(() => mocks.listeners.get('meeting-browser-navigation-blocked')?.({ payload: { session: 7, host: 'cdn.other.test' } }))
+		expect(await screen.findByText(m.browserNavigationBlocked({ host: 'cdn.other.test' }))).toBeTruthy()
+
+		await userEvent.click(screen.getByRole('button', { name: m.browserBlockedHostAllow() }))
+		await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('browser_allow_host', { host: 'cdn.other.test' }))
+		await waitFor(() => expect(screen.queryByText(m.browserNavigationBlocked({ host: 'cdn.other.test' }))).toBeNull())
 	})
 
 	it('closes the session from the chrome', async () => {

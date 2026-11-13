@@ -1,3 +1,4 @@
+use crate::browser_policy;
 use crate::config::STORE_FILENAME;
 use once_cell::sync::Lazy;
 use serde::Serialize;
@@ -12,13 +13,14 @@ use tauri::{AppHandle, Emitter, Manager, Url, WebviewUrl, WindowEvent};
 use tauri::{PhysicalPosition, PhysicalSize, Window};
 use tauri_plugin_store::StoreExt;
 
-const HOSTS_KEY: &str = "meeting.browserHosts";
 /// Opt-in registration as the system handler for other applications' meeting schemes.
 const SCHEMES_KEY: &str = "meeting.schemesEnabled";
-const DEFAULT_HOSTS: [&str; 2] = ["telemost.yandex.ru", "stream.wb.ru"];
 const SESSION_EVENT: &str = "meeting-browser-session";
 const CLOSED_EVENT: &str = "meeting-browser-closed";
 const CLOSE_REQUESTED_EVENT: &str = "meeting-browser-close-requested";
+/// Emitted with `{ session, host }` when a top-level navigation is refused, so the chrome can
+/// offer to allow the host in place.
+const NAVIGATION_BLOCKED_EVENT: &str = "meeting-browser-navigation-blocked";
 /// Emitted to the main window when a page never finished loading: a blank webview with no
 /// explanation is the worst outcome, so the user gets a retry/close question instead.
 const LOAD_FAILED_EVENT: &str = "meeting-browser-load-failed";
@@ -40,7 +42,6 @@ pub struct BrowserSessionInfo {
     pub session: u64,
     pub url: String,
     pub host: String,
-    pub is_meeting: bool,
     pub can_back: bool,
     pub can_forward: bool,
 }
@@ -62,8 +63,9 @@ struct BrowserRuntime {
 }
 
 impl BrowserRuntime {
-    fn meeting_count(&self) -> usize {
-        self.sessions.values().filter(|session| session.info.is_meeting).count()
+    /// Every open browser window suppresses the external meeting prompt, whatever its host.
+    fn session_count(&self) -> usize {
+        self.sessions.len()
     }
 }
 
@@ -97,76 +99,6 @@ fn page_label(session: u64) -> String {
     browser_label(session)
 }
 
-fn default_hosts() -> Vec<String> {
-    DEFAULT_HOSTS.iter().map(|host| (*host).to_string()).collect()
-}
-
-/// Accepts a bare host name or a pasted URL and returns a lowercase host name.
-fn normalize_host(raw: &str) -> Option<String> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let candidate = if trimmed.contains("://") {
-        trimmed.to_string()
-    } else {
-        format!("https://{trimmed}")
-    };
-    let parsed = Url::parse(&candidate).ok()?;
-    let host = parsed.host_str()?.trim_end_matches('.').to_ascii_lowercase();
-    (!host.is_empty()).then_some(host)
-}
-
-fn normalize_hosts(hosts: impl IntoIterator<Item = String>) -> Vec<String> {
-    let mut normalized: Vec<String> = Vec::new();
-    for raw in hosts {
-        let Some(host) = normalize_host(&raw) else {
-            continue;
-        };
-        if !normalized.contains(&host) {
-            normalized.push(host);
-        }
-    }
-    normalized
-}
-
-fn load_hosts(app: &AppHandle) -> Vec<String> {
-    let Ok(store) = app.store(STORE_FILENAME) else {
-        return default_hosts();
-    };
-    let Some(value) = store.get(HOSTS_KEY) else {
-        return default_hosts();
-    };
-    let Some(items) = value.as_array() else {
-        return default_hosts();
-    };
-    normalize_hosts(items.iter().filter_map(|item| item.as_str().map(str::to_string)))
-}
-
-fn host_of(url: &str) -> String {
-    Url::parse(url)
-        .ok()
-        .and_then(|parsed| parsed.host_str().map(|host| host.trim_end_matches('.').to_ascii_lowercase()))
-        .unwrap_or_default()
-}
-
-/// Meeting hosts only match over https, on the exact host or one of its subdomains.
-fn is_meeting_url(url: &str, hosts: &[String]) -> bool {
-    let Ok(parsed) = Url::parse(url) else {
-        return false;
-    };
-    if parsed.scheme() != "https" {
-        return false;
-    }
-    let Some(host) = parsed.host_str() else {
-        return false;
-    };
-    let host = host.trim_end_matches('.').to_ascii_lowercase();
-    hosts
-        .iter()
-        .any(|entry| host == *entry || host.ends_with(&format!(".{entry}")))
-}
-
 fn emit_session(app: &AppHandle, info: &BrowserSessionInfo) {
     if let Err(error) = app.emit(SESSION_EVENT, info) {
         tracing::warn!("could not emit meeting browser session: {error}");
@@ -184,7 +116,6 @@ fn handle_page_load(app: &AppHandle, session: u64, url: &Url) {
         return;
     }
     let normalized = url.as_str().to_string();
-    let hosts = load_hosts(app);
     let (changed, count) = {
         let Ok(mut runtime) = RUNTIME.lock() else {
             return;
@@ -206,13 +137,12 @@ fn handle_page_load(app: &AppHandle, session: u64, url: &Url) {
             }
             state.info.url = normalized;
             state.loaded = true;
-            state.info.host = host_of(&state.info.url);
-            state.info.is_meeting = is_meeting_url(&state.info.url, &hosts);
+            state.info.host = browser_policy::host_of(&state.info.url);
             state.info.can_back = state.index > 0;
             state.info.can_forward = state.index + 1 < state.history.len();
             (state.info != previous).then(|| state.info.clone())
         };
-        (changed, runtime.meeting_count())
+        (changed, runtime.session_count())
     };
     if let Some(info) = changed {
         emit_session(app, &info);
@@ -227,7 +157,7 @@ fn finalize_session(app: &AppHandle, session: u64) {
             return;
         };
         let removed = runtime.sessions.remove(&session).is_some();
-        (removed, runtime.meeting_count())
+        (removed, runtime.session_count())
     };
     if !removed {
         return;
@@ -310,25 +240,60 @@ fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo
         .map_err(|error| format!("Could not open the browser chrome: {error}"))?;
 
     tracing::info!(session, "creating the browser page webview");
-    window
+    let navigation_app = app.clone();
+    let page = window
         .add_child(
-            WebviewBuilder::new(page_label(session), WebviewUrl::External(parsed)).on_page_load(move |webview, payload| {
-                tracing::info!(
-                    session,
-                    url = %payload.url(),
-                    event = ?payload.event(),
-                    "meeting browser page load"
-                );
-                if payload.event() == PageLoadEvent::Finished {
-                    handle_page_load(webview.app_handle(), session, payload.url());
-                }
-            }),
+            WebviewBuilder::new(page_label(session), WebviewUrl::External(parsed))
+                .on_navigation(move |url| allow_navigation(&navigation_app, session, url))
+                .on_page_load(move |webview, payload| {
+                    tracing::info!(
+                        session,
+                        url = %payload.url(),
+                        event = ?payload.event(),
+                        "meeting browser page load"
+                    );
+                    if payload.event() == PageLoadEvent::Finished {
+                        handle_page_load(webview.app_handle(), session, payload.url());
+                    }
+                }),
             tauri::LogicalPosition::new(0.0, TOOLBAR_H),
             tauri::LogicalSize::new(CONTENT_WIDTH, CONTENT_HEIGHT),
         )
         .map_err(|error| format!("Could not open the browser page: {error}"))?;
 
+    // Windows intercepts every resource request; other platforms are navigation-only for now.
+    #[cfg(windows)]
+    install_resource_interceptor(&page, app.clone());
+    #[cfg(not(windows))]
+    let _ = page;
+
     Ok(())
+}
+
+/// The top-level navigation gate shared by the engine backends. A refused host is recorded and
+/// published to the chrome, which can offer to allow it.
+fn allow_navigation(app: &AppHandle, session: u64, url: &Url) -> bool {
+    !refuse_if_blocked(app, session, url.as_str())
+}
+
+/// Record and report a top-level navigation that the allowlist refuses. Returns whether the
+/// navigation must be stopped.
+fn refuse_if_blocked(app: &AppHandle, session: u64, url: &str) -> bool {
+    let allowed = browser_policy::allowed();
+    if !browser_policy::should_block(url, &allowed) {
+        return false;
+    }
+    let host = browser_policy::host_of(url);
+    if !host.is_empty() {
+        browser_policy::record_blocked_host(app, &host);
+    }
+    if let Err(error) = app.emit(
+        NAVIGATION_BLOCKED_EVENT,
+        serde_json::json!({ "session": session, "host": host }),
+    ) {
+        tracing::warn!("could not emit the blocked navigation: {error}");
+    }
+    true
 }
 
 /// macOS fallback: keep the page embedded but with no chrome bar. WKWebView in this Tauri
@@ -337,10 +302,12 @@ fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo
 /// remains the escape hatch. This deliberately has no panic path.
 #[cfg(target_os = "macos")]
 fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo, parsed: Url) -> Result<(), String> {
+    let navigation_app = app.clone();
     tauri::WebviewWindowBuilder::new(app, page_label(session), WebviewUrl::External(parsed))
         .title(info.host.clone())
         .inner_size(CONTENT_WIDTH, CONTENT_HEIGHT)
         .focused(true)
+        .on_navigation(move |url| allow_navigation(&navigation_app, session, url))
         .on_page_load(move |window, payload| {
             tracing::info!(
                 session,
@@ -377,6 +344,12 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
         .to_ascii_lowercase();
     let normalized = parsed.as_str().to_string();
 
+    let allowed = browser_policy::load_allowed(&app);
+    if !browser_policy::is_allowed_url(&normalized, &allowed) {
+        browser_policy::record_blocked_host(&app, &host);
+        return Err(format!("{host} is not in the allowlist"));
+    }
+
     let existing = {
         let runtime = lock_runtime()?;
         runtime
@@ -393,13 +366,11 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
         return Ok(info);
     }
 
-    let hosts = load_hosts(&app);
     let session = NEXT_SESSION.fetch_add(1, Ordering::Relaxed);
     let info = BrowserSessionInfo {
         session,
         url: normalized.clone(),
         host,
-        is_meeting: is_meeting_url(&normalized, &hosts),
         can_back: false,
         can_forward: false,
     };
@@ -416,18 +387,18 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
             },
         );
     }
-    tracing::info!(session, url = %info.url, host = %info.host, meeting = info.is_meeting, "opening meeting browser");
+    tracing::info!(session, url = %info.url, host = %info.host, "opening meeting browser");
     tracing::info!(session, "creating the browser window");
-    // Suppress external detection as soon as the meeting session exists, before the webview
+    // Suppress external detection as soon as the browser session exists, before the webview
     // has loaded enough to fire its first page event.
-    let initial_count = lock_runtime()?.meeting_count();
+    let initial_count = lock_runtime()?.session_count();
     sync_meeting_suppression(initial_count);
     tracing::info!(session, "meeting suppression updated");
 
     if let Err(error) = build_session_window(&app, session, &info, parsed) {
         let count = if let Ok(mut runtime) = RUNTIME.lock() {
             runtime.sessions.remove(&session);
-            Some(runtime.meeting_count())
+            Some(runtime.session_count())
         } else {
             None
         };
@@ -492,7 +463,7 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
     let (info, count) = {
         let runtime = lock_runtime()?;
         let info = runtime.sessions.get(&session).map(|state| state.info.clone()).unwrap_or(info);
-        (info, runtime.meeting_count())
+        (info, runtime.session_count())
     };
     emit_session(&app, &info);
     sync_meeting_suppression(count);
@@ -507,7 +478,6 @@ pub fn meeting_browser_session(session: u64) -> Result<Option<BrowserSessionInfo
 
 #[tauri::command]
 pub fn meeting_browser_navigate(app: AppHandle, session: u64, action: String) -> Result<(), String> {
-    let hosts = load_hosts(&app);
     let (target, new_index) = {
         let runtime = lock_runtime()?;
         let state = runtime
@@ -539,6 +509,10 @@ pub fn meeting_browser_navigate(app: AppHandle, session: u64, action: String) ->
         }
     };
 
+    // A reload of a host the user removed is a navigation too, so it is refused and reported.
+    if refuse_if_blocked(&app, session, &target) {
+        return Err(format!("{} is not in the allowlist", browser_policy::host_of(&target)));
+    }
     let page = app
         .get_webview(&page_label(session))
         .ok_or_else(|| format!("Browser page for session {session} is not open"))?;
@@ -556,14 +530,12 @@ pub fn meeting_browser_navigate(app: AppHandle, session: u64, action: String) ->
                 let previous = state.info.clone();
                 state.index = index;
                 state.info.url = target;
-                let host = host_of(&state.info.url);
-                state.info.host = host;
-                state.info.is_meeting = is_meeting_url(&state.info.url, &hosts);
+                state.info.host = browser_policy::host_of(&state.info.url);
                 state.info.can_back = state.index > 0;
                 state.info.can_forward = state.index + 1 < state.history.len();
                 (state.info != previous).then(|| state.info.clone())
             };
-            (changed, runtime.meeting_count())
+            (changed, runtime.session_count())
         };
         if let Some(info) = changed {
             emit_session(&app, &info);
@@ -583,10 +555,15 @@ pub fn meeting_browser_load(app: AppHandle, session: u64, url: String) -> Result
             parsed.scheme()
         ));
     }
+    if refuse_if_blocked(&app, session, parsed.as_str()) {
+        return Err(format!(
+            "{} is not in the allowlist",
+            browser_policy::host_of(parsed.as_str())
+        ));
+    }
     let page = app
         .get_webview(&page_label(session))
         .ok_or_else(|| format!("Browser page for session {session} is not open"))?;
-    let hosts = load_hosts(&app);
     let (info, count) = {
         let mut runtime = lock_runtime()?;
         let state = runtime
@@ -597,11 +574,10 @@ pub fn meeting_browser_load(app: AppHandle, session: u64, url: String) -> Result
         state.history.push(parsed.as_str().to_string());
         state.index = state.history.len() - 1;
         state.info.url = parsed.as_str().to_string();
-        state.info.host = host_of(&state.info.url);
-        state.info.is_meeting = is_meeting_url(&state.info.url, &hosts);
+        state.info.host = browser_policy::host_of(&state.info.url);
         state.info.can_back = state.index > 0;
         state.info.can_forward = false;
-        (state.info.clone(), runtime.meeting_count())
+        (state.info.clone(), runtime.session_count())
     };
     page.navigate(parsed)
         .map_err(|error| format!("Could not navigate the browser page: {error}"))?;
@@ -685,8 +661,8 @@ pub async fn open_meeting_link(app: AppHandle, raw: String) -> Result<Option<Bro
         crate::meeting_schemes::meeting_url(&raw)
             .ok_or_else(|| format!("This link is not a meeting link Vibe can open: {raw:?}"))?
     };
-    let hosts = load_hosts(&app);
-    if is_meeting_url(&url, &hosts) {
+    let allowed = browser_policy::load_allowed(&app);
+    if browser_policy::is_allowed_url(&url, &allowed) {
         open_meeting_browser(app, url).await.map(Some)
     } else {
         tauri_plugin_opener::open_url(url, None::<&str>)
@@ -701,62 +677,114 @@ pub fn meeting_browser_retry(app: AppHandle, session: u64) -> Result<(), String>
 }
 
 #[tauri::command]
-pub fn meeting_hosts(app: AppHandle) -> Result<Vec<String>, String> {
-    Ok(load_hosts(&app))
+pub fn browser_allowed_hosts(app: AppHandle) -> Result<Vec<String>, String> {
+    Ok(browser_policy::load_allowed(&app))
 }
 
 #[tauri::command]
-pub fn set_meeting_hosts(app: AppHandle, hosts: Vec<String>) -> Result<(), String> {
-    let hosts = normalize_hosts(hosts);
-    let store = app.store(STORE_FILENAME).map_err(|error| error.to_string())?;
-    store.set(HOSTS_KEY, serde_json::json!(hosts));
-    store.save().map_err(|error| error.to_string())?;
+pub fn browser_blocked_hosts() -> Vec<String> {
+    browser_policy::blocked_hosts()
+}
 
-    let (changed, count) = {
-        let mut runtime = lock_runtime()?;
-        let changed = {
-            let mut changed = Vec::new();
-            for state in runtime.sessions.values_mut() {
-                let is_meeting = is_meeting_url(&state.info.url, &hosts);
-                if state.info.is_meeting != is_meeting {
-                    state.info.is_meeting = is_meeting;
-                    changed.push(state.info.clone());
-                }
-            }
-            changed
-        };
-        (changed, runtime.meeting_count())
+/// Add a host to the allowlist and reload the open pages so their refused assets retry.
+#[tauri::command]
+pub fn browser_allow_host(app: AppHandle, host: String) -> Result<Vec<String>, String> {
+    let allowed = browser_policy::allow_host(&app, &host)?;
+    reload_browser_pages(&app);
+    Ok(allowed)
+}
+
+#[tauri::command]
+pub fn browser_remove_allowed_host(app: AppHandle, host: String) -> Result<Vec<String>, String> {
+    browser_policy::remove_allowed_host(&app, &host)
+}
+
+/// Reload every page webview that is open, on the main thread where the engine expects it.
+fn reload_browser_pages(app: &AppHandle) {
+    let sessions: Vec<u64> = match RUNTIME.lock() {
+        Ok(runtime) => runtime.sessions.keys().copied().collect(),
+        Err(_) => return,
     };
-    for info in changed {
-        emit_session(&app, &info);
+    for session in sessions {
+        if let Some(page) = app.get_webview(&page_label(session)) {
+            if let Err(error) = page.reload() {
+                tracing::warn!(session, "could not reload the browser page: {error}");
+            }
+        }
     }
-    sync_meeting_suppression(count);
+}
+
+#[cfg(windows)]
+fn install_resource_interceptor(page: &tauri::Webview, app: AppHandle) {
+    // `with_webview` runs the closure on the UI thread, where WebView2 expects its COM calls.
+    // Any failure must leave the window usable: navigation blocking is already installed.
+    if let Err(error) = page.with_webview(move |platform| {
+        // SAFETY: the closure runs on the main thread; every COM result is checked below.
+        if let Err(error) = unsafe { attach_resource_filter(&platform, &app) } {
+            tracing::warn!("could not attach the WebView2 resource filter ({error}); falling back to navigation-only blocking");
+        }
+    }) {
+        tracing::warn!("could not reach the WebView2 handle: {error}; falling back to navigation-only blocking");
+    }
+}
+
+#[cfg(windows)]
+unsafe fn attach_resource_filter(platform: &tauri::webview::PlatformWebview, app: &AppHandle) -> Result<(), String> {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        ICoreWebView2, ICoreWebView2WebResourceRequestedEventArgs, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
+    };
+    use webview2_com::WebResourceRequestedEventHandler;
+    use windows061::core::HSTRING;
+
+    let controller = platform.controller();
+    let core = controller.CoreWebView2().map_err(|error| error.to_string())?;
+    let environment = platform.environment();
+    core.AddWebResourceRequestedFilter(&HSTRING::from("*"), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL)
+        .map_err(|error| error.to_string())?;
+
+    let handler_app = app.clone();
+    let handler_environment = environment.clone();
+    let handler = WebResourceRequestedEventHandler::create(Box::new(
+        move |_sender: Option<ICoreWebView2>, args: Option<ICoreWebView2WebResourceRequestedEventArgs>| {
+            let Some(args) = args else { return Ok(()) };
+            if let Err(error) = block_resource_request(&handler_app, &handler_environment, &args) {
+                tracing::warn!("could not block a WebView2 resource request: {error}");
+            }
+            Ok(())
+        },
+    ));
+    core.add_WebResourceRequested(&handler, std::ptr::null_mut())
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Answer a refused resource request with an error response, so the engine does not retry and
+/// the page sees the origin as unavailable. Allowed requests are left to the engine.
+#[cfg(windows)]
+unsafe fn block_resource_request(
+    app: &AppHandle,
+    environment: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Environment,
+    args: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2WebResourceRequestedEventArgs,
+) -> Result<(), String> {
+    use windows061::core::{HSTRING, PWSTR};
+    use windows061::Win32::System::Com::IStream;
 
-    #[test]
-    fn meeting_matching_is_https_exact_host_or_subdomain() {
-        let hosts = vec!["telemost.yandex.ru".to_string()];
-        assert!(is_meeting_url("https://telemost.yandex.ru/rooms/1", &hosts));
-        assert!(is_meeting_url("https://sub.telemost.yandex.ru/x", &hosts));
-        assert!(is_meeting_url("https://TELEMOST.YANDEX.RU/", &hosts));
-        assert!(!is_meeting_url("http://telemost.yandex.ru/rooms/1", &hosts));
-        assert!(!is_meeting_url("https://nottelemost.yandex.ru/x", &hosts));
-        assert!(!is_meeting_url("https://yandex.ru/x", &hosts));
+    let request = args.Request().map_err(|error| error.to_string())?;
+    let mut uri = PWSTR::null();
+    request.Uri(&mut uri).map_err(|error| error.to_string())?;
+    let uri = webview2_com::take_pwstr(uri);
+    if !browser_policy::should_block(&uri, &browser_policy::allowed()) {
+        return Ok(());
     }
-
-    #[test]
-    fn host_normalization_accepts_urls_and_dedupes() {
-        let hosts = normalize_hosts(vec![
-            " Telemost.Yandex.RU ".to_string(),
-            "https://stream.wb.ru/path".to_string(),
-            "telemost.yandex.ru".to_string(),
-            "   ".to_string(),
-        ]);
-        assert_eq!(hosts, vec!["telemost.yandex.ru", "stream.wb.ru"]);
+    let host = browser_policy::host_of(&uri);
+    if !host.is_empty() {
+        browser_policy::record_blocked_host(app, &host);
     }
+    let reason = HSTRING::from("Blocked by Vibe");
+    let headers = HSTRING::from("");
+    let response = environment
+        .CreateWebResourceResponse(None::<&IStream>, 403, &reason, &headers)
+        .map_err(|error| error.to_string())?;
+    args.SetResponse(&response).map_err(|error| error.to_string())?;
+    Ok(())
 }

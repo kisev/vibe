@@ -30,7 +30,7 @@ import {
 } from '~/lib/transcripts-store'
 import type { NamedPath, ProjectSource } from '~/lib/types'
 import { ErrorModalContext } from '~/providers/error-modal'
-import { hidesStableTimestamps, withoutUnsupportedOptions } from '~/lib/model'
+import { hidesStableTimestamps, isModelFileUsable, withoutUnsupportedOptions } from '~/lib/model'
 import { type Preference, usePreferenceProvider } from '~/providers/preference'
 
 export type JobStatus = 'queued' | 'running' | 'done' | 'error' | 'cancelled'
@@ -157,8 +157,12 @@ export async function buildSharedOptions(preference: Preference) {
 		preference.chunkSeconds != null && capabilities?.max_input_seconds != null
 			? Math.min(preference.chunkSeconds, capabilities.max_input_seconds)
 			: null
+	// A preference can be on while the model is not on disk yet (it is the default, and the
+	// download is a separate step); sending a missing path would fail the whole transcription.
+	const diarizePath = preference.diarizeEnabled && modelsFolder ? `${modelsFolder}/${config.diarizeModelFilename}` : null
+	const diarizeUsable = diarizePath !== null && (await isModelFileUsable(diarizePath))
 	return {
-		...(preference.diarizeEnabled ? { diarize_model: `${modelsFolder}/${config.diarizeModelFilename}` } : {}),
+		...(diarizeUsable ? { diarize_model: diarizePath } : {}),
 		...(stableTimestamps || requiresVad ? { vad_model: `${modelsFolder}/${config.vadModelFilename}` } : {}),
 		...(stableTimestamps ? { stable_timestamps: true } : {}),
 		...(chunkSeconds != null ? { chunk_seconds: chunkSeconds } : {}),

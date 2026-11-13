@@ -4,7 +4,7 @@ import { unregisterAll } from '@tauri-apps/plugin-global-shortcut'
 import './globals.css'
 import { CONFIG_KEYS } from './lib/config-keys'
 import { loadConfigStore, readConfig } from './lib/config-store'
-import { getTextDirection, setLocale } from './paraglide/runtime.js'
+import { getLocale, getTextDirection, setLocale } from './paraglide/runtime.js'
 import { runMigrations } from './lib/migrations'
 import Root from './root'
 import BrowserWindow from './windows/browser-window'
@@ -14,12 +14,15 @@ import BrowserWindow from './windows/browser-window'
  * time, so setting it before the first render is what makes the labels match the app.
  */
 function applyAppearance() {
-	const locale = readConfig<string>(CONFIG_KEYS.displayLanguage, 'en-US')
-	if (locale) setLocale(locale as never, { reload: false })
+	// Only a stored preference wins: with none, Paraglide's own resolved locale (the persisted
+	// Paraglide key, then the browser) is already right, and forcing a default would override it.
+	const stored = readConfig<string | null>(CONFIG_KEYS.displayLanguage, null)
+	if (stored) setLocale(stored as never, { reload: false })
+	const locale = getLocale()
 	const theme = readConfig<'light' | 'dark'>(CONFIG_KEYS.theme, window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
 	document.documentElement.classList.toggle('dark', theme === 'dark')
-	document.documentElement.lang = locale || 'en-US'
-	document.body.dir = getTextDirection((locale || 'en-US') as never)
+	document.documentElement.lang = locale
+	document.body.dir = getTextDirection(locale)
 }
 
 /**

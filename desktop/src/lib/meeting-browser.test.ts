@@ -1,20 +1,16 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_MEETING_HOSTS, isMeetingLaunchArg, normalizeMeetingHost, normalizeMeetingUrl } from './meeting-browser'
+import { isMeetingLaunchArg, normalizeAllowedHost, normalizeMeetingUrl } from './meeting-browser'
 
-describe('meeting host normalization', () => {
+describe('allowed host normalization', () => {
 	it('lowercases a bare host and drops the trailing dot', () => {
-		expect(normalizeMeetingHost(' Meet.Example.COM. ')).toBe('meet.example.com')
+		expect(normalizeAllowedHost(' Meet.Example.COM. ')).toBe('meet.example.com')
 	})
 
-	it('keeps the shipped defaults as bare hosts', () => {
-		for (const host of DEFAULT_MEETING_HOSTS) expect(normalizeMeetingHost(host)).toBe(host)
-	})
-
-	it('rejects schemes, paths, ports and credentials', () => {
-		for (const value of ['https://example.com', 'example.com/path', 'example.com:443', 'user@example.com', 'not a host', '']) {
-			expect(normalizeMeetingHost(value)).toBeNull()
+	it('rejects paths, ports and credentials', () => {
+		for (const value of ['example.com/path', 'example.com:443', 'user@example.com', 'not a host', '']) {
+			expect(normalizeAllowedHost(value)).toBeNull()
 		}
 	})
 })

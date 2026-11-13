@@ -35,7 +35,8 @@ test('every settings section renders without hitting the error boundary', async 
 
 test('the meeting browser settings live under Recording and expose the open-link flow', async ({ page }) => {
 	await goToSection(page, 'Recording')
-	await expect(page.getByRole('heading', { name: 'Meeting hosts' })).toBeVisible()
+	await expect(page.getByRole('heading', { name: 'Allowed domains' })).toBeVisible()
+	await expect(page.getByRole('heading', { name: 'Blocked', exact: true })).toBeVisible()
 	await expect(page.getByRole('textbox', { name: 'Link to open' })).toBeVisible()
 	await expect(page.getByRole('button', { name: 'Open', exact: true })).toBeDisabled()
 	await expectNoBoundary(page)

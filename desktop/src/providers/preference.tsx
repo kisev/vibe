@@ -259,8 +259,11 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 	// engine, so a persisted toggle can point at a file that is no longer
 	// downloaded — revalidate it before the first transcription, not after.
 	const diarizationMigrationDone = useRef(false)
+	// Only a preference the user actually persisted is revalidated: the default is on, and
+	// prompting every fresh install to migrate would be a dialog nobody asked for.
+	const persistedDiarize = readConfig<boolean | null>(CONFIG_KEYS.diarizeEnabled, null)
 	useEffect(() => {
-		if (diarizationMigrationDone.current || !diarizeEnabled) return
+		if (diarizationMigrationDone.current || !diarizeEnabled || persistedDiarize !== true) return
 		diarizationMigrationDone.current = true
 		void runDiarizationMigration(diarizeEnabled, () => setDiarizeEnabled(false))
 	}, [diarizeEnabled, setDiarizeEnabled])

@@ -1,6 +1,6 @@
 # Meeting browser
 
-The meeting browser is a single Vibe-hosted window: Vibe's chrome (address, back, forward, reload, open-external, close and the record action) fills the top strip, and the page occupies the rest of the same window underneath it. There is no separate always-on-top bar. This page lists the schemes, defaults, and settings paths; [the explanation](../explanation/meeting-browser.md) covers why it works this way, and [the how-to](../how-to/use-the-meeting-browser.md) covers the steps.
+The meeting browser is a single Vibe-hosted window: Vibe's chrome (address, back, forward, reload, open-external, close and the record action) fills the top strip, and the page occupies the rest of the same window underneath it. There is no separate always-on-top bar. This page lists the schemes, the allowlist and settings paths; [the explanation](../explanation/meeting-browser.md) covers why it works this way, and [the how-to](../how-to/use-the-meeting-browser.md) covers the steps.
 
 ## URL schemes
 
@@ -21,21 +21,19 @@ The page shares the app's WebView2 environment; WebView2 does not support a seco
 
 The window holds two child webviews: the app-owned chrome, which has the app's capabilities, and the remote page, which has none. This multi-webview layout is supported on desktop Windows and Linux only. On macOS Vibe falls back to a plain page-only `WebviewWindow` with no in-window chrome (the page still loads in Vibe; recording stays on the main window, and **Open in system browser** remains the escape hatch).
 
-## Meeting hosts
+## Allowed domains
 
-Default hosts:
+The embedded browser is an allowlist. Only hosts in `browser.allowedHosts` (edited in **Settings → Recording → Allowed domains**) may load, and a host covers its subdomains over https; an `http` URL never loads. There are no seeded defaults: the list starts empty and the previous `meeting.browserHosts` value is migrated into it once on startup.
 
-- `telemost.yandex.ru`
-- `stream.wb.ru`
-
-Matching is by host name over https: a subdomain of a listed host matches, an `http` URL does not. The list is editable in **Settings → Recording → Meeting hosts**. Removing a host keeps its links openable; they just lose the in-window record action.
+Every top-level navigation and every resource request from an unlisted origin is refused and the origin is recorded once under **Blocked**, newest first. Allowing a blocked host adds it to the list and reloads the open pages. Windows enforces resource blocking through WebView2's `WebResourceRequested`; Linux and macOS currently enforce top-level navigation only.
 
 ## Settings and actions
 
 | Where | What |
 | --- | --- |
 | Settings → Recording → **Open in Vibe** | Paste a link and open it in the single browser window |
-| Settings → Recording → **Meeting hosts** | Add or remove recording hosts |
+| Settings → Recording → **Allowed domains** | Add or remove the domains the browser may load |
+| Settings → Recording → **Blocked** | Allow a host the browser refused; the page reloads |
 | Browser chrome (top of the window) | Address, back, forward, reload, close, **Open in system browser** |
 | Browser chrome (top of the window) | **Record this call**, and stop while recording |
 
