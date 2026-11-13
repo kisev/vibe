@@ -15,6 +15,7 @@ import { BoundaryFallback } from './components/boundary-fallback'
 import ErrorModalWithContext from './components/error-modal-with-context'
 import HandoffTranscriptSaver from './components/handoff-transcript-saver'
 import MeetingBrowserCloseGate from './components/meeting-browser-close-gate'
+import MeetingBarWindow from './windows/meeting-bar-window'
 import { FilesProvider } from './providers/files-provider'
 import { HotkeyProvider } from './providers/hotkey'
 import { RecordingShortcutProvider } from './providers/recording-shortcut'
@@ -24,15 +25,15 @@ import { TooltipProvider } from '~/components/ui/tooltip'
 import { DirectionProvider } from '~/components/ui/direction'
 import { setMeetingDetectionEnabled } from '~/lib/meeting-prompt'
 
-export default function App() {
+export default function App({ meetingBarSession = null }: { meetingBarSession?: number | null }) {
 	return (
 		<PreferenceProvider>
-			<AppContent />
+			<AppContent meetingBarSession={meetingBarSession} />
 		</PreferenceProvider>
 	)
 }
 
-function AppContent() {
+function AppContent({ meetingBarSession }: { meetingBarSession: number | null }) {
 	const { displayLanguage, closeToTray, meetingDetectionEnabled } = usePreferenceProvider()
 	const dir = getTextDirection(displayLanguage)
 	useTray(closeToTray, displayLanguage)
@@ -60,10 +61,14 @@ function AppContent() {
 										<HandoffTranscriptSaver />
 										<MeetingBrowserCloseGate />
 										<FilesProvider>
-											<Routes>
-												<Route path="/" element={<MainPage />} />
-												<Route path="/setup" element={<SetupPage />} />
-											</Routes>
+											{meetingBarSession !== null ? (
+												<MeetingBarWindow session={meetingBarSession} />
+											) : (
+												<Routes>
+													<Route path="/" element={<MainPage />} />
+													<Route path="/setup" element={<SetupPage />} />
+												</Routes>
+											)}
 										</FilesProvider>
 										<Toaster position="bottom-right" />
 									</RecordingShortcutProvider>

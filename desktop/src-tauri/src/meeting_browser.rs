@@ -18,12 +18,11 @@ const CLOSE_REQUESTED_EVENT: &str = "meeting-browser-close-requested";
 /// Emitted to the main window when a page never finished loading: a blank webview with no
 /// explanation is the worst outcome, so the user gets a retry/close question instead.
 const LOAD_FAILED_EVENT: &str = "meeting-browser-load-failed";
-/// The content webviews get their own data partition, separate from the app's storage.
-const PROFILE_DIR: &str = "browser-profile";
 const CONTENT_WIDTH: f64 = 1100.0;
 const CONTENT_HEIGHT: f64 = 760.0;
-/// Menu ids carry the session so one handler serves every window.
-const MENU_PREFIX: &str = "meeting-browser";
+/// The bar window: its own small always-on-top surface, sitting above the content window.
+const BAR_WIDTH: f64 = 720.0;
+const BAR_HEIGHT: f64 = 96.0;
 /// How long a page may stay unloaded before the window offers a retry instead of white.
 const LOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 
@@ -71,65 +70,8 @@ fn content_label(session: u64) -> String {
     format!("browser-{session}")
 }
 
-/// The window's own menu: the controls survive any page, including one that fails to load,
-/// so a white webview can never leave the user without a way to reload or close it.
-fn menu_id(session: u64, action: &str) -> String {
-    format!("{MENU_PREFIX}:{session}:{action}")
-}
-
-fn build_menu(app: &AppHandle, session: u64, can_back: bool, can_forward: bool) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
-    use tauri::menu::{Menu, MenuItem};
-    let back = MenuItem::with_id(app, menu_id(session, "back"), "←", can_back, None::<&str>)?;
-    let forward = MenuItem::with_id(app, menu_id(session, "forward"), "→", can_forward, None::<&str>)?;
-    let reload = MenuItem::with_id(app, menu_id(session, "reload"), "⟳", true, None::<&str>)?;
-    let external = MenuItem::with_id(app, menu_id(session, "external"), "↗", true, None::<&str>)?;
-    let close = MenuItem::with_id(app, menu_id(session, "close"), "✕", true, None::<&str>)?;
-    Menu::with_items(app, &[&back, &forward, &reload, &external, &close])
-}
-
-fn refresh_menu(app: &AppHandle, info: &BrowserSessionInfo) {
-    if let Some(window) = app.get_webview_window(&content_label(info.session)) {
-        if let Ok(menu) = build_menu(app, info.session, info.can_back, info.can_forward) {
-            if let Err(error) = window.set_menu(menu) {
-                tracing::warn!("could not refresh the meeting window menu: {error}");
-            }
-        }
-    }
-}
-
-/// One handler for every meeting window; the id carries the session and the action.
-fn ensure_menu_handler(app: &AppHandle) {
-    static HANDLER: std::sync::Once = std::sync::Once::new();
-    HANDLER.call_once(|| {
-        app.on_menu_event(|app, event| {
-            let id = event.id().as_ref();
-            let Some(rest) = id.strip_prefix(MENU_PREFIX) else {
-                return;
-            };
-            let mut parts = rest.trim_start_matches(':').splitn(2, ':');
-            let session = parts.next().and_then(|value| value.parse::<u64>().ok());
-            let action = parts.next();
-            let (Some(session), Some(action)) = (session, action) else {
-                return;
-            };
-            let result = match action {
-                "back" | "forward" | "reload" => meeting_browser_navigate(app.clone(), session, action.to_string()),
-                "external" => meeting_browser_open_external(session),
-                "close" => meeting_browser_close(app.clone(), session),
-                _ => Ok(()),
-            };
-            if let Err(error) = result {
-                tracing::warn!("meeting window menu action {action} failed: {error}");
-            }
-        });
-    });
-}
-
-fn attach_menu(app: &AppHandle, window: &tauri::WebviewWindow, session: u64) -> Result<(), String> {
-    ensure_menu_handler(app);
-    let menu = build_menu(app, session, false, false).map_err(|error| error.to_string())?;
-    window.set_menu(menu).map_err(|error| error.to_string())?;
-    Ok(())
+fn bar_label(session: u64) -> String {
+    format!("meeting-bar-{session}")
 }
 
 fn default_hosts() -> Vec<String> {
@@ -251,7 +193,6 @@ fn handle_page_load(app: &AppHandle, session: u64, url: &Url) {
     };
     if let Some(info) = changed {
         emit_session(app, &info);
-        refresh_menu(app, &info);
     }
     sync_meeting_suppression(count);
 }
@@ -267,6 +208,9 @@ fn finalize_session(app: &AppHandle, session: u64) {
     };
     if !removed {
         return;
+    }
+    if let Some(bar) = app.get_webview_window(&bar_label(session)) {
+        let _ = bar.close();
     }
     sync_meeting_suppression(count);
     if let Err(error) = app.emit(CLOSED_EVENT, serde_json::json!({ "session": session })) {
@@ -326,13 +270,6 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
         return Ok(info);
     }
 
-    let profile = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| format!("Could not resolve the app data directory: {error}"))?
-        .join(PROFILE_DIR);
-    std::fs::create_dir_all(&profile).map_err(|error| format!("Could not create the browser profile directory: {error}"))?;
-
     let hosts = load_hosts(&app);
     let session = NEXT_SESSION.fetch_add(1, Ordering::Relaxed);
     let info = BrowserSessionInfo {
@@ -356,7 +293,7 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
             },
         );
     }
-    tracing::info!(session, url = %info.url, host = %info.host, meeting = info.is_meeting, profile = %profile.display(), "opening meeting browser");
+    tracing::info!(session, url = %info.url, host = %info.host, meeting = info.is_meeting, "opening meeting browser");
     // Suppress external detection as soon as the meeting session exists, before the webview
     // has loaded enough to fire its first page event.
     let initial_count = lock_runtime()?.meeting_count();
@@ -365,7 +302,6 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
     let content = match WebviewWindowBuilder::new(&app, content_label(session), WebviewUrl::External(parsed))
         .title(info.host.clone())
         .inner_size(CONTENT_WIDTH, CONTENT_HEIGHT)
-        .data_directory(profile)
         .focused(true)
         .on_page_load(move |window, payload| {
             tracing::info!(
@@ -415,10 +351,34 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
         _ => {}
     });
 
-    if let Err(error) = attach_menu(&app, &content, session) {
-        let _ = content.destroy();
-        finalize_session(&app, session);
-        return Err(format!("Could not build the meeting window menu: {error}"));
+    // The bar is the trusted app UI (address, back, forward, reload, open-external, close).
+    // A webview cannot host our own chrome, so it lives in its own always-on-top window; the
+    // content window keeps its ordinary titlebar, so it can always be closed even if the bar
+    // fails to open.
+    let bar_url = format!("index.html?window=meeting-bar&session={session}");
+    match WebviewWindowBuilder::new(&app, bar_label(session), WebviewUrl::App(bar_url.into()))
+        .title("Vibe browser")
+        .inner_size(BAR_WIDTH, BAR_HEIGHT)
+        .always_on_top(true)
+        .build()
+    {
+        Ok(bar) => {
+            if let Ok(Some(monitor)) = app.primary_monitor() {
+                let size = monitor.size();
+                let width = (BAR_WIDTH * monitor.scale_factor()) as i32;
+                let x = ((size.width as i32) - width) / 2;
+                if let Err(error) = bar.set_position(tauri::PhysicalPosition::new(x.max(0), 48)) {
+                    tracing::warn!("could not place the meeting bar: {error}");
+                }
+            }
+            let bar_app = app.clone();
+            bar.on_window_event(move |event| {
+                if let WindowEvent::CloseRequested { .. } = event {
+                    let _ = close_session(&bar_app, session);
+                }
+            });
+        }
+        Err(error) => tracing::warn!(session, "could not open the meeting bar: {error}"),
     }
 
     // A webview that never finishes loading shows a blank surface with no explanation. Ask the
@@ -526,6 +486,44 @@ pub fn meeting_browser_navigate(app: AppHandle, session: u64, action: String) ->
         sync_meeting_suppression(count);
     }
     Ok(())
+}
+
+/// Load a URL typed into the bar: a fresh entry in the same session's history.
+#[tauri::command]
+pub fn meeting_browser_load(app: AppHandle, session: u64, url: String) -> Result<BrowserSessionInfo, String> {
+    let parsed = Url::parse(&url).map_err(|error| format!("Invalid URL {url:?}: {error}"))?;
+    if parsed.scheme() != "https" {
+        return Err(format!(
+            "Only https URLs can be opened; {url:?} uses the {} scheme",
+            parsed.scheme()
+        ));
+    }
+    let window = app
+        .get_webview_window(&content_label(session))
+        .ok_or_else(|| format!("Browser window for session {session} is not open"))?;
+    let hosts = load_hosts(&app);
+    let (info, count) = {
+        let mut runtime = lock_runtime()?;
+        let state = runtime
+            .sessions
+            .get_mut(&session)
+            .ok_or_else(|| format!("Unknown browser session {session}"))?;
+        state.history.truncate(state.index + 1);
+        state.history.push(parsed.as_str().to_string());
+        state.index = state.history.len() - 1;
+        state.info.url = parsed.as_str().to_string();
+        state.info.host = host_of(&state.info.url);
+        state.info.is_meeting = is_meeting_url(&state.info.url, &hosts);
+        state.info.can_back = state.index > 0;
+        state.info.can_forward = false;
+        (state.info.clone(), runtime.meeting_count())
+    };
+    window
+        .navigate(parsed)
+        .map_err(|error| format!("Could not navigate the browser window: {error}"))?;
+    emit_session(&app, &info);
+    sync_meeting_suppression(count);
+    Ok(info)
 }
 
 #[tauri::command]

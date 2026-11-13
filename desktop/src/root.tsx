@@ -9,6 +9,9 @@ export default function Root() {
 
 	if (windowName === 'dictation-indicator') return <DictationIndicatorWindow />
 	if (windowName === 'meeting-prompt') return <MeetingPromptWindow />
+	// The meeting bar keeps the app's providers (preferences, error modal, recording) but
+	// replaces the routed UI, so it can start a recording without a second bootstrap.
+	if (windowName === 'meeting-bar') return <App meetingBarSession={Number(params.get('session')) || null} />
 
 	return (
 		<BrowserRouter>

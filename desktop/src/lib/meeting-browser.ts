@@ -28,6 +28,9 @@ export const getMeetingBrowserSession = (session: number) => invoke<BrowserSessi
 export const navigateMeetingBrowser = (session: number, action: BrowserNavigationAction) =>
 	invoke<void>('meeting_browser_navigate', { session, action })
 
+/** Load a URL typed into the bar: it becomes a new entry in the session history. */
+export const loadMeetingBrowserUrl = (session: number, url: string) => invoke<BrowserSessionInfo>('meeting_browser_load', { session, url })
+
 export const openMeetingBrowserExternal = (session: number) => invoke<void>('meeting_browser_open_external', { session })
 
 export const closeMeetingBrowser = (session: number) => invoke<void>('meeting_browser_close', { session })

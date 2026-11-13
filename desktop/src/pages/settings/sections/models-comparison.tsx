@@ -173,6 +173,11 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 	const chosenModels = selectableModels.filter((entry) => selected.has(entry.path))
 	const needMore = Boolean(input) && chosenModels.length < 2
 	const busy = running
+	// A failed run is worth surfacing before the results window: otherwise the
+	// only trace is a row that is easy to read as a model that never ran.
+	const finished = runs.filter((candidate) => candidate.status === 'done').length
+	const failed = runs.filter((candidate) => candidate.status === 'error').length
+	const settled = runs.length > 0 && !running
 
 	async function run() {
 		if (!input) return
@@ -285,10 +290,15 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 					{m.compareRun()}
 				</Button>
 				{needMore && !running && <span className="text-xs text-muted-foreground">{m.compareNeedTwo()}</span>}
-				{runs.some((candidate) => candidate.status === 'done') && !running && (
-					<Button variant="secondary" onClick={() => setShowResults(true)}>
-						{m.compareResults()}
-					</Button>
+				{settled && (
+					<>
+						<span className="text-xs text-muted-foreground">
+							{m.compareRunsDone({ count: finished })} · {m.compareRunsFailed({ count: failed })}
+						</span>
+						<Button variant="secondary" onClick={() => setShowResults(true)}>
+							{m.compareResults()}
+						</Button>
+					</>
 				)}
 			</div>
 

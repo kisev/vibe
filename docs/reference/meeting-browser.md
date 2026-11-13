@@ -17,7 +17,7 @@ The meeting browser is a Vibe-hosted Chromium webview with a small always-on-top
 | macOS | WKWebView |
 | Linux | WebKitGTK |
 
-The content window uses its own data directory, so service cookies do not mix with the app's storage. No scripts are injected into the page.
+The content window shares the app's WebView2 environment; WebView2 does not support a second data directory in one process, and an attempt to use one is what used to leave the window blank and the app unresponsive. No scripts are injected into the page.
 
 ## Meeting hosts
 

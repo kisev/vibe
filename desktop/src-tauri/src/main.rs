@@ -161,6 +161,7 @@ async fn main() -> Result<()> {
             meeting_browser::open_meeting_browser,
             meeting_browser::meeting_browser_session,
             meeting_browser::meeting_browser_navigate,
+            meeting_browser::meeting_browser_load,
             meeting_browser::meeting_browser_open_external,
             meeting_browser::meeting_browser_close,
             meeting_browser::meeting_browser_confirm_close,

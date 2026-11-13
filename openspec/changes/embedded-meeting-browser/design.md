@@ -37,7 +37,7 @@ A browser never hands an `https://` link to an installed app unless that app is 
 
 - **Deep links are validated before any window opens.** `vibe://open/?url=` is parsed in Rust, the scheme must be `https`, the URL must be well formed, and the app focuses an existing window for the same URL instead of spawning duplicates. Invalid input asks before doing anything. Because any local process can invoke `vibe://`, validation is the only gate and nothing is auto-recorded from a link.
 
-- **Isolation is per-window storage.** The content webview gets its own data directory so service cookies never mix with the app's storage; Vibe never reads page credentials. Camera and microphone permissions are the platform webview's own prompts. The bar is app UI and holds no page content.
+- **Isolation is per-window storage, within what WebView2 allows.** A second WebView2 environment with its own data directory is not supported in one process: the attempt left the window blank and the app unresponsive on Windows, so the content webview shares the app's environment (`meeting-browser-rework`). Vibe never reads page credentials. Camera and microphone permissions are the platform webview's own prompts. The bar is app UI and holds no page content.
 
 - **Meeting detection suppression is state-driven.** While an in-app meeting window is open on a meeting host, `meeting_prompt.rs` suppresses the external prompt for that session; when the window closes, detection resumes. External-browser calls behave exactly as they do today.
 

@@ -51,6 +51,17 @@ export const meetingHandlers: CommandHandlerMap = {
 		return info
 	},
 
+	meeting_browser_load: (args) => {
+		const session = Number(args.session)
+		const current = sessions.get(session)
+		if (!current) throw `[mock-meeting] unknown session ${String(args.session)}`
+		const url = String(args.url ?? '')
+		if (!/^https?:\/\//i.test(url)) throw `[mock-meeting] unsupported URL: ${url}`
+		const next = { ...current, url, host: hostOf(url), canBack: true, canForward: false }
+		sessions.set(session, next)
+		return next
+	},
+
 	meeting_browser_retry: (args) => {
 		if (!sessions.has(Number(args.session))) {
 			throw `[mock-meeting] unknown session ${String(args.session)}`

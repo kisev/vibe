@@ -289,6 +289,54 @@ describe('models comparison section', () => {
 		expect(screen.queryByText('+0')).toBeNull()
 	})
 
+	it('states how many models finished and how many failed before the results button', async () => {
+		mocks.runComparison.mockResolvedValue([
+			{
+				model: { name: 'Alpha', path: '/models/alpha.gguf' },
+				status: 'done',
+				seconds: 3,
+				outputPath: '/out/Alpha.md',
+				segments: [{ start: 0, stop: 1, text: 'hello world' }],
+			},
+			{
+				model: { name: 'Beta', path: '/models/beta.gguf' },
+				status: 'done',
+				seconds: 5,
+				outputPath: '/out/Beta.md',
+				segments: [{ start: 0, stop: 1, text: 'hello there' }],
+			},
+			{ model: { name: 'Gamma', path: '/models/gamma.gguf' }, status: 'error', error: 'boom' },
+		])
+		const user = userEvent.setup()
+		renderSection([model('alpha.gguf'), model('beta.gguf'), model('gamma.gguf')])
+		await chooseFile(user)
+		for (const name of ['alpha.gguf', 'beta.gguf', 'gamma.gguf']) {
+			await user.click(screen.getByRole('button', { name }))
+		}
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+
+		expect(await screen.findByText(`${m.compareRunsDone({ count: 2 })} · ${m.compareRunsFailed({ count: 1 })}`)).toBeTruthy()
+		expect(screen.getByRole('button', { name: m.compareResults() })).toBeTruthy()
+	})
+
+	it('opens the results when every run failed, without a baseline', async () => {
+		mocks.runComparison.mockResolvedValue([
+			{ model: { name: 'Alpha', path: '/models/alpha.gguf' }, status: 'error', error: 'boom' },
+			{ model: { name: 'Beta', path: '/models/beta.gguf' }, status: 'error', error: 'bang' },
+		])
+		const user = userEvent.setup()
+		renderSection([model('alpha.gguf'), model('beta.gguf')])
+		await chooseFile(user)
+		await user.click(screen.getByRole('button', { name: 'alpha.gguf' }))
+		await user.click(screen.getByRole('button', { name: 'beta.gguf' }))
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+
+		await user.click(await screen.findByRole('button', { name: m.compareResults() }))
+
+		expect(await screen.findByText(m.compareAllFailed())).toBeTruthy()
+		expect(screen.queryByText(m.compareBaseline())).toBeNull()
+	})
+
 	it('does not offer corrupt model files', () => {
 		renderSection([model('good.gguf'), model('bad.gguf', { valid: false, reason: 'truncated' })])
 

@@ -47,3 +47,4 @@
 ## Workflow follow-up
 
 - Optional auto-record per host is a separate future change; it is not part of this one.
+- [x] 1.4 2026-11-13: the per-session data directory was removed by `meeting-browser-rework` — WebView2 does not support a second environment in one process, and the attempt left the content window blank with the app unresponsive; the content webview now shares the app's environment.

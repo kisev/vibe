@@ -65,6 +65,9 @@ function DiffText({ parts }: { parts: DiffPart[] }) {
 
 export function ModelsComparisonResults({ input, runs, open, onOpenChange }: ComparisonResultsProps) {
 	const done = runs.filter((run) => run.status === 'done')
+	// A failed run still gets a column: dropping it makes the model look unselected
+	// rather than broken, and the error is the one thing that explains the gap.
+	const failed = runs.filter((run) => run.status === 'error')
 	const [baselinePath, setBaselinePath] = useState<string | null>(null)
 	const [highlight, setHighlight] = useState(true)
 	const baseline = done.find((run) => run.model.path === baselinePath) ?? done[0]
@@ -82,31 +85,55 @@ export function ModelsComparisonResults({ input, runs, open, onOpenChange }: Com
 								{input.duration !== null ? ` · ${input.duration}s` : ''}
 							</DialogDescription>
 						</div>
-						<div className="flex flex-wrap items-center gap-3">
-							<label className="flex items-center gap-2 text-sm text-muted-foreground">
-								{m.compareBaseline()}
-								<Select value={baseline?.model.path ?? ''} onValueChange={setBaselinePath}>
-									<SelectTrigger className="w-56">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{done.map((run) => (
-											<SelectItem key={run.model.path} value={run.model.path}>
-												{run.model.name}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</label>
-							<label className="flex items-center gap-2 text-sm text-muted-foreground">
-								{m.compareHighlight()}
-								<Switch checked={highlight} onCheckedChange={setHighlight} aria-label={m.compareHighlight()} />
-							</label>
-						</div>
+						{done.length > 0 && (
+							<div className="flex flex-wrap items-center gap-3">
+								<label className="flex items-center gap-2 text-sm text-muted-foreground">
+									{m.compareBaseline()}
+									<Select value={baseline?.model.path ?? ''} onValueChange={setBaselinePath}>
+										<SelectTrigger className="w-56">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											{done.map((run) => (
+												<SelectItem key={run.model.path} value={run.model.path}>
+													{run.model.name}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</label>
+								<label className="flex items-center gap-2 text-sm text-muted-foreground">
+									{m.compareHighlight()}
+									<Switch checked={highlight} onCheckedChange={setHighlight} aria-label={m.compareHighlight()} />
+								</label>
+							</div>
+						)}
 					</header>
 
+					{done.length === 0 && failed.length > 0 && (
+						<p className="border-b border-border bg-destructive/5 px-6 py-3 text-sm text-destructive">{m.compareAllFailed()}</p>
+					)}
+
 					<div className="flex min-h-0 flex-1 overflow-x-auto">
-						{done.map((run) => {
+						{runs.map((run) => {
+							if (run.status !== 'done') {
+								return (
+									<section
+										key={run.model.path}
+										aria-label={run.model.name}
+										className="flex min-h-0 min-w-[24rem] flex-1 basis-0 flex-col border-e border-border last:border-e-0">
+										<div className="flex flex-col gap-2 border-b border-border bg-background/95 px-4 py-3">
+											<span className="truncate text-sm font-semibold">{run.model.name}</span>
+										</div>
+										<div
+											className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+												run.status === 'error' ? 'text-destructive' : 'text-muted-foreground'
+											}`}>
+											{run.status === 'error' ? `${m.error()}: ${run.error ?? ''}` : m.transcribing()}
+										</div>
+									</section>
+								)
+							}
 							const isBaseline = run.model.path === baseline?.model.path
 							const text = transcriptText(run.segments ?? [])
 							const words = tokenize(text).length
@@ -116,6 +143,7 @@ export function ModelsComparisonResults({ input, runs, open, onOpenChange }: Com
 							return (
 								<section
 									key={run.model.path}
+									aria-label={run.model.name}
 									className="flex min-h-0 min-w-[24rem] flex-1 basis-0 flex-col border-e border-border last:border-e-0">
 									<div className="flex flex-col gap-2 border-b border-border bg-background/95 px-4 py-3">
 										<div className="flex flex-wrap items-center justify-between gap-2">
