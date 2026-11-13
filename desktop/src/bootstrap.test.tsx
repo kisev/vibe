@@ -15,7 +15,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ label: mocks.windowLabel }) }))
 vi.mock('@tauri-apps/plugin-global-shortcut', () => ({ unregisterAll: mocks.unregisterAll }))
-vi.mock('./lib/config-store', () => ({ loadConfigStore: mocks.loadConfigStore }))
+vi.mock('./lib/config-store', () => ({
+	loadConfigStore: mocks.loadConfigStore,
+	readConfig: (_key: string, fallback: unknown) => fallback,
+}))
+// First paint applies the configured locale and theme, so bootstrap reads these at module level.
+vi.mock('./paraglide/runtime.js', () => ({ setLocale: vi.fn(), getTextDirection: () => 'ltr' }))
 vi.mock('./lib/migrations', () => ({ runMigrations: mocks.runMigrations }))
 vi.mock('./root', () => ({ default: () => null }))
 vi.mock('react-dom/client', () => ({ default: { createRoot: () => ({ render: mocks.render }) } }))

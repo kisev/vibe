@@ -13,7 +13,7 @@ import BrowserWindow from './windows/browser-window'
  * Theme, language and direction for a chrome-only window: paraglide resolves the locale at call
  * time, so setting it before the first render is what makes the labels match the app.
  */
-function applyChromeAppearance() {
+function applyAppearance() {
 	const locale = readConfig<string>(CONFIG_KEYS.displayLanguage, 'en-US')
 	if (locale) setLocale(locale as never, { reload: false })
 	const theme = readConfig<'light' | 'dark'>(CONFIG_KEYS.theme, window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
@@ -38,11 +38,13 @@ async function start() {
 		// The chrome follows the app's theme and language, so the store must be in memory before
 		// the first paint — but migrations stay with the main window only.
 		await loadConfigStore()
-		applyChromeAppearance()
+		applyAppearance()
 		ReactDOM.createRoot(root).render(<BrowserWindow session={Number(params.get('session'))} />)
 		return
 	}
 	await loadConfigStore()
+	// Before the first paint: a wrong-language frame on every launch reads as a reset setting.
+	applyAppearance()
 	runMigrations()
 	// Native registrations outlive a webview reload, including their dead JS callbacks.
 	// Clear them before either shortcut provider mounts. Auxiliary windows must never

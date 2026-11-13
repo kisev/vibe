@@ -4,7 +4,6 @@ import { Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { m } from '~/paraglide/messages.js'
-import { ReactComponent as DiscordIcon } from '~/icons/discord.svg'
 import { ReactComponent as GithubIcon } from '~/icons/github.svg'
 import { ReactComponent as LinkIcon } from '~/icons/link.svg'
 import * as config from '~/lib/config'
@@ -68,10 +67,10 @@ export function GeneralSection({ vm }: { vm: SettingsViewModel }) {
 	return (
 		<div className="space-y-5">
 			<SettingsGroup>
-				<SettingsRow label={m.displayLanguage()}>
+				<SettingsRow label={m.displayLanguage()} description={m.infoDisplayLanguage()}>
 					<DisplayLanguageInput value={vm.preference.displayLanguage} onSelect={vm.preference.setDisplayLanguage} className="w-52" />
 				</SettingsRow>
-				<SettingsRow label={m.theme()}>
+				<SettingsRow label={m.theme()} description={m.infoTheme()}>
 					<div role="radiogroup" aria-label={m.theme()} className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5">
 						{config.themes.map((theme) => {
 							const Icon = themeIcons[theme as keyof typeof themeIcons]
@@ -117,7 +116,6 @@ export function GeneralSection({ vm }: { vm: SettingsViewModel }) {
 					{[
 						{ label: m.projectLink(), icon: LinkIcon, action: () => openUrl(config.aboutURL) },
 						{ label: m.reportIssue(), icon: GithubIcon, action: vm.reportIssue },
-						{ label: m.discordCommunity(), icon: DiscordIcon, action: () => openUrl(config.discordURL) },
 					].map(({ label, icon: Icon, action }) => (
 						<button
 							key={label}

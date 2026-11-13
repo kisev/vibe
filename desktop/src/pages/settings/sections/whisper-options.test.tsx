@@ -2,6 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '~/components/ui/tooltip'
 import { m } from '~/paraglide/messages.js'
 import type { ModelCapabilities } from '~/lib/model'
 import type { SettingsViewModel } from './shared'
@@ -59,9 +60,17 @@ function vmWith(capabilities: ModelCapabilities | null) {
 	} as unknown as SettingsViewModel
 }
 
+function renderWhisper(vm: SettingsViewModel) {
+	return render(
+		<TooltipProvider>
+			<WhisperOptionsSection vm={vm} />
+		</TooltipProvider>,
+	)
+}
+
 describe('Whisper-only option gating', () => {
 	it('shows the decoding controls for a Whisper model', () => {
-		render(<WhisperOptionsSection vm={vmWith(whisper)} />)
+		renderWhisper(vmWith(whisper))
 
 		expect(screen.getByText(m.translateToEnglish())).toBeTruthy()
 		expect(screen.getByText(m.useWordTimestamps())).toBeTruthy()
@@ -74,7 +83,7 @@ describe('Whisper-only option gating', () => {
 	})
 
 	it('hides them for GigaAM while keeping the shared thread count', () => {
-		render(<WhisperOptionsSection vm={vmWith(gigaam)} />)
+		renderWhisper(vmWith(gigaam))
 
 		expect(screen.getByText(m.whisperOnlyOptionsNote())).toBeTruthy()
 		expect(screen.queryByText(m.translateToEnglish())).toBeNull()
@@ -89,7 +98,7 @@ describe('Whisper-only option gating', () => {
 	})
 
 	it('keeps the controls when metadata has not loaded yet', () => {
-		render(<WhisperOptionsSection vm={vmWith(null)} />)
+		renderWhisper(vmWith(null))
 		expect(screen.getByText(m.translateToEnglish())).toBeTruthy()
 		expect(screen.queryByText(m.whisperOnlyOptionsNote())).toBeNull()
 	})

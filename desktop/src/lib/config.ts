@@ -14,7 +14,6 @@ export const changelogURL = (version?: string) => {
 	if (wanted === 'dev' || wanted === 'unreleased' || wanted.includes('-dev.')) return 'https://kisev.github.io/vibe/changelog/dev'
 	return `https://kisev.github.io/vibe/changelog/${version}`
 }
-export const discordURL = 'https://discord.gg/EcxWSstQN8'
 export const privacyPolicyURL = 'https://kisev.github.io/vibe/?action=open-privacy-policy'
 export const storeFilename = 'app_config.json'
 

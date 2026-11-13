@@ -1,4 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react'
+import { Info } from 'lucide-react'
+import { m } from '~/paraglide/messages.js'
 import { cn } from '~/lib/style'
 import { Button } from '~/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
@@ -41,7 +43,22 @@ export function SettingsGroup({
 function RowLabel({ label, description, clamp = true }: { label: ReactNode; description?: ReactNode; clamp?: boolean }) {
 	return (
 		<div className="min-w-0 space-y-0.5">
-			<div className="text-sm text-foreground">{label}</div>
+			<div className="flex items-center gap-1.5 text-sm text-foreground">
+				<span className="min-w-0">{label}</span>
+				{description && (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<button
+								type="button"
+								aria-label={m.parameterHelp()}
+								className="flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70">
+								<Info className="h-3.5 w-3.5" />
+							</button>
+						</TooltipTrigger>
+						<TooltipContent className="max-w-xs">{description}</TooltipContent>
+					</Tooltip>
+				)}
+			</div>
 			{description && <p className={cn('text-xs text-muted-foreground', clamp && 'line-clamp-1')}>{description}</p>}
 		</div>
 	)

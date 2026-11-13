@@ -190,7 +190,8 @@ const defaultOptions = {
 	modelPath: null,
 	modelOptions: DEFAULT_MODEL_OPTIONS,
 	ffmpegOptions: {
-		normalize_loudness: false,
+		// On by default: the app's own note says it buys accuracy, and a silent default is worse.
+		normalize_loudness: true,
 		custom_command: null,
 	},
 	ytDlpVersion: null,
@@ -251,7 +252,8 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 	})
 
 	const [recentLanguages, setRecentLanguages] = usePersisted<{ code: string; ts: number }[]>(CONFIG_KEYS.recentLanguages, [])
-	const [diarizeEnabled, setDiarizeEnabled] = usePersisted<boolean>(CONFIG_KEYS.diarizeEnabled, false)
+	// On by default; the missing-model migration still switches it off when the model is absent.
+	const [diarizeEnabled, setDiarizeEnabled] = usePersisted<boolean>(CONFIG_KEYS.diarizeEnabled, true)
 	const [stableTimestampsEnabled, setStableTimestampsEnabled] = usePersisted<boolean>(CONFIG_KEYS.stableTimestampsEnabled, false)
 	// Once per session: the diarization model changed format with the unified
 	// engine, so a persisted toggle can point at a file that is no longer

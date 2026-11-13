@@ -5,6 +5,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '~/components/ui/tooltip'
 import { m } from '~/paraglide/messages.js'
 import type { SettingsViewModel } from './shared'
 import { ApiSection } from './api'
@@ -28,6 +29,14 @@ function apiViewModel(overrides: Partial<SettingsViewModel> = {}): SettingsViewM
 	} as unknown as SettingsViewModel
 }
 
+function renderApi(vm: SettingsViewModel) {
+	return render(
+		<TooltipProvider>
+			<ApiSection vm={vm} />
+		</TooltipProvider>,
+	)
+}
+
 function toggle(): HTMLElement {
 	return screen.getByRole('switch')
 }
@@ -36,7 +45,7 @@ afterEach(cleanup)
 
 describe('local API section', () => {
 	it('defaults the switch to off', () => {
-		render(<ApiSection vm={apiViewModel()} />)
+		renderApi(apiViewModel())
 
 		expect(toggle().getAttribute('aria-checked')).toBe('false')
 	})
@@ -44,13 +53,13 @@ describe('local API section', () => {
 	it('stays off while a transcription process is alive', () => {
 		// A model load for transcription starts the shared server, but that is not the user's
 		// choice: the base URL exists while the intent is still off.
-		render(<ApiSection vm={apiViewModel({ apiEnabled: false, apiBaseUrl: runningUrl })} />)
+		renderApi(apiViewModel({ apiEnabled: false, apiBaseUrl: runningUrl }))
 
 		expect(toggle().getAttribute('aria-checked')).toBe('false')
 	})
 
 	it('reads on from the persisted intent', () => {
-		render(<ApiSection vm={apiViewModel({ apiEnabled: true })} />)
+		renderApi(apiViewModel({ apiEnabled: true }))
 
 		expect(toggle().getAttribute('aria-checked')).toBe('true')
 	})
@@ -58,13 +67,13 @@ describe('local API section', () => {
 	it('starts the server when turned on and stops it when turned off', async () => {
 		const user = userEvent.setup()
 		const off = apiViewModel({ apiEnabled: false })
-		const { unmount } = render(<ApiSection vm={off} />)
+		const { unmount } = renderApi(off)
 		await user.click(toggle())
 		expect(off.startApiServer).toHaveBeenCalledTimes(1)
 		unmount()
 
 		const on = apiViewModel({ apiEnabled: true, apiBaseUrl: runningUrl })
-		render(<ApiSection vm={on} />)
+		renderApi(on)
 		await user.click(toggle())
 		expect(on.stopApiServer).toHaveBeenCalledTimes(1)
 	})
@@ -75,7 +84,7 @@ describe('local API section', () => {
 		expect((screen.getByRole('button', { name: m.copyAgentSkill() }) as HTMLButtonElement).disabled).toBe(true)
 		unmount()
 
-		render(<ApiSection vm={apiViewModel({ apiEnabled: true, apiBaseUrl: runningUrl })} />)
+		renderApi(apiViewModel({ apiEnabled: true, apiBaseUrl: runningUrl }))
 		expect((screen.getByRole('button', { name: m.swaggerDocs() }) as HTMLButtonElement).disabled).toBe(false)
 		expect((screen.getByRole('button', { name: m.copyAgentSkill() }) as HTMLButtonElement).disabled).toBe(false)
 	})

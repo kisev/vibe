@@ -41,7 +41,6 @@ export function TuningSection({ vm, onOpenWhisper, onOpenAudio }: { vm: Settings
 						{vm.preference.stableTimestampsEnabled && <SettingsNote>{m.stableTimestampsSlowNote()}</SettingsNote>}
 					</>
 				)}
-				{whisperOnlyHidden && <SettingsNote>{m.whisperOnlyOptionsNote()}</SettingsNote>}
 			</SettingsGroup>
 			{vm.preference.modelMetadata?.capabilities.max_input_seconds != null && (
 				<SettingsGroup title={m.longRecordings()}>
@@ -65,7 +64,11 @@ export function TuningSection({ vm, onOpenWhisper, onOpenAudio }: { vm: Settings
 				</SettingsGroup>
 			)}
 			<SettingsGroup>
-				{!whisperOnlyHidden && (
+				{whisperOnlyHidden ? (
+					// The note explains the Whisper options that this model hides; it belongs here,
+					// not beside the speaker toggle where it read as a limit on separation.
+					<SettingsNote>{m.whisperOnlyOptionsNote()}</SettingsNote>
+				) : (
 					<ActionRow
 						label={
 							<span className="flex items-center gap-2">

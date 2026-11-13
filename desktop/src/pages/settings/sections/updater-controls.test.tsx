@@ -5,6 +5,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '~/components/ui/tooltip'
 import { m } from '~/paraglide/messages.js'
 import { UpdaterContext, type UpdaterContextType } from '~/providers/updater'
 import { UpdateControls } from './updater-controls'
@@ -35,9 +36,11 @@ function renderWith(overrides: Partial<UpdaterContextType> = {}) {
 		...overrides,
 	}
 	const utils = render(
-		<UpdaterContext.Provider value={value}>
-			<UpdateControls />
-		</UpdaterContext.Provider>,
+		<TooltipProvider>
+			<UpdaterContext.Provider value={value}>
+				<UpdateControls />
+			</UpdaterContext.Provider>
+		</TooltipProvider>,
 	)
 	return { ...utils, value }
 }
