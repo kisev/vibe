@@ -80,8 +80,8 @@ def main() -> int:
         valid_assets = filter_valid_assets(latest_release.get("assets", []))
         mapped_assets = map_assets(valid_assets)
         releases_data = {"assets": mapped_assets, "version": tag_name}
-        RELEASES_PATH.write_text(json.dumps(releases_data, indent=4), encoding="utf-8")
-        print(f"Updated releases at {RELEASES_PATH} with \n{json.dumps(releases_data, indent=4)}")
+        RELEASES_PATH.write_text(json.dumps(releases_data, indent=2) + "\n", encoding="utf-8")
+        print(f"Updated releases at {RELEASES_PATH} with \n{json.dumps(releases_data, indent=2)}")
         return 0
     except Exception as exc:
         print(f"Error fetching or processing latest release: {exc}", file=sys.stderr)
