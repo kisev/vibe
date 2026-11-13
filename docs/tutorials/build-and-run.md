@@ -67,3 +67,17 @@ If the window opens but transcription fails, the server or its GPU backend is th
 - [Check your change](../how-to/check-your-change.md) before opening a pull request.
 - [Build the server](../how-to/build-the-server.md) if you are changing the engine rather than the UI.
 - [Repository layout](../reference/repository-layout.md) and [tooling](../reference/tooling.md) explain where things live.
+
+## Build a Windows installer from WSL
+
+When Vibe runs on Windows but the repository lives in WSL, the Windows host builds the installer itself — the same toolchain the release uses, without a GitHub run:
+
+```console
+task app:build:windows
+```
+
+The target syncs the tree to `VIBE_WIN_CHECKOUT` (default: your Windows profile's `vibe-build`, so nothing depends on a user name), fetches the Windows ggml libraries and diarization helper, and runs `pnpm tauri build --bundles nsis` there. The installer lands in that checkout under `desktop/src-tauri/target/release/bundle/nsis/`; the output of the task prints the path.
+
+The build carries `1.0.0-local.<date>.<sha>` and publishes nothing: no tag, no release, no signature. The updater ignores a version containing `-local`, so a local build is never moved onto a release or dev line. `task app:build:windows:verified` runs `task verify` first.
+
+Requirements on the Windows host: rustup with the MSVC toolchain, Visual Studio Build Tools with the C++ workload, pnpm, Git Bash (used for the sidecar scripts) and the WebView2 runtime. The path may name any drive directory; a `\\wsl.localhost\…` path is refused, because cargo and pnpm cannot run there.

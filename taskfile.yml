@@ -61,6 +61,16 @@ tasks:
       - task: setup
       - pnpm --dir desktop exec tauri build
 
+  app:build:windows:
+    desc: Build the Windows installer on the Windows host from this checkout (VIBE_WIN_CHECKOUT, default <home>\vibe-build)
+    cmds:
+      - bash scripts/local_windows_build.sh
+
+  app:build:windows:verified:
+    desc: Run the local gate, then build the Windows installer locally
+    cmds:
+      - bash scripts/local_windows_build.sh --verified
+
   app:upgrade:
     desc: Rebuild vibe.app, replace the installed one and relaunch it (macOS)
     cmds:
@@ -70,6 +80,7 @@ tasks:
     desc: Run the website locally
     cmds:
       - uv run scripts/roadmap.py
+      - pnpm --dir website install
       - pnpm --dir website dev
 
   website:build:
@@ -221,6 +232,11 @@ tasks:
     cmds:
       - pnpm --dir website test
 
+  roadmap:test:
+    desc: Roadmap generator and translation tests
+    cmds:
+      - uv run scripts/roadmap_test.py
+
   website:typecheck:
     desc: Website type check (build)
     cmds:
@@ -266,6 +282,10 @@ tasks:
       - task: server:deny
       - task: server:machete
       - task: test
+      - task: docs:models:check
+      # CI rebuilds the site on a push; a broken roadmap, link pass or Vite
+      # build must fail here, not minutes after the push.
+      - task: website:build
       - task: ci:e2e
       # Last: it is the one step that needs host build packages the others
       # never touch, so a host that lacks them still runs every other gate.
@@ -298,12 +318,20 @@ tasks:
       # carries the one fork-side allow line for its generated bindings.
       - bash ../scripts/ci/clippy.sh -p vibe-server -p vibe-diarize-native --all-targets -- -D warnings
 
+  scripts:test:
+    desc: Unit tests for the standalone Python scripts
+    cmds:
+      - uv run scripts/roadmap_test.py
+      - uv run scripts/release_notes_test.py
+      - uv run scripts/check_docs_pages.py
+
   test:
     desc: All unit suites
     cmds:
       - task: desktop:test
       - task: website:test
       - task: server:test
+      - task: scripts:test
 
   lint:
     desc: Run every linter (whole tree)
@@ -578,9 +606,9 @@ tasks:
       - python3 scripts/release_set_version.py
 
   release:notes:
-    desc: Assemble the GitHub release body - English notes under the website changelog link (VERSION, RELEASE_NOTES; stdout when unset)
+    desc: Assemble the GitHub release body - English notes under the website changelog link (VERSION defaults to tauri.conf.json; RELEASE_NOTES; --github-output appends to $GITHUB_OUTPUT)
     cmds:
-      - '{{.PYTHON}} scripts/release_notes.py'
+      - '{{.PYTHON}} scripts/release_notes.py {{.CLI_ARGS}}'
 
   dev:tag:
     desc: Cut a dev build - tag dev.<next> on the dev branch and push the tag

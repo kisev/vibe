@@ -80,6 +80,11 @@ pub async fn update_check(
     pending: State<'_, PendingUpdate>,
     channel: Channel,
 ) -> Result<Option<AvailableUpdate>, String> {
+    // A locally built app (`1.0.0-local.<date>.<sha>`) is not on any channel: offering it a
+    // release or dev build would move the tester off the revision they are checking.
+    if app.package_info().version.to_string().contains("-local") {
+        return Ok(None);
+    }
     let url = tauri::Url::parse(&channel.url()).map_err(|error| format!("{error}"))?;
     let found = app
         .updater_builder()
