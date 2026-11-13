@@ -217,8 +217,9 @@ build_libs() {
     done
 
     # lib/ and include/ are the archive's top-level entries; fetch relies on that layout.
-    # Relative on purpose, for the reason given in fetch_libs.
-    (cd "$pkg" && tar -czf "../ggml-libs-$platform.tar.gz" lib include)
+    # Relative names on purpose, for the reason given in fetch_libs; the destination is
+    # spelled relative to the repository root so `upload` finds it where it expects.
+    (cd "$ROOT" && tar -czf "ggml-libs-$platform.tar.gz" -C "${pkg#"$ROOT"/}" lib include)
     echo "packaged $ROOT/ggml-libs-$platform.tar.gz"
 }
 
