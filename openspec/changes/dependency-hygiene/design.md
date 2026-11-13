@@ -21,8 +21,8 @@ Six scripts pin their own dependencies in PEP 723 blocks: `scripts/website_links
 
 ## Decisions
 
-- **Root uv project, not per-script environments.** A single root `pyproject.toml` (`vibe-scripts`) with `requires-python = ">=3.12"` and the union of the six scripts' dependencies, plus one `uv.lock`. `uv run` walks up from the working directory, so `uv run scripts/x.py`, `website.chore`'s `uv run ../scripts/website_links.py`, and CI all resolve the same environment. Per-script projects would multiply lockfiles and reintroduce the drift this change removes. The PEP 723 blocks are deleted, not replaced by `--with` flags.
-- **Scripts keep `#!/usr/bin/env python3`.** They are invoked through `uv run` by tasks/chores; a direct `python3 scripts/x.py` outside the project env is not supported and not needed.
+- **Root uv project, not per-script environments.** A single root `pyproject.toml` (`vibe-scripts`) with `requires-python = ">=3.12"` and the union of the six scripts' dependencies, plus one `uv.lock`. `uv run` walks up from the working directory, so `uv run scripts/x.py`, `scripts/website_build.sh`'s `uv run ../scripts/website_links.py`, and CI all resolve the same environment. Per-script projects would multiply lockfiles and reintroduce the drift this change removes. The PEP 723 blocks are deleted, not replaced by `--with` flags.
+- **Scripts keep `#!/usr/bin/env python3`.** They are invoked through `uv run` by tasks; a direct `python3 scripts/x.py` outside the project env is not supported and not needed.
 - **`uv lock --check` plus `uv pip list --outdated`.** The check task reports outdated Python packages from the locked environment; the update task runs `uv lock --upgrade` and leaves `pyproject.toml` alone unless a constraint blocks the upgrade.
 - **Cargo: `cargo outdated --workspace` per manifest, `cargo update` for in-range, `cargo upgrade --incompatible` for majors.** `cargo-edit` provides `upgrade`; both tools are pinned in `mise.toml`. The four manifests are enumerated explicitly in the task, so a new workspace is a one-line addition.
 - **pnpm: `pnpm outdated` / `pnpm update` per package; `--latest` only in the major task.** Workspace files are not linked, so three invocations are the honest model.
@@ -35,7 +35,7 @@ Six scripts pin their own dependencies in PEP 723 blocks: `scripts/website_links
 - [Renovate needs a token the repository does not have yet] → Documented as the one manual setup step; the workflow fails loudly until it exists.
 - \[`cargo outdated` reports transitive-only updates that `cargo update` already handles\] → The check task prints direct and transitive separately; the update task is the action.
 - [Major PRs are noisy] → They are separate and not automerged; dependabot-style churn is bounded by the weekly schedule.
-- \[Removing PEP 723 blocks breaks direct `python3 script.py` use\] → The tasks and chores are the supported entry points; docs say so.
+- \[Removing PEP 723 blocks breaks direct `python3 script.py` use\] → The tasks are the supported entry points; docs say so.
 
 ## Migration Plan
 

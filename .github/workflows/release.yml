@@ -66,6 +66,14 @@ jobs:
                   VERSION: ${{ inputs.version }}
               run: mise exec -- task release:set-version
 
+            # The prerelease carries the same body a promotion will: the
+            # versioned English entry under the website link line. A link-only
+            # placeholder is what let a stable release ship without its notes.
+            - name: Assemble the release body
+              id: release-notes
+              shell: bash
+              run: mise exec -- task release:notes -- --github-output
+
             - name: setup pnpm
               uses: pnpm/action-setup@v4
               with:
@@ -148,9 +156,10 @@ jobs:
               with:
                   tagName: v__VERSION__ # the action automatically replaces __VERSION__ with the app version.
                   releaseName: "v__VERSION__"
-                  # The promotion step replaces this with the English notes plus
-                  # the same line; until then, it is the only body a reader sees.
-                  releaseBody: "Read this changelog in your language: https://kisev.github.io/vibe/changelog/__VERSION__"
+                  # Assembled above with `task release:notes`: the versioned
+                  # English notes under the same line, so the candidate body is
+                  # never a link-only placeholder.
+                  releaseBody: ${{ steps.release-notes.outputs.body }}
                   prerelease: true
                   args: ${{ matrix.args }} ${{ matrix.platform == 'windows-latest' && inputs.sign-windows && '--config src-tauri/tauri.windows.signing.conf.json' || '' }}
                   projectPath: "./desktop"

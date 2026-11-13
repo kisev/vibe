@@ -15,7 +15,7 @@
 
 ## 3. Dev sidecar source
 
-- [x] 3.1 Change the `chorefile` server download from `gh://thewh1teagle/vibe/...` to `gh://kisev/vibe/...` and verify `chore` still resolves the pinned `.server-version` URL (dry-run the fetch step)
+- [x] 3.1 Change the `task setup` server download from `gh://thewh1teagle/vibe/...` to `gh://kisev/vibe/...` and verify `task setup` still resolves the pinned `.server-version` URL (dry-run the fetch step)
 - [x] 3.2 Publish the pinned `server-v0.8.0` release in the fork (tag `server-v0.8.0`; the server-release workflow builds it) and verify the exact sidecar asset URL returns 200
 
 ## 4. Installer identity (winget isolation)

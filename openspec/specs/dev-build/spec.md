@@ -84,7 +84,7 @@ The dev sweep SHALL be bounded retention: the newest five dev prereleases surviv
 #### Scenario: New commit
 
 - **WHEN** a run builds a commit that has no release yet
-- **THEN** it creates the prerelease `dev.<run-number>` named with the commit's dev version and attaches the bundles
+- **THEN** it creates the prerelease `dev.<n>` named with the commit's dev version and attaches the bundles
 
 #### Scenario: Failed run
 
@@ -94,7 +94,7 @@ The dev sweep SHALL be bounded retention: the newest five dev prereleases surviv
 #### Scenario: Re-run of a failed run
 
 - **WHEN** a partially failed run is re-run
-- **THEN** it reuses its own `dev.<run-number>` release, the five matrix jobs share it as before, and the cleanup runs when the run completes
+- **THEN** it reuses its own `dev.<n>` release, the five matrix jobs share it as before, and the cleanup runs when the run completes
 
 #### Scenario: Later builds
 

@@ -20,9 +20,9 @@
 
   All six blocks are gone; `python3 -m py_compile` passes on every file and `grep '/// script'` finds none. The `uv run` smoke paths are blocked by 1.1 (no lock, no PyPI).
 
-- [x] 1.3 Verify every call site still resolves the project: `taskfile.yml`, `chorefile`, `website/website.chore`, `.github/workflows/*`; fix any that passed `--script`/`--no-project` or relied on inline pins
+- [x] 1.3 Verify every call site still resolves the project: `taskfile.yml`, `.github/workflows/*`; fix any that passed `--script`/`--no-project` or relied on inline pins
 
-  No call site used `--no-project` or `--script`. `taskfile.yml`, `chorefile`, and `handoff/handoff.chore` run from the repository root; `website/website.chore` runs `uv run ../scripts/...` from `website/`, and `desktop/src-tauri/tauri.windows.signing.conf.json` runs `uv run ../../scripts/sign.py` from the Tauri directory — all have the root as an ancestor, so uv discovers `pyproject.toml`. No command needed changing.
+  No call site used `--no-project` or `--script`. `taskfile.yml` runs from the repository root; `scripts/website_build.sh` runs `uv run ../scripts/...` from `website/`, and `desktop/src-tauri/tauri.windows.signing.conf.json` runs `uv run ../../scripts/sign.py` from the Tauri directory — all have the root as an ancestor, so uv discovers `pyproject.toml`. No command needed changing.
 
 ## 2. Tasks
 

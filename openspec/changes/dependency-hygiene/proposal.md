@@ -23,6 +23,6 @@ Dependencies are updated by hand, if at all, and there is no single place that a
 
 ## Impact
 
-- New root `pyproject.toml` and `uv.lock`; six `scripts/*.py` lose their inline dependency blocks; `chorefile`, `website/website.chore`, `taskfile.yml` and the workflows that call `uv run` keep working through the project.
+- New root `pyproject.toml` and `uv.lock`; six `scripts/*.py` lose their inline dependency blocks; `taskfile.yml` and the workflows that call `uv run` keep working through the project.
 - `renovate.json`, `.github/workflows/dependency-updates.yml`, `mise.toml` (`cargo-outdated`, `cargo-edit`), `AGENTS.md`, and the `RENOVATE_TOKEN` repository secret (a fine-grained token with contents and pull-request write).
 - `security-scanning` consumes the uv lockfile for `pip-audit`, so this change lands first.

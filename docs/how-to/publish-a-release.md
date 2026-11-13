@@ -17,7 +17,7 @@ Releases are cut with `.github/workflows/release.yml` (dispatch only) and publis
 # branch: main, version: 1.1.0-rc.1
 ```
 
-The workflow rewrites `tauri.conf.json` for the run, tags `v1.1.0-rc.1`, and publishes a prerelease whose `latest.json` the updater can read. Point the beta channel at it from a checkout:
+The workflow rewrites `tauri.conf.json` for the run, tags `v1.1.0-rc.1`, and publishes a prerelease whose `latest.json` the updater can read. The prerelease body is assembled with `task release:notes` before the build, so it already carries the link line and the English entry below it. Point the beta channel at it from a checkout:
 
 ```console
 uv run scripts/channel.py 1.1.0-rc.1 --channel beta
@@ -42,11 +42,14 @@ git add website/public/updater/stable.json
 git commit -m "Point stable at 1.0.0"
 ```
 
-Then mark the release stable on GitHub:
+Then mark the release stable on GitHub, rebuilding its body first:
 
 ```console
-gh release edit v1.0.0 --prerelease=false --latest
+VERSION=1.0.0 RELEASE_NOTES=/tmp/notes.md task release:notes
+gh release edit v1.0.0 --prerelease=false --latest --notes-file /tmp/notes.md
 ```
+
+`task release:notes` writes the versioned English entry under the line pointing at the same entry on the website. Pass that file to `gh release edit`; a hand-written or link-only body must never become the stable release's notes.
 
 Run the `gh release edit` last. Apps built before the channel files (the upstream 3.x line) still read whichever GitHub release is marked "latest", so this is what ships the version to them.
 

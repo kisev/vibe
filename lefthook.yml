@@ -1,6 +1,6 @@
 # Local quality gates, same stack as kisev/skills and kisev/gitlaw. Install once
 # per checkout with `task hooks`. pre-commit runs the cheap, file-scoped checks
-# in parallel over the staged set; pre-push runs the unit suites; commit-msg
+# in parallel over the staged set; pre-push runs `task verify`; commit-msg
 # lints the message. Binaries come from mise (pinned in mise.toml).
 glob_matcher: doublestar
 

@@ -114,7 +114,7 @@ CI SHALL run the same lint and format tasks the hooks run, so a gate that passes
 
 ### Requirement: One command mirrors the CI gate set
 
-`task verify` SHALL run every gate a push or pull request triggers that can run locally: the lint matrix, `format:check`, `cargo fmt --all -- --check`, clippy over the desktop/CLI workspace with `-D warnings`, the server clippy and dependency gates, the unit suites, and the browser E2E suite. A green `task verify` on a revision SHALL mean every local-capable CI job is expected to pass on it.
+`task verify` SHALL run every deterministic, locally-runnable gate a push or pull request triggers: the lint matrix, formatting and both clippy gates, the server dependency gates, the unit suites, the site build, and the browser E2E suite. A green run SHALL mean every local-capable CI job is expected to pass on that revision. The transcribe spike stays CI-only: it downloads a model, runs an inference, and needs the Vulkan SDK on two platforms.
 
 #### Scenario: A warning in the desktop workspace
 

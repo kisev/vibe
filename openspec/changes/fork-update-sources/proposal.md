@@ -23,6 +23,6 @@ The fork keeps checking the upstream update channel (`thewh1teagle/vibe`), so a 
 
 ## Impact
 
-- `desktop/src-tauri/tauri.conf.json` (updater endpoint + pubkey), `desktop/src/lib/config.ts`, `desktop/src/lib/app.ts`, `desktop/src-tauri/src/diagnostics.rs`, `desktop/src-tauri/src/keepawake.rs`, `desktop/src-tauri/src/handoff/mod.rs`, the handoff mock and URL tests, root `chorefile` server download, and fork repository secrets (updater signing key).
+- `desktop/src-tauri/tauri.conf.json` (updater endpoint + pubkey), `desktop/src/lib/config.ts`, `desktop/src/lib/app.ts`, `desktop/src-tauri/src/diagnostics.rs`, `desktop/src-tauri/src/keepawake.rs`, `desktop/src-tauri/src/handoff/mod.rs`, the handoff mock and URL tests, the root `task setup` sidecar download, and fork repository secrets (updater signing key).
 - Fork release workflow behavior: updater artifacts (`latest.json`) must be produced and minisign-signed on every release run. Windows binaries ship unsigned — Authenticode and Apple notarization are permanently out of scope.
 - No server code, no transcription behavior.

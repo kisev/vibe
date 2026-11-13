@@ -57,4 +57,6 @@ task verify
 
 On Linux the desktop clippy step needs the build packages from [the build tutorial](../tutorials/build-and-run.md) (`task linux-deps`, once, with sudo). Without them `task verify` stops at that step and says so instead of failing inside `gdk-sys`.
 
+A fresh checkout needs `task setup` first: the desktop clippy step links the `vibe-server` and `ffmpeg` sidecars, and the server workspace links the prebuilt ggml libraries that `task libs:fetch` stages. Both are downloaded artifacts and are not committed.
+
 Nothing is pushed, and no `dev.<n>` or release tag is created, before `task verify` is green on that revision. CI is the backstop: the individual commands above stay available for a fast loop while working, but the check that counts before a push is the whole set — several defects (an unformatted page, a clippy warning in the desktop workspace, an E2E server that could not start) were each found in CI while every narrower local check was green.

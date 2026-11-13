@@ -95,7 +95,10 @@ does nothing — poll the checks and merge when they settle. Then `git switch ma
 gh workflow run release.yml --ref main
 ```
 
-~20 min. tauri-action creates the tag `vX.Y.Z` and a **prerelease**. Leave both
+~20 min. tauri-action creates the tag `vX.Y.Z` and a **prerelease**. The
+prerelease body is assembled with `task release:notes` before the build, so it
+already carries the website link line and the versioned English entry; step 5
+rebuilds the same body instead of posting a link-only replacement. Leave both
 signing inputs at their `false` defaults: there is no signing infrastructure to
 reach, and a signing-enabled run would only fail or ship an unexpected config.
 The Windows job produces an unsigned `vibe.exe`; that is the accepted permanent

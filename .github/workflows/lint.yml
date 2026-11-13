@@ -58,7 +58,7 @@ jobs:
               run: mise exec -- task lint format:check
 
             - name: Rust format check
-              run: cargo fmt --all -- --check
+              run: mise exec -- task rust:fmt-check
 
             - name: Server clippy
               run: mise exec -- task server:clippy
