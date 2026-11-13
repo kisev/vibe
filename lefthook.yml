@@ -60,7 +60,8 @@ pre-commit:
       run: mise exec -- oxfmt --check {staged_files}
     js:
       glob: "**/*.{ts,tsx,js,mjs}"
-      exclude: "{node_modules,desktop/src/paraglide}/**"
+      # mock-tauri is ignored by oxlint itself; passing it alone made the hook fail with "no files".
+      exclude: "{node_modules,desktop/src/paraglide,desktop/src/mock-tauri}/**"
       run: mise exec -- oxlint {staged_files}
     shell:
       glob: "**/*.sh"

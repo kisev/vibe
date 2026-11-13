@@ -82,18 +82,43 @@ struct StreamHandle(Stream);
 unsafe impl Send for StreamHandle {}
 unsafe impl Sync for StreamHandle {}
 
-/// At most ~10 `record_level` events per second reach the webview.
+/// At most ~10 `record_level` events per second per source reach the webview.
 const LEVEL_EMIT_INTERVAL_MS: u64 = 100;
 /// Peak is taken from every Nth sample — plenty for a meter, and keeps the callback cheap.
 const LEVEL_SAMPLE_STRIDE: usize = 4;
 
-/// Shared by every capture stream of a recording session, so the emitted value is the max
-/// level across input + output (loopback) devices.
+/// Which captured source a level belongs to. Input devices are the microphone, output devices
+/// (loopback) are the system audio; the UI keeps one meter per tag.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RecordLevelDevice {
+    Microphone,
+    System,
+}
+
+/// Payload of the app-wide `record_level` event: that source's own peak, ~10 times per second.
+#[derive(Clone, Copy, Debug, Serialize)]
+pub struct RecordLevelPayload {
+    pub device: RecordLevelDevice,
+    pub level: f32,
+}
+
+fn level_device_for(is_input: bool) -> RecordLevelDevice {
+    if is_input {
+        RecordLevelDevice::Microphone
+    } else {
+        RecordLevelDevice::System
+    }
+}
+
+/// One per capture stream, so each source keeps its own peak and throttle clock (no max across
+/// devices). Events are emitted app-wide, not to `main`, so the browser chrome can read them too.
 ///
-/// Everything here is atomic and allocation-free: the audio callback only does a few relaxed
-/// loads/stores, and once per 100ms one callback also performs the (non-blocking) `emit_to`.
+/// Everything here is atomic and allocation-free at sample rate: the audio callback only does a
+/// few relaxed loads/stores, and once per 100ms also performs the (non-blocking) `emit`.
 struct LevelMeter {
     app_handle: AppHandle,
+    device: RecordLevelDevice,
     started_at: Instant,
     /// Max level seen since the last emit, stored as `f32::to_bits` (monotonic for +0.0..=1.0).
     peak_bits: AtomicU32,
@@ -101,9 +126,10 @@ struct LevelMeter {
 }
 
 impl LevelMeter {
-    fn new(app_handle: AppHandle) -> Self {
+    fn new(app_handle: AppHandle, device: RecordLevelDevice) -> Self {
         Self {
             app_handle,
+            device,
             started_at: Instant::now(),
             peak_bits: AtomicU32::new(0),
             last_emit_ms: AtomicU64::new(0),
@@ -119,7 +145,8 @@ impl LevelMeter {
         if now_ms.saturating_sub(last_ms) < LEVEL_EMIT_INTERVAL_MS {
             return;
         }
-        // Only the stream that wins the swap emits, so two devices can't double-emit a window.
+        // A meter belongs to one stream, but keep the CAS so a re-entrant callback can never
+        // double-emit a window.
         if self
             .last_emit_ms
             .compare_exchange(last_ms, now_ms, Ordering::Relaxed, Ordering::Relaxed)
@@ -128,7 +155,15 @@ impl LevelMeter {
             return;
         }
         let level = f32::from_bits(self.peak_bits.swap(0, Ordering::Relaxed)).clamp(0.0, 1.0);
-        self.app_handle.emit_to("main", "record_level", level).ok();
+        self.app_handle
+            .emit(
+                "record_level",
+                RecordLevelPayload {
+                    device: self.device,
+                    level,
+                },
+            )
+            .ok();
     }
 }
 
@@ -174,15 +209,13 @@ pub async fn start_record(app_handle: AppHandle, devices: Vec<AudioDevice>, reco
     let mut wav_paths: Vec<(PathBuf, u32)> = Vec::new();
     let mut stream_handles = Vec::new();
     let mut stream_writers = Vec::new();
-    // One meter for the whole session: input and output streams both feed it, so the UI sees
-    // the max of the two under a single throttled `record_level` event.
-    let meter = Arc::new(LevelMeter::new(app_handle.clone()));
 
     for device in devices {
         tracing::debug!("Recording from device: {}", device.name);
         tracing::debug!("Device ID: {}", device.id);
 
         let is_input = device.is_input;
+        let level_device = level_device_for(is_input);
         let (device, config) = if is_input {
             let device_id: usize = device.id.parse().context("Failed to parse device ID")?;
             let dev = host.devices()?.nth(device_id).context("Failed to get device by ID")?;
@@ -202,7 +235,9 @@ pub async fn start_record(app_handle: AppHandle, devices: Vec<AudioDevice>, reco
         stream_writers.push(writer.clone());
         let writer_2 = writer.clone();
 
-        let stream = build_input_stream(&device, config, writer_2, meter.clone())?;
+        // One meter per stream: each source emits its own peak under its own throttle clock.
+        let meter = Arc::new(LevelMeter::new(app_handle.clone(), level_device));
+        let stream = build_input_stream(&device, config, writer_2, meter)?;
         stream.play()?;
         tracing::debug!("Stream started playing");
 
@@ -435,7 +470,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::best_raw_capture;
+    use super::{best_raw_capture, buffer_peak, level_device_for, RecordLevelDevice, RecordLevelPayload};
+    use serde_json::json;
     use std::path::PathBuf;
 
     #[test]
@@ -443,5 +479,38 @@ mod tests {
         let captures = vec![(PathBuf::from("short.wav"), 12), (PathBuf::from("long.wav"), 42)];
         assert_eq!(best_raw_capture(&captures), Some(PathBuf::from("long.wav")));
         assert_eq!(best_raw_capture(&[]), None);
+    }
+
+    #[test]
+    fn input_devices_tag_as_microphone_and_outputs_as_system() {
+        assert_eq!(level_device_for(true), RecordLevelDevice::Microphone);
+        assert_eq!(level_device_for(false), RecordLevelDevice::System);
+    }
+
+    #[test]
+    fn level_payload_serializes_with_its_device_tag() {
+        let mic = RecordLevelPayload {
+            device: RecordLevelDevice::Microphone,
+            level: 0.25,
+        };
+        assert_eq!(
+            serde_json::to_value(mic).expect("serialize"),
+            json!({"device": "microphone", "level": 0.25})
+        );
+
+        let system = RecordLevelPayload {
+            device: RecordLevelDevice::System,
+            level: 0.0,
+        };
+        assert_eq!(
+            serde_json::to_value(system).expect("serialize"),
+            json!({"device": "system", "level": 0.0})
+        );
+    }
+
+    #[test]
+    fn silence_yields_a_zero_peak_and_loudness_is_clamped() {
+        assert_eq!(buffer_peak::<f32>(&[0.0; 8]), 0.0);
+        assert_eq!(buffer_peak::<f32>(&[2.0, -1.0]), 1.0);
     }
 }
