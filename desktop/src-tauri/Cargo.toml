@@ -11,7 +11,8 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset", "devtools", "macos-private-api", "tray-icon"] }
+# `unstable` enables multi-webview: one window holding the app chrome and the remote page.
+tauri = { version = "2", features = ["protocol-asset", "devtools", "macos-private-api", "tray-icon", "unstable"] }
 meeting-detect = { path = "../../crates/meeting-detect" }
 
 # Plugins

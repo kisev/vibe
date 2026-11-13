@@ -3,7 +3,7 @@ import { message } from '@tauri-apps/plugin-dialog'
 import { m } from '~/paraglide/messages.js'
 import type { AudioDevice } from './audio'
 import { CONFIG_KEYS } from './config-keys'
-import { readConfig } from './config-store'
+import { readConfig, writeConfig } from './config-store'
 import { resolveSelection } from './device-selection'
 
 /** The Rust-side session record, mirrored for the frontend. */
@@ -28,7 +28,7 @@ export const getMeetingBrowserSession = (session: number) => invoke<BrowserSessi
 export const navigateMeetingBrowser = (session: number, action: BrowserNavigationAction) =>
 	invoke<void>('meeting_browser_navigate', { session, action })
 
-/** Load a URL typed into the bar: it becomes a new entry in the session history. */
+/** Load a URL typed into the chrome: it becomes a new entry in the session history. */
 export const loadMeetingBrowserUrl = (session: number, url: string) => invoke<BrowserSessionInfo>('meeting_browser_load', { session, url })
 
 export const openMeetingBrowserExternal = (session: number) => invoke<void>('meeting_browser_open_external', { session })
@@ -116,18 +116,80 @@ export async function handOffMeetingUrl(url: string | null): Promise<void> {
 	}
 }
 
-/** The configured device selection, resolved exactly like the main recording path. */
-export async function readConfiguredRecordingDevices(): Promise<{ input: AudioDevice | null; output: AudioDevice | null }> {
+/** Everything a chrome-only picker needs: the device snapshot and the configured selection. */
+export interface RecordingDeviceState {
+	devices: AudioDevice[]
+	input: AudioDevice | null
+	output: AudioDevice | null
+	inputUnavailableName: string | null
+	outputUnavailableName: string | null
+	hiddenInputDevices: string[]
+	hiddenOutputDevices: string[]
+}
+
+/**
+ * Resolve the configured recording devices exactly like the main recording path: stable device
+ * names, the system default when nothing is pinned, and a pinned-but-absent name flagged rather
+ * than silently replaced.
+ */
+export async function readRecordingDeviceState(): Promise<RecordingDeviceState> {
 	const devices = await invoke<AudioDevice[]>('get_audio_devices')
+	const hiddenInputDevices = readConfig<string[]>(CONFIG_KEYS.hiddenInputDevices, [])
+	const hiddenOutputDevices = readConfig<string[]>(CONFIG_KEYS.hiddenOutputDevices, [])
 	const input = resolveSelection(
 		devices.filter((device) => device.isInput),
 		readConfig<string | null>(CONFIG_KEYS.inputDeviceName, null),
-		readConfig<string[]>(CONFIG_KEYS.hiddenInputDevices, []),
-	).device
+		hiddenInputDevices,
+	)
 	const output = resolveSelection(
 		devices.filter((device) => !device.isInput),
 		readConfig<string | null>(CONFIG_KEYS.outputDeviceName, null),
-		readConfig<string[]>(CONFIG_KEYS.hiddenOutputDevices, []),
-	).device
-	return { input, output }
+		hiddenOutputDevices,
+	)
+	return {
+		devices,
+		input: input.device,
+		output: output.device,
+		inputUnavailableName: input.unavailableName,
+		outputUnavailableName: output.unavailableName,
+		hiddenInputDevices,
+		hiddenOutputDevices,
+	}
+}
+
+/** The configured device selection, resolved exactly like the main recording path. */
+export async function readConfiguredRecordingDevices(): Promise<{ input: AudioDevice | null; output: AudioDevice | null }> {
+	const state = await readRecordingDeviceState()
+	return { input: state.input, output: state.output }
+}
+
+/**
+ * Persist a picker choice under the same keys and convention the main window uses: an empty name
+ * means "no device" and the system default is never written.
+ */
+export function writeRecordingDeviceSelection(type: 'input' | 'output', name: string | null): void {
+	writeConfig(type === 'input' ? CONFIG_KEYS.inputDeviceName : CONFIG_KEYS.outputDeviceName, name ?? '')
+}
+
+/** Select a device the user had hidden, removing it from that direction's hidden list. */
+export function restoreRecordingDevice(type: 'input' | 'output', name: string): void {
+	const hiddenKey = type === 'input' ? CONFIG_KEYS.hiddenInputDevices : CONFIG_KEYS.hiddenOutputDevices
+	writeConfig(
+		hiddenKey,
+		readConfig<string[]>(hiddenKey, []).filter((hidden) => hidden !== name),
+	)
+	writeRecordingDeviceSelection(type, name)
+}
+
+/** What the main window reports about the recording it owns, for the chrome to mirror. */
+export const RECORDING_STATE_EVENT = 'meeting-browser-recording-state'
+/** Ask the main window to start or stop recording on the chrome's behalf. */
+export const RECORDING_TOGGLE_EVENT = 'meeting-browser-recording-toggle'
+/** Ask the main window to repeat its state, for a chrome that mounts while recording. */
+export const RECORDING_STATE_REQUEST_EVENT = 'meeting-browser-recording-state-request'
+
+export interface RecordingStatePayload {
+	recording: boolean
+	/** Epoch ms when the recording began, or null when idle. */
+	startedAt: number | null
 }

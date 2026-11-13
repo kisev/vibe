@@ -6,10 +6,12 @@ On Windows 11 the embedded meeting browser opens a white window that never rende
 
 ## What Changes
 
-- The content webview is created in the process's existing WebView2 environment (no `data_directory`); the meeting window gets a real close button from its own titlebar and a bar with address, back, forward, reload, open-external and close.
-- The bar is app UI in its own small always-on-top window (the design in `embedded-meeting-browser` already called for it), driven by the existing session commands and events.
-- A page that never loads is reported to the bar within the timeout and offers retry/close; the window can always be closed.
-- The address bar accepts a URL and navigates the content webview (new `meeting_browser_load` command).
+- The page webview is created in the process's existing WebView2 environment (no `data_directory`), so window creation cannot block the app.
+- The chrome (address, back, forward, reload, open-external, close, record) and the page live in ONE window: a plain Tauri window hosts our app chrome webview on top and the remote page webview below it, using multi-webview (`tauri`'s `unstable` feature). There is no separate always-on-top bar window.
+- The chrome webview alone has the app's capabilities; the page webview has none.
+- A page that never loads is reported to the main window within the timeout and offers retry/close; the window can always be closed.
+- The address bar accepts a URL and navigates the page webview (new `meeting_browser_load` command).
+- macOS has no multi-webview embed here, so the browser falls back to a page-only `WebviewWindow` with no chrome instead of panicking.
 
 ## Capabilities
 
@@ -17,4 +19,4 @@ On Windows 11 the embedded meeting browser opens a white window that never rende
 
 ## Impact
 
-- `desktop/src-tauri/src/meeting_browser.rs`, `desktop/src/pages/meeting-bar*`, `desktop/src/lib/meeting-browser.ts`, capabilities, tests, docs.
+- `desktop/src-tauri/src/meeting_browser.rs`, `desktop/src-tauri/Cargo.toml`, `desktop/src/windows/browser-window*`, `desktop/src/bootstrap.tsx`, `desktop/src/lib/meeting-browser.ts`, capabilities, tests, docs.

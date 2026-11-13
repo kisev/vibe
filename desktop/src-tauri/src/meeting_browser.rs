@@ -5,7 +5,11 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use tauri::webview::PageLoadEvent;
-use tauri::{AppHandle, Emitter, Manager, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+#[cfg(not(target_os = "macos"))]
+use tauri::webview::WebviewBuilder;
+use tauri::{AppHandle, Emitter, Manager, Url, WebviewUrl, WindowEvent};
+#[cfg(not(target_os = "macos"))]
+use tauri::{PhysicalPosition, PhysicalSize, Window};
 use tauri_plugin_store::StoreExt;
 
 const HOSTS_KEY: &str = "meeting.browserHosts";
@@ -20,9 +24,13 @@ const CLOSE_REQUESTED_EVENT: &str = "meeting-browser-close-requested";
 const LOAD_FAILED_EVENT: &str = "meeting-browser-load-failed";
 const CONTENT_WIDTH: f64 = 1100.0;
 const CONTENT_HEIGHT: f64 = 760.0;
-/// The bar window: its own small always-on-top surface, sitting above the content window.
-const BAR_WIDTH: f64 = 720.0;
-const BAR_HEIGHT: f64 = 96.0;
+/// Height of the app-owned toolbar above the page, in logical pixels.
+///
+/// The two webviews share one window, so this must match the toolbar height in the chrome
+/// component (`TOOLBAR_HEIGHT` in `desktop/src/windows/browser-window.tsx`).
+// Wide enough for two rows (address and recording) without the page clipping the button.
+const TOOLBAR_H: f64 = 104.0;
+const WINDOW_HEIGHT: f64 = CONTENT_HEIGHT + TOOLBAR_H;
 /// How long a page may stay unloaded before the window offers a retry instead of white.
 const LOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 
@@ -39,7 +47,7 @@ pub struct BrowserSessionInfo {
 
 struct BrowserSession {
     info: BrowserSessionInfo,
-    /// URLs in visit order. `index` points at the entry the content window currently shows.
+    /// URLs in visit order. `index` points at the entry the page webview currently shows.
     history: Vec<String>,
     index: usize,
     /// Set before a programmatic close so `CloseRequested` does not prompt a second time.
@@ -66,12 +74,27 @@ fn lock_runtime() -> Result<MutexGuard<'static, BrowserRuntime>, String> {
     RUNTIME.lock().map_err(|_| "meeting browser state is unavailable".to_string())
 }
 
-fn content_label(session: u64) -> String {
+/// The one window both webviews live in.
+fn browser_label(session: u64) -> String {
     format!("browser-{session}")
 }
 
-fn bar_label(session: u64) -> String {
-    format!("meeting-bar-{session}")
+/// The app-owned chrome webview (address bar, controls); the only one with capabilities.
+#[cfg(not(target_os = "macos"))]
+fn chrome_label(session: u64) -> String {
+    format!("browser-chrome-{session}")
+}
+
+/// The remote page webview. On macOS the page is a plain `WebviewWindow`, whose webview label
+/// equals its window label, so the shared browser label addresses the page there.
+#[cfg(not(target_os = "macos"))]
+fn page_label(session: u64) -> String {
+    format!("browser-page-{session}")
+}
+
+#[cfg(target_os = "macos")]
+fn page_label(session: u64) -> String {
+    browser_label(session)
 }
 
 fn default_hosts() -> Vec<String> {
@@ -197,7 +220,7 @@ fn handle_page_load(app: &AppHandle, session: u64, url: &Url) {
     sync_meeting_suppression(count);
 }
 
-/// Remove a session after its content window is gone and notify listeners.
+/// Remove a session after its browser window is gone and notify listeners.
 fn finalize_session(app: &AppHandle, session: u64) {
     let (removed, count) = {
         let Ok(mut runtime) = RUNTIME.lock() else {
@@ -208,9 +231,6 @@ fn finalize_session(app: &AppHandle, session: u64) {
     };
     if !removed {
         return;
-    }
-    if let Some(bar) = app.get_webview_window(&bar_label(session)) {
-        let _ = bar.close();
     }
     sync_meeting_suppression(count);
     if let Err(error) = app.emit(CLOSED_EVENT, serde_json::json!({ "session": session })) {
@@ -228,7 +248,7 @@ fn close_session(app: &AppHandle, session: u64) -> Result<(), String> {
             .ok_or_else(|| format!("Unknown browser session {session}"))?;
         state.force_close = true;
     }
-    if let Some(window) = app.get_webview_window(&content_label(session)) {
+    if let Some(window) = app.get_window(&browser_label(session)) {
         window
             .close()
             .map_err(|error| format!("Could not close the browser window: {error}"))?;
@@ -238,8 +258,111 @@ fn close_session(app: &AppHandle, session: u64) -> Result<(), String> {
     Ok(())
 }
 
+/// Keep the chrome and the page filling the window: the chrome spans the whole surface, and the
+/// page starts below the toolbar, so its top edge never covers the controls.
+#[cfg(not(target_os = "macos"))]
+fn resize_children(app: &AppHandle, session: u64, size: PhysicalSize<u32>) {
+    let scale = app
+        .get_window(&browser_label(session))
+        .and_then(|window| window.scale_factor().ok())
+        .unwrap_or(1.0);
+    let toolbar = (TOOLBAR_H * scale).round() as u32;
+    let page_height = size.height.saturating_sub(toolbar);
+    if let Some(chrome) = app.get_webview(&chrome_label(session)) {
+        if let Err(error) = chrome.set_size(PhysicalSize::new(size.width, size.height)) {
+            tracing::warn!(session, "could not resize the browser chrome: {error}");
+        }
+        if let Err(error) = chrome.set_position(PhysicalPosition::new(0, 0)) {
+            tracing::warn!(session, "could not place the browser chrome: {error}");
+        }
+    }
+    if let Some(page) = app.get_webview(&page_label(session)) {
+        if let Err(error) = page.set_size(PhysicalSize::new(size.width, page_height)) {
+            tracing::warn!(session, "could not resize the browser page: {error}");
+        }
+        if let Err(error) = page.set_position(PhysicalPosition::new(0, toolbar)) {
+            tracing::warn!(session, "could not place the browser page: {error}");
+        }
+    }
+}
+
+/// Build the single browser window: our chrome webview on top, the remote page below it.
+///
+/// Multi-webview (a window with several child webviews) is supported on Windows and Linux only.
+#[cfg(not(target_os = "macos"))]
+fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo, parsed: Url) -> Result<(), String> {
+    let window = Window::builder(app, browser_label(session))
+        .title(info.host.clone())
+        .inner_size(CONTENT_WIDTH, WINDOW_HEIGHT)
+        .focused(true)
+        .build()
+        .map_err(|error| format!("Could not open the browser window: {error}"))?;
+    tracing::info!(session, "browser window created");
+
+    let chrome_url = format!("index.html?window=browser&session={session}");
+    tracing::info!(session, "creating the browser chrome webview");
+    window
+        .add_child(
+            WebviewBuilder::new(chrome_label(session), WebviewUrl::App(chrome_url.into())).focused(true),
+            tauri::LogicalPosition::new(0.0, 0.0),
+            tauri::LogicalSize::new(CONTENT_WIDTH, WINDOW_HEIGHT),
+        )
+        .map_err(|error| format!("Could not open the browser chrome: {error}"))?;
+
+    tracing::info!(session, "creating the browser page webview");
+    window
+        .add_child(
+            WebviewBuilder::new(page_label(session), WebviewUrl::External(parsed)).on_page_load(move |webview, payload| {
+                tracing::info!(
+                    session,
+                    url = %payload.url(),
+                    event = ?payload.event(),
+                    "meeting browser page load"
+                );
+                if payload.event() == PageLoadEvent::Finished {
+                    handle_page_load(webview.app_handle(), session, payload.url());
+                }
+            }),
+            tauri::LogicalPosition::new(0.0, TOOLBAR_H),
+            tauri::LogicalSize::new(CONTENT_WIDTH, CONTENT_HEIGHT),
+        )
+        .map_err(|error| format!("Could not open the browser page: {error}"))?;
+
+    Ok(())
+}
+
+/// macOS fallback: keep the page embedded but with no chrome bar. WKWebView in this Tauri
+/// version has no reliable multi-webview embedding, so the page gets an ordinary
+/// `WebviewWindow`; recording stays reachable from the main window, and the system browser
+/// remains the escape hatch. This deliberately has no panic path.
+#[cfg(target_os = "macos")]
+fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo, parsed: Url) -> Result<(), String> {
+    tauri::WebviewWindowBuilder::new(app, page_label(session), WebviewUrl::External(parsed))
+        .title(info.host.clone())
+        .inner_size(CONTENT_WIDTH, CONTENT_HEIGHT)
+        .focused(true)
+        .on_page_load(move |window, payload| {
+            tracing::info!(
+                session,
+                url = %payload.url(),
+                event = ?payload.event(),
+                "meeting browser page load"
+            );
+            if payload.event() == PageLoadEvent::Finished {
+                handle_page_load(window.app_handle(), session, payload.url());
+            }
+        })
+        .build()
+        .map_err(|error| format!("Could not open the browser window: {error}"))?;
+    Ok(())
+}
+
+// Async on purpose: WebView2 creates its environment by pumping the message loop, and a
+// synchronous command runs on the main thread — pumping there from inside the event loop is
+// what froze the app, leaving a white window and no way out. An async command runs on the
+// async runtime, and Tauri marshals the window creation to the main loop itself.
 #[tauri::command]
-pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessionInfo, String> {
+pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessionInfo, String> {
     let parsed = Url::parse(&url).map_err(|error| format!("Invalid URL {url:?}: {error}"))?;
     if parsed.scheme() != "https" {
         return Err(format!(
@@ -263,7 +386,7 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
             .map(|state| state.info.clone())
     };
     if let Some(info) = existing {
-        if let Some(window) = app.get_webview_window(&content_label(info.session)) {
+        if let Some(window) = app.get_window(&browser_label(info.session)) {
             let _ = window.show();
             let _ = window.set_focus();
         }
@@ -294,45 +417,36 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
         );
     }
     tracing::info!(session, url = %info.url, host = %info.host, meeting = info.is_meeting, "opening meeting browser");
+    tracing::info!(session, "creating the browser window");
     // Suppress external detection as soon as the meeting session exists, before the webview
     // has loaded enough to fire its first page event.
     let initial_count = lock_runtime()?.meeting_count();
     sync_meeting_suppression(initial_count);
+    tracing::info!(session, "meeting suppression updated");
 
-    let content = match WebviewWindowBuilder::new(&app, content_label(session), WebviewUrl::External(parsed))
-        .title(info.host.clone())
-        .inner_size(CONTENT_WIDTH, CONTENT_HEIGHT)
-        .focused(true)
-        .on_page_load(move |window, payload| {
-            tracing::info!(
-                session,
-                url = %payload.url(),
-                event = ?payload.event(),
-                "meeting browser page load"
-            );
-            if payload.event() == PageLoadEvent::Finished {
-                handle_page_load(window.app_handle(), session, payload.url());
-            }
-        })
-        .build()
-    {
-        Ok(window) => window,
-        Err(error) => {
-            let count = if let Ok(mut runtime) = RUNTIME.lock() {
-                runtime.sessions.remove(&session);
-                Some(runtime.meeting_count())
-            } else {
-                None
-            };
-            if let Some(count) = count {
-                sync_meeting_suppression(count);
-            }
-            return Err(format!("Could not open the browser window: {error}"));
+    if let Err(error) = build_session_window(&app, session, &info, parsed) {
+        let count = if let Ok(mut runtime) = RUNTIME.lock() {
+            runtime.sessions.remove(&session);
+            Some(runtime.meeting_count())
+        } else {
+            None
+        };
+        if let Some(count) = count {
+            sync_meeting_suppression(count);
         }
-    };
+        // A window may exist even if one of its webviews failed to attach.
+        if let Some(window) = app.get_window(&browser_label(session)) {
+            let _ = window.close();
+        }
+        return Err(error);
+    }
+    tracing::info!(session, "browser window is up");
 
+    let window = app
+        .get_window(&browser_label(session))
+        .ok_or_else(|| format!("Browser window for session {session} is not open"))?;
     let handler_app = app.clone();
-    content.on_window_event(move |event| match event {
+    window.on_window_event(move |event| match event {
         WindowEvent::CloseRequested { api, .. } => {
             let force_close = RUNTIME
                 .lock()
@@ -348,38 +462,10 @@ pub fn open_meeting_browser(app: AppHandle, url: String) -> Result<BrowserSessio
             }
         }
         WindowEvent::Destroyed => finalize_session(&handler_app, session),
+        #[cfg(not(target_os = "macos"))]
+        WindowEvent::Resized(size) => resize_children(&handler_app, session, *size),
         _ => {}
     });
-
-    // The bar is the trusted app UI (address, back, forward, reload, open-external, close).
-    // A webview cannot host our own chrome, so it lives in its own always-on-top window; the
-    // content window keeps its ordinary titlebar, so it can always be closed even if the bar
-    // fails to open.
-    let bar_url = format!("index.html?window=meeting-bar&session={session}");
-    match WebviewWindowBuilder::new(&app, bar_label(session), WebviewUrl::App(bar_url.into()))
-        .title("Vibe browser")
-        .inner_size(BAR_WIDTH, BAR_HEIGHT)
-        .always_on_top(true)
-        .build()
-    {
-        Ok(bar) => {
-            if let Ok(Some(monitor)) = app.primary_monitor() {
-                let size = monitor.size();
-                let width = (BAR_WIDTH * monitor.scale_factor()) as i32;
-                let x = ((size.width as i32) - width) / 2;
-                if let Err(error) = bar.set_position(tauri::PhysicalPosition::new(x.max(0), 48)) {
-                    tracing::warn!("could not place the meeting bar: {error}");
-                }
-            }
-            let bar_app = app.clone();
-            bar.on_window_event(move |event| {
-                if let WindowEvent::CloseRequested { .. } = event {
-                    let _ = close_session(&bar_app, session);
-                }
-            });
-        }
-        Err(error) => tracing::warn!(session, "could not open the meeting bar: {error}"),
-    }
 
     // A webview that never finishes loading shows a blank surface with no explanation. Ask the
     // main window instead, so the user gets retry and close rather than a silent white window.
@@ -453,13 +539,12 @@ pub fn meeting_browser_navigate(app: AppHandle, session: u64, action: String) ->
         }
     };
 
-    let window = app
-        .get_webview_window(&content_label(session))
-        .ok_or_else(|| format!("Browser window for session {session} is not open"))?;
+    let page = app
+        .get_webview(&page_label(session))
+        .ok_or_else(|| format!("Browser page for session {session} is not open"))?;
     let parsed = Url::parse(&target).map_err(|error| format!("Invalid tracked URL {target:?}: {error}"))?;
-    window
-        .navigate(parsed)
-        .map_err(|error| format!("Could not navigate the browser window: {error}"))?;
+    page.navigate(parsed)
+        .map_err(|error| format!("Could not navigate the browser page: {error}"))?;
 
     if let Some(index) = new_index {
         let (changed, count) = {
@@ -488,7 +573,7 @@ pub fn meeting_browser_navigate(app: AppHandle, session: u64, action: String) ->
     Ok(())
 }
 
-/// Load a URL typed into the bar: a fresh entry in the same session's history.
+/// Load a URL typed into the chrome: a fresh entry in the same session's history.
 #[tauri::command]
 pub fn meeting_browser_load(app: AppHandle, session: u64, url: String) -> Result<BrowserSessionInfo, String> {
     let parsed = Url::parse(&url).map_err(|error| format!("Invalid URL {url:?}: {error}"))?;
@@ -498,9 +583,9 @@ pub fn meeting_browser_load(app: AppHandle, session: u64, url: String) -> Result
             parsed.scheme()
         ));
     }
-    let window = app
-        .get_webview_window(&content_label(session))
-        .ok_or_else(|| format!("Browser window for session {session} is not open"))?;
+    let page = app
+        .get_webview(&page_label(session))
+        .ok_or_else(|| format!("Browser page for session {session} is not open"))?;
     let hosts = load_hosts(&app);
     let (info, count) = {
         let mut runtime = lock_runtime()?;
@@ -518,9 +603,8 @@ pub fn meeting_browser_load(app: AppHandle, session: u64, url: String) -> Result
         state.info.can_forward = false;
         (state.info.clone(), runtime.meeting_count())
     };
-    window
-        .navigate(parsed)
-        .map_err(|error| format!("Could not navigate the browser window: {error}"))?;
+    page.navigate(parsed)
+        .map_err(|error| format!("Could not navigate the browser page: {error}"))?;
     emit_session(&app, &info);
     sync_meeting_suppression(count);
     Ok(info)
@@ -548,7 +632,7 @@ pub fn meeting_browser_close(app: AppHandle, session: u64) -> Result<(), String>
 #[tauri::command]
 pub fn meeting_browser_confirm_close(app: AppHandle, session: u64, stop_recording: bool) -> Result<(), String> {
     if stop_recording {
-        // The recorder listens for this event itself; the bar closes right after.
+        // The recorder listens for this event itself; the browser closes right after.
         if let Err(error) = app.emit("stop_record", serde_json::json!({})) {
             tracing::warn!("could not stop the recording before closing the browser: {error}");
         }
@@ -594,7 +678,7 @@ pub fn set_meeting_schemes_enabled(app: AppHandle, enabled: bool) -> Result<(), 
 /// A scheme or web link from the system: mapped to https, then either the meeting window
 /// (configured host) or the system browser, so the handler never traps an ordinary link.
 #[tauri::command]
-pub fn open_meeting_link(app: AppHandle, raw: String) -> Result<Option<BrowserSessionInfo>, String> {
+pub async fn open_meeting_link(app: AppHandle, raw: String) -> Result<Option<BrowserSessionInfo>, String> {
     let url = if raw.starts_with("https://") {
         raw
     } else {
@@ -603,7 +687,7 @@ pub fn open_meeting_link(app: AppHandle, raw: String) -> Result<Option<BrowserSe
     };
     let hosts = load_hosts(&app);
     if is_meeting_url(&url, &hosts) {
-        open_meeting_browser(app, url).map(Some)
+        open_meeting_browser(app, url).await.map(Some)
     } else {
         tauri_plugin_opener::open_url(url, None::<&str>)
             .map_err(|error| format!("Could not open the URL in the system browser: {error}"))?;

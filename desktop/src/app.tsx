@@ -15,7 +15,7 @@ import { BoundaryFallback } from './components/boundary-fallback'
 import ErrorModalWithContext from './components/error-modal-with-context'
 import HandoffTranscriptSaver from './components/handoff-transcript-saver'
 import MeetingBrowserCloseGate from './components/meeting-browser-close-gate'
-import MeetingBarWindow from './windows/meeting-bar-window'
+import MeetingBrowserRecordGate from './components/meeting-browser-record-gate'
 import { FilesProvider } from './providers/files-provider'
 import { HotkeyProvider } from './providers/hotkey'
 import { RecordingShortcutProvider } from './providers/recording-shortcut'
@@ -25,15 +25,15 @@ import { TooltipProvider } from '~/components/ui/tooltip'
 import { DirectionProvider } from '~/components/ui/direction'
 import { setMeetingDetectionEnabled } from '~/lib/meeting-prompt'
 
-export default function App({ meetingBarSession = null }: { meetingBarSession?: number | null }) {
+export default function App() {
 	return (
 		<PreferenceProvider>
-			<AppContent meetingBarSession={meetingBarSession} />
+			<AppContent />
 		</PreferenceProvider>
 	)
 }
 
-function AppContent({ meetingBarSession }: { meetingBarSession: number | null }) {
+function AppContent() {
 	const { displayLanguage, closeToTray, meetingDetectionEnabled } = usePreferenceProvider()
 	const dir = getTextDirection(displayLanguage)
 	useTray(closeToTray, displayLanguage)
@@ -60,15 +60,12 @@ function AppContent({ meetingBarSession }: { meetingBarSession: number | null })
 										{/* Phone transcriptions arrive while the user is elsewhere, so this must outlive any page. */}
 										<HandoffTranscriptSaver />
 										<MeetingBrowserCloseGate />
+										<MeetingBrowserRecordGate />
 										<FilesProvider>
-											{meetingBarSession !== null ? (
-												<MeetingBarWindow session={meetingBarSession} />
-											) : (
-												<Routes>
-													<Route path="/" element={<MainPage />} />
-													<Route path="/setup" element={<SetupPage />} />
-												</Routes>
-											)}
+											<Routes>
+												<Route path="/" element={<MainPage />} />
+												<Route path="/setup" element={<SetupPage />} />
+											</Routes>
 										</FilesProvider>
 										<Toaster position="bottom-right" />
 									</RecordingShortcutProvider>

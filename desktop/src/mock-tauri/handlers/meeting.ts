@@ -1,6 +1,6 @@
-// Browser-mode mocks for the meeting browser commands. The real window, page loads and
-// native menus cannot exist in a browser tab, so this keeps the session record and the
-// two close-gate decisions observable instead of pretending to load a page.
+// Browser-mode mocks for the meeting browser commands. The real single window and its native
+// page webview cannot exist in a browser tab, so this keeps the session record and the two
+// close-gate decisions observable instead of pretending to load a page.
 import type { CommandHandlerMap } from '../types'
 
 /** Same default allowlist as `src/lib/meeting-browser.ts`; the real Rust side seeds it too. */

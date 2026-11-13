@@ -1,6 +1,6 @@
 # Meeting browser
 
-The meeting browser exists because a call is easier to record when Vibe hosts the page itself: the app controls the window, knows when a recording is underway, and can show a bar with one action. The design is shaped by what the operating system actually allows.
+The meeting browser exists because a call is easier to record when Vibe hosts the page itself: the app controls the window, knows when a recording is underway, and can show its own chrome with one action. The design is shaped by what the operating system actually allows.
 
 ## Why a URL scheme instead of https clicks
 
@@ -15,13 +15,13 @@ Clicking an `https` link in Chrome, Edge, or Firefox still opens that browser. M
 
 ## Why the content view is isolated
 
-The content window is an ordinary webview with its own data directory. Service cookies never mix with the app's storage, no scripts are injected into the page, and camera/microphone prompts come from the page itself rather than from Vibe granting them on the user's behalf. The embedded page is treated as untrusted web content, not as part of the app.
+The window holds two child webviews: Vibe's chrome and the remote page. The chrome is app UI and carries the app's capabilities; the page is ordinary untrusted web content with no capabilities at all, no scripts injected into it, and camera/microphone prompts coming from the page itself rather than from Vibe granting them on the user's behalf. Both share the process's WebView2 environment, because WebView2 does not support a second data directory in one process.
 
-The bar offers address, back, forward, reload, close, and **Open in system browser**. That last action is the escape hatch for a service that refuses to run in the embedded webview.
+The chrome offers address, back, forward, reload, close, and **Open in system browser**. That last action is the escape hatch for a service that refuses to run in the embedded webview. Multi-webview embedding is a desktop Windows/Linux capability here; on macOS the browser falls back to a page-only window with no chrome rather than failing.
 
 ## Why recording stays manual
 
-Hosts in the meeting list make the window a meeting session: the bar shows **Record this call**, and while that session is open the external-browser meeting prompt is suppressed. Recording is still manual — press the button before or during the call, stop from the bar or the main window. Automatic start would record calls the user did not ask to record, and would make the app's microphone indicator appear without an explicit action.
+Hosts in the meeting list make the window a meeting session: the chrome shows **Record this call**, and while that session is open the external-browser meeting prompt is suppressed. Recording is still manual — press the button before or during the call, stop from the chrome or the main window. Automatic start would record calls the user did not ask to record, and would make the app's microphone indicator appear without an explicit action.
 
 Closing the window while recording asks whether to stop or keep recording in the background, so leaving a call cannot silently discard or continue a recording.
 
