@@ -569,7 +569,7 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 				<p className="px-4 py-3 text-sm text-muted-foreground">{m.catalogNoMatches()}</p>
 			)}
 
-			<SettingsRow label={m.downloadModel()}>
+			<SettingsRow label={m.downloadModel()} description={m.infoDownloadModel()}>
 				<Input
 					type="text"
 					value={vm.downloadURL}

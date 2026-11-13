@@ -65,7 +65,7 @@ export function DictationSection({ vm, onOpenCleanup }: { vm: SettingsViewModel;
 	return (
 		<div className="space-y-6">
 			<SettingsGroup title={m.settingsDictationActivation()}>
-				<SettingsRow label={m.globalHotkeyEnabled()}>
+				<SettingsRow label={m.globalHotkeyEnabled()} description={m.infoGlobalHotkey()}>
 					<Switch checked={hotkey.hotkeyEnabled} onCheckedChange={hotkey.setHotkeyEnabled} />
 				</SettingsRow>
 
@@ -102,7 +102,7 @@ export function DictationSection({ vm, onOpenCleanup }: { vm: SettingsViewModel;
 
 			{hotkey.hotkeyEnabled && (
 				<SettingsGroup title={m.settingsDictationOutput()}>
-					<SettingsRow label={m.hotkeyOutputMode()}>
+					<SettingsRow label={m.hotkeyOutputMode()} description={m.infoHotkeyOutputMode()}>
 						<SegmentedControl value={hotkey.hotkeyOutputMode} options={outputOptions} onChange={hotkey.setHotkeyOutputMode} />
 					</SettingsRow>
 

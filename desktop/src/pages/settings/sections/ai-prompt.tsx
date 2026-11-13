@@ -68,7 +68,7 @@ export function AiPromptSection({ vm, task }: { vm: SettingsViewModel; task: AiT
 	return (
 		<div className="space-y-6">
 			<SettingsGroup description={task === 'summary' ? m.aiSummaryTaskInfo() : m.aiDictationTaskInfo()}>
-				<SettingsRow label={task === 'summary' ? m.aiSummaryTask() : m.aiDictationTask()}>
+				<SettingsRow label={task === 'summary' ? m.aiSummaryTask() : m.aiDictationTask()} description={m.infoAiTaskEnabled()}>
 					<Switch checked={settings.enabled} onCheckedChange={(enabled) => update({ enabled })} />
 				</SettingsRow>
 			</SettingsGroup>

@@ -215,6 +215,7 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 	return (
 		<SettingsGroup title={m.compareModels()}>
 			<SettingsRow
+				description={m.infoCompareRecord()}
 				label={
 					input ? (
 						<span className="flex items-center gap-1.5">
@@ -261,7 +262,7 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 				</SettingsRow>
 			)}
 
-			<SettingsField label={m.comparePickModels()}>
+			<SettingsField label={m.comparePickModels()} description={m.infoComparePickModels()}>
 				<div className="space-y-1">
 					{selectableModels.map((entry) => {
 						const active = selected.has(entry.path)

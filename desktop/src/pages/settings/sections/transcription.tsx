@@ -75,10 +75,10 @@ export function TranscriptionSection({ vm, onOpenAutoExport }: { vm: SettingsVie
 						<Switch checked={autoExport.enabled} onCheckedChange={(enabled) => vm.preference.setAutoExport({ ...autoExport, enabled })} />
 					</div>
 				</SettingsRow>
-				<SettingsRow label={m.playSoundOnFinish()}>
+				<SettingsRow label={m.playSoundOnFinish()} description={m.infoPlaySoundOnFinish()}>
 					<Switch checked={vm.preference.soundOnFinish} onCheckedChange={vm.preference.setSoundOnFinish} />
 				</SettingsRow>
-				<SettingsRow label={m.focusWindowOnFinish()}>
+				<SettingsRow label={m.focusWindowOnFinish()} description={m.infoFocusWindowOnFinish()}>
 					<Switch checked={vm.preference.focusOnFinish} onCheckedChange={vm.preference.setFocusOnFinish} />
 				</SettingsRow>
 			</SettingsGroup>
@@ -89,7 +89,8 @@ export function TranscriptionSection({ vm, onOpenAutoExport }: { vm: SettingsVie
 						<span title={projectsPath} className="block truncate font-mono text-xs text-muted-foreground">
 							{projectsPath}
 						</span>
-					}>
+					}
+					description={m.infoProjectsFolder()}>
 					{vm.preference.projectsPath && (
 						<Button variant="ghost" size="sm" onMouseDown={vm.resetProjectsPath}>
 							{m.resetToDefault()}

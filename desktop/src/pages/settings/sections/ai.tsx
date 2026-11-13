@@ -96,7 +96,7 @@ export function AiSection({ vm, onOpenPrompt }: { vm: SettingsViewModel; onOpenP
 			</SettingsGroup>
 
 			<SettingsGroup title={m.connection()}>
-				<SettingsRow label={m.llmPlatform()}>
+				<SettingsRow label={m.llmPlatform()} description={m.infoLlmPlatform()}>
 					<Select value={connection.platform} onValueChange={(platform: AiPlatform) => setConnection({ platform, model: defaultModel(platform) })}>
 						<SelectTrigger className={`w-52 ${rowControlClass}`}>
 							<SelectValue />
@@ -131,7 +131,8 @@ export function AiSection({ vm, onOpenPrompt }: { vm: SettingsViewModel; onOpenP
 									tooltip={m.findHere()}
 									onClick={() => openUrl('https://docs.anthropic.com/en/docs/about-claude/models')}
 								/>
-							}>
+							}
+							description={m.infoLlmModel()}>
 							<Input
 								value={connection.model}
 								onChange={(e) => setConnection({ model: e.target.value })}
@@ -144,7 +145,7 @@ export function AiSection({ vm, onOpenPrompt }: { vm: SettingsViewModel; onOpenP
 
 				{connection.platform === 'ollama' && (
 					<>
-						<SettingsRow label={m.ollamaBaseUrl()}>
+						<SettingsRow label={m.ollamaBaseUrl()} description={m.infoOllamaBaseUrl()}>
 							<Input
 								value={connection.ollamaBaseUrl}
 								onChange={(e) => setConnection({ ollamaBaseUrl: e.target.value })}
@@ -158,7 +159,8 @@ export function AiSection({ vm, onOpenPrompt }: { vm: SettingsViewModel; onOpenP
 									tooltip={m.findHere()}
 									onClick={() => openUrl(`https://ollama.com/library/${connection.model}`)}
 								/>
-							}>
+							}
+							description={m.infoLlmModel()}>
 							<Input
 								value={connection.model}
 								onChange={(e) => setConnection({ model: e.target.value })}
@@ -171,7 +173,7 @@ export function AiSection({ vm, onOpenPrompt }: { vm: SettingsViewModel; onOpenP
 
 				{connection.platform === 'openai' && (
 					<>
-						<SettingsRow label={m.baseUrl()}>
+						<SettingsRow label={m.baseUrl()} description={m.infoBaseUrl()}>
 							<Input
 								value={connection.openaiBaseUrl}
 								onChange={(e) => setConnection({ openaiBaseUrl: e.target.value })}
@@ -179,7 +181,7 @@ export function AiSection({ vm, onOpenPrompt }: { vm: SettingsViewModel; onOpenP
 								className={`w-64 ${rowControlClass}`}
 							/>
 						</SettingsRow>
-						<SettingsRow label={m.apiKey()}>
+						<SettingsRow label={m.apiKey()} description={m.infoApiKey()}>
 							<Input
 								value={connection.openaiApiKey}
 								onChange={(e) => setConnection({ openaiApiKey: e.target.value })}
@@ -188,7 +190,7 @@ export function AiSection({ vm, onOpenPrompt }: { vm: SettingsViewModel; onOpenP
 								className={`w-64 ${rowControlClass}`}
 							/>
 						</SettingsRow>
-						<SettingsRow label={m.llmModel()}>
+						<SettingsRow label={m.llmModel()} description={m.infoLlmModel()}>
 							<Input
 								value={connection.model}
 								onChange={(e) => setConnection({ model: e.target.value })}

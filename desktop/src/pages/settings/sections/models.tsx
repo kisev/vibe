@@ -25,7 +25,7 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 				</SettingsRow>
 
 				{!vm.isMacOS && !vm.preference.noGpu && (
-					<SettingsRow label={m.gpuDevice()}>
+					<SettingsRow label={m.gpuDevice()} description={m.infoGpuDevice()}>
 						{vm.gpuDevices.length > 0 ? (
 							<Select
 								value={vm.preference.gpuDevice != null ? String(vm.preference.gpuDevice) : 'auto'}

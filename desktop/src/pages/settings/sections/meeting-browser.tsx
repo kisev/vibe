@@ -112,7 +112,7 @@ export function MeetingBrowserSettings() {
 			<SettingsGroup
 				title={m.meetingHandlers()}
 				description={handlers && !handlers.supported ? m.meetingHandlersUnavailable() : m.meetingHandlersInfo()}>
-				<SettingsRow label={m.meetingHandlers()}>
+				<SettingsRow label={m.meetingHandlers()} description={m.infoMeetingHandlers()}>
 					<Switch
 						checked={handlers?.enabled ?? false}
 						disabled={!handlers?.supported}
@@ -133,6 +133,7 @@ export function MeetingBrowserSettings() {
 				))}
 				<SettingsField
 					label={m.meetingHostAdd()}
+					description={m.infoMeetingHostAdd()}
 					footer={error ? <span className="text-destructive">{error}</span> : undefined}>
 					<div className="flex gap-2">
 						<Input
@@ -159,7 +160,7 @@ export function MeetingBrowserSettings() {
 			</SettingsGroup>
 
 			<SettingsGroup title={m.openInVibe()} description={m.openInVibeInfo()}>
-				<SettingsField label={m.openInVibeUrlLabel()}>
+				<SettingsField label={m.openInVibeUrlLabel()} description={m.infoOpenInVibeLink()}>
 					<div className="flex gap-2">
 						<Input
 							type="text"

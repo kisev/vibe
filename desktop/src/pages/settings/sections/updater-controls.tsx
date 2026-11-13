@@ -59,7 +59,7 @@ export function UpdateControls() {
 
 	return (
 		<SettingsGroup title={m.updates()}>
-			<SettingsRow label={m.updatesCurrentVersion()}>
+			<SettingsRow label={m.updatesCurrentVersion()} description={m.infoUpdatesCurrentVersion()}>
 				<span className="text-sm tabular-nums text-muted-foreground">{version || '—'}</span>
 			</SettingsRow>
 
@@ -86,7 +86,7 @@ export function UpdateControls() {
 
 			<SettingsRow
 				label={checkState === 'current' && channel === 'beta' ? m.updateNoCandidate() : statusText(checkState, manifest?.version, lastCheckedAt)}
-				description={checkState === 'error' ? checkError : undefined}
+				description={checkState === 'error' ? checkError : m.infoCheckForUpdates()}
 				clampDescription={false}>
 				{busy && checkState !== 'available' && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
 				{checkState === 'downloading' && progress !== null && (
