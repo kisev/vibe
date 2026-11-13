@@ -1,84 +1,19 @@
-import { listen } from '@tauri-apps/api/event'
 import { AnimatePresence, motion } from 'framer-motion'
-import { FolderOpen, Link2, Mic, Plus, Square, Upload, X } from 'lucide-react'
+import { FolderOpen, Globe, Link2, Mic, Plus, Square, Upload, X } from 'lucide-react'
 import { siFacebook, siInstagram, siTiktok, siX, siYoutube } from 'simple-icons'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { m } from '~/paraglide/messages.js'
 import AudioDeviceInput from '~/components/audio-device-input'
+import RecordingIndicator, { useRecordingStartedAt } from '~/components/recording-feedback'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Spinner } from '~/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/style'
 import { parseMediaLinks } from '~/lib/ytdlp'
+import { normalizeMeetingUrl, openMeetingBrowser } from '~/lib/meeting-browser'
 import { useSession, type IdlePanel } from '../session'
 import QuietRow from './quiet-row'
-
-function formatElapsed(seconds: number) {
-	const minutes = Math.floor(seconds / 60)
-	return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
-}
-
-// Live capture meter — five hairline bars driven by the backend's `record_level` event
-// (a 0..1 peak, throttled to ~10/s). Center bars react hardest so the shape reads as a voice.
-const BAR_WEIGHTS = [0.5, 0.78, 1, 0.78, 0.5]
-const BAR_MIN_HEIGHT = 6
-const BAR_MAX_HEIGHT = 18
-/** Below this the capture counts as silence. */
-const SILENCE_LEVEL = 0.03
-/** How long silence must hold before the meter drops to dim stubs. */
-const SILENCE_HOLD_MS = 1000
-const METER_TICK_MS = 60
-/** No event for this long means the stream stalled — let the target fall back to zero. */
-const LEVEL_STALE_MS = 160
-
-function LevelMeter() {
-	const [level, setLevel] = useState(0)
-	const [silent, setSilent] = useState(false)
-	// Refs keep the audio-rate values out of the render path; only the smoothed level is state.
-	const targetRef = useRef(0)
-	const lastEventRef = useRef(Date.now())
-	const lastSoundRef = useRef(Date.now())
-
-	useEffect(() => {
-		const unlisten = listen<number>('record_level', ({ payload }) => {
-			const next = typeof payload === 'number' && Number.isFinite(payload) ? Math.min(Math.max(payload, 0), 1) : 0
-			targetRef.current = next
-			lastEventRef.current = Date.now()
-			if (next > SILENCE_LEVEL) lastSoundRef.current = Date.now()
-		})
-
-		const timer = window.setInterval(() => {
-			const now = Date.now()
-			// A dead device emits nothing at all — decay so it can't freeze mid-bar.
-			if (now - lastEventRef.current > LEVEL_STALE_MS) targetRef.current *= 0.6
-			// Fast attack, slower release: peaks stay legible, the fall stays calm.
-			setLevel((prev) => {
-				const target = targetRef.current
-				const eased = prev + (target - prev) * (target > prev ? 0.7 : 0.3)
-				return Math.abs(eased - target) < 0.004 ? target : eased
-			})
-			setSilent(now - lastSoundRef.current > SILENCE_HOLD_MS)
-		}, METER_TICK_MS)
-
-		return () => {
-			window.clearInterval(timer)
-			unlisten.then((fn) => fn())
-		}
-	}, [])
-
-	return (
-		<span aria-hidden className={cn('flex h-[18px] items-center gap-[3px]', silent && 'opacity-40')}>
-			{BAR_WEIGHTS.map((weight, index) => (
-				<span
-					key={index}
-					className="w-[2px] rounded-full bg-foreground transition-[height] duration-75 ease-out"
-					style={{ height: silent ? BAR_MIN_HEIGHT : BAR_MIN_HEIGHT + level * weight * (BAR_MAX_HEIGHT - BAR_MIN_HEIGHT) }}
-				/>
-			))}
-		</span>
-	)
-}
 
 /** One segment of the joined source switcher: icon-only keys, the active one reads as raised. */
 function Segment({ active, label, onClick, children }: { active?: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
@@ -103,7 +38,8 @@ function Segment({ active, label, onClick, children }: { active?: boolean; label
 }
 
 function RecordPanel() {
-	const { recording, recordElapsed, preference } = useSession()
+	const { recording, preference } = useSession()
+	const startedAt = useRecordingStartedAt(recording.isRecording)
 
 	useEffect(() => {
 		// The recording hook loads audio devices for this tab only.
@@ -112,11 +48,12 @@ function RecordPanel() {
 
 	if (recording.isRecording) {
 		return (
-			<div className="flex flex-col items-center gap-4 py-2.5">
-				<div className="flex items-center gap-3">
-					<LevelMeter />
-					<span className="font-mono text-2xl tracking-tight tabular-nums">{formatElapsed(recordElapsed)}</span>
-				</div>
+			<div className="flex w-full flex-col items-center gap-4 py-2.5">
+				<RecordingIndicator
+					startedAt={startedAt}
+					microphoneName={recording.inputDevice?.name ?? m.noRecord()}
+					systemName={recording.outputDevice?.name ?? m.noRecord()}
+				/>
 				<Button onClick={() => recording.stopRecord()} className="h-10 w-full rounded-xl">
 					<Square className="h-3.5 w-3.5 fill-current" />
 					{m.stopRecording()}
@@ -183,6 +120,45 @@ const linkSources: { title: string; path: string }[] = [
 	{ title: siX.title, path: siX.path },
 	{ title: siFacebook.title, path: siFacebook.path },
 ]
+
+/** Open any https link in the embedded browser, which lives in its own window. */
+function BrowserPanel() {
+	const [url, setUrl] = useState('')
+	const [error, setError] = useState<string | null>(null)
+
+	async function open() {
+		const normalized = normalizeMeetingUrl(url)
+		if (!normalized) {
+			setError(m.meetingBrowserInvalidLink({ reason: url.trim() }))
+			return
+		}
+		setError(null)
+		try {
+			await openMeetingBrowser(normalized)
+			setUrl('')
+		} catch (reason) {
+			setError(reason instanceof Error ? reason.message : String(reason))
+		}
+	}
+
+	return (
+		<div className="flex w-full flex-col gap-3">
+			<div className="flex gap-2">
+				<Input
+					value={url}
+					onChange={(event) => setUrl(event.target.value)}
+					onKeyDown={(event) => (event.key === 'Enter' ? void open() : null)}
+					placeholder={m.meetingBarAddress()}
+					className="h-10 min-w-0 rounded-xl px-3.5 text-sm"
+				/>
+				<Button onClick={() => void open()} disabled={url.trim().length === 0} className="h-10 shrink-0 rounded-xl px-4">
+					{m.openInVibe()}
+				</Button>
+			</div>
+			<p className={cn('min-h-[18px] text-[12px]', error ? 'text-destructive' : 'text-muted-foreground')}>{error ?? m.meetingHostsInfo()}</p>
+		</div>
+	)
+}
 
 function LinkPanel() {
 	const { link, preference } = useSession()
@@ -368,6 +344,10 @@ export default function IdleHero() {
 				<Segment active={panel === 'link'} label={m.fromLink()} onClick={() => selectPanel('link')}>
 					<Link2 className="h-[18px] w-[18px]" />
 				</Segment>
+				{/* The embedded browser is a destination of its own, not a Settings sub-page. */}
+				<Segment active={panel === 'browser'} label={m.meetingBrowserTitle()} onClick={() => selectPanel('browser')}>
+					<Globe className="h-[18px] w-[18px]" />
+				</Segment>
 			</div>
 
 			{/* Fixed-height slot sized to the drop zone so switching sources never moves the pills or the quiet row. */}
@@ -413,7 +393,7 @@ export default function IdleHero() {
 							transition={{ duration: 0.18, ease: 'easeOut' }}
 							// Same footprint as the drop zone so the composition stays anchored.
 							className="flex min-h-[220px] w-full flex-col justify-center rounded-[1.25rem] border border-border bg-muted/30 px-7">
-							{panel === 'record' ? <RecordPanel /> : <LinkPanel />}
+							{panel === 'record' ? <RecordPanel /> : panel === 'link' ? <LinkPanel /> : <BrowserPanel />}
 						</motion.div>
 					)}
 				</AnimatePresence>

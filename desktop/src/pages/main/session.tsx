@@ -24,7 +24,7 @@ import { useSummaries, type Summaries } from './hooks/use-summaries'
 import { useTranscribeQueue, type TranscribeQueue } from './hooks/use-transcribe-queue'
 
 export type SessionMode = 'idle' | 'working' | 'done'
-export type IdlePanel = 'none' | 'record' | 'link'
+export type IdlePanel = 'none' | 'record' | 'link' | 'browser'
 
 type Recording = ReturnType<typeof useRecording>
 type AudioDownload = ReturnType<typeof useAudioDownload>
@@ -39,7 +39,6 @@ export interface Session {
 	panel: IdlePanel
 	setPanel: (panel: IdlePanel) => void
 	recording: Recording
-	recordElapsed: number
 	link: AudioDownload
 	collectingFolder: boolean
 	browse: () => Promise<void>
@@ -65,7 +64,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 	const summaries = useSummaries(queue)
 	const [panel, setPanel] = useState<IdlePanel>('none')
 	const [collectingFolder, setCollectingFolder] = useState(false)
-	const [recordElapsed, setRecordElapsed] = useState(0)
 
 	const enqueueRef = useRef(queue.enqueue)
 	useEffect(() => {
@@ -142,17 +140,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		if (recordingShortcut.isShortcutRecording) setPanel('record')
 	}, [recordingShortcut.isShortcutRecording])
-
-	useEffect(() => {
-		if (!recording.isRecording) {
-			setRecordElapsed(0)
-			return
-		}
-		setRecordElapsed(0)
-		const startedAt = Date.now()
-		const timer = window.setInterval(() => setRecordElapsed(Math.floor((Date.now() - startedAt) / 1000)), 500)
-		return () => window.clearInterval(timer)
-	}, [recording.isRecording])
 
 	// A recording becomes a durable project first. Transcription is an optional second step which
 	// updates that same project, so a failed/disabled transcription never costs the user the audio.
@@ -321,13 +308,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 			panel,
 			setPanel,
 			recording,
-			recordElapsed,
 			link,
 			collectingFolder,
 			browse,
 			startNew,
 		}),
-		[mode, queue, summaries, preference, dragging, panel, recording, recordElapsed, link, collectingFolder, browse, startNew],
+		[mode, queue, summaries, preference, dragging, panel, recording, link, collectingFolder, browse, startNew],
 	)
 
 	return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

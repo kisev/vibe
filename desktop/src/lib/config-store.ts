@@ -25,16 +25,28 @@ function notify(key: string) {
 	for (const listener of listeners.get(key) ?? []) listener()
 }
 
+/** Apply one changed value, waking subscribers only when it really moved. */
+function applyConfigValue(key: string, value: unknown) {
+	const exists = value !== undefined
+	if (!exists && !cache.has(key)) return
+	if (exists && cache.has(key) && JSON.stringify(cache.get(key)) === JSON.stringify(value)) return
+	if (exists) cache.set(key, value)
+	else cache.delete(key)
+	notify(key)
+}
+
 /** Must finish before the first render, or every setting would flash its default. */
 export async function loadConfigStore() {
 	try {
 		// autoSave batches the disk writes: a slider being dragged costs one save, not fifty.
 		store = await load(config.storeFilename, { autoSave: 300, defaults: {} })
 		for (const [key, value] of await store.entries()) cache.set(key, value)
-		await store.onChange((key, value) => {
-			if (value === undefined) cache.delete(key)
-			else cache.set(key, value)
-			notify(key)
+		// `store.onChange` filters by this webview's resource id, so a write from another window
+		// (the main window and the browser chrome share one config file) never reaches it. The
+		// plugin emits the same event app-wide; listen to it raw so every window stays in step.
+		await listen<{ path: string; key: string; value?: unknown; exists: boolean }>('store://change', ({ payload }) => {
+			if (!payload?.path?.endsWith(config.storeFilename)) return
+			applyConfigValue(payload.key, payload.exists ? payload.value : undefined)
 		})
 		await listen<Record<string, unknown>>(CONFIG_CHANGED_EVENT, ({ payload }) => applyExternalConfig(payload))
 	} catch (error) {
