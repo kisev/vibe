@@ -1,0 +1,90 @@
+{
+  "app-update-controls": {
+    "title": "Contrôles de mise à jour de l’application",
+    "why": "Les mises à jour sont vérifiées en arrière-plan et le seul contrôle est un interrupteur « Mises à jour Beta » inexpliqué enfoui dans Général : aucun « vérifier maintenant » explicite, aucun canal dev (les builds dev sont livrés sans artefacts de mise à jour), et aucune règle énoncée sur ce que signifie chaque canal."
+  },
+  "comparison-failed-runs": {
+    "title": "Exécutions échouées de la comparaison",
+    "why": "Avec trois modèles sélectionnés, la fenêtre de résultats n’en affichait que deux : la troisième exécution avait échoué et la fenêtre filtre sur `status === 'done'`, si bien qu’un échec disparaît au lieu d’être expliqué."
+  },
+  "dependency-hygiene": {
+    "title": "Hygiène des dépendances",
+    "why": "Les dépendances sont mises à jour à la main, quand elles le sont, et il n’existe aucun endroit unique qui réponde à « qu’est-ce qui est obsolète ? »."
+  },
+  "desktop-e2e": {
+    "title": "Tests E2E de l’application de bureau",
+    "why": "Jusqu’ici, chaque régression de l’application de bureau a été trouvée par le mainteneur en installant un build dev et en le parcourant à la main."
+  },
+  "dev-branch-lint": {
+    "title": "Lint de la branche dev",
+    "why": "AGENTS.md indique que le code qui nécessite une compilation ou une vérification CI va sur main afin que l’exécution de Lint le valide."
+  },
+  "dev-changelog-links": {
+    "title": "Liens du journal des modifications dev",
+    "why": "Les versions dev sont nettoyées — seule la plus récente subsiste — et les builds dev n’ont pas d’entrée de journal des modifications versionnée qui leur soit propre ; leurs notes sont l’entrée non publiée au moment de la version."
+  },
+  "dev75-fixes": {
+    "title": "Corrections de Dev75",
+    "why": "Le premier build que le mainteneur a utilisé pendant une journée (1.0.0-dev.75) a révélé cinq défauts qu’aucun test unitaire n’avait détectés : la vue de comparaison annonce zéro différence sur de vraies transcriptions, les canaux de mise à jour mélangent les noms anglais et traduits et proposent un build stable sur Beta, le navigateur de réunion ouvre une fenêtre blanche inutilisable impossible à fermer et dépend d’un schéma vibe:// que personne d’autre ne produit, la page du journal des modifications dev retombe sur 1.0.0 et laisse deux libellés non traduits, et l’interrupteur du serveur API local s’active tout seul après un redémarrage."
+  },
+  "embedded-meeting-browser": {
+    "title": "Navigateur de réunion intégré",
+    "why": "Les liens de réunion (telemost.yandex.ru, stream.wb.ru, et tout ce que l’utilisateur ajoute) s’ouvrent dans le navigateur système, si bien que Vibe peut seulement deviner, à partir des processus de navigateur en cours, qu’un appel a lieu, puis demander à enregistrer."
+  },
+  "fork-update-sources": {
+    "title": "Sources de mise à jour du fork",
+    "why": "Le fork continue de vérifier le canal de mise à jour amont (thewh1teagle/vibe), si bien qu’une version amont peut être proposée à un build du fork — et le remplacer — dès que l’amont en publie une."
+  },
+  "live-conversation-assistant": {
+    "title": "Assistant de conversation en direct",
+    "why": "L’application transcrit les réunions, mais l’aide arrive après l’appel : les résumés et les questions portent sur une transcription terminée."
+  },
+  "local-windows-build": {
+    "title": "Build Windows local",
+    "why": "L’acceptation manuelle des changements de l’application dépend du pool de runners GitHub : un tag dev coûte un build matriciel, et les cellules macOS en particulier sont annulées au hasard, tandis que les cellules Linux et Windows prennent des dizaines de minutes."
+  },
+  "meeting-browser-rework": {
+    "title": "Refonte du navigateur de réunion",
+    "why": "Sur Windows 11, le navigateur de réunion intégré ouvre une fenêtre blanche qui ne s’affiche jamais, et ni la fenêtre ni Vibe ne peuvent plus être fermés ensuite."
+  },
+  "model-comparison": {
+    "title": "Comparaison de modèles",
+    "why": "La page des modèles note chaque entrée du catalogue avec des barres de précision et de vitesse publiées, mais ces mesures proviennent de l’audio et du matériel d’autres personnes — sur une 5070 Ti face au CPU d’un portable, l’ordre peut s’inverser, et les chiffres ne disent rien de la façon dont un modèle traite la langue et l’accent de l’utilisateur."
+  },
+  "post-release-hardening": {
+    "title": "Durcissement après la version",
+    "why": "La re-vérification des changements archivés après la v1.0.0 a révélé des défauts que les contrôles automatisés n’avaient pas détectés : le guide pratique publié sur la publication d’une version promeut une version sans reconstruire son corps, si bien qu’une version stable est livrée sans les notes en anglais intégrées qu’exige la spécification ; `task verify` omet deux jobs CI exécutables localement (la construction du site et le spike de transcription) ; la CI exécute `cargo fmt`/`clippy` bruts au lieu des cibles de tâche, si bien que les commandes locale et distante peuvent diverger ; la construction de la feuille de route ignore `openspec/changes/**` ; l’archive ggml précompilée est empaquetée dans `ggml-build/` alors que l’upload lit la racine du dépôt ; et le filtre de chemins du job E2E omet les fichiers que lit la suite."
+  },
+  "remove-upstream-ties": {
+    "title": "Supprimer les liens avec l’amont",
+    "why": "Le fork porte encore la mécanique externe du projet d’origine : la télémétrie Aptabase qui envoie des événements à un tableau de bord tiers, et les surfaces de don Ko-fi qui renvoient vers la page de soutien de quelqu’un d’autre."
+  },
+  "security-scanning": {
+    "title": "Analyse de sécurité",
+    "why": "Rien dans le dépôt ne fait échouer un build parce qu’une dépendance a une vulnérabilité connue."
+  },
+  "show-speaker-model": {
+    "title": "Afficher le modèle de locuteur",
+    "why": "Le modèle de séparation des locuteurs est auxiliaire : listInstalledModels le filtre hors du catalogue, si bien que rien dans les paramètres n’indique quel modèle l’application utilise pour la séparation des locuteurs, s’il est téléchargé, ni que l’application en a récupéré un."
+  },
+  "site-localization": {
+    "title": "Localisation du site",
+    "why": "Changer la langue du site réaffiche la page, mais deux surfaces conservent leur contenu en anglais : le journal des modifications dev (`/changelog/dev`) n’a pas de `i18n/changelog/<locale>/unreleased.md`, et les cartes de la feuille de route proviennent de roadmap.json, qui est généré à partir des fichiers proposal.md en anglais."
+  },
+  "speaker-voice-memory": {
+    "title": "Mémoire vocale des locuteurs",
+    "why": "La diarisation étiquette les locuteurs de chaque enregistrement comme Locuteur 1…N, et les noms saisis par l’utilisateur sont stockés par transcription."
+  },
+  "upstream-fetch-isolation": {
+    "title": "Isolation du fetch amont",
+    "why": "git fetch upstream échoue dans ce fork : l’amont et le fork veulent tous deux posséder des tags comme v1.0.0, et l’historique du fork est délibérément le sien (une ligne de version qui lui est propre démarrant à 1.0.0, des builds dev étiquetés dev.)."
+  },
+  "website-deploy-from-main": {
+    "title": "Déploiement du site depuis main",
+    "why": "Chaque version publiée — de dev.76 à dev.81 — a laissé derrière elle une exécution Deploy Website en échec."
+  },
+  "website-language-selector": {
+    "title": "Sélecteur de langue du site",
+    "why": "Le site dispose déjà d’un runtime Paraglide, de catalogues par locale, d’un LanguageSelector dans la navigation et de documentation et journal des modifications entièrement traduits — mais la couverture est inégale (Maison et Caractéristiques portent encore de l’anglais codé en dur), le choix ne vit que dans localStorage si bien qu’un lien partagé s’ouvre toujours dans la langue du destinataire plutôt que celle de l’expéditeur, et le sélecteur est facile à manquer sur petit écran."
+  }
+}

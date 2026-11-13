@@ -1,0 +1,90 @@
+{
+  "app-update-controls": {
+    "title": "应用更新控制",
+    "why": "更新在后台检查，唯一的控件是埋在“通用”里、没有任何说明的“Beta 更新”开关：没有明确的“立即检查”，完全没有 Dev 通道（开发构建不附带更新程序产物），也没有说明每个通道的含义。"
+  },
+  "comparison-failed-runs": {
+    "title": "对比失败运行",
+    "why": "选中三个模型时，结果窗口只显示两个：第三次运行失败了，而窗口会过滤到 status === 'done'，于是失败被隐藏，而不是得到解释。"
+  },
+  "dependency-hygiene": {
+    "title": "依赖治理",
+    "why": "依赖靠手工更新，甚至常常不更新，也没有一个地方能回答“什么已经过时了？”。"
+  },
+  "desktop-e2e": {
+    "title": "桌面端 e2e",
+    "why": "到目前为止，每一个桌面端回归问题都是维护者安装开发构建后点一遍才发现的。"
+  },
+  "dev-branch-lint": {
+    "title": "dev 分支 Lint",
+    "why": "AGENTS.md 规定，需要编译或 CI 检查的代码要进入 main，以便 Lint 运行对其进行验证。"
+  },
+  "dev-changelog-links": {
+    "title": "Dev 更新日志链接",
+    "why": "Dev 发行版会被清理——只保留最新的 Dev 发行版——而且开发构建没有自己的带版本号的更新日志条目；它们的说明就是发布时的未发布条目。"
+  },
+  "dev75-fixes": {
+    "title": "Dev75 修复",
+    "why": "维护者第一次连续使用一整天的构建（1.0.0-dev.75）暴露出五个单元测试都没有发现的缺陷：对比视图在真实转录上声称零处差异；更新通道混用英文名和译名，并在 Beta 上提供稳定版本；会议浏览器会打开一个无法关闭、不可用的白窗口，还依赖一个别人都不会生成的 vibe:// 协议；开发版更新日志页面回退到 1.0.0，并有两个标签未翻译；本地 API 服务器开关在重启后自行开启。"
+  },
+  "embedded-meeting-browser": {
+    "title": "内置会议浏览器",
+    "why": "会议链接（telemost.yandex.ru、stream.wb.ru，以及用户自行添加的任何主机）会在系统浏览器中打开，因此 Vibe 只能通过正在运行的浏览器进程猜测有通话发生，然后再询问是否录制。"
+  },
+  "fork-update-sources": {
+    "title": "分支更新源",
+    "why": "分支仍会检查上游更新通道（thewh1teagle/vibe），因此上游一发布，分支构建就可能被推荐更新——并被上游发行版替换。"
+  },
+  "live-conversation-assistant": {
+    "title": "实时对话助手",
+    "why": "应用能转录会议，但帮助总是在通话结束后才到来：摘要和提问针对的是已经完成的转录。"
+  },
+  "local-windows-build": {
+    "title": "本地 Windows 构建",
+    "why": "对应用改动的手动验收要等 GitHub runner 池：一个 dev 标签就要消耗一次矩阵构建，而 macOS 单元尤其会被随机取消，Linux 和 Windows 单元则要花几十分钟。"
+  },
+  "meeting-browser-rework": {
+    "title": "会议浏览器重构",
+    "why": "在 Windows 11 上，内置会议浏览器会打开一个始终无法渲染的白窗口，之后窗口和 Vibe 都无法关闭。"
+  },
+  "model-comparison": {
+    "title": "模型对比",
+    "why": "模型页面用公布的准确度/速度条为每个目录条目评分，但这些基准来自别人的音频和别人的硬件——在 5070 Ti 与笔记本 CPU 上，排序可能颠倒，而这些数字完全不能说明模型对用户语言和口音的处理能力。"
+  },
+  "post-release-hardening": {
+    "title": "发布后加固",
+    "why": "重新核验 v1.0.0 之后归档的改动时，发现了自动门禁未能发现的缺陷：已发布的发布操作指南在提升发行版时不会重建其正文，因此稳定版发布时会缺少规范所要求的内联英文说明；task verify 遗漏了两个可在本地运行的 CI 作业（站点构建和转录 spike）；CI 运行的是原生 cargo fmt/clippy，而不是 task 目标，因此本地与远程命令可能产生漂移；路线图构建忽略了 openspec/changes/**；预构建的 ggml 归档被打包到 ggml-build/，而 upload 读取的是仓库根目录；E2E 作业的路径过滤器漏掉了测试套件读取的文件。"
+  },
+  "remove-upstream-ties": {
+    "title": "移除上游关联",
+    "why": "分支仍保留着原项目对外的基础设施：把事件发送到第三方仪表板的 Aptabase 遥测，以及指向别人支持页面的 Ko-fi 捐赠入口。"
+  },
+  "security-scanning": {
+    "title": "安全扫描",
+    "why": "仓库中没有任何机制会因为某个依赖存在已知漏洞而让构建失败。"
+  },
+  "show-speaker-model": {
+    "title": "显示发言者模型",
+    "why": "发言者分离模型是附属模型：listInstalledModels 会把它从目录中过滤掉，因此设置里没有任何地方说明应用使用哪个模型进行发言者分离、该模型是否已下载，或者应用已经自动拉取了一个。"
+  },
+  "site-localization": {
+    "title": "网站本地化",
+    "why": "切换站点语言会重新渲染页面，但有两个界面仍保留英文内容：Dev 更新日志（/changelog/dev）没有 i18n/changelog/<locale>/unreleased.md，而路线图卡片来自 roadmap.json，该文件是由英文 proposal.md 文件生成的。"
+  },
+  "speaker-voice-memory": {
+    "title": "发言者声音记忆",
+    "why": "发言者分离会把每段录音的发言者标记为发言者 1…N，而用户输入的名字按转录分别存储。"
+  },
+  "upstream-fetch-isolation": {
+    "title": "上游拉取隔离",
+    "why": "在这个分支中，git fetch upstream 会失败：上游和分支都想要拥有像 v1.0.0 这样的标签，而分支的历史刻意保持独立（自己的版本线从 1.0.0 开始，开发构建使用 dev. 标签）。"
+  },
+  "website-deploy-from-main": {
+    "title": "从 main 部署网站",
+    "why": "每个已发布的发行版——从 dev.76 到 dev.81——都留下了一次失败的 Deploy Website 运行。"
+  },
+  "website-language-selector": {
+    "title": "网站语言选择器",
+    "why": "网站已经有 Paraglide 运行时、按语言划分的目录、导航中的 LanguageSelector，以及完全翻译的文档和更新日志——但覆盖并不均匀（首页和功能特性仍带有硬编码的英文），语言选择只保存在 localStorage 中，因此分享的链接总是以接收者的语言打开，而不是发送者的语言，而且选择器在小屏幕上很容易被忽略。"
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "app-update-controls": {
+    "title": "Ovládání aktualizací aplikace",
+    "why": "Aktualizace se kontrolují na pozadí a jediným ovládacím prvkem je nevysvětlený přepínač „Beta updates“ ukrytý v sekci Obecné: žádné výslovné „zkontrolovat nyní“, žádný vývojový kanál (vývojová sestavení vycházejí bez artefaktů aktualizátoru) a žádné stanovené pravidlo, co který kanál znamená."
+  },
+  "dependency-hygiene": {
+    "title": "Hygiena závislostí",
+    "why": "Závislosti se aktualizují ručně, pokud vůbec, a neexistuje jediné místo, které odpovídá na otázku „co je zastaralé?“."
+  },
+  "desktop-e2e": {
+    "title": "Desktopové e2e testy",
+    "why": "Každou dosavadní regresi desktopové aplikace objevil správce projektu tím, že nainstaloval vývojové sestavení a proklikal se jím."
+  },
+  "dev-branch-lint": {
+    "title": "Lint na vývojové větvi",
+    "why": "AGENTS.md uvádí, že kód, který potřebuje kontrolu kompilace nebo CI, jde do main, aby jej ověřil běh Lint."
+  },
+  "dev-changelog-links": {
+    "title": "Odkazy na vývojový seznam změn",
+    "why": "Vývojová vydání se uklízejí — zůstává jen nejnovější vývojové vydání — a vývojová sestavení nemají vlastní číslovaný záznam v seznamu změn; jejich poznámky tvoří v době vydání záznam „unreleased“."
+  },
+  "dev75-fixes": {
+    "title": "Opravy pro dev.75",
+    "why": "První sestavení, se kterým správce projektu strávil celý den (1.0.0-dev.75), odhalilo pět závad, které nezachytil žádný unit test: zobrazení porovnání hlásí u skutečných přepisů nula rozdílů, kanály aktualizací míchají anglické a přeložené názvy a na Beta nabízejí stabilní sestavení, prohlížeč schůzek otevírá nepoužitelné bílé okno, které nelze zavřít a které závisí na schématu vibe://, jež nikdo jiný nevytváří, vývojová stránka seznamu změn se vrací k 1.0.0 a nechává dva popisky nepřeložené a místní přepínač serveru API se po restartu sám zapne."
+  },
+  "embedded-meeting-browser": {
+    "title": "Vestavěný prohlížeč schůzek",
+    "why": "Odkazy na schůzky (telemost.yandex.ru, stream.wb.ru a cokoli, co uživatel přidá) se otevírají v systémovém prohlížeči, takže Vibe může z běžících procesů prohlížeče jen hádat, že probíhá hovor, a poté požádat o nahrávání."
+  },
+  "fork-update-sources": {
+    "title": "Zdroje aktualizací forku",
+    "why": "Fork stále kontroluje upstreamový aktualizační kanál (thewh1teagle/vibe), takže sestavení forku může být nabídnuto — a nahrazeno — upstreamovým vydáním ve chvíli, kdy upstream nějaké zveřejní."
+  },
+  "live-conversation-assistant": {
+    "title": "Asistent živé konverzace",
+    "why": "Aplikace přepisuje schůzky, ale pomoc přichází až po hovoru: shrnutí a otázky se týkají dokončeného přepisu."
+  },
+  "model-comparison": {
+    "title": "Porovnání modelů",
+    "why": "Stránka modelů hodnotí každou položku katalogu zveřejněnými pruhy přesnosti a rychlosti, ale tyto benchmarky pocházejí z cizího zvuku a cizího hardwaru — na 5070 Ti versus notebookovém CPU se pořadí může obrátit a čísla nic neříkají o tom, jak si model poradí s jazykem a přízvukem uživatele."
+  },
+  "remove-upstream-ties": {
+    "title": "Odstranění vazeb na upstream",
+    "why": "Fork stále nese navenek viditelné mechanismy původního projektu: telemetrii Aptabase, která posílá události do dashboardu třetí strany, a darovací plochy Ko-fi odkazující na cizí stránku podpory."
+  },
+  "security-scanning": {
+    "title": "Bezpečnostní skenování",
+    "why": "V repozitáři nic nezastaví sestavení kvůli tomu, že má závislost známou zranitelnost."
+  },
+  "show-speaker-model": {
+    "title": "Zobrazení modelu pro rozlišení mluvčích",
+    "why": "Model pro rozlišení mluvčích je pomocný: listInstalledModels jej odfiltrovává z katalogu, takže v nastavení nic neříká, který model aplikace pro rozlišení mluvčích používá, zda je stažený nebo že si ho aplikace sama stáhla."
+  },
+  "speaker-voice-memory": {
+    "title": "Paměť hlasů mluvčích",
+    "why": "Diarizace označuje mluvčí každé nahrávky jako Mluvčí 1…N a jména, která uživatel zadá, se ukládají pro každý přepis zvlášť."
+  },
+  "upstream-fetch-isolation": {
+    "title": "Izolace stahování z upstreamu",
+    "why": "git fetch upstream v tomto forku selhává: upstream i fork chtějí vlastnit značky jako v1.0.0 a historie forku je záměrně vlastní (vlastní číselná řada začínající na 1.0.0, vývojová sestavení označená dev.)."
+  },
+  "website-deploy-from-main": {
+    "title": "Nasazování webu z main",
+    "why": "Každé zveřejněné vydání — od dev.76 po dev.81 — po sobě zanechalo neúspěšný běh Deploy Website."
+  },
+  "website-language-selector": {
+    "title": "Výběr jazyka na webu",
+    "why": "Web už má runtime Paraglide, katalogy pro jednotlivé jazyky, LanguageSelector v navigaci a plně přeloženou dokumentaci i seznam změn — pokrytí je ale nerovnoměrné (Domů a Funkce stále obsahují natvrdo zapsanou angličtinu), volba žije jen v localStorage, takže sdílený odkaz se vždy otevře v jazyce příjemce, nikoli odesílatele, a na malých obrazovkách je výběr snadno přehlédnutelný."
+  },
+  "comparison-failed-runs": {
+    "title": "Neúspěšné běhy porovnání",
+    "why": "Při výběru tří modelů okno výsledků zobrazilo jen dva: třetí běh selhal a okno filtruje na status === 'done', takže selhání zmizí, místo aby bylo vysvětleno."
+  },
+  "local-windows-build": {
+    "title": "Lokální sestavení pro Windows",
+    "why": "Ruční ověření změn aplikace čeká na pool běžců GitHubu: značka dev vyžaduje maticové sestavení a zejména buňky s macOS se ruší náhodně, zatímco buňky s Linuxem a Windows trvají desítky minut."
+  },
+  "meeting-browser-rework": {
+    "title": "Přepracování prohlížeče schůzek",
+    "why": "Ve Windows 11 otevírá vestavěný prohlížeč schůzek bílé okno, které se nikdy nevykreslí, a poté nelze zavřít ani okno, ani Vibe."
+  },
+  "post-release-hardening": {
+    "title": "Zpevnění po vydání",
+    "why": "Opětovné ověření změn archivovaných po v1.0.0 odhalilo závady, které automatické kontroly nezachytily: zveřejněný návod k vydání povyšuje vydání bez opětovného sestavení jeho těla, takže stabilní vydání vyjde bez anglických poznámek vložených přímo do těla, které specifikace vyžaduje; task verify vynechává dvě lokálně spustitelné CI úlohy (sestavení webu a transkripční spike); CI spouští surové cargo fmt/clippy místo cílů task, takže se místní a vzdálené příkazy mohou rozejít; sestavení plánu vývoje ignoruje openspec/changes/**; předpřipravený archiv ggml se balí do ggml-build/, zatímco upload čte kořen repozitáře; a filtr cest úlohy E2E míjí soubory, které sada čte."
+  },
+  "site-localization": {
+    "title": "Lokalizace webu",
+    "why": "Přepnutí jazyka webu znovu vykreslí stránku, ale dvě místa si ponechávají anglický obsah: vývojový seznam změn (/changelog/dev) nemá i18n/changelog/<locale>/unreleased.md a karty plánu vývoje pocházejí z roadmap.json, který se generuje z anglických souborů proposal.md."
+  }
+}

@@ -12,8 +12,9 @@ import {
 	type Release,
 	type Section,
 } from '~/lib/changelog'
+import { useLocale } from '~/lib/useLocale'
 import { m } from '~/paraglide/messages.js'
-import { getLocale, getTextDirection, type Locale } from '~/paraglide/runtime.js'
+import { getTextDirection, type Locale } from '~/paraglide/runtime.js'
 
 const badge: Record<Section, string> = {
 	New: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
@@ -111,11 +112,14 @@ function Entry({ release, single, dev }: { release: Release; single: boolean; de
 
 export default function Changelog() {
 	const { version } = useParams()
+	// The language switcher remounts this page; reading the locale from the router
+	// keeps the fetch in step with the switch instead of a value captured once.
+	const locale = useLocale()
 	// A dev link — the alias or a swept `-dev.` version — always resolves to the dev line.
 	const dev = isDevVersion(version)
 	// A locale with translations waits for them instead of painting English first: swapping
 	// English for, say, Hebrew a moment later flips direction and reflows the whole page.
-	const [list, setList] = useState<Release[] | null>(() => (hasTranslations(getLocale()) ? null : releases))
+	const [list, setList] = useState<Release[] | null>(() => (hasTranslations(locale) ? null : releases))
 	const devEntry = dev && list ? findDevRelease(list) : undefined
 	const one = !dev && version && list ? findRelease(version, list) : undefined
 	const shown = dev ? (devEntry ? [devEntry.release] : []) : one ? [one] : (list ?? [])
@@ -127,15 +131,21 @@ export default function Changelog() {
 	}, [dev])
 
 	useEffect(() => {
-		if (list) return
 		let live = true
-		loadReleases(getLocale()).then((translated) => {
+		if (!hasTranslations(locale)) {
+			setList(releases)
+			return () => {
+				live = false
+			}
+		}
+		setList(null)
+		loadReleases(locale).then((translated) => {
 			if (live) setList(translated)
 		})
 		return () => {
 			live = false
 		}
-	}, [])
+	}, [locale])
 
 	useEffect(() => {
 		document.title = one ? `Vibe v${one.version}: ${one.title}` : `Vibe ${m.changelog()}`
@@ -146,7 +156,7 @@ export default function Changelog() {
 
 	return (
 		<main className="mx-auto w-full max-w-[1065px] px-5 pb-24 pt-14 lg:pt-20">
-			<header dir={getTextDirection(getLocale())}>
+			<header dir={getTextDirection(locale)}>
 				<p className="eyebrow">Vibe</p>
 				<h1 className="mt-4 text-[2rem] font-semibold leading-[1.08] tracking-[-0.03em] text-foreground lg:text-[2.5rem]">{m.changelog()}</h1>
 				{devEntry?.fallback && <p className="mt-4 text-muted-foreground">{m.changelogDevFallback()}</p>}

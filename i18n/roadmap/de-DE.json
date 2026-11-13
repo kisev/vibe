@@ -1,0 +1,90 @@
+{
+  "app-update-controls": {
+    "title": "App-Update-Steuerung",
+    "why": "Updates werden im Hintergrund geprüft, und die einzige Steuerung ist ein unerklärter Schalter „Beta-Updates“, der unter Allgemein vergraben ist: kein ausdrückliches „Jetzt prüfen“, überhaupt kein Dev-Kanal (Dev-Builds erscheinen ohne Updater-Artefakte) und keine festgelegte Regel, was die einzelnen Kanäle bedeuten."
+  },
+  "comparison-failed-runs": {
+    "title": "Fehlgeschlagene Läufe im Vergleich",
+    "why": "Bei drei ausgewählten Modellen zeigte das Ergebnisfenster zwei: Der dritte Lauf schlug fehl, und das Fenster filtert auf status === 'done', sodass ein Fehler verschwindet, statt erklärt zu werden."
+  },
+  "dependency-hygiene": {
+    "title": "Abhängigkeits-Hygiene",
+    "why": "Abhängigkeiten werden von Hand aktualisiert, wenn überhaupt, und es gibt keinen einzigen Ort, der die Frage „Was ist veraltet?“ beantwortet."
+  },
+  "desktop-e2e": {
+    "title": "Desktop-E2E",
+    "why": "Jede bisherige Desktop-Regression wurde vom Maintainer gefunden, indem er einen Dev-Build installierte und sich durchklickte."
+  },
+  "dev-branch-lint": {
+    "title": "Dev-Branch-Lint",
+    "why": "Laut AGENTS.md geht Code, der einen Kompilier- oder CI-Check braucht, auf main, damit der Lint-Lauf ihn validiert."
+  },
+  "dev-changelog-links": {
+    "title": "Dev-Änderungsprotokoll-Links",
+    "why": "Dev-Releases werden aufgeräumt — nur das neueste Dev-Release bleibt —, und Dev-Builds haben keinen eigenen versionierten Änderungsprotokoll-Eintrag; ihre Notizen sind zum Release-Zeitpunkt der Unveröffentlicht-Eintrag."
+  },
+  "dev75-fixes": {
+    "title": "Dev75-Fixes",
+    "why": "Der erste Build, in dem der Maintainer einen Tag lang lebte (1.0.0-dev.75), legte fünf Defekte offen, die kein Unit-Test fing: Die Vergleichsansicht behauptet bei echten Transkripten null Unterschiede, die Update-Kanäle verraten englische/übersetzte Namen und bieten auf Beta einen stabilen Build an, der Besprechungsbrowser öffnet ein unbrauchbares weißes Fenster, das sich nicht schließen lässt und von einem vibe://-Schema abhängt, das niemand sonst erzeugt, die Dev-Änderungsprotokoll-Seite fällt auf 1.0.0 zurück und lässt zwei Beschriftungen unübersetzt, und der lokale API-Server-Schalter schaltet sich nach einem Neustart selbst ein."
+  },
+  "embedded-meeting-browser": {
+    "title": "Integrierter Besprechungsbrowser",
+    "why": "Besprechungslinks (telemost.yandex.ru, stream.wb.ru und alles, was der Nutzer hinzufügt) öffnen im Systembrowser, sodass Vibe nur aus laufenden Browserprozessen erraten kann, dass ein Gespräch stattfindet, und dann anbietet aufzunehmen."
+  },
+  "fork-update-sources": {
+    "title": "Fork-Update-Quellen",
+    "why": "Der Fork prüft weiterhin den Upstream-Update-Kanal (thewh1teagle/vibe), sodass einem Fork-Build ein Upstream-Release angeboten — und es dadurch ersetzt — werden kann, sobald Upstream eines veröffentlicht."
+  },
+  "live-conversation-assistant": {
+    "title": "Live-Gesprächsassistent",
+    "why": "Die App transkribiert Besprechungen, aber Hilfe kommt erst nach dem Gespräch: Zusammenfassungen und Fragen beziehen sich auf ein fertiges Transkript."
+  },
+  "local-windows-build": {
+    "title": "Lokaler Windows-Build",
+    "why": "Die manuelle Abnahme von App-Änderungen wartet auf den GitHub-Runner-Pool: Ein Dev-Tag kostet einen Matrix-Build, und besonders die macOS-Zellen werden willkürlich abgebrochen, während Linux- und Windows-Zellen Dutzende Minuten brauchen."
+  },
+  "meeting-browser-rework": {
+    "title": "Überarbeitung des Besprechungsbrowsers",
+    "why": "Unter Windows 11 öffnet der integrierte Besprechungsbrowser ein weißes Fenster, das nie rendert, und danach lassen sich weder das Fenster noch Vibe schließen."
+  },
+  "model-comparison": {
+    "title": "Modellvergleich",
+    "why": "Die Modellseite bewertet jeden Katalogeintrag mit veröffentlichten Genauigkeits-/Geschwindigkeitsbalken, aber diese Benchmarks stammen von fremdem Audio und fremder Hardware — auf einer 5070 Ti gegenüber einer Laptop-CPU kann sich die Reihenfolge umkehren, und die Zahlen sagen nichts darüber, wie ein Modell mit Sprache und Akzent des Nutzers umgeht."
+  },
+  "post-release-hardening": {
+    "title": "Härtung nach dem Release",
+    "why": "Die erneute Prüfung der nach v1.0.0 archivierten Änderungen legte Defekte offen, die die automatisierten Prüfungen nicht fanden: Die veröffentlichte Release-Anleitung stuft ein Release hoch, ohne dessen Text neu zu erzeugen, sodass ein stabiles Release ohne die eingebetteten englischen Hinweise ausgeliefert wird, die die Spezifikation verlangt; task verify lässt zwei lokal ausführbare CI-Jobs aus (den Website-Build und den Transkriptions-Spike); die CI ruft direkt cargo fmt/clippy statt der Task-Ziele auf, sodass lokale und entfernte Befehle auseinanderdriften können; der Fahrplan-Build ignoriert openspec/changes/**; das vorgebaute ggml-Archiv wird in ggml-build/ verpackt, während upload das Repository-Stammverzeichnis liest; und der Pfadfilter des E2E-Jobs übersieht die Dateien, die die Suite liest."
+  },
+  "remove-upstream-ties": {
+    "title": "Upstream-Bindungen entfernen",
+    "why": "Der Fork trägt noch die nach außen gerichtete Maschinerie des Originalprojekts: Aptabase-Telemetrie, die Ereignisse an ein Dashboard eines Drittanbieters sendet, und Ko-fi-Spendenelemente, die auf die Support-Seite von jemand anderem verweisen."
+  },
+  "security-scanning": {
+    "title": "Sicherheits-Scans",
+    "why": "Nichts im Repository lässt einen Build fehlschlagen, weil eine Abhängigkeit eine bekannte Schwachstelle hat."
+  },
+  "show-speaker-model": {
+    "title": "Sprechermodell anzeigen",
+    "why": "Das Sprechertrennungsmodell ist Hilfsmittel: listInstalledModels filtert es aus dem Katalog heraus, sodass nichts in den Einstellungen sagt, welches Modell die App zur Sprechertrennung nutzt, ob es heruntergeladen ist oder dass die App eines bezogen hat."
+  },
+  "site-localization": {
+    "title": "Lokalisierung der Website",
+    "why": "Der Wechsel der Website-Sprache rendert die Seite neu, aber zwei Oberflächen behalten ihre englische Nutzlast: Das Dev-Änderungsprotokoll (/changelog/dev) hat keine i18n/changelog/<locale>/unreleased.md, und die Fahrplan-Karten stammen aus roadmap.json, das aus englischen proposal.md-Dateien generiert wird."
+  },
+  "speaker-voice-memory": {
+    "title": "Sprecher-Stimmgedächtnis",
+    "why": "Die Diarisierung kennzeichnet die Sprecher jeder Aufnahme als Sprecher 1…N, und die vom Nutzer eingegebenen Namen werden pro Transkript gespeichert."
+  },
+  "upstream-fetch-isolation": {
+    "title": "Isolierung von Upstream-Fetches",
+    "why": "git fetch upstream schlägt in diesem Fork fehl: Upstream und der Fork wollen beide Tags wie v1.0.0 besitzen, und die Historie des Forks ist bewusst eigenständig (eine eigene Versionslinie ab 1.0.0, Dev-Builds mit Tags wie dev.)."
+  },
+  "website-deploy-from-main": {
+    "title": "Website-Deploy von main",
+    "why": "Jedes veröffentlichte Release — dev.76 bis dev.81 — hinterließ einen fehlgeschlagenen Deploy-Website-Lauf."
+  },
+  "website-language-selector": {
+    "title": "Sprachauswahl der Website",
+    "why": "Die Website hat bereits eine Paraglide-Laufzeit, Kataloge pro Sprache, eine LanguageSelector-Komponente in der Navigation und vollständig übersetzte Dokumentation und ein übersetztes Änderungsprotokoll — aber die Abdeckung ist ungleichmäßig (Startseite und Funktionen tragen noch fest eingebautes Englisch), die Auswahl lebt nur in localStorage, sodass ein geteilter Link immer in der Sprache des Empfängers statt des Absenders öffnet, und die Auswahl auf kleinen Bildschirmen leicht zu übersehen ist."
+  }
+}

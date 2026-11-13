@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react'
 import { loadRoadmap, type RoadmapEntry } from '~/lib/roadmap'
+import { useLocale } from '~/lib/useLocale'
 import { m } from '~/paraglide/messages.js'
 
 export default function Roadmap() {
+	// Cards follow the chosen language, so a switch re-fetches the list with that
+	// locale's translations rather than keeping the previous cards in state.
+	const locale = useLocale()
 	const [entries, setEntries] = useState<RoadmapEntry[] | null>(null)
 	const [failed, setFailed] = useState(false)
 
 	useEffect(() => {
 		const controller = new AbortController()
-		loadRoadmap(controller.signal)
-			.then(setEntries)
+		setEntries(null)
+		setFailed(false)
+		loadRoadmap(locale, controller.signal)
+			.then((loaded) => {
+				if (!controller.signal.aborted) setEntries(loaded)
+			})
 			.catch((error) => {
 				// An aborted request is the page unmounting, not a broken roadmap.
 				if (controller.signal.aborted) return
@@ -17,7 +25,7 @@ export default function Roadmap() {
 				setFailed(true)
 			})
 		return () => controller.abort()
-	}, [])
+	}, [locale])
 
 	return (
 		<main className="mx-auto w-full max-w-[1065px] px-5 pb-24 pt-14 lg:pt-20">

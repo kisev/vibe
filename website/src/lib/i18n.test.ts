@@ -1,18 +1,27 @@
 // @vitest-environment jsdom
 import { createElement, type ReactElement } from 'react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import * as ts from 'typescript'
 import { getLocale, locales } from '../paraglide/runtime.js'
 import Layout from '../components/Layout'
 import Changelog from '../pages/Changelog'
+import Docs from '../pages/Docs'
 import Features from '../pages/Features'
+import Roadmap from '../pages/Roadmap'
 import { localeFromSearch, safeTranslate, supportedWebsiteLocales, urlWithLocale, writeLocaleToUrl } from './i18n'
 
 const pageSources = import.meta.glob('../pages/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const componentSources = import.meta.glob('../components/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const changelogTranslations = import.meta.glob('../../../i18n/changelog/*/*.md') as Record<string, unknown>
+const englishChangelog = import.meta.glob('../../../i18n/changelog/*.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+const translatedChangelog = import.meta.glob('../../../i18n/changelog/*/*.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+const docsPages = import.meta.glob('../../../i18n/docs/*/**/*.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+const roadmapTranslations = import.meta.glob('../../../i18n/roadmap/*.json', { eager: true, import: 'default' }) as Record<
+	string,
+	Record<string, { title: string; why: string }>
+>
 
 // Node's disabled `localStorage` global shadows jsdom's in this environment, so give the
 // tests a real in-memory Storage; the runtime treats it exactly like the browser's.
@@ -114,6 +123,60 @@ function scanSource(path: string, source: string, violations: string[]) {
 	visit(file)
 }
 
+/** A raw source picked out of an `import.meta.glob` map by a path suffix. */
+function rawFile(files: Record<string, string>, suffix: string) {
+	const found = Object.entries(files).find(([path]) => path.endsWith(suffix))
+	if (!found) throw new Error(`test fixture missing: ${suffix}`)
+	return found[1]
+}
+
+/** The bold lead of a changelog bullet — its title, and the part every locale translates. */
+function boldLead(markdown: string) {
+	return /\*\*(.+?)\*\*/.exec(markdown)?.[1] ?? ''
+}
+
+function h1(markdown: string) {
+	return /^#\s+(.+?)\s*$/m.exec(markdown)?.[1] ?? ''
+}
+
+function switchTo(locale: string) {
+	fireEvent.click(screen.getAllByRole('button', { name: 'Language' })[0])
+	const option = document.querySelector(`[data-locale="${locale}"]`)
+	expect(option).not.toBeNull()
+	fireEvent.click(option as HTMLElement)
+}
+
+/** The real app's route table, so a test can land on /docs, /roadmap or /changelog/dev. */
+function renderSite(path: string) {
+	window.history.replaceState({}, '', path)
+	return render(
+		createElement(
+			BrowserRouter,
+			{ basename: '/vibe' },
+			createElement(
+				Routes,
+				null,
+				createElement(
+					Route,
+					{ element: createElement(Layout) },
+					createElement(Route, { index: true, element: createElement('div') }),
+					createElement(Route, { path: 'features', element: createElement(Features) }),
+					createElement(Route, { path: 'roadmap', element: createElement(Roadmap) }),
+					createElement(Route, { path: 'docs', element: createElement(Docs) }),
+					createElement(Route, { path: 'changelog/:version', element: createElement(Changelog) }),
+				),
+			),
+		),
+	)
+}
+
+function respondWith(body: unknown) {
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => ({ ok: true, status: 200, json: async () => body })),
+	)
+}
+
 function renderLayout(url: string, page: ReactElement = createElement('div')) {
 	window.history.replaceState({}, '', url)
 	return render(
@@ -140,6 +203,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup()
+	vi.unstubAllGlobals()
 })
 
 describe('website i18n', () => {
@@ -259,6 +323,58 @@ describe('layout document attributes', () => {
 		await waitFor(() => expect(window.location.pathname).toBe('/vibe/features'))
 		expect(getLocale()).toBe('fr-FR')
 		expect(new URLSearchParams(window.location.search).get('lang')).toBe('fr-FR')
+	})
+})
+
+describe('translated surfaces after a locale switch', () => {
+	it('shows the dev changelog in the chosen locale without its English entry', async () => {
+		const englishTitle = boldLead(rawFile(englishChangelog, '/i18n/changelog/unreleased.md'))
+		const frenchTitle = boldLead(rawFile(translatedChangelog, '/fr-FR/unreleased.md'))
+
+		// Opened from a shared link: the router's cached location still says en-US
+		// after the switch, so the page must read the live URL instead.
+		renderSite('/vibe/changelog/dev?lang=en-US')
+		await waitFor(() => expect(document.body.textContent).toContain(englishTitle))
+
+		switchTo('fr-FR')
+
+		await waitFor(() => expect(document.body.textContent).toContain(frenchTitle))
+		expect(document.body.textContent).not.toContain(englishTitle)
+	})
+
+	it('shows roadmap cards in the chosen locale and keeps English only for an untranslated change', async () => {
+		const french = Object.entries(roadmapTranslations).find(([path]) => path.endsWith('/fr-FR.json'))?.[1]
+		expect(french).toBeDefined()
+		const translatedName = Object.keys(french as Record<string, unknown>)[0]
+		const card = (french as Record<string, { title: string; why: string }>)[translatedName]
+		respondWith([
+			{ name: translatedName, title: 'English card title', why: 'English card summary' },
+			{ name: 'not-yet-translated', title: 'Untranslated card', why: 'Stays in English' },
+		])
+
+		renderSite('/vibe/roadmap')
+		expect(await screen.findByText('English card title')).toBeTruthy()
+
+		switchTo('fr-FR')
+
+		await waitFor(() => expect(screen.getByText(card.title)).toBeTruthy())
+		expect(screen.getByText(card.why)).toBeTruthy()
+		expect(screen.queryByText('English card title')).toBeNull()
+		// Per-entry fallback: one translated card never blanks the rest of the list.
+		expect(screen.getByText('Untranslated card')).toBeTruthy()
+	})
+
+	it('waits for the docs translation instead of leaving the English page behind', async () => {
+		const englishTitle = h1(rawFile(docsPages, '/en-US/tutorials/install.md'))
+		const frenchTitle = h1(rawFile(docsPages, '/fr-FR/tutorials/install.md'))
+
+		renderSite('/vibe/docs')
+		await waitFor(() => expect(document.body.textContent).toContain(englishTitle))
+
+		switchTo('fr-FR')
+
+		await waitFor(() => expect(document.body.textContent).toContain(frenchTitle))
+		expect(document.body.textContent).not.toContain(englishTitle)
 	})
 })
 

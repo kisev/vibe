@@ -1,0 +1,90 @@
+{
+  "app-update-controls": {
+    "title": "應用程式更新控制",
+    "why": "更新只在背景檢查,而唯一的控制項是藏在「一般」設定中、沒有說明的「Beta 更新」開關:沒有明確的「立即檢查」,完全沒有開發頻道(開發構建發佈時不附更新程式成品),也沒有說明各個頻道代表甚麼。"
+  },
+  "comparison-failed-runs": {
+    "title": "比較失敗的執行",
+    "why": "選取三個模型後,結果視窗只顯示兩個:第三次執行失敗,而視窗會篩選出 status === 'done' 的結果,因此失敗會消失,而不是得到解釋。"
+  },
+  "dependency-hygiene": {
+    "title": "依賴管理",
+    "why": "依賴即使有更新,也是人手進行,而且沒有一個地方能回答「哪些已經過時?」。"
+  },
+  "desktop-e2e": {
+    "title": "桌面端 e2e",
+    "why": "迄今每個桌面端回歸問題,都是由維護者安裝開發構建並逐一點擊發現的。"
+  },
+  "dev-branch-lint": {
+    "title": "開發分支 Lint",
+    "why": "AGENTS.md 指出,需要編譯或 CI 檢查的程式碼要送到 main,讓 Lint 執行來驗證。"
+  },
+  "dev-changelog-links": {
+    "title": "開發版更新日誌連結",
+    "why": "開發版發行會被清理——只保留最新的開發版發行——而開發構建沒有自己的版本化更新日誌條目;它們的說明在發行時就是未發佈的條目。"
+  },
+  "dev75-fixes": {
+    "title": "Dev75 修正",
+    "why": "維護者首個全日使用的構建(1.0.0-dev.75)暴露出五個單元測試都無法捕捉的缺陷:比較檢視在真實轉錄上聲稱零差異、更新頻道洩漏英文／翻譯名稱並在 Beta 提供穩定構建、會議瀏覽器開啟一個無法關閉且依賴無人會產生的 vibe:// 通訊協定的無用白視窗、開發版更新日誌頁面退回 1.0.0 並留下兩個未翻譯的標籤,以及本機 API 伺服器開關在重新啟動後自行開啟。"
+  },
+  "embedded-meeting-browser": {
+    "title": "內建會議瀏覽器",
+    "why": "會議連結(telemost.yandex.ru、stream.wb.ru,以及使用者新增的任何主機)會在系統瀏覽器中開啟,因此 Vibe 只能從運行中的瀏覽器程序猜測正在通話,然後詢問是否錄音。"
+  },
+  "fork-update-sources": {
+    "title": "分支更新來源",
+    "why": "分支仍然檢查上游更新頻道(thewh1teagle/vibe),因此上游一發佈,分支構建就可能收到——並被取代為——一個上游發行。"
+  },
+  "live-conversation-assistant": {
+    "title": "即時對話助理",
+    "why": "應用程式會轉錄會議,但協助總在通話之後才到來:摘要和提問都是針對已完成的轉錄文字。"
+  },
+  "local-windows-build": {
+    "title": "本機 Windows 構建",
+    "why": "應用程式變更的手動驗收要等待 GitHub 執行器集區:一個 Dev 標籤就要消耗一次矩陣構建,而 macOS 項目尤其會隨機被取消,Linux 和 Windows 項目則要花數十分鐘。"
+  },
+  "meeting-browser-rework": {
+    "title": "會議瀏覽器重構",
+    "why": "在 Windows 11 上,內建會議瀏覽器會開啟一個永不渲染的白色視窗,之後視窗和 Vibe 都無法關閉。"
+  },
+  "model-comparison": {
+    "title": "模型比較",
+    "why": "模型頁面以公佈的準確度／速度條為目錄中每個項目評分,但這些基準來自別人的音頻和別人的硬件——在 5070 Ti 與手提電腦 CPU 之間,排名可能倒轉,而這些數字也完全無法說明模型如何處理使用者的語言和口音。"
+  },
+  "post-release-hardening": {
+    "title": "發行後加固",
+    "why": "重新核驗 v1.0.0 之後封存的變更時,發現了自動檢查未能發現的缺陷:已發佈的發行操作指南在提升發行版時不會重建其內文,因此穩定版發行會缺少規範所要求的內嵌英文說明;task verify 遺漏了兩個可在本機執行的 CI 作業(網站構建與轉錄 spike);CI 直接執行原始的 cargo fmt/clippy,而不是 task 目標,因此本機與遠端命令可能出現偏差;路線圖構建忽略了 openspec/changes/**;預先構建的 ggml 封存檔被打包進 ggml-build/,而 upload 讀取的是倉庫根目錄;以及 E2E 作業的路徑篩選器漏掉了測試套件所讀取的文件。"
+  },
+  "remove-upstream-ties": {
+    "title": "移除上游關聯",
+    "why": "分支仍保留原專案對外的機制:Aptabase 遙測會將事件送到第三方儀表板,而 Ko-fi 捐款介面則指向別人的贊助頁面。"
+  },
+  "security-scanning": {
+    "title": "安全掃描",
+    "why": "倉庫中沒有任何機制會因為依賴有已知漏洞而令構建失敗。"
+  },
+  "show-speaker-model": {
+    "title": "顯示發言者模型",
+    "why": "發言者分離模型是輔助性質:listInstalledModels 會將它從目錄中篩走,因此設定中沒有任何地方說明應用程式使用哪個模型進行發言者分離、該模型是否已下載,或應用程式曾自行下載過一個。"
+  },
+  "site-localization": {
+    "title": "網站本地化",
+    "why": "切換網站語言會重新渲染頁面,但有兩個介面仍保留英文內容:開發版更新日誌(/changelog/dev)沒有 i18n/changelog/<locale>/unreleased.md,而路線圖卡片來自 roadmap.json,該檔案是由英文 proposal.md 檔案所產生的。"
+  },
+  "speaker-voice-memory": {
+    "title": "發言者聲音記憶",
+    "why": "發言者分離會將每段錄音的發言者標示為發言者 1…N,而使用者輸入的名稱只按每份轉錄儲存。"
+  },
+  "upstream-fetch-isolation": {
+    "title": "上游擷取隔離",
+    "why": "在此分支中 git fetch upstream 會失敗:上游與分支都想擁有 v1.0.0 這類標籤,而分支的歷史刻意獨立(自 1.0.0 開始的自家版本線,開發構建以 dev. 標記)。"
+  },
+  "website-deploy-from-main": {
+    "title": "從 main 部署網站",
+    "why": "每個已發佈的版本——dev.76 至 dev.81——都留下一次失敗的 Deploy Website 執行。"
+  },
+  "website-language-selector": {
+    "title": "網站語言選擇器",
+    "why": "網站已有 Paraglide 執行環境、各語言目錄、導覽列中的 LanguageSelector,以及完整翻譯的文件和更新日誌——但覆蓋率並不平均(首頁和功能特點仍帶有硬編碼英文),選擇只存在於 localStorage,因此分享的連結總是以收件人的語言開啟而非寄件人的語言,而且選擇器在小螢幕上很容易被忽略。"
+  }
+}

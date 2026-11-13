@@ -1,0 +1,90 @@
+{
+  "app-update-controls": {
+    "title": "Sterowanie aktualizacjami aplikacji",
+    "why": "Aktualizacje są sprawdzane w tle, a jedynym elementem sterującym jest niewyjaśniony przełącznik „Aktualizacje beta” ukryty w sekcji Ogólne: brak wyraźnego „sprawdź teraz”, brak jakiegokolwiek kanału dev (kompilacje dev są wydawane bez artefaktów aktualizatora) i brak określonej zasady, co oznacza każdy kanał."
+  },
+  "comparison-failed-runs": {
+    "title": "Nieudane uruchomienia porównania",
+    "why": "Po wybraniu trzech modeli okno wyników pokazało dwa: trzecie uruchomienie nie powiodło się, a okno filtruje według status === 'done', więc niepowodzenie znika, zamiast zostać wyjaśnione."
+  },
+  "dependency-hygiene": {
+    "title": "Higiena zależności",
+    "why": "Zależności są aktualizowane ręcznie, o ile w ogóle, i nie ma jednego miejsca, które odpowiada na pytanie „co jest przestarzałe?”."
+  },
+  "desktop-e2e": {
+    "title": "E2E aplikacji desktopowej",
+    "why": "Każda dotychczasowa regresja w aplikacji desktopowej została znaleziona przez opiekuna projektu, który zainstalował kompilację dev i przeklikał ją."
+  },
+  "dev-branch-lint": {
+    "title": "Lint gałęzi dev",
+    "why": "AGENTS.md mówi, że kod wymagający kompilacji lub sprawdzenia w CI trafia do main, aby przebieg Lint go zweryfikował."
+  },
+  "dev-changelog-links": {
+    "title": "Linki dziennika zmian wersji dev",
+    "why": "Wydania dev są czyszczone — pozostaje tylko najnowsze wydanie dev — a kompilacje dev nie mają własnego wersjonowanego wpisu w dzienniku zmian; ich notatki stanowią wpis niewydany w chwili wydania."
+  },
+  "dev75-fixes": {
+    "title": "Poprawki dev75",
+    "why": "Pierwsza kompilacja, w której opiekun projektu spędził cały dzień (1.0.0-dev.75), ujawniła pięć usterek, których nie wychwycił żaden test jednostkowy: widok porównania zgłasza zero różnic na prawdziwych transkrypcjach, kanały aktualizacji ujawniają angielskie/przetłumaczone nazwy i oferują stabilną kompilację na kanale Beta, przeglądarka spotkań otwiera bezużyteczne białe okno, którego nie da się zamknąć i które zależy od schematu vibe://, którego nikt inny nie tworzy, strona dziennika zmian wersji dev cofa się do 1.0.0 i pozostawia dwie nieprzetłumaczone etykiety, a przełącznik lokalnego serwera API włącza się sam po ponownym uruchomieniu."
+  },
+  "embedded-meeting-browser": {
+    "title": "Wbudowana przeglądarka spotkań",
+    "why": "Linki do spotkań (telemost.yandex.ru, stream.wb.ru i cokolwiek doda użytkownik) otwierają się w przeglądarce systemowej, więc Vibe może jedynie zgadywać po działających procesach przeglądarki, że trwa rozmowa, a potem prosić o jej nagranie."
+  },
+  "fork-update-sources": {
+    "title": "Źródła aktualizacji forka",
+    "why": "Fork nadal sprawdza kanał aktualizacji upstreamu (thewh1teagle/vibe), więc kompilacja forka może otrzymać propozycję wydania upstreamu — i zostać przez nie zastąpiona — gdy tylko upstream je opublikuje."
+  },
+  "live-conversation-assistant": {
+    "title": "Asystent rozmów na żywo",
+    "why": "Aplikacja transkrybuje spotkania, ale pomoc przychodzi po rozmowie: podsumowania i pytania dotyczą już ukończonej transkrypcji."
+  },
+  "local-windows-build": {
+    "title": "Lokalna kompilacja Windows",
+    "why": "Ręczna akceptacja zmian w aplikacji czeka na pulę runnerów GitHub: tag dev kosztuje kompilację całej macierzy, a zwłaszcza komórki macOS bywają losowo anulowane, podczas gdy komórki Linux i Windows zajmują dziesiątki minut."
+  },
+  "meeting-browser-rework": {
+    "title": "Przebudowa przeglądarki spotkań",
+    "why": "W systemie Windows 11 wbudowana przeglądarka spotkań otwiera białe okno, które nigdy się nie renderuje, a potem nie da się zamknąć ani okna, ani Vibe."
+  },
+  "model-comparison": {
+    "title": "Porównywanie modeli",
+    "why": "Strona modeli ocenia każdy wpis katalogu opublikowanymi paskami dokładności i szybkości, ale te testy pochodzą z cudzego dźwięku i cudzego sprzętu — na 5070 Ti w porównaniu z procesorem laptopa kolejność może się odwrócić, a liczby nic nie mówią o tym, jak model radzi sobie z językiem i akcentem użytkownika."
+  },
+  "post-release-hardening": {
+    "title": "Utwardzanie po wydaniu",
+    "why": "Ponowna weryfikacja zmian zarchiwizowanych po v1.0.0 ujawniła defekty, których nie wychwyciły zautomatyzowane bramki: opublikowany poradnik wydawania promuje wydanie bez przebudowania jego treści, więc stabilne wydanie trafia do użytkowników bez wbudowanych angielskich notatek, których wymaga specyfikacja; task verify pomija dwa możliwe do uruchomienia lokalnie zadania CI (kompilację strony i spike transkrypcji); CI uruchamia surowe cargo fmt/clippy zamiast celów task, więc polecenia lokalne i zdalne mogą się rozjechać; kompilacja planu rozwoju ignoruje openspec/changes/**; wstępnie zbudowane archiwum ggml jest pakowane do ggml-build/, podczas gdy upload czyta katalog główny repozytorium; a filtr ścieżek zadania E2E pomija pliki, które czyta zestaw testów."
+  },
+  "remove-upstream-ties": {
+    "title": "Usunięcie powiązań z upstreamem",
+    "why": "Fork nadal nosi skierowaną na zewnątrz infrastrukturę oryginalnego projektu: telemetrię Aptabase, która wysyła zdarzenia do panelu firmy trzeciej, oraz powierzchnie darowizn Ko-fi, które prowadzą do cudzej strony wsparcia."
+  },
+  "security-scanning": {
+    "title": "Skanowanie bezpieczeństwa",
+    "why": "Nic w repozytorium nie powoduje niepowodzenia kompilacji z powodu znanej luki w zależności."
+  },
+  "show-speaker-model": {
+    "title": "Pokazywanie modelu mówców",
+    "why": "Model rozdzielania mówców jest pomocniczy: listInstalledModels odfiltrowuje go z katalogu, więc nic w ustawieniach nie mówi, którego modelu aplikacja używa do rozdzielania mówców, czy jest pobrany ani że aplikacja ściągnęła jakiś model."
+  },
+  "site-localization": {
+    "title": "Lokalizacja strony",
+    "why": "Przełączenie języka strony ponownie renderuje stronę, ale dwa obszary zachowują angielską treść: dziennik zmian wersji dev (/changelog/dev) nie ma pliku i18n/changelog/<locale>/unreleased.md, a karty planu rozwoju pochodzą z roadmap.json, który jest generowany z angielskich plików proposal.md."
+  },
+  "speaker-voice-memory": {
+    "title": "Pamięć głosów mówców",
+    "why": "Rozpoznawanie mówców etykietuje mówców każdego nagrania jako Mówca 1…N, a nazwy wpisane przez użytkownika są zapisywane osobno dla każdej transkrypcji."
+  },
+  "upstream-fetch-isolation": {
+    "title": "Izolacja pobierania upstreamu",
+    "why": "git fetch upstream kończy się w tym forku niepowodzeniem: upstream i fork chcą mieć własne tagi takie jak v1.0.0, a historia forka jest celowo niezależna (własna linia wersji zaczynająca się od 1.0.0, kompilacje dev oznaczane tagami dev.)."
+  },
+  "website-deploy-from-main": {
+    "title": "Wdrażanie strony z main",
+    "why": "Każde opublikowane wydanie — od dev.76 do dev.81 — pozostawiało po sobie nieudany przebieg Deploy Website."
+  },
+  "website-language-selector": {
+    "title": "Selektor języka strony",
+    "why": "Strona ma już środowisko uruchomieniowe Paraglide, katalogi dla poszczególnych języków, LanguageSelector w nawigacji oraz w pełni przetłumaczoną dokumentację i dziennik zmian — ale pokrycie jest nierówne (Strona główna i Funkcje wciąż zawierają zaszyty na stałe angielski), wybór żyje tylko w localStorage, więc udostępniony link zawsze otwiera się w języku odbiorcy, a nie nadawcy, a selektor łatwo przeoczyć na małych ekranach."
+  }
+}

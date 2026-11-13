@@ -1,0 +1,90 @@
+{
+  "app-update-controls": {
+    "title": "Oppdateringskontroller i appen",
+    "why": "Oppdateringer sjekkes i bakgrunnen, og den eneste kontrollen er en uforklart «Beta-oppdateringer»-bryter gjemt under Generelt: ingen tydelig «sjekk nå», ingen dev-kanal i det hele tatt (dev-bygg leveres uten oppdateringsartefakter), og ingen uttalt regel for hva hver kanal betyr."
+  },
+  "comparison-failed-runs": {
+    "title": "Mislykkede kjøringer i sammenligningen",
+    "why": "Med tre modeller valgt viste resultatvinduet bare to: den tredje kjøringen mislyktes, og vinduet filtrerer på status === 'done', så en feil forsvinner i stedet for å bli forklart."
+  },
+  "dependency-hygiene": {
+    "title": "Ryddighet i avhengigheter",
+    "why": "Avhengigheter oppdateres for hånd, om i det hele tatt, og det finnes ikke ett sted som svarer på «hva er utdatert?»."
+  },
+  "desktop-e2e": {
+    "title": "E2E for skrivebordsappen",
+    "why": "Hver skrivebordsregresjon så langt er funnet av vedlikeholderen som installerte et dev-bygg og klikket seg gjennom det."
+  },
+  "dev-branch-lint": {
+    "title": "Lint på dev-grenen",
+    "why": "AGENTS.md sier at kode som trenger en kompilering eller CI-sjekk, går til main slik at Lint-kjøringen validerer den."
+  },
+  "dev-changelog-links": {
+    "title": "Endringslogglenker for dev",
+    "why": "Dev-utgivelser ryddes bort — bare den nyeste dev-utgivelsen blir liggende — og dev-bygg har ingen egen versjonert endringsloggoppføring; notatene deres er den ikke-utgitte oppføringen ved utgivelsen."
+  },
+  "dev75-fixes": {
+    "title": "Rettelser for dev.75",
+    "why": "Det første bygget vedlikeholderen brukte en hel dag i (1.0.0-dev.75), avdekket fem feil som ingen enhetstest fanget opp: sammenligningsvisningen hevder null forskjeller på ekte transkripsjoner, oppdateringskanalene lekker engelske/oversatte navn og tilbyr et stabilt bygg på Beta, møtenettleseren åpner et ubrukelig hvitt vindu som ikke kan lukkes og er avhengig av et vibe://-skjema ingen andre produserer, dev-endringsloggsiden faller tilbake til 1.0.0 og lar to etiketter stå uoversatt, og bryteren for den lokale API-serveren slår seg selv på etter en omstart."
+  },
+  "embedded-meeting-browser": {
+    "title": "Innebygd møtenettleser",
+    "why": "Møtelenker (telemost.yandex.ru, stream.wb.ru og det brukeren selv legger til) åpnes i systemnettleseren, så Vibe kan bare gjette ut fra kjørende nettleserprosesser at et møte pågår, og deretter spørre om å ta det opp."
+  },
+  "fork-update-sources": {
+    "title": "Oppdateringskilder for forken",
+    "why": "Forken fortsetter å sjekke oppdateringskanalen til oppstrømsprosjektet (thewh1teagle/vibe), så et fork-bygg kan bli tilbudt — og erstattet av — en oppstrømsutgivelse i samme øyeblikk som oppstrøms publiserer en."
+  },
+  "live-conversation-assistant": {
+    "title": "Assistent for samtaler i sanntid",
+    "why": "Appen transkriberer møter, men hjelpen kommer etter samtalen: sammendrag og spørsmål stilles om en ferdig transkripsjon."
+  },
+  "local-windows-build": {
+    "title": "Lokalt Windows-bygg",
+    "why": "Manuell godkjenning av endringer i appen venter på GitHubs runner-pool: en dev-tag koster et matrisebygg, og særlig macOS-cellene blir tilfeldig avbrutt, mens Linux- og Windows-cellene tar titalls minutter."
+  },
+  "meeting-browser-rework": {
+    "title": "Omarbeiding av møtenettleseren",
+    "why": "På Windows 11 åpner den innebygde møtenettleseren et hvitt vindu som aldri tegnes, og etterpå kan verken vinduet eller Vibe lukkes."
+  },
+  "model-comparison": {
+    "title": "Modellsammenligning",
+    "why": "Modellsiden vurderer hver katalogoppføring med publiserte nøyaktighets- og hastighetsstolper, men de referansemålingene kommer fra andres lyd og andres maskinvare — på et 5070 Ti kontra en bærbar CPU kan rekkefølgen snu, og tallene sier ingenting om hvordan en modell håndterer brukerens språk og aksent."
+  },
+  "post-release-hardening": {
+    "title": "Herding etter utgivelsen",
+    "why": "Ny verifisering av endringene som ble arkivert etter v1.0.0 avdekket feil som de automatiserte kontrollene ikke fanget: den publiserte veiledningen for utgivelse promoterer en utgivelse uten å bygge utgivelsesteksten på nytt, så en stabil utgivelse sendes uten de innebygde engelske notatene spesifikasjonen krever; task verify utelater to CI-jobber som kan kjøres lokalt (nettstedsbygget og transkripsjonsspiken); CI kjører rå cargo fmt/clippy i stedet for task-målene, så de lokale og eksterne kommandoene kan avvike fra hverandre; veikartbygget ignorerer openspec/changes/**; det forhåndsbygde ggml-arkivet pakkes inn i ggml-build/ mens opplastingen leser rotmappen i repositoriet; og stifilteret i E2E-jobben utelater filene som testsuiten leser."
+  },
+  "remove-upstream-ties": {
+    "title": "Fjern bånd til oppstrømsprosjektet",
+    "why": "Forken bærer fortsatt det opprinnelige prosjektets utadrettede maskineri: Aptabase-telemetri som sender hendelser til et tredjepartsdashbord, og Ko-fi-donasjonsflater som peker på noen andres støtteside."
+  },
+  "security-scanning": {
+    "title": "Sikkerhetsskanning",
+    "why": "Ingenting i repositoriet får et bygg til å feile fordi en avhengighet har en kjent sårbarhet."
+  },
+  "show-speaker-model": {
+    "title": "Vis talermodellen",
+    "why": "Talerseparasjonsmodellen er en hjelpemodell: listInstalledModels filtrerer den ut av katalogen, så ingenting i innstillingene sier hvilken modell appen bruker til talerseparasjon, om den er lastet ned, eller at appen hentet en."
+  },
+  "site-localization": {
+    "title": "Lokalisering av nettstedet",
+    "why": "Å bytte språk på nettstedet tegner siden på nytt, men to flater beholder sitt engelske innhold: dev-endringsloggen (/changelog/dev) mangler i18n/changelog/<locale>/unreleased.md, og veikartkortene kommer fra roadmap.json, som genereres fra engelske proposal.md-filer."
+  },
+  "speaker-voice-memory": {
+    "title": "Talerminne",
+    "why": "Diarisering merker talerne i hvert opptak som Taler 1…N, og navnene brukeren skriver inn, lagres per transkripsjon."
+  },
+  "upstream-fetch-isolation": {
+    "title": "Isolert henting fra oppstrømsprosjektet",
+    "why": "git fetch upstream mislykkes i denne forken: oppstrømsprosjektet og forken vil begge eie tagger som v1.0.0, og forkens historikk er bevisst sin egen (en egen versjonslinje som starter på 1.0.0, dev-bygg tagget dev.)."
+  },
+  "website-deploy-from-main": {
+    "title": "Nettstedsutrulling fra main",
+    "why": "Hver publiserte utgivelse — dev.76 til og med dev.81 — etterlot en mislykket Deploy Website-kjøring."
+  },
+  "website-language-selector": {
+    "title": "Språkvelger på nettstedet",
+    "why": "Nettstedet har allerede en Paraglide-runtime, kataloger per språk, en LanguageSelector i navigasjonen og fullt oversatte dokumenter og endringslogg — men dekningen er ujevn (Hjem og Funksjoner bærer fortsatt hardkodet engelsk), valget ligger bare i localStorage, så en delt lenke alltid åpnes på mottakerens språk og ikke avsenderens, og velgeren er lett å overse på små skjermer."
+  }
+}

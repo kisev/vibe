@@ -2,9 +2,10 @@
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, MemoryRouter, Route, Routes } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Roadmap from '../pages/Roadmap'
+import { localizeRoadmap } from './roadmap'
 import { m } from '../paraglide/messages.js'
 import { setLocale } from '../paraglide/runtime.js'
 
@@ -35,6 +36,11 @@ function respondWith(body: unknown, ok = true, status = 200) {
 	)
 }
 
+/** The page reads the locale from the router, so it must render inside one even in a unit test. */
+function renderRoadmap() {
+	return render(createElement(MemoryRouter, null, createElement(Roadmap)))
+}
+
 beforeEach(() => {
 	cleanup()
 	setLocale('en-US', { reload: false })
@@ -49,7 +55,7 @@ describe('Roadmap', () => {
 	it('lists every generated entry and says the work is planned, not shipped', async () => {
 		respondWith(entries)
 
-		render(createElement(Roadmap))
+		renderRoadmap()
 
 		expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Roadmap')
 		expect(screen.getByText(m['roadmap-note']())).toBeTruthy()
@@ -61,7 +67,7 @@ describe('Roadmap', () => {
 	it('says so when the roadmap cannot be loaded', async () => {
 		respondWith(null, false, 500)
 
-		render(createElement(Roadmap))
+		renderRoadmap()
 
 		expect((await screen.findByRole('alert')).textContent).toBe(m['roadmap-load-failed']())
 	})
@@ -69,7 +75,7 @@ describe('Roadmap', () => {
 	it('renders the empty state when there are no planned changes', async () => {
 		respondWith([])
 
-		render(createElement(Roadmap))
+		renderRoadmap()
 
 		expect(await screen.findByText(m['roadmap-empty']())).toBeTruthy()
 	})
@@ -77,9 +83,13 @@ describe('Roadmap', () => {
 	it('treats malformed JSON as a failed load', async () => {
 		respondWith({ not: 'a list' })
 
-		render(createElement(Roadmap))
+		renderRoadmap()
 
 		await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
+	})
+
+	it('keeps every card in English when the locale has no translation for it', () => {
+		expect(localizeRoadmap(entries, 'xx-XX')).toEqual(entries)
 	})
 
 	it('is reachable from the header navigation', async () => {

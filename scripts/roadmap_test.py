@@ -43,6 +43,13 @@ class RoadmapTest(unittest.TestCase):
         self.assertEqual(entries[0]["why"], "Alpha is first with a link.")
         self.assertEqual(entries[1]["why"], "Zebras are striped.")
 
+    def test_keeps_angle_bracket_placeholders(self) -> None:
+        self.proposal("placeholder-change", "The page has no `i18n/changelog/<locale>/unreleased.md` yet.")
+
+        entries = roadmap.collect(self.changes)
+
+        self.assertEqual(entries[0]["why"], "The page has no i18n/changelog/<locale>/unreleased.md yet.")
+
     def test_uses_a_real_h1_as_the_title(self) -> None:
         write(
             self.changes / "titled-change" / "proposal.md",
@@ -95,6 +102,37 @@ class RoadmapTest(unittest.TestCase):
         roadmap.write(roadmap.collect(self.changes), out)
 
         self.assertEqual(json.loads(out.read_text(encoding="utf-8"))[0]["name"], "one-change")
+
+    def test_reads_translations_keyed_by_locale_and_change_name(self) -> None:
+        directory = Path(self.changes).parent / "i18n" / "roadmap"
+        write(directory / "fr-FR.json", json.dumps({"one-change": {"title": "Un changement", "why": "Un changement existe."}}))
+        write(directory / "de-DE.json", json.dumps({"one-change": {"title": "Eine Änderung", "why": "Eine Änderung existiert."}}))
+
+        translated = roadmap.translations(directory)
+
+        self.assertEqual(sorted(translated), ["de-DE", "fr-FR"])
+        self.assertEqual(translated["fr-FR"]["one-change"]["title"], "Un changement")
+
+    def test_treats_a_missing_translation_directory_as_empty(self) -> None:
+        self.assertEqual(roadmap.translations(Path(self.changes).parent / "absent"), {})
+
+    def test_fails_on_a_malformed_translation_file(self) -> None:
+        directory = Path(self.changes).parent / "i18n" / "roadmap"
+        write(directory / "fr-FR.json", "{ not json")
+
+        with self.assertRaises(SystemExit) as caught:
+            roadmap.translations(directory)
+
+        self.assertIn("invalid JSON", str(caught.exception))
+
+    def test_fails_on_a_translation_without_a_why(self) -> None:
+        directory = Path(self.changes).parent / "i18n" / "roadmap"
+        write(directory / "fr-FR.json", json.dumps({"one-change": {"title": "Un changement"}}))
+
+        with self.assertRaises(SystemExit) as caught:
+            roadmap.translations(directory)
+
+        self.assertIn("missing a why", str(caught.exception))
 
 
 if __name__ == "__main__":

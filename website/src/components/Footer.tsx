@@ -45,6 +45,9 @@ export default function Footer({ onOpenPrivacyPolicy }: FooterProps) {
 						<Link className={linkClass} to="/features">
 							{m.features()}
 						</Link>
+						<Link className={linkClass} to="/roadmap">
+							{m.roadmap()}
+						</Link>
 						<Link className={linkClass} to="/docs">
 							{m.documentation()}
 						</Link>

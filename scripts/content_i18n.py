@@ -8,8 +8,9 @@ file it was made from:
     i18n/docs/en-US/<category>/<slug>.md
     i18n/docs/<locale>/<category>/<slug>.md
 
-Only the newest RECENT releases are worth translating; anything older stays
-English and nobody is asked about it. Every docs page is expected everywhere.
+The newest RECENT releases plus the unreleased dev entry are worth translating;
+anything older stays English and nobody is asked about it. Every docs page is
+expected everywhere.
 
     uv run scripts/content_i18n.py          report coverage and staleness
     uv run scripts/content_i18n.py stamp    refresh every `source` hash
@@ -92,12 +93,20 @@ def frontmatter(path: Path) -> dict[str, str]:
     return meta
 
 
+def expected_changelog() -> dict[str, Path]:
+    """The entries every website locale is expected to carry: the dev line plus the newest releases."""
+    releases = english_releases()
+    unreleased = [path for path in releases if path.stem == "unreleased"]
+    recent = [path for path in releases if path.stem != "unreleased"][:RECENT]
+    return {path.stem: path for path in [*unreleased, *recent]}
+
+
 def changelog_audit() -> tuple[list[str], list[str]]:
     """Returns (issues, warnings). A missing translation is only ever a warning."""
     issues: list[str] = []
     warnings: list[str] = []
-    recent = [path for path in english_releases() if path.stem != "unreleased"][:RECENT]
-    expected = {path.stem: path for path in recent}
+    expected = expected_changelog()
+    released = {version: path for version, path in expected.items() if version != "unreleased"}
 
     for locale in website_locales():
         directory = CHANGELOG / locale
@@ -118,8 +127,11 @@ def changelog_audit() -> tuple[list[str], list[str]]:
             if meta.get("source") != source_hash(english):
                 stale.append(path.stem)
         missing = [version for version in expected if not (directory / f"{version}.md").exists()]
-        if missing:
-            warnings.append(f"changelog {locale}: {len(expected) - len(missing)} of the {len(expected)} newest releases translated, using fallback")
+        missing_releases = [version for version in missing if version != "unreleased"]
+        if "unreleased" in missing:
+            warnings.append(f"changelog {locale}: unreleased.md is not translated, using fallback")
+        if missing_releases:
+            warnings.append(f"changelog {locale}: {len(released) - len(missing_releases)} of the {len(released)} newest releases translated, using fallback")
         if stale:
             warnings.append(f"changelog {locale}: {', '.join(sorted(stale, key=version_key))} translated from older English notes")
     return issues, warnings
@@ -132,6 +144,12 @@ def docs_audit() -> tuple[list[str], list[str]]:
     for relative in DOC_RELATIVE:
         if not (DOCS / "en-US" / relative).exists():
             issues.append(f"docs: i18n/docs/en-US/{relative} is missing")
+    # The reverse check: an English page the site never shows is dead content the
+    # reader cannot reach, and nothing else would notice it.
+    for path in sorted((DOCS / "en-US").rglob("*.md")):
+        relative = path.relative_to(DOCS / "en-US").as_posix()
+        if relative not in DOC_RELATIVE:
+            issues.append(f"docs: i18n/docs/en-US/{relative} is not a page the site shows")
 
     for locale in website_locales():
         directory = DOCS / locale

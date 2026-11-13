@@ -1,0 +1,90 @@
+{
+  "app-update-controls": {
+    "title": "Controles de actualización de la aplicación",
+    "why": "Las actualizaciones se comprueban en segundo plano y el único control es un interruptor «Actualizaciones Beta» sin explicación enterrado en General: no hay un «buscar ahora» explícito, no hay ningún canal de desarrollo (las compilaciones de desarrollo se publican sin artefactos del actualizador) y no hay una regla establecida sobre qué significa cada canal."
+  },
+  "comparison-failed-runs": {
+    "title": "Ejecuciones fallidas en la comparación",
+    "why": "Con tres modelos seleccionados, la ventana de resultados mostraba dos: la tercera ejecución falló y la ventana filtra por status === 'done', así que un fallo desaparece en lugar de explicarse."
+  },
+  "dependency-hygiene": {
+    "title": "Higiene de dependencias",
+    "why": "Las dependencias se actualizan a mano, si acaso, y no hay un único lugar que responda «¿qué está desactualizado?»."
+  },
+  "desktop-e2e": {
+    "title": "E2E de escritorio",
+    "why": "Cada regresión del escritorio encontrada hasta ahora la detectó el mantenedor al instalar una compilación de desarrollo y recorrerla haciendo clic."
+  },
+  "dev-branch-lint": {
+    "title": "Lint de la rama dev",
+    "why": "AGENTS.md indica que el código que necesita una compilación o una comprobación de CI va a main para que la ejecución de Lint lo valide."
+  },
+  "dev-changelog-links": {
+    "title": "Enlaces del registro de cambios de desarrollo",
+    "why": "Las versiones de desarrollo se limpian —solo queda la versión de desarrollo más reciente— y las compilaciones de desarrollo no tienen una entrada propia versionada en el registro de cambios; sus notas son la entrada sin publicar en el momento de la versión."
+  },
+  "dev75-fixes": {
+    "title": "Correcciones de Dev75",
+    "why": "La primera compilación en la que el mantenedor convivió durante un día (1.0.0-dev.75) expuso cinco defectos que ninguna prueba unitaria detectó: la vista de comparación afirma que hay cero diferencias en transcripciones reales, los canales de actualización filtran nombres en inglés/traducidos y ofrecen una compilación estable en Beta, el navegador de reuniones abre una ventana blanca inservible que no se puede cerrar y depende de un esquema vibe:// que nadie más genera, la página del registro de cambios de desarrollo recurre a 1.0.0 y deja dos etiquetas sin traducir, y el interruptor del servidor local de la API se enciende solo tras un reinicio."
+  },
+  "embedded-meeting-browser": {
+    "title": "Navegador de reuniones integrado",
+    "why": "Los enlaces de reuniones (telemost.yandex.ru, stream.wb.ru y los que añada el usuario) se abren en el navegador del sistema, así que Vibe solo puede deducir de los procesos de navegador en ejecución que hay una llamada y luego pedir que se grabe."
+  },
+  "fork-update-sources": {
+    "title": "Fuentes de actualización del fork",
+    "why": "El fork sigue consultando el canal de actualización upstream (thewh1teagle/vibe), así que a una compilación del fork se le puede ofrecer —y ser reemplazada por— una versión upstream en el momento en que upstream publique una."
+  },
+  "live-conversation-assistant": {
+    "title": "Asistente de conversación en vivo",
+    "why": "La aplicación transcribe reuniones, pero la ayuda llega después de la llamada: los resúmenes y las preguntas se hacen sobre una transcripción terminada."
+  },
+  "local-windows-build": {
+    "title": "Compilación local para Windows",
+    "why": "La aceptación manual de los cambios de la aplicación espera al grupo de runners de GitHub: una etiqueta de desarrollo cuesta una compilación de matriz, y las celdas de macOS en particular se cancelan al azar, mientras que las celdas de Linux y Windows tardan decenas de minutos."
+  },
+  "meeting-browser-rework": {
+    "title": "Reelaboración del navegador de reuniones",
+    "why": "En Windows 11 el navegador de reuniones integrado abre una ventana blanca que nunca llega a dibujarse, y después no se puede cerrar ni la ventana ni Vibe."
+  },
+  "model-comparison": {
+    "title": "Comparación de modelos",
+    "why": "La página de modelos califica cada entrada del catálogo con barras publicadas de precisión/velocidad, pero esos puntos de referencia provienen del audio y del hardware de otras personas —en una 5070 Ti frente a la CPU de una laptop el orden puede invertirse—, y los números no dicen nada sobre cómo maneja un modelo el idioma y el acento del usuario."
+  },
+  "post-release-hardening": {
+    "title": "Endurecimiento posterior a la versión",
+    "why": "Volver a verificar los cambios archivados después de v1.0.0 encontró defectos que las verificaciones automatizadas no detectaron: la guía publicada sobre cómo publicar una versión promociona una versión sin reconstruir su cuerpo, así que una versión estable se publica sin las notas en inglés insertadas que exige la especificación; task verify omite dos trabajos de CI que se pueden ejecutar localmente (la compilación del sitio y el spike de transcripción); CI ejecuta cargo fmt/clippy directamente en lugar de los objetivos de task, así que los comandos locales y remotos pueden divergir; la compilación de la hoja de ruta ignora openspec/changes/**; el archivo ggml precompilado se empaqueta en ggml-build/ mientras que upload lee la raíz del repositorio; y el filtro de rutas del trabajo E2E omite los archivos que lee la suite."
+  },
+  "remove-upstream-ties": {
+    "title": "Eliminar vínculos con upstream",
+    "why": "El fork aún conserva la maquinaria de cara al exterior del proyecto original: la telemetría de Aptabase que envía eventos a un panel de terceros, y las superficies de donaciones de Ko-fi que apuntan a la página de soporte de otra persona."
+  },
+  "security-scanning": {
+    "title": "Análisis de seguridad",
+    "why": "Nada en el repositorio hace fallar una compilación porque una dependencia tenga una vulnerabilidad conocida."
+  },
+  "show-speaker-model": {
+    "title": "Mostrar el modelo de hablante",
+    "why": "El modelo de separación de hablantes es auxiliar: listInstalledModels lo filtra del catálogo, así que nada en la configuración indica qué modelo usa la aplicación para separar hablantes, si está descargado o que la aplicación descargó uno."
+  },
+  "site-localization": {
+    "title": "Localización del sitio",
+    "why": "Cambiar el idioma del sitio vuelve a dibujar la página, pero dos superficies conservan su contenido en inglés: el registro de cambios de desarrollo (/changelog/dev) no tiene i18n/changelog/<locale>/unreleased.md, y las tarjetas de la hoja de ruta provienen de roadmap.json, que se genera a partir de archivos proposal.md en inglés."
+  },
+  "speaker-voice-memory": {
+    "title": "Memoria de voz de los hablantes",
+    "why": "La diarización etiqueta a los hablantes de cada grabación como Hablante 1…N, y los nombres que escribe un usuario se guardan por transcripción."
+  },
+  "upstream-fetch-isolation": {
+    "title": "Aislamiento de la obtención de upstream",
+    "why": "git fetch upstream falla en este fork: upstream y el fork quieren ambos poseer etiquetas como v1.0.0, y la historia del fork es deliberadamente propia (una línea de versiones propia que empieza en 1.0.0, compilaciones de desarrollo etiquetadas dev.)."
+  },
+  "website-deploy-from-main": {
+    "title": "Despliegue del sitio desde main",
+    "why": "Cada versión publicada —de dev.76 a dev.81— dejó atrás una ejecución fallida de Deploy Website."
+  },
+  "website-language-selector": {
+    "title": "Selector de idioma del sitio",
+    "why": "El sitio web ya tiene un entorno de ejecución de Paraglide, catálogos por idioma, un LanguageSelector en la navegación y documentación y registro de cambios totalmente traducidos, pero la cobertura es desigual (Inicio y Características aún contienen inglés escrito directamente en el código), la elección solo vive en localStorage, así que un enlace compartido siempre se abre en el idioma del destinatario en lugar del del remitente, y el selector es fácil de pasar por alto en pantallas pequeñas."
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "app-update-controls": {
+    "title": "Controles de atualização do app",
+    "why": "As atualizações são verificadas em segundo plano e o único controle é um interruptor “Atualizações Beta” não explicado, escondido em Geral: não há um “verificar agora” explícito, nenhum canal dev (as builds de dev são publicadas sem artefatos de atualizador) e nenhuma regra declarada sobre o que cada canal significa."
+  },
+  "dependency-hygiene": {
+    "title": "Higiene de dependências",
+    "why": "As dependências são atualizadas manualmente, quando são, e não há um único lugar que responda “o que está desatualizado?”."
+  },
+  "desktop-e2e": {
+    "title": "E2E do desktop",
+    "why": "Todas as regressões do desktop até agora foram encontradas pelo mantenedor instalando uma build de dev e clicando por ela."
+  },
+  "dev-branch-lint": {
+    "title": "Lint na branch dev",
+    "why": "O AGENTS.md diz que o código que precisa de uma compilação ou verificação de CI vai para a main para que a execução do Lint o valide."
+  },
+  "dev-changelog-links": {
+    "title": "Links do registro de alterações de dev",
+    "why": "As versões de dev são limpas — só a versão de dev mais recente permanece — e as builds de dev não têm uma entrada de registro de alterações versionada própria; suas notas são a entrada não lançada no momento do lançamento."
+  },
+  "dev75-fixes": {
+    "title": "Correções da dev.75",
+    "why": "A primeira build em que o mantenedor viveu por um dia (1.0.0-dev.75) revelou cinco defeitos que nenhum teste unitário pegou: a visualização de comparação afirma zero diferenças em transcrições reais, os canais de atualização vazam nomes em inglês/traduzidos e oferecem uma build estável no Beta, o navegador de reuniões abre uma janela branca inutilizável que não pode ser fechada e depende de um esquema vibe:// que ninguém mais produz, a página do registro de alterações de dev recorre à 1.0.0 e deixa dois rótulos sem tradução, e o interruptor do servidor de API local se liga sozinho após uma reinicialização."
+  },
+  "embedded-meeting-browser": {
+    "title": "Navegador de reuniões integrado",
+    "why": "Links de reunião (telemost.yandex.ru, stream.wb.ru e o que o usuário adicionar) abrem no navegador do sistema, então o Vibe só pode adivinhar pelos processos de navegador em execução que uma chamada está acontecendo e então perguntar se quer gravar."
+  },
+  "fork-update-sources": {
+    "title": "Fontes de atualização do fork",
+    "why": "O fork continua verificando o canal de atualizações upstream (thewh1teagle/vibe), então uma build do fork pode receber a oferta de — e ser substituída por — uma versão upstream no momento em que o upstream publicar uma."
+  },
+  "live-conversation-assistant": {
+    "title": "Assistente de conversa ao vivo",
+    "why": "O app transcreve reuniões, mas a ajuda chega depois da chamada: resumos e perguntas são feitos sobre uma transcrição concluída."
+  },
+  "model-comparison": {
+    "title": "Comparação de modelos",
+    "why": "A página de modelos avalia cada entrada do catálogo com barras publicadas de precisão/velocidade, mas esses benchmarks vêm do áudio de outras pessoas e do hardware de outras pessoas — em uma 5070 Ti contra a CPU de um notebook a ordem pode se inverter, e os números não dizem nada sobre como um modelo lida com o idioma e o sotaque do usuário."
+  },
+  "remove-upstream-ties": {
+    "title": "Remover os laços com o upstream",
+    "why": "O fork ainda carrega a maquinaria voltada ao público do projeto original: telemetria do Aptabase que envia eventos a um painel de terceiros, e superfícies de doação do Ko-fi que apontam para a página de suporte de outra pessoa."
+  },
+  "security-scanning": {
+    "title": "Verificação de segurança",
+    "why": "Nada no repositório faz uma build falhar porque uma dependência tem uma vulnerabilidade conhecida."
+  },
+  "show-speaker-model": {
+    "title": "Exibir o modelo de falantes",
+    "why": "O modelo de separação de falantes é auxiliar: listInstalledModels o filtra do catálogo, então nada nas configurações diz qual modelo o app usa para separação de falantes, se ele está baixado ou que o app puxou um."
+  },
+  "speaker-voice-memory": {
+    "title": "Memória de voz dos falantes",
+    "why": "A diarização rotula os falantes de cada gravação como Palestrante 1…N, e os nomes que um usuário digita são armazenados por transcrição."
+  },
+  "upstream-fetch-isolation": {
+    "title": "Isolamento do fetch do upstream",
+    "why": "O git fetch upstream falha neste fork: o upstream e o fork querem ambos possuir tags como v1.0.0, e o histórico do fork é deliberadamente próprio (uma linha de versão própria começando em 1.0.0, builds de dev marcadas com dev.)."
+  },
+  "website-deploy-from-main": {
+    "title": "Implantação do site a partir da main",
+    "why": "Toda versão publicada — da dev.76 à dev.81 — deixou para trás uma execução falha do Deploy Website."
+  },
+  "website-language-selector": {
+    "title": "Seletor de idioma do site",
+    "why": "O site já tem um runtime Paraglide, catálogos por idioma, um LanguageSelector na navegação e documentação e registro de alterações totalmente traduzidos — mas a cobertura é irregular (Início e Recursos ainda carregam inglês fixo no código), a escolha vive apenas no localStorage, então um link compartilhado sempre abre no idioma do destinatário em vez do remetente, e o seletor é fácil de passar despercebido em telas pequenas."
+  },
+  "comparison-failed-runs": {
+    "title": "Execuções com falha na comparação",
+    "why": "Com três modelos selecionados, a janela de resultados mostrou dois: a terceira execução falhou e a janela filtra por status === 'done', então uma falha desaparece em vez de ser explicada."
+  },
+  "local-windows-build": {
+    "title": "Build local para Windows",
+    "why": "A aceitação manual das alterações do app depende do pool de runners do GitHub: uma tag de dev custa uma build de matriz, e as células do macOS em particular são canceladas ao acaso, enquanto as células do Linux e do Windows levam dezenas de minutos."
+  },
+  "meeting-browser-rework": {
+    "title": "Retrabalho do navegador de reuniões",
+    "why": "No Windows 11, o navegador de reuniões integrado abre uma janela branca que nunca é renderizada, e depois nem a janela nem o Vibe podem ser fechados."
+  },
+  "post-release-hardening": {
+    "title": "Endurecimento pós-lançamento",
+    "why": "Reverificar as alterações arquivadas depois da v1.0.0 encontrou defeitos que os gates automatizados não pegaram: o guia publicado de como publicar um lançamento promove um lançamento sem reconstruir seu corpo, então um lançamento estável é enviado sem as notas em inglês embutidas que a especificação exige; o task verify omite dois jobs de CI executáveis localmente (a build do site e o spike de transcrição); a CI executa cargo fmt/clippy diretamente em vez dos alvos task, então os comandos locais e remotos podem divergir; a build do roteiro ignora openspec/changes/**; o arquivo ggml pré-construído é empacotado em ggml-build/ enquanto o upload lê a raiz do repositório; e o filtro de caminhos do job E2E não cobre os arquivos que a suíte lê."
+  },
+  "site-localization": {
+    "title": "Localização do site",
+    "why": "Trocar o idioma do site faz a página ser renderizada novamente, mas duas superfícies mantêm o conteúdo em inglês: o registro de alterações de dev (/changelog/dev) não tem i18n/changelog/<locale>/unreleased.md, e os cartões do roteiro vêm de roadmap.json, que é gerado a partir de arquivos proposal.md em inglês."
+  }
+}
