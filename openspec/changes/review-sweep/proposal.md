@@ -25,7 +25,9 @@ against the current tree instead of applying the report verbatim.
 
 ## Capabilities
 
-- `dev-tooling`, `desktop-e2e`, `site-locale`, `site-roadmap`, `docs` (existing).
+None. The sweep changes no specified behavior: it fixes defects and records per-finding decisions in
+`sweep-report.md`, so the change sets `skip_specs: true`. The existing `dev-tooling`, `desktop-e2e`,
+`site-locale`, `site-roadmap` and `docs` capabilities are affected code, not requirement changes.
 
 ## Impact
 

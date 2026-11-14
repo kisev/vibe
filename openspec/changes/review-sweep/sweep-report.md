@@ -6,14 +6,21 @@ current tree before anything changed; `review-1.md` keeps the full text.
 
 ## Outcome
 
-- About 140 findings were valid and are fixed in this change.
-- 5 were already fixed by commits that landed after the review started (`244b8c98`, `24394c36`,
+All 167 findings were re-checked individually:
+
+- 144 were fixed or resolved in this change, including cross-group items completed by another
+  area's pass and follow-ups landed while the sweep ran.
+- 6 were already fixed by commits that landed after the review started (`244b8c98`, `24394c36`,
   `2048d075`, `22078d9c`, `dc474f54`).
-- A handful were false positives and were not changed.
-- The remaining findings need a product decision or external data; they are listed below instead of
-  being guessed at.
+- 7 were false positives, listed below.
+- 10 remain open product decisions or need external data, grouped below.
+
+144 + 6 + 7 + 10 = 167.
 
 ## Decisions
+
+Ten open findings, grouped (the ffmpeg bullet covers three: the two checksums and the duplicated
+URL).
 
 - **ffmpeg checksums** (`fetch_ffmpeg.py`, `package_server_release.sh`): pin an ffmpeg version and a
   SHA-256 per target before adding verification. gyan.dev publishes `<url>.sha256`; the osxexperts
@@ -41,6 +48,9 @@ current tree before anything changed; `review-1.md` keeps the full text.
   fallback is documented as intentional. A `translate` run closes the gap.
 
 ## False positives
+
+Complete list; each was refuted against the current code, and the area passes' summary counts were
+reconciled with their per-finding tables (one pass had over-counted its rejections by one).
 
 - `taskfile.yml` `cargo outdated`: the installed cargo-outdated exits 0 when updates exist.
 - `updater.tsx` mock handlers: `update_check` is already mocked; download/install are unreachable.
