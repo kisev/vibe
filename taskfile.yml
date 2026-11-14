@@ -624,6 +624,10 @@ tasks:
     desc: Cut a dev build - tag dev.<next> on the dev branch and push the tag
     cmds:
       - git fetch origin main dev --tags --prune --prune-tags
+      # The tag rule is "green pipeline first, tag second", and this is the
+      # only place that can enforce it: no tag on a commit whose Lint run has
+      # not finished green.
+      - '{{.PYTHON}} scripts/dev_build.py lint-gate'
       - |
         branch=$(git rev-parse --abbrev-ref HEAD)
         if [ "$branch" != "dev" ]; then

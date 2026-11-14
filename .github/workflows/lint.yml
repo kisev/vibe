@@ -143,45 +143,19 @@ jobs:
     # stack (and any host, for Windows-only code paths) get their first desktop
     # Rust compile HERE — on every push to main, minutes after the push — so a
     # dev tag is only ever cut from a revision whose desktop crate compiles.
+    #
+    # macOS is in the matrix for one reason: the crate's macOS-only blocks
+    # compile nowhere else, and four dev releases in a row (dev.81–dev.84) went
+    # out with every macOS cell failing on a `bail!` that crate never imported
+    # while every other cell was green. The check costs minutes; a failed
+    # release costs a matrix and a janitor rerun chain.
     desktop-check:
-        timeout-minutes: 25
-        runs-on: ubuntu-24.04
-        env:
-            # Setup mise installs only `task`; this job does not need the
-            # lint/format toolchain.
-            MISE_EXEC_AUTO_INSTALL: "false"
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Setup mise
-              uses: jdx/mise-action@v2
-              with:
-                  install: true
-                  install_args: aqua:go-task/task
-                  cache: true
-
-            - name: Setup Rust stable
-              uses: dtolnay/rust-toolchain@stable
-
-            - name: Cache cargo
-              uses: Swatinem/rust-cache@v2
-              with:
-                  workspaces: desktop/src-tauri
-
-            - name: Install desktop build prerequisites
-              run: mise exec -- task ci:desktop-build-deps
-
-            - name: Type-check the desktop crate
-              run: mise exec -- task ci:desktop-check
-
-    # Same check on macOS, for one reason: the crate's macOS-only blocks compile
-    # nowhere else, and four dev releases in a row (dev.81–dev.84) went out with
-    # every macOS cell failing on a `bail!` this crate never imported while every
-    # other cell was green. The check takes minutes; a failed release takes a
-    # matrix and a janitor rerun chain.
-    desktop-check-macos:
         timeout-minutes: 30
-        runs-on: macos-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-24.04, macos-latest]
+        runs-on: ${{ matrix.os }}
         env:
             # Setup mise installs only `task`; this job does not need the
             # lint/format toolchain.
@@ -203,6 +177,12 @@ jobs:
               uses: Swatinem/rust-cache@v2
               with:
                   workspaces: desktop/src-tauri
+
+            # The GTK/WebKit headers the crate's Linux build needs; macOS ships
+            # its own SDK, so the step is Linux-only.
+            - name: Install desktop build prerequisites
+              if: runner.os == 'Linux'
+              run: mise exec -- task ci:desktop-build-deps
 
             - name: Type-check the desktop crate
               run: mise exec -- task ci:desktop-check

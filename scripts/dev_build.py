@@ -4,9 +4,10 @@
 One file owns what the Dev Build workflow does around the builds, so the
 workflow itself only names the step:
 
-    python3 scripts/dev_build.py guard     # dev tags live on the dev branch
-    python3 scripts/dev_build.py prepare   # version/tag/config/body -> GITHUB_OUTPUT
-    python3 scripts/dev_build.py cleanup   # bounded-retention release sweep
+    python3 scripts/dev_build.py guard      # dev tags live on the dev branch
+    python3 scripts/dev_build.py lint-gate  # HEAD already passed the Lint workflow
+    python3 scripts/dev_build.py prepare    # version/tag/config/body -> GITHUB_OUTPUT
+    python3 scripts/dev_build.py cleanup    # bounded-retention release sweep
 
 Environment inputs (all set by the workflow): GITHUB_EVENT_NAME, GITHUB_REF,
 GITHUB_REF_NAME, GITHUB_SHA, GITHUB_RUN_NUMBER, GITHUB_OUTPUT, KEEP,
@@ -21,6 +22,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -29,6 +31,7 @@ UNRELEASED_CHANGELOG = Path("i18n/changelog/unreleased.md")
 DEV_TAG_PREFIX = "dev."
 DEV_REF_PREFIX = "refs/tags/" + DEV_TAG_PREFIX
 CHANGELOG_LIMIT = 60_000
+LINT_WORKFLOW = "lint.yml"
 DEV_NOTES = "[Read the latest dev notes](https://kisev.github.io/vibe/changelog/dev)."
 
 
@@ -59,6 +62,82 @@ def guard() -> int:
         )
         return 1
     return 0
+
+
+def repo_slug() -> str:
+    """owner/name, from the workflow's environment or from the origin remote."""
+    from_env = os.environ.get("GITHUB_REPOSITORY")
+    if from_env:
+        return from_env
+    url = subprocess.run(
+        ["git", "remote", "get-url", "origin"],
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+    ).stdout.strip()
+    match = re.search(r"[:/]([^/:]+/[^/]+?)(?:\.git)?$", url)
+    if not match:
+        raise SystemExit(f"cannot read the repository from {url}")
+    return match.group(1)
+
+
+def lint_gate() -> int:
+    """Fail unless the Lint workflow already finished green on HEAD.
+
+    The tag rule is "green pipeline first, tag second", and a rule the tooling
+    does not check is a rule the maintainer has to remember at 1 a.m. The run
+    is looked up with `head_sha`, so a green run on a neighbouring commit never
+    counts.
+    """
+    sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], check=True, stdout=subprocess.PIPE, text=True
+    ).stdout.strip()
+    query = (
+        f"repos/{repo_slug()}/actions/workflows/{LINT_WORKFLOW}"
+        f"/runs?head_sha={sha}&per_page=1"
+    )
+    failure = ""
+    for attempt in range(3):
+        try:
+            payload = json.loads(gh_api(query))
+        except (subprocess.CalledProcessError, json.JSONDecodeError) as error:
+            failure = str(error)
+            if attempt < 2:
+                time.sleep(5)
+                continue
+            print(
+                f"could not read the Lint runs for {sha[:8]}: {failure}\n"
+                "A tag needs a green Lint run before it exists; retry when GitHub answers.",
+                file=sys.stderr,
+            )
+            return 1
+        runs = payload.get("workflow_runs") or []
+        if not runs:
+            break
+        run = runs[0]
+        status, conclusion = run.get("status"), run.get("conclusion")
+        if status != "completed":
+            print(
+                f"the Lint run for {sha[:8]} is {status}, not finished "
+                f"({run.get('html_url')})",
+                file=sys.stderr,
+            )
+            return 1
+        if conclusion != "success":
+            print(
+                f"the Lint run for {sha[:8]} finished {conclusion} "
+                f"({run.get('html_url')})",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"lint gate: {sha[:8]} is green ({run.get('html_url')})")
+        return 0
+    print(
+        f"no Lint run exists for {sha[:8]}: dispatch one before tagging\n"
+        f"    gh workflow run {LINT_WORKFLOW} --ref dev",
+        file=sys.stderr,
+    )
+    return 1
 
 
 def unreleased_changelog() -> bytes:
@@ -184,6 +263,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = {
         "guard": guard,
+        "lint-gate": lint_gate,
         "prepare": prepare,
         "cleanup": cleanup,
     }
