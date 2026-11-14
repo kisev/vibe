@@ -17,5 +17,6 @@ fi
 
 cd server
 cargo build -p vibe-diarize-native --release --target "$triple"
+mkdir -p ../desktop/src-tauri/binaries
 cp "target/$triple/release/vibe-diarize-native$exe" \
     "../desktop/src-tauri/binaries/vibe-diarize-native-$triple$exe"

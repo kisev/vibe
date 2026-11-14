@@ -9,19 +9,16 @@ use tauri::Manager;
 
 use super::protocol::{self, HandoffEvent, HandoffHeader};
 use super::transfer::{receive_audio, server_transfer_error, write_event, HandoffHandler, TransferError};
+use crate::cmd::config::{DEFAULT_UNLOAD_TIMEOUT_MINUTES, UNLOAD_TIMEOUT_MINUTES_KEY};
 use crate::server::ServerEvent;
 
 /// Keys in `app_config.json` holding the user's model settings (`lib/config-keys.ts`).
 const CONFIG_KEY_MODEL_PATH: &str = "model.path";
 const CONFIG_KEY_GPU_DEVICE: &str = "model.gpuDevice";
 const CONFIG_KEY_NO_GPU: &str = "model.noGpu";
-const CONFIG_KEY_UNLOAD_TIMEOUT_MINUTES: &str = "model.unloadTimeoutMinutes";
 
 /// Display name for a phone transcription in Recents.
 const PHONE_TRANSCRIPT_NAME: &str = "Phone recording";
-
-/// Matches the frontend default in `providers/preference.tsx`.
-const DEFAULT_UNLOAD_TIMEOUT_MINUTES: u32 = 5;
 
 // Keep in sync with lib/config.ts; phone requests do not pass through the frontend.
 const VAD_MODEL_FILENAME: &str = "ggml-silero-v6.2.0.bin";
@@ -298,7 +295,7 @@ pub(super) fn model_settings(app_handle: &tauri::AppHandle) -> Option<ModelSetti
         .and_then(|value| value.as_bool())
         .unwrap_or(false);
     let unload_timeout_minutes = store
-        .get(CONFIG_KEY_UNLOAD_TIMEOUT_MINUTES)
+        .get(UNLOAD_TIMEOUT_MINUTES_KEY)
         .and_then(|value| value.as_u64())
         .map(|value| value as u32)
         .unwrap_or(DEFAULT_UNLOAD_TIMEOUT_MINUTES);

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Fetch the sidecars the desktop build links against, for one target triple:
 # `vibe-server-<triple>` and, outside Linux, `ffmpeg-<triple>`, into
-# desktop/src-tauri/binaries.
+# desktop/src-tauri/binaries. On Linux the diarization helper, which lives in
+# the same directory but is built from server/, is built here when missing.
 #
 # The asset names are the server release's own; the triple also becomes the
 # sidecar's file name, because Tauri looks for `vibe-server-<triple>` beside the
@@ -48,8 +49,11 @@ esac
 # Linux ships the server alone; every other target gets ffmpeg beside it, so
 # both have to be present before this is a no-op. Checking only the server
 # would leave a half-populated directory and fail the Tauri build much later.
+# Linux also needs the locally built diarization helper: the base tauri.conf
+# names it in externalBin (only the macOS overlay drops it), and tauri-build
+# refuses to compile until it exists.
 if $is_linux; then
-    if [ -f "$bin/vibe-server-$triple" ]; then
+    if [ -f "$bin/vibe-server-$triple" ] && [ -f "$bin/vibe-diarize-native-$triple" ]; then
         echo "sidecars for $triple are already in place"
         exit 0
     fi
@@ -64,10 +68,18 @@ tag="server-$server"
 
 if $is_linux; then
     # Linux ships the bare binary, with no ffmpeg alongside it.
-    gh release download "$tag" --repo kisev/vibe --pattern "$asset" --dir "$bin" --clobber
-    mv "$bin/$asset" "$bin/vibe-server-$triple"
-    chmod 755 "$bin/vibe-server-$triple"
-    echo "installed vibe-server-$triple"
+    if [ ! -f "$bin/vibe-server-$triple" ]; then
+        gh release download "$tag" --repo kisev/vibe --pattern "$asset" --dir "$bin" --clobber
+        mv "$bin/$asset" "$bin/vibe-server-$triple"
+        chmod 755 "$bin/vibe-server-$triple"
+        echo "installed vibe-server-$triple"
+    fi
+    if [ ! -f "$bin/vibe-diarize-native-$triple" ]; then
+        echo "building vibe-diarize-native-$triple"
+        TRIPLE="$triple" bash "$ROOT/scripts/ci/ggml-libs.sh"
+        TRIPLE="$triple" bash "$ROOT/scripts/ci/diarize-helper.sh"
+    fi
+    echo "sidecars for $triple are in place"
     exit 0
 fi
 
@@ -85,7 +97,7 @@ case "$asset" in
 esac
 
 member() {
-    found="$(find "$stage/unpacked" -type f -name "$1" | head -1)"
+    found="$(find "$stage/unpacked" -type f -name "$1" -print -quit)"
     [ -n "$found" ] || {
         echo "$1 is missing from $asset" >&2
         exit 1

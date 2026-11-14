@@ -449,6 +449,7 @@
   "updateDownloading": "מוריד את העדכון…",
   "updateInstalling": "מתקין את העדכון…",
   "updateFailed": "בדיקת העדכונים האחרונה נכשלה",
+  "updateInstallFailed": "לא ניתן היה להתקין את העדכון. הורד את הגרסה החדשה מהאתר.",
   "updateLastChecked": "בדיקה אחרונה: {time}",
   "updateNoCandidate": "אין מועמד שחרור בקו הזה",
   "updatingModalBody": "מעדכן את vibe לגרסה {version}",

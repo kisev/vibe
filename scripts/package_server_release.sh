@@ -39,7 +39,7 @@ esac
 curl -fsSL --retry 3 --connect-timeout 20 --max-time 180 -o "$stage/ffmpeg.zip" "$url"
 unzip -q -o "$stage/ffmpeg.zip" 'ffmpeg' 'ffmpeg.exe' -d "$stage" 2>/dev/null ||
     unzip -q -o "$stage/ffmpeg.zip" -d "$stage"
-found="$(find "$stage" -type f \( -name ffmpeg -o -name ffmpeg.exe \) ! -name '*.zip' | head -1)"
+found="$(find "$stage" -type f \( -name ffmpeg -o -name ffmpeg.exe \) ! -name '*.zip' -print -quit)"
 [ -n "$found" ] || {
     echo "the ffmpeg archive holds no binary" >&2
     exit 1
@@ -47,8 +47,15 @@ found="$(find "$stage" -type f \( -name ffmpeg -o -name ffmpeg.exe \) ! -name '*
 # Windows resolves the sidecar by its full name, so the extension is part of the contract.
 ffmpeg_name="ffmpeg"
 [ "$goos" = "windows" ] && ffmpeg_name="ffmpeg.exe"
-mv "$found" "$stage/$ffmpeg_name"
+# The macOS archives already hold ffmpeg at their root; moving a file onto
+# itself is an error under `set -e`.
+if [ "$found" != "$stage/$ffmpeg_name" ]; then
+    mv "$found" "$stage/$ffmpeg_name"
+fi
 rm -f "$stage/ffmpeg.zip"
+# The gyan.dev archive nests its binary (bin/ffmpeg.exe) and carries ffprobe,
+# ffplay, docs and licenses; only the two files above belong in the archive.
+find "$stage" -mindepth 1 -maxdepth 1 ! -name "$name" ! -name "$ffmpeg_name" -exec rm -rf {} +
 chmod 755 "$stage/$ffmpeg_name"
 
 # Everything at the staging root goes into the archive root, so the app finds the

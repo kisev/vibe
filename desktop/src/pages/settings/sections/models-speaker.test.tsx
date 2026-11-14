@@ -67,7 +67,8 @@ describe('speaker separation model group', () => {
 	})
 
 	it('offers the download when the model is missing and flips to installed', async () => {
-		mocks.isUsable.mockResolvedValue(false)
+		// Missing on the first check; the file is usable once the download has finished.
+		mocks.isUsable.mockResolvedValueOnce(false).mockResolvedValue(true)
 		mocks.downloadModel.mockResolvedValue(`C:/models/${config.diarizeModelFilename}`)
 		const user = userEvent.setup()
 		renderGroup()

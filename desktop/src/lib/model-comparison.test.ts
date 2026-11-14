@@ -3,6 +3,7 @@
 // touches the OS lives there, while the runner only needs the injected contract.
 import { invoke } from '@tauri-apps/api/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderExport } from '~/lib/auto-export'
 import * as config from '~/lib/config'
 import {
 	comparisonFolderName,
@@ -202,6 +203,20 @@ describe('tauriComparisonIo transcribe options', () => {
 		expect(invokeMock).toHaveBeenCalledWith('transcribe', {
 			options: { path: '/rec/clip.wav', lang: 'ru', diarize_model: 'C:/models/speakers.gguf' },
 		})
+	})
+
+	it('renders the speaker labels the results window shows when separation is on', async () => {
+		const renderExportMock = renderExport as unknown as ReturnType<typeof vi.fn>
+		renderExportMock.mockResolvedValue('# rendered')
+		const withDiarize = tauriComparisonIo({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null, 'C:/models/speakers.gguf')
+
+		await withDiarize.renderMarkdown('Alpha', [])
+
+		expect(renderExportMock).toHaveBeenCalledWith(
+			'md',
+			expect.anything(),
+			expect.objectContaining({ showSpeakers: true, speakerLabel: expect.any(String) }),
+		)
 	})
 
 	it('still transcribes when the model metadata cannot be read', async () => {

@@ -71,7 +71,7 @@ pub fn resolve_ffmpeg_path(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     None
 }
 
-fn spawn_process(
+pub(crate) fn spawn_process(
     app_handle: &tauri::AppHandle,
     unload_timeout_minutes: u32,
     cpu_variant: crate::cmd::config::CpuVariant,
@@ -213,6 +213,12 @@ fn cache_dir_under(root: std::path::PathBuf) -> std::path::PathBuf {
     root.join("transcribe-cache")
 }
 
+/// How long the tiny metadata response may take before the probe is given up on. The client
+/// deliberately has no whole-request timeout (transcriptions stream for minutes), so this one
+/// bounded call has its own: a probe that accepts the connection and then stalls must not hang
+/// the command forever.
+const METADATA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
 #[tauri::command]
 pub async fn get_model_metadata(app_handle: tauri::AppHandle, model_path: String) -> CommandResult<crate::server::ModelMetadata> {
     let server_state: State<'_, Mutex<ServerState>> = app_handle.state();
@@ -223,14 +229,26 @@ pub async fn get_model_metadata(app_handle: tauri::AppHandle, model_path: String
         return Ok(state.process.as_ref().unwrap().model_metadata(&model_path).await?);
     }
     state.process = None;
+    // The probe path needs none of the shared state, and its spawn handshakes with the sidecar
+    // for up to `READY_TIMEOUT` and its kill waits for the child: neither may run on an async
+    // worker or under the lock every other server command queues on.
+    drop(state);
+    let unload_timeout_minutes = crate::cmd::config::unload_timeout_minutes(&app_handle);
+    let cpu_variant = crate::cmd::config::cpu_variant(&app_handle);
+    let spawn_handle = app_handle.clone();
+    let spawner = move || spawn_process(&spawn_handle, unload_timeout_minutes, cpu_variant);
+    let mut probe = tauri::async_runtime::spawn_blocking(spawner)
+        .await
+        .map_err(|error| eyre::eyre!("the probe server task failed: {error}"))??;
     // Otherwise read through a short-lived process. The model is read whenever the app starts, and
     // leaving the shared server up for that would make the API run behind the user's back.
-    let mut probe = spawn_process(
-        &app_handle,
-        crate::cmd::config::unload_timeout_minutes(&app_handle),
-        crate::cmd::config::cpu_variant(&app_handle),
-    )?;
-    let metadata = probe.model_metadata(&model_path).await;
+    let metadata = match tokio::time::timeout(METADATA_TIMEOUT, probe.model_metadata(&model_path)).await {
+        Ok(metadata) => metadata,
+        Err(_) => Err(eyre::eyre!(
+            "timed out after {}s reading model metadata from the probe server",
+            METADATA_TIMEOUT.as_secs()
+        )),
+    };
     probe.kill();
     Ok(metadata?)
 }

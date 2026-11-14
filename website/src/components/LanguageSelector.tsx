@@ -7,12 +7,12 @@ interface LanguageSelectorProps {
 	locale: Locale
 	availableLocales: readonly Locale[]
 	onLocaleChange: (locale: Locale) => void
-	/** Compact trigger for the small-screen header: the same list, less chrome. */
-	compact?: boolean
+	/** Which header slot this instance fills; the visible difference comes from the parent's `className`. */
+	placement: 'mobile' | 'desktop'
 	className?: string
 }
 
-export default function LanguageSelector({ locale, availableLocales, onLocaleChange, compact = false, className }: LanguageSelectorProps) {
+export default function LanguageSelector({ locale, availableLocales, onLocaleChange, placement, className }: LanguageSelectorProps) {
 	const [open, setOpen] = useState(false)
 	const menuRef = useRef<HTMLLIElement>(null)
 	const languageNames = new Intl.DisplayNames([locale], { type: 'language' })
@@ -26,8 +26,20 @@ export default function LanguageSelector({ locale, availableLocales, onLocaleCha
 		return () => document.removeEventListener('mousedown', closeOnOutsideClick)
 	}, [])
 
+	useEffect(() => {
+		if (!open) return
+		function closeOnEscape(event: KeyboardEvent) {
+			if (event.key !== 'Escape') return
+			setOpen(false)
+			// Escape leaves the list, so the trigger takes focus back rather than dropping it.
+			menuRef.current?.querySelector<HTMLButtonElement>('button[type="button"]')?.focus()
+		}
+		document.addEventListener('keydown', closeOnEscape)
+		return () => document.removeEventListener('keydown', closeOnEscape)
+	}, [open])
+
 	return (
-		<li ref={menuRef} data-placement={compact ? 'mobile' : 'desktop'} className={`relative ${className ?? ''}`}>
+		<li ref={menuRef} data-placement={placement} className={`relative ${className ?? ''}`}>
 			<button
 				type="button"
 				aria-label={m.language()}

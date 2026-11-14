@@ -9,8 +9,12 @@ for attempt in 1 2 3; do
         timeout 180 sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 install -y libvulkan-dev glslc glslang-tools spirv-headers; then
         exit 0
     fi
-    echo "apt attempt $attempt failed; retrying in 10s"
-    sleep 10
+    if [ "$attempt" -lt 3 ]; then
+        echo "apt attempt $attempt failed; retrying in 10s"
+        sleep 10
+    else
+        echo "apt attempt $attempt failed; no attempts left" >&2
+    fi
 done
 echo "::error::could not install the Vulkan build prerequisites after 3 attempts"
 exit 1

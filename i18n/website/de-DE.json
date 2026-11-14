@@ -121,5 +121,7 @@
   "roadmap-description": "Was die nächsten Versionen bringen. Jeder Eintrag ist eine aktive OpenSpec-Änderung im Repository.",
   "roadmap-note": "Diese Änderungen sind geplant, aber nicht veröffentlicht. Die Liste wird aus den nicht archivierten OpenSpec-Vorschlägen des Repositorys generiert.",
   "roadmap-empty": "Es sind noch keine geplanten Änderungen erfasst.",
-  "roadmap-load-failed": "Der Fahrplan konnte nicht geladen werden."
+  "roadmap-load-failed": "Der Fahrplan konnte nicht geladen werden.",
+  "dev-preview-banner": "Entwicklungsvorschau — erstellt aus dem dev-Branch.",
+  "dev-preview-link": "Release-Website öffnen"
 }

@@ -442,6 +442,7 @@
   "updateDevBoundary": "Dev 構建版本的版本號低於已安裝版本，因此 Dev 版本線要先手動安裝一次 Dev 構建才能開始。",
   "updateDownloading": "正在下載更新…",
   "updateFailed": "上次更新檢查失敗",
+  "updateInstallFailed": "無法安裝更新。請從網站下載新版本。",
   "updateInstalling": "正在安裝更新…",
   "updateLastChecked": "上次檢查：{time}",
   "updateNoCandidate": "此發行線暫無候選版本",

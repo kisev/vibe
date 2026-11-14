@@ -17,7 +17,7 @@ const channels: { value: UpdateChannel; label: string }[] = [
 ]
 
 /** One sentence for the last check, whatever the phase. */
-function statusText(state: CheckState, version: string | undefined, lastCheckedAt: number | null): string {
+function statusText(state: CheckState, version: string | undefined, lastCheckedAt: number | null, errorStage: 'check' | 'install' | null): string {
 	switch (state) {
 		case 'checking':
 			return m.updateChecking()
@@ -30,14 +30,14 @@ function statusText(state: CheckState, version: string | undefined, lastCheckedA
 		case 'installing':
 			return m.updateInstalling()
 		case 'error':
-			return m.updateFailed()
+			return errorStage === 'install' ? m.updateInstallFailed() : m.updateFailed()
 		default:
 			return lastCheckedAt ? m.updateLastChecked({ time: new Date(lastCheckedAt).toLocaleTimeString() }) : m.updateNotChecked()
 	}
 }
 
 export function UpdateControls() {
-	const { channel, setChannel, checkNow, checkState, checkError, lastCheckedAt, manifest, updateApp, updating, progress } = useContext(UpdaterContext)
+	const { channel, setChannel, checkNow, checkState, checkError, errorStage, lastCheckedAt, manifest, updateApp, updating, progress } = useContext(UpdaterContext)
 	const [version, setVersion] = useState('')
 
 	useEffect(() => {
@@ -53,8 +53,9 @@ export function UpdateControls() {
 	}, [])
 
 	// A release or beta build cannot be offered a `-dev.N` version: semver sorts it
-	// below what is installed. The copy says so instead of pretending a check failed.
-	const devLineBelow = channel === 'dev' && version !== '' && !version.includes('-dev.')
+	// below what is installed. The copy says so instead of pretending a check failed —
+	// but only when the line offered nothing, not next to an "update now" button.
+	const devLineBelow = channel === 'dev' && checkState === 'current' && version !== '' && !version.includes('-dev.')
 	const busy = checkState === 'checking' || updating
 
 	return (
@@ -73,8 +74,9 @@ export function UpdateControls() {
 								type="button"
 								role="radio"
 								aria-checked={selected}
+								disabled={busy}
 								onClick={() => setChannel(value)}
-								className={`flex h-8 cursor-pointer items-center justify-center rounded-md px-3 text-xs transition-colors ${
+								className={`flex h-8 cursor-pointer items-center justify-center rounded-md px-3 text-xs transition-colors disabled:pointer-events-none disabled:opacity-50 ${
 									selected ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
 								}`}>
 								{label}
@@ -85,7 +87,7 @@ export function UpdateControls() {
 			</SettingsField>
 
 			<SettingsRow
-				label={checkState === 'current' && channel === 'beta' ? m.updateNoCandidate() : statusText(checkState, manifest?.version, lastCheckedAt)}
+				label={checkState === 'current' && channel !== 'stable' ? m.updateNoCandidate() : statusText(checkState, manifest?.version, lastCheckedAt, errorStage)}
 				description={checkState === 'error' ? checkError : m.infoCheckForUpdates()}
 				clampDescription={false}>
 				{busy && checkState !== 'available' && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}

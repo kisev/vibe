@@ -442,6 +442,7 @@
   "updateDevBoundary": "Les compilacions Dev queden per sota de la versió instal·lada; per això, la línia Dev comença amb una instal·lació manual d'una compilació Dev.",
   "updateDownloading": "Descarregant l'actualització…",
   "updateFailed": "La darrera comprovació d'actualitzacions ha fallat",
+  "updateInstallFailed": "L'actualització no s'ha pogut instal·lar. Descarrega la nova versió des del lloc web.",
   "updateInstalling": "Instal·lant l'actualització…",
   "updateLastChecked": "Darrera comprovació: {time}",
   "updateNoCandidate": "Cap versió candidata en aquesta línia",

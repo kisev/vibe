@@ -23,7 +23,11 @@ vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen, emit: mocks.emit
 vi.mock('@tauri-apps/api/window', () => ({
 	getCurrentWindow: () => ({ close: vi.fn(async () => {}), setTheme: vi.fn(async () => {}) }),
 }))
-vi.mock('~/lib/config-store', () => ({ readConfig: mocks.readConfig, writeConfig: mocks.writeConfig }))
+vi.mock('~/lib/config-store', () => ({
+	readConfig: mocks.readConfig,
+	writeConfig: mocks.writeConfig,
+	usePersisted: (key: string, initial: unknown) => [mocks.readConfig(key, initial), mocks.writeConfig],
+}))
 
 const session = {
 	session: 7,

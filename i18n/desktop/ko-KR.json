@@ -449,6 +449,7 @@
   "updateDownloading": "업데이트 다운로드 중…",
   "updateInstalling": "업데이트 설치 중…",
   "updateFailed": "마지막 업데이트 확인에 실패했습니다",
+  "updateInstallFailed": "업데이트를 설치할 수 없습니다. 사이트에서 새 버전을 다운로드하세요.",
   "updateLastChecked": "마지막 확인: {time}",
   "updateNoCandidate": "이 라인에 출시 후보가 없습니다",
   "updatingModalBody": "Vibe를 버전 {version}으로 업데이트 중",

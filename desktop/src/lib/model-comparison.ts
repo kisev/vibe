@@ -5,6 +5,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import * as pathApi from '@tauri-apps/api/path'
 import * as fs from '@tauri-apps/plugin-fs'
+import { m } from '~/paraglide/messages.js'
 import { renderExport } from '~/lib/auto-export'
 import * as config from '~/lib/config'
 import { requiresVad, type ModelMetadata } from '~/lib/model'
@@ -180,8 +181,9 @@ export function tauriComparisonIo(load: ComparisonLoadOptions, projectsPath?: st
 				direction: 'ltr',
 				theme: 'light',
 				showTimestamps: true,
-				showSpeakers: false,
-				speakerLabel: '',
+				// The saved transcript must show the same speaker labels as the results window.
+				showSpeakers: diarizeModelPath != null,
+				speakerLabel: m.speakerPrefix(),
 				labels: { transcript: '', summary: '' },
 			}).then((rendered) => String(rendered)),
 		comparisonsFolder: async () => pathApi.join(await transcriptsFolder(projectsPath), 'comparisons'),

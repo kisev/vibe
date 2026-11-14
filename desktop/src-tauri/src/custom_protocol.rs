@@ -17,16 +17,86 @@ mod imp {
     use winreg::enums::*;
     use winreg::RegKey;
 
+    /// Where another application's command is kept while Vibe answers for its scheme, so turning
+    /// the setting off can hand the scheme back instead of deleting somebody else's registration.
+    const BACKUP_ROOT: &str = "Software\\Vibe\\MeetingSchemes";
+
     fn current_command() -> Result<String> {
         let program_path = std::env::current_exe()?;
         Ok(format!("\"{}\" \"%1\"", program_path.to_str().context("tostr")?))
     }
 
+    /// The command another application registered for `scheme`, if the key exists.
+    fn previous_command(classes: &RegKey, scheme: &str) -> Option<String> {
+        let class = classes.open_subkey(scheme).ok()?;
+        let command = class.open_subkey("shell\\open\\command").ok()?;
+        command.get_value::<String, _>("").ok()
+    }
+
+    /// Remember the scheme key's state before Vibe overwrites it. A refresh of our own
+    /// registration (setup re-points the handler after every update) must keep the original
+    /// backup rather than saving Vibe's own command as the previous owner.
+    fn remember(classes: &RegKey, backup_root: &RegKey, scheme: &str, ours: &str) -> Result<()> {
+        let existing = previous_command(classes, scheme);
+        if existing.as_deref() == Some(ours) {
+            return Ok(());
+        }
+        let existed = classes.open_subkey(scheme).is_ok();
+        let (saved, _) = backup_root.create_subkey(scheme)?;
+        saved.set_value("Existed", &u32::from(existed))?;
+        match existing {
+            Some(previous) => saved.set_value("PreviousCommand", &previous)?,
+            None => {
+                let _ = saved.delete_value("PreviousCommand");
+            }
+        }
+        Ok(())
+    }
+
+    /// Delete `scheme`, treating a missing key as the state we want and reporting every other
+    /// failure: otherwise the setting would say "off" while Vibe is still the handler.
+    fn delete_scheme(classes: &RegKey, scheme: &str) -> Result<()> {
+        match classes.delete_subkey_all(scheme) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    /// Hand `scheme` back: restore the command the previous owner had, or remove the key
+    /// entirely when Vibe created it.
+    fn restore(classes: &RegKey, backup_root: &RegKey, scheme: &str) -> Result<()> {
+        let Ok(saved) = backup_root.open_subkey(scheme) else {
+            // No backup to hand back (registered before the backup existed, or somebody cleared
+            // it): remove what Vibe registered.
+            return delete_scheme(classes, scheme);
+        };
+        let existed = saved.get_value::<u32, _>("Existed").unwrap_or(0) != 0;
+        if !existed {
+            delete_scheme(classes, scheme)?;
+        } else {
+            let (class, _) = classes.create_subkey(scheme)?;
+            let (shell, _) = class.create_subkey("shell")?;
+            let (open, _) = shell.create_subkey("open")?;
+            let (command, _) = open.create_subkey("command")?;
+            match saved.get_value::<String, _>("PreviousCommand") {
+                Ok(previous) => command.set_value("", &previous)?,
+                Err(_) => {
+                    let _ = command.delete_value("");
+                }
+            }
+        }
+        backup_root.delete_subkey_all(scheme)?;
+        Ok(())
+    }
+
     pub fn register_schemes(schemes: &[&str]) -> Result<()> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let classes = hkcu.open_subkey_with_flags("Software\\Classes", KEY_ALL_ACCESS)?;
+        let (backup_root, _) = hkcu.create_subkey(BACKUP_ROOT)?;
         let command_value = current_command()?;
         for scheme in schemes {
+            remember(&classes, &backup_root, scheme, &command_value)?;
             let (class, _) = classes.create_subkey(scheme)?;
             class.set_value("", &format!("URL:{scheme}"))?;
             class.set_value("URL Protocol", &"")?;
@@ -41,10 +111,12 @@ mod imp {
     pub fn unregister_schemes(schemes: &[&str]) -> Result<()> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let classes = hkcu.open_subkey_with_flags("Software\\Classes", KEY_ALL_ACCESS)?;
+        let backup_root = hkcu.open_subkey_with_flags(BACKUP_ROOT, KEY_ALL_ACCESS).ok();
         for scheme in schemes {
-            // A missing key is the state we want; only a key that exists but
-            // cannot be removed is an error worth reporting.
-            let _ = classes.delete_subkey_all(scheme);
+            match &backup_root {
+                Some(backup_root) => restore(&classes, backup_root, scheme)?,
+                None => delete_scheme(&classes, scheme)?,
+            }
         }
         Ok(())
     }
@@ -57,9 +129,47 @@ mod imp {
     use std::fs;
     use std::path::PathBuf;
 
+    /// The desktop entry Vibe owns; also the value `xdg-mime default` writes into `mimeapps.list`.
+    const HANDLER_FILE: &str = "vibe-meeting-handler.desktop";
+
     fn desktop_file() -> Result<PathBuf> {
         let home = std::env::var("HOME").context("HOME is not set")?;
-        Ok(PathBuf::from(home).join(".local/share/applications/vibe-meeting-handler.desktop"))
+        Ok(PathBuf::from(home).join(".local/share/applications").join(HANDLER_FILE))
+    }
+
+    /// The association list `xdg-mime default` updates.
+    fn mimeapps_file() -> Result<PathBuf> {
+        if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME").filter(|value| !value.is_empty()) {
+            return Ok(PathBuf::from(config_home).join("mimeapps.list"));
+        }
+        let home = std::env::var("HOME").context("HOME is not set")?;
+        Ok(PathBuf::from(home).join(".config/mimeapps.list"))
+    }
+
+    /// Remove `handler` from every association list in a `mimeapps.list`, dropping a line when
+    /// it was the only handler so the scheme falls back instead of pointing at a deleted file.
+    /// Section headers and unrelated lines are kept verbatim.
+    fn without_handler(contents: &str, handler: &str) -> String {
+        let mut out = String::with_capacity(contents.len());
+        for line in contents.lines() {
+            let Some((key, value)) = line.split_once('=') else {
+                out.push_str(line);
+                out.push('\n');
+                continue;
+            };
+            let entries: Vec<&str> = value.split(';').filter(|entry| !entry.is_empty()).collect();
+            let kept: Vec<&str> = entries.iter().copied().filter(|entry| *entry != handler).collect();
+            if kept.len() == entries.len() {
+                out.push_str(line);
+                out.push('\n');
+            } else if !kept.is_empty() {
+                out.push_str(key);
+                out.push('=');
+                out.push_str(&kept.join(";"));
+                out.push_str(";\n");
+            }
+        }
+        out
     }
 
     fn desktop_entry(schemes: &[&str]) -> Result<String> {
@@ -81,12 +191,8 @@ mod imp {
         // Best effort: without xdg-mime the file is inert, which the setting
         // reports as not applied rather than silently claiming success.
         let status = std::process::Command::new("xdg-mime")
-            .args(["default", "vibe-meeting-handler.desktop"])
-            .args(
-                schemes
-                    .iter()
-                    .flat_map(|scheme| ["x-scheme-handler/".to_string(), scheme.to_string()]),
-            )
+            .args(["default", HANDLER_FILE])
+            .args(schemes.iter().map(|scheme| format!("x-scheme-handler/{scheme}")))
             .status();
         match status {
             Ok(status) if status.success() => Ok(()),
@@ -99,7 +205,47 @@ mod imp {
         if path.exists() {
             fs::remove_file(path)?;
         }
+        // `xdg-mime default` left the handler in mimeapps.list; drop it there too, otherwise the
+        // schemes keep pointing at a desktop file that no longer exists.
+        let mimeapps = mimeapps_file()?;
+        if mimeapps.exists() {
+            let contents = fs::read_to_string(&mimeapps).wrap_err_with(|| format!("could not read {}", mimeapps.display()))?;
+            let updated = without_handler(&contents, HANDLER_FILE);
+            if updated != contents {
+                fs::write(&mimeapps, updated).wrap_err_with(|| format!("could not update {}", mimeapps.display()))?;
+            }
+        }
         Ok(())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::without_handler;
+
+        #[test]
+        fn removing_the_handler_keeps_other_handlers_and_sections() {
+            let contents = "[Default Applications]\n\
+                            x-scheme-handler/zoommtg=vibe-meeting-handler.desktop;\n\
+                            text/plain=org.gnome.TextEditor.desktop;\n\
+                            [Added Associations]\n\
+                            x-scheme-handler/msteams=vibe-meeting-handler.desktop;teams-for-linux.desktop;\n\
+                            \n";
+            let updated = without_handler(contents, "vibe-meeting-handler.desktop");
+            assert_eq!(
+                updated,
+                "[Default Applications]\n\
+                 text/plain=org.gnome.TextEditor.desktop;\n\
+                 [Added Associations]\n\
+                 x-scheme-handler/msteams=teams-for-linux.desktop;\n\
+                 \n"
+            );
+        }
+
+        #[test]
+        fn a_file_without_the_handler_is_unchanged() {
+            let contents = "[Default Applications]\ntext/plain=org.gnome.TextEditor.desktop;\n";
+            assert_eq!(without_handler(contents, "vibe-meeting-handler.desktop"), contents);
+        }
     }
 }
 

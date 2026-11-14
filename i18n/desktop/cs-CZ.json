@@ -442,6 +442,7 @@
   "updateDevBoundary": "Sestavení Dev se řadí pod nainstalovanou verzi, takže řada dev začíná jednou ruční instalací sestavení Dev.",
   "updateDownloading": "Stahování aktualizace…",
   "updateFailed": "Poslední kontrola aktualizací selhala",
+  "updateInstallFailed": "Aktualizaci se nepodařilo nainstalovat. Stáhněte si novou verzi z webu.",
   "updateInstalling": "Instalace aktualizace…",
   "updateLastChecked": "Naposledy zkontrolováno {time}",
   "updateNoCandidate": "Žádný kandidát v této řadě",

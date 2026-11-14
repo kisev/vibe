@@ -64,6 +64,9 @@ struct BrowserSession {
     loaded: bool,
     /// The chrome is showing the blocked-hosts region, so the page sits lower.
     expanded: bool,
+    /// A resource of this page was refused under the strict policy. Only such a page has
+    /// anything to retry after a host is allowed, so only such a page is reloaded.
+    blocked_requests: bool,
 }
 
 #[derive(Default)]
@@ -286,7 +289,9 @@ fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo
         .map_err(|error| format!("Could not open the browser window: {error}"))?;
     tracing::info!(session, "browser window created");
 
-    let chrome_url = format!("index.html?window=browser&session={session}");
+    // The chrome cannot import Rust constants, so the two heights it mirrors travel in the URL.
+    // This keeps its toolbar/list region from drifting from the webview geometry computed here.
+    let chrome_url = format!("index.html?window=browser&session={session}&toolbar={TOOLBAR_H}&blocked={BLOCKED_LIST_H}");
     tracing::info!(session, "creating the browser chrome webview");
     window
         .add_child(
@@ -328,7 +333,7 @@ fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo
     // The filter is installed in every mode: its handler asks the cached policy, so switching
     // to trusted-site applies to this page on the next request instead of a new window.
     #[cfg(windows)]
-    install_resource_interceptor(&page, app.clone());
+    install_resource_interceptor(&page, app.clone(), session);
     #[cfg(not(windows))]
     let _ = page;
 
@@ -418,13 +423,41 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
         return Err(format!("{host} is not in the allowlist"));
     }
 
-    let existing = {
-        let runtime = lock_runtime()?;
-        runtime
+    // Look up and insert under one lock: two calls for the same link (a double click on the
+    // meeting page, a repeated invoke from `open_meeting_link`) must not both miss and open a
+    // second window.
+    let (existing, created) = {
+        let mut runtime = lock_runtime()?;
+        let existing = runtime
             .sessions
             .values()
             .find(|state| state.info.url == normalized)
-            .map(|state| state.info.clone())
+            .map(|state| state.info.clone());
+        if existing.is_some() {
+            (existing, None)
+        } else {
+            let session = NEXT_SESSION.fetch_add(1, Ordering::Relaxed);
+            let info = BrowserSessionInfo {
+                session,
+                url: normalized.clone(),
+                host,
+                can_back: false,
+                can_forward: false,
+            };
+            runtime.sessions.insert(
+                session,
+                BrowserSession {
+                    info: info.clone(),
+                    history: vec![normalized],
+                    index: 0,
+                    force_close: false,
+                    loaded: false,
+                    expanded: false,
+                    blocked_requests: false,
+                },
+            );
+            (None, Some(info))
+        }
     };
     if let Some(info) = existing {
         if let Some(window) = app.get_window(&browser_label(info.session)) {
@@ -433,29 +466,10 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
         }
         return Ok(info);
     }
-
-    let session = NEXT_SESSION.fetch_add(1, Ordering::Relaxed);
-    let info = BrowserSessionInfo {
-        session,
-        url: normalized.clone(),
-        host,
-        can_back: false,
-        can_forward: false,
+    let Some(info) = created else {
+        return Err("the meeting browser session was neither found nor created".to_string());
     };
-    {
-        let mut runtime = lock_runtime()?;
-        runtime.sessions.insert(
-            session,
-            BrowserSession {
-                info: info.clone(),
-                history: vec![normalized],
-                index: 0,
-                force_close: false,
-                loaded: false,
-                expanded: false,
-            },
-        );
-    }
+    let session = info.session;
     tracing::info!(session, url = %info.url, host = %info.host, "opening meeting browser");
     tracing::info!(session, "creating the browser window");
     // Suppress external detection as soon as the browser session exists, before the webview
@@ -482,9 +496,13 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
     }
     tracing::info!(session, "browser window is up");
 
-    let window = app
-        .get_window(&browser_label(session))
-        .ok_or_else(|| format!("Browser window for session {session} is not open"))?;
+    let Some(window) = app.get_window(&browser_label(session)) else {
+        // The window went away between `build` and here; without the handler below its
+        // `Destroyed` event would never finalize the session, which would keep suppressing the
+        // external meeting prompt for the rest of the run.
+        finalize_session(&app, session);
+        return Err(format!("Browser window for session {session} is not open"));
+    };
     let handler_app = app.clone();
     window.on_window_event(move |event| match event {
         WindowEvent::CloseRequested { api, .. } => {
@@ -510,6 +528,14 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
         WindowEvent::ScaleFactorChanged { new_inner_size, .. } => resize_children(&handler_app, session, *new_inner_size),
         _ => {}
     });
+
+    // Tauri 2.10 has no builder-time window-event hook, so the handler is attached only after
+    // `build`: a window destroyed in that gap reports nothing and would leak the session (and its
+    // meeting-prompt suppression), so check that it is still there.
+    if app.get_window(&browser_label(session)).is_none() {
+        finalize_session(&app, session);
+        return Err(format!("Browser window for session {session} closed while it was opening"));
+    }
 
     // A webview that never finishes loading shows a blank surface with no explanation. Ask the
     // main window instead, so the user gets retry and close rather than a silent white window.
@@ -637,6 +663,12 @@ pub fn meeting_browser_load(app: AppHandle, session: u64, url: String) -> Result
     let page = app
         .get_webview(&page_label(session))
         .ok_or_else(|| format!("Browser page for session {session} is not open"))?;
+    // Navigate first: if the engine refuses, the session's history, address bar and back/forward
+    // state must stay on the page that is still shown. `meeting_browser_navigate` has the same
+    // order.
+    let target = parsed.as_str().to_string();
+    page.navigate(parsed)
+        .map_err(|error| format!("Could not navigate the browser page: {error}"))?;
     let (info, count) = {
         let mut runtime = lock_runtime()?;
         let state = runtime
@@ -644,16 +676,14 @@ pub fn meeting_browser_load(app: AppHandle, session: u64, url: String) -> Result
             .get_mut(&session)
             .ok_or_else(|| format!("Unknown browser session {session}"))?;
         state.history.truncate(state.index + 1);
-        state.history.push(parsed.as_str().to_string());
+        state.history.push(target.clone());
         state.index = state.history.len() - 1;
-        state.info.url = parsed.as_str().to_string();
+        state.info.url = target;
         state.info.host = browser_policy::host_of(&state.info.url);
         state.info.can_back = state.index > 0;
         state.info.can_forward = false;
         (state.info.clone(), runtime.session_count())
     };
-    page.navigate(parsed)
-        .map_err(|error| format!("Could not navigate the browser page: {error}"))?;
     emit_session(&app, &info);
     sync_meeting_suppression(count);
     Ok(info)
@@ -779,7 +809,7 @@ pub fn browser_blocked_hosts() -> Vec<String> {
     browser_policy::blocked_hosts()
 }
 
-/// Add a host to the allowlist and reload the open pages so their refused assets retry.
+/// Add a host to the allowlist and reload the pages whose resources were refused, so they retry.
 #[tauri::command]
 pub fn browser_allow_host(app: AppHandle, host: String) -> Result<Vec<String>, String> {
     let allowed = browser_policy::allow_host(&app, &host)?;
@@ -804,10 +834,24 @@ pub fn set_browser_policy(app: AppHandle, policy: String) -> Result<String, Stri
     browser_policy::save_policy(&app, &policy).map(|policy| policy.as_str().to_string())
 }
 
-/// Reload every page webview that is open, on the main thread where the engine expects it.
+/// Reload the page webviews that had a resource refused, so a host the user just allowed retries.
+///
+/// Only `strict` refuses resources and only a refused page has anything to retry; trusting-site
+/// pages are reloaded never, so allowing a host there cannot tear down a live call for nothing.
 fn reload_browser_pages(app: &AppHandle) {
+    if browser_policy::cached_policy() != browser_policy::Policy::Strict {
+        return;
+    }
     let sessions: Vec<u64> = match RUNTIME.lock() {
-        Ok(runtime) => runtime.sessions.keys().copied().collect(),
+        Ok(mut runtime) => {
+            let mut sessions = Vec::new();
+            for (session, state) in runtime.sessions.iter_mut() {
+                if std::mem::take(&mut state.blocked_requests) {
+                    sessions.push(*session);
+                }
+            }
+            sessions
+        }
         Err(_) => return,
     };
     for session in sessions {
@@ -820,12 +864,12 @@ fn reload_browser_pages(app: &AppHandle) {
 }
 
 #[cfg(windows)]
-fn install_resource_interceptor(page: &tauri::Webview, app: AppHandle) {
+fn install_resource_interceptor(page: &tauri::Webview, app: AppHandle, session: u64) {
     // `with_webview` runs the closure on the UI thread, where WebView2 expects its COM calls.
     // Any failure must leave the window usable: navigation blocking is already installed.
     if let Err(error) = page.with_webview(move |platform| {
         // SAFETY: the closure runs on the main thread; every COM result is checked below.
-        if let Err(error) = unsafe { attach_resource_filter(&platform, &app) } {
+        if let Err(error) = unsafe { attach_resource_filter(&platform, &app, session) } {
             tracing::warn!("could not attach the WebView2 resource filter ({error}); falling back to navigation-only blocking");
         }
     }) {
@@ -833,8 +877,18 @@ fn install_resource_interceptor(page: &tauri::Webview, app: AppHandle) {
     }
 }
 
+/// # Safety
+///
+/// Must run on the UI/main thread with the handle of the webview the filter belongs to: WebView2
+/// COM objects are apartment-bound. The handler registered here captures clones of `app` and of
+/// the webview's environment and lives at least as long as the webview, so both stay valid for
+/// the handler's lifetime.
 #[cfg(windows)]
-unsafe fn attach_resource_filter(platform: &tauri::webview::PlatformWebview, app: &AppHandle) -> Result<(), String> {
+unsafe fn attach_resource_filter(
+    platform: &tauri::webview::PlatformWebview,
+    app: &AppHandle,
+    session: u64,
+) -> Result<(), String> {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
         ICoreWebView2, ICoreWebView2WebResourceRequestedEventArgs, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
     };
@@ -852,7 +906,7 @@ unsafe fn attach_resource_filter(platform: &tauri::webview::PlatformWebview, app
     let handler = WebResourceRequestedEventHandler::create(Box::new(
         move |_sender: Option<ICoreWebView2>, args: Option<ICoreWebView2WebResourceRequestedEventArgs>| {
             let Some(args) = args else { return Ok(()) };
-            if let Err(error) = block_resource_request(&handler_app, &handler_environment, &args) {
+            if let Err(error) = block_resource_request(&handler_app, &handler_environment, &args, session) {
                 tracing::warn!("could not block a WebView2 resource request: {error}");
             }
             Ok(())
@@ -865,11 +919,19 @@ unsafe fn attach_resource_filter(platform: &tauri::webview::PlatformWebview, app
 
 /// Answer a refused resource request with an error response, so the engine does not retry and
 /// the page sees the origin as unavailable. Allowed requests are left to the engine.
+///
+/// # Safety
+///
+/// Called only from the resource handler of one live webview, on the UI thread: `environment`
+/// and `args` belong to that webview and are valid only for the duration of the event. The
+/// request's `PWSTR` is owned by the request and taken with `take_pwstr`; the response built from
+/// `environment` is handed to `args`, which takes ownership.
 #[cfg(windows)]
 unsafe fn block_resource_request(
     app: &AppHandle,
     environment: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Environment,
     args: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2WebResourceRequestedEventArgs,
+    session: u64,
 ) -> Result<(), String> {
     use windows061::core::{HSTRING, PWSTR};
     use windows061::Win32::System::Com::IStream;
@@ -880,12 +942,19 @@ unsafe fn block_resource_request(
     let uri = webview2_com::take_pwstr(uri);
     // The filter is installed in every mode; the cached policy decides whether this request is
     // refused, so a Settings change applies without reopening the page and no store is read here.
-    if !browser_policy::blocks_resource(&uri, &browser_policy::allowed()) {
+    let allowed = browser_policy::allowed();
+    if !browser_policy::blocks_resource(&uri, allowed.as_slice()) {
         return Ok(());
     }
     let host = browser_policy::host_of(&uri);
     if !host.is_empty() {
         browser_policy::record_blocked_host(app, &host);
+        // Mark the page so allowing a host reloads this session and retries, and only this one.
+        if let Ok(mut runtime) = RUNTIME.lock() {
+            if let Some(state) = runtime.sessions.get_mut(&session) {
+                state.blocked_requests = true;
+            }
+        }
     }
     let reason = HSTRING::from("Blocked by Vibe");
     let headers = HSTRING::from("");

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getLocale, getTextDirection, setLocale, type Locale } from '../paraglide/runtime.js'
-import { localeFromSearch, supportedWebsiteLocales, writeLocaleToUrl } from '~/lib/i18n'
-import { Outlet, useLocation } from 'react-router-dom'
+import { localeFromSearch, supportedWebsiteLocales, websiteLocaleParam, writeLocaleToUrl } from '~/lib/i18n'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { siteRouter } from '~/lib/site'
 import useUrlActions from '~/lib/useUrlActions'
 import DevBanner from './DevBanner'
 import Footer from './Footer'
@@ -10,24 +11,33 @@ import PrivacyPolicy from './PrivacyPolicy'
 
 export default function Layout() {
 	const location = useLocation()
+	const navigate = useNavigate()
 	const [privacyOpen, setPrivacyOpen] = useState(false)
-	// A supported ?lang= in the URL wins over the stored choice from the first render, so the
-	// first paint already resolves messages in the shared language instead of flashing another.
-	const [locale, setCurrentLocale] = useState<Locale>(() => {
-		const initial = localeFromSearch(location.search) ?? getLocale()
-		setLocale(initial, { reload: false })
-		return initial
-	})
+	// The entry point resolves a supported ?lang= into Paraglide before the first render, so the
+	// first paint already speaks the shared language; here the state just starts from the same value.
+	const [locale, setCurrentLocale] = useState<Locale>(() => localeFromSearch(location.search) ?? getLocale())
 	const localeRef = useRef(locale)
 	localeRef.current = locale
 	const direction = getTextDirection(locale)
 	const availableLocales = supportedWebsiteLocales as readonly Locale[]
 	const onOpenPrivacyPolicy = useCallback(() => setPrivacyOpen(true), [])
-	const onLocaleChange = useCallback((nextLocale: Locale) => {
-		setLocale(nextLocale, { reload: false })
-		setCurrentLocale(nextLocale)
-		writeLocaleToUrl(nextLocale)
-	}, [])
+	const onLocaleChange = useCallback(
+		(nextLocale: Locale) => {
+			setLocale(nextLocale, { reload: false })
+			setCurrentLocale(nextLocale)
+			// The path-routed site switches through the router, so its cached location never
+			// disagrees with the address bar. The hash build keeps its language in the outer
+			// URL, where a router navigation cannot reach it.
+			if (siteRouter() === 'browser') {
+				const search = new URLSearchParams(location.search)
+				search.set(websiteLocaleParam, nextLocale)
+				navigate({ pathname: location.pathname, search: `?${search.toString()}`, hash: location.hash }, { replace: true })
+				return
+			}
+			writeLocaleToUrl(nextLocale)
+		},
+		[location.pathname, location.search, location.hash, navigate],
+	)
 
 	// A supported ?lang= outranks the stored choice and becomes the stored choice for the next visit.
 	useEffect(() => {
@@ -39,6 +49,10 @@ export default function Layout() {
 
 	// Keep lang in the URL so in-site navigation and shared links carry the choice.
 	useEffect(() => {
+		// A fresh ?lang= outranks a locale state that has not committed yet: writing the
+		// previous value here would clobber the address bar for a render.
+		const fromUrl = localeFromSearch(window.location.search)
+		if (fromUrl && fromUrl !== localeRef.current) return
 		writeLocaleToUrl(localeRef.current)
 	}, [location.pathname, location.search, locale])
 

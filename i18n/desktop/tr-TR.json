@@ -449,6 +449,7 @@
   "updateDownloading": "Güncelleme indiriliyor…",
   "updateInstalling": "Güncelleme yükleniyor…",
   "updateFailed": "Son güncelleme kontrolü başarısız oldu",
+  "updateInstallFailed": "Güncelleme yüklenemedi. Yeni sürümü siteden indirin.",
   "updateLastChecked": "Son kontrol: {time}",
   "updateNoCandidate": "Bu hatta sürüm adayı yok",
   "updatingModalBody": "Vibe sürümü güncelleniyor {version}",

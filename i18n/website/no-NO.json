@@ -121,5 +121,7 @@
   "roadmap-description": "Hva de neste utgivelsene vil bringe. Hvert element er en aktiv OpenSpec-endring i repositoriet.",
   "roadmap-note": "Disse endringene er planlagte, ikke utgitte. Listen genereres fra repositoriets ikke-arkiverte OpenSpec-forslag.",
   "roadmap-empty": "Ingen planlagte endringer er registrert ennå.",
-  "roadmap-load-failed": "Veikartet kunne ikke lastes."
+  "roadmap-load-failed": "Veikartet kunne ikke lastes.",
+  "dev-preview-banner": "Utviklingsforhåndsvisning — bygget fra dev-grenen.",
+  "dev-preview-link": "Åpne utgivelsesnettstedet"
 }

@@ -76,9 +76,10 @@ pre-commit:
       run: mise exec -- editorconfig-checker {staged_files}
     rust-format:
       # rustfmt needs no compilation, so every commit checks it; the lint
-      # workflow runs the same command tree-wide
+      # workflow runs the same command tree-wide. server/ is its own workspace,
+      # which the root manifest excludes, so it needs its own invocation.
       glob: "**/*.rs"
-      run: cargo fmt --all -- --check
+      run: cargo fmt --all -- --check && cargo fmt --all --manifest-path server/Cargo.toml -- --check
 
     prettier:
       # The pages and style sheets had no pre-commit formatter, so an
@@ -90,6 +91,12 @@ pre-commit:
     workflows:
       glob: ".github/workflows/*.{yml,yaml}"
       run: mise exec -- actionlint
+
+    review:
+      # Reviews exactly the staged snapshot with OCR. A medium/high finding
+      # blocks the commit; an unreachable provider only warns. OCR_SKIP=1
+      # bypasses the gate for a commit whose findings are already understood.
+      run: task review:staged
 
 pre-push:
   commands:

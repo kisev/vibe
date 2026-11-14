@@ -39,13 +39,27 @@ export function SettingsGroup({
 	)
 }
 
-/** Label + optional one-line description, used on the left side of every row. */
-function RowLabel({ label, description, clamp = true }: { label: ReactNode; description?: ReactNode; clamp?: boolean }) {
+/**
+ * Label + optional one-line description, used on the left side of every row. `help` is off inside
+ * `ActionRow`: its help trigger is a button, and a button cannot live inside the row's own button.
+ * The description stays visible there, unclamped, so nothing is only reachable by hover.
+ */
+function RowLabel({
+	label,
+	description,
+	clamp = true,
+	help = true,
+}: {
+	label: ReactNode
+	description?: ReactNode
+	clamp?: boolean
+	help?: boolean
+}) {
 	return (
 		<div className="min-w-0 space-y-0.5">
 			<div className="flex items-center gap-1.5 text-sm text-foreground">
 				<span className="min-w-0">{label}</span>
-				{description && (
+				{help && description && (
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<button
@@ -147,7 +161,7 @@ export function ActionRow({
 				'disabled:pointer-events-none disabled:opacity-50',
 				className,
 			)}>
-			<RowLabel label={<span className="text-sm">{label}</span>} description={description} />
+			<RowLabel label={<span className="text-sm">{label}</span>} description={description} clamp={false} help={false} />
 			{icon && <span className={cn('shrink-0', destructive ? 'text-destructive' : 'text-muted-foreground')}>{icon}</span>}
 		</button>
 	)

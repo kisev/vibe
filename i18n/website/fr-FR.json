@@ -121,5 +121,7 @@
   "roadmap-description": "Ce que les prochaines versions apporteront. Chaque entrée correspond à un changement OpenSpec actif dans le dépôt.",
   "roadmap-note": "Ces changements sont planifiés, pas encore livrés. La liste est générée à partir des propositions OpenSpec non archivées du dépôt.",
   "roadmap-empty": "Aucun changement planifié n'est encore enregistré.",
-  "roadmap-load-failed": "Impossible de charger la feuille de route."
+  "roadmap-load-failed": "Impossible de charger la feuille de route.",
+  "dev-preview-banner": "Aperçu de développement — construit à partir de la branche dev.",
+  "dev-preview-link": "Ouvrir le site des versions"
 }

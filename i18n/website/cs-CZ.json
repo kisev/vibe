@@ -121,5 +121,7 @@
   "roadmap-description": "Co přinesou příští vydání. Každý záznam je aktivní změna OpenSpec v repozitáři.",
   "roadmap-note": "Tyto změny jsou plánované, nikoli vydané. Seznam se generuje z nearchivovaných návrhů OpenSpec v repozitáři.",
   "roadmap-empty": "Zatím nejsou zaznamenány žádné plánované změny.",
-  "roadmap-load-failed": "Plán vývoje se nepodařilo načíst."
+  "roadmap-load-failed": "Plán vývoje se nepodařilo načíst.",
+  "dev-preview-banner": "Náhled vývoje — sestaven z větve dev.",
+  "dev-preview-link": "Otevřít web vydání"
 }

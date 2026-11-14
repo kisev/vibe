@@ -16,10 +16,9 @@ if command -v apt-get >/dev/null; then
 elif command -v zypper >/dev/null; then
     # openSUSE names differ from Debian's: libsoup's 3.x headers ship in
     # libsoup-devel (libsoup2-devel is the 2.4 line) and libxdo's in
-    # xdotool-devel. The WebKitGTK 4.1 development package is
-    # webkit2gtk-4_1-devel where the distribution publishes it and
-    # webkitgtk4-devel on releases that only carry the 4.0 split, so both are
-    # tried and the pkg-config check afterwards decides.
+    # xdotool-devel. WebKitGTK 4.1 is webkitgtk3-devel on most releases, with
+    # webkit2gtk-4_1-devel as the fallback where the split package is published
+    # instead; the pkg-config check afterwards decides.
     sudo zypper install -y --no-recommends \
         pkgconf gcc gcc-c++ glib2-devel gtk3-devel libsoup-devel \
         xdotool-devel alsa-devel libayatana-appindicator3-devel \

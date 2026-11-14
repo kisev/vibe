@@ -12,6 +12,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # `unstable` enables multi-webview: one window holding the app chrome and the remote page.
+# That API carries no stability guarantee across tauri 2.x minors, so re-verify the meeting
+# browser window (desktop/src-tauri/src/meeting_browser.rs) when Renovate bumps the minor.
 tauri = { version = "2", features = ["protocol-asset", "devtools", "macos-private-api", "tray-icon", "unstable"] }
 meeting-detect = { path = "../../crates/meeting-detect" }
 

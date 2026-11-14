@@ -5,7 +5,7 @@
 // This is a chrome-only surface: `bootstrap` mounts it instead of the app, so it never runs the
 // startup migrations, device enumeration or server supervision a second time. Recording is the
 // main window's job: the chrome only asks it, through an event, and mirrors the state it reports.
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { emit, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { ArrowLeft, ArrowRight, ExternalLink, Mic, RotateCw, ShieldAlert, Square, X } from 'lucide-react'
@@ -26,8 +26,8 @@ import {
 	navigateMeetingBrowser,
 	openMeetingBrowserExternal,
 	loadMeetingBrowserUrl,
+	normalizeMeetingUrl,
 	readRecordingDeviceState,
-	restoreRecordingDevice,
 	setBrowserChromeExpanded,
 	writeRecordingDeviceSelection,
 	RECORDING_STATE_EVENT,
@@ -41,18 +41,30 @@ import {
 	type RecordingStatePayload,
 } from '~/lib/meeting-browser'
 import { m } from '~/paraglide/messages.js'
-import { getTextDirection, setLocale } from '~/paraglide/runtime.js'
+import { getLocale, getTextDirection, isLocale, setLocale } from '~/paraglide/runtime.js'
 import { CONFIG_KEYS } from '~/lib/config-keys'
-import { readConfig } from '~/lib/config-store'
+import { usePersisted } from '~/lib/config-store'
 import { cn } from '~/lib/style'
 
-/** Must match `TOOLBAR_H` in `desktop/src-tauri/src/meeting_browser.rs`. */
-const TOOLBAR_HEIGHT = 104
 /**
- * Height of the blocked-hosts region below the toolbar. The chrome webview grows by this much
- * while the list is open, and the page moves down; must match `BLOCKED_LIST_H` in Rust.
+ * The chrome webview is sized by Rust before this script runs, and both sides must agree on the
+ * same two heights. Rust passes them in the window URL so neither constant can drift silently;
+ * the literals below are the fallback for a stale Rust side and for the unit tests.
  */
-const BLOCKED_LIST_HEIGHT = 200
+const chromeParams = new URLSearchParams(window.location.search)
+function chromeHeight(name: string, fallback: number): number {
+	const parsed = Number(chromeParams.get(name))
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+const TOOLBAR_HEIGHT = chromeHeight('toolbar', 104)
+const BLOCKED_LIST_HEIGHT = chromeHeight('blocked', 200)
+
+/** A native option cannot use a component, so "none" and the absent pin get their copy here. */
+function entryLabel(entry: DeviceMenuEntry): string {
+	if (entry.kind === 'none') return m.noRecord()
+	if (entry.kind === 'unavailable') return m.deviceUnavailable({ name: entry.label })
+	return entry.label
+}
 
 /**
  * A compact device picker: the same device list, hidden lists and "none" entry the main window's
@@ -99,7 +111,7 @@ function DevicePicker({
 				.filter((entry) => entry.kind !== 'hidden')
 				.map((entry) => (
 					<option key={entry.value} value={entry.value}>
-						{entry.label}
+						{entryLabel(entry)}
 					</option>
 				))}
 			{value !== 'none' && !entries.some((entry) => entry.value === value) && <option value={value}>{triggerLabel}</option>}
@@ -109,12 +121,21 @@ function DevicePicker({
 
 export default function BrowserWindow({ session }: { session: number }) {
 	// The chrome must follow the app's theme and language: it is a separate webview, so the
-	// providers never run here and nothing would set the `dark` class or the locale.
-	const theme = readConfig<'light' | 'dark'>(CONFIG_KEYS.theme, window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-	const locale = readConfig<string>(CONFIG_KEYS.displayLanguage, 'en-US')
+	// providers never run here and nothing would set the `dark` class or the locale. Subscribing
+	// (rather than reading once) makes a change in the main window reach a chrome already open.
+	const [theme] = usePersisted<'light' | 'dark'>(
+		CONFIG_KEYS.theme,
+		window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+	)
+	const [locale] = usePersisted<string>(CONFIG_KEYS.displayLanguage, getLocale())
 	useLayoutEffect(() => {
-		if (locale) setLocale(locale as never, { reload: false })
-		document.body.dir = getTextDirection(locale as never)
+		// A hand-edited config must not push an unknown locale into Paraglide; fall back to the
+		// resolved one, exactly like bootstrap's pre-paint pass.
+		const stored = isLocale(locale) ? locale : undefined
+		if (stored) setLocale(stored, { reload: false })
+		const active = stored ?? getLocale()
+		document.documentElement.lang = active
+		document.body.dir = getTextDirection(active)
 		document.documentElement.classList.toggle('dark', theme === 'dark')
 		void getCurrentWindow()
 			.setTheme(theme)
@@ -123,6 +144,8 @@ export default function BrowserWindow({ session }: { session: number }) {
 
 	const [info, setInfo] = useState<BrowserSessionInfo | null>(null)
 	const [address, setAddress] = useState('')
+	/** True while the user is typing an address, so a page redirect does not overwrite it. */
+	const addressFocused = useRef(false)
 	const [error, setError] = useState<string | null>(null)
 	/** A host the allowlist refused in this window; the notice offers to allow it. */
 	const [blockedHost, setBlockedHost] = useState<string | null>(null)
@@ -183,32 +206,47 @@ export default function BrowserWindow({ session }: { session: number }) {
 			.catch((reason) => console.error('could not read the blocked hosts:', reason))
 
 		const unlisteners: (() => void)[] = []
-		listen<string[]>(BROWSER_BLOCKED_HOSTS_EVENT, (event) => setBlockedHosts(event.payload)).then((fn) => unlisteners.push(fn))
-		listen<BrowserPolicy>(BROWSER_POLICY_EVENT, (event) => setPolicy(event.payload)).then((fn) => unlisteners.push(fn))
-		listen<BrowserSessionInfo>('meeting-browser-session', (event) => {
-			if (event.payload.session !== session) return
-			setInfo(event.payload)
-			setAddress(event.payload.url)
-			setBlockedHost(null)
-		}).then((fn) => unlisteners.push(fn))
-		listen<BrowserNavigationBlocked>(BROWSER_NAVIGATION_BLOCKED_EVENT, (event) => {
-			if (event.payload.session !== session) return
-			setBlockedHost(event.payload.host)
-		}).then((fn) => unlisteners.push(fn))
-		listen<{ session: number }>('meeting-browser-closed', (event) => {
-			if (event.payload.session !== session) return
-			// Restore the page before the window goes away, in case unmount never runs.
-			setChromeExpanded(false)
-			void getCurrentWindow().close()
-		}).then((fn) => unlisteners.push(fn))
+		// `listen` resolves asynchronously: if the window unmounts first, unsubscribe immediately
+		// instead of leaving the handler behind for a webview that already went away.
+		const track = (pending: Promise<() => void>) => pending.then((fn) => (active ? unlisteners.push(fn) : fn()))
+
+		track(listen<string[]>(BROWSER_BLOCKED_HOSTS_EVENT, (event) => setBlockedHosts(event.payload)))
+		track(listen<BrowserPolicy>(BROWSER_POLICY_EVENT, (event) => setPolicy(event.payload)))
+		track(
+			listen<BrowserSessionInfo>('meeting-browser-session', (event) => {
+				if (event.payload.session !== session) return
+				setInfo(event.payload)
+				// A redirect during a login flow must not wipe an address being typed right now.
+				if (!addressFocused.current) setAddress(event.payload.url)
+				setBlockedHost(null)
+			}),
+		)
+		track(
+			listen<BrowserNavigationBlocked>(BROWSER_NAVIGATION_BLOCKED_EVENT, (event) => {
+				if (event.payload.session !== session) return
+				setBlockedHost(event.payload.host)
+			}),
+		)
+		track(
+			listen<{ session: number }>('meeting-browser-closed', (event) => {
+				if (event.payload.session !== session) return
+				// Restore the page before the window goes away, in case unmount never runs.
+				setChromeExpanded(false)
+				void getCurrentWindow().close()
+			}),
+		)
 		listen<RecordingStatePayload>(RECORDING_STATE_EVENT, (event) => {
 			setRecording(event.payload.recording)
 			setRecordingStartedAt(event.payload.recording ? (event.payload.startedAt ?? Date.now()) : null)
-		}).then((fn) => unlisteners.push(fn))
+		}).then((fn) => {
+			if (active) unlisteners.push(fn)
+			else fn()
+			// A chrome opened while a recording already runs learns the current state instead of
+			// waiting for the next flip. Asked only now, so the answer cannot arrive before the listener.
+			void emit(RECORDING_STATE_REQUEST_EVENT)
+		})
 
-		// A chrome opened while a recording already runs learns the current state instead of
-		// waiting for the next flip. Devices refresh on focus, when the main window may have moved.
-		void emit(RECORDING_STATE_REQUEST_EVENT)
+		// Devices refresh on focus, when the main window may have moved.
 		void refreshDevices()
 		const onFocus = () => void refreshDevices()
 		window.addEventListener('focus', onFocus)
@@ -242,7 +280,9 @@ export default function BrowserWindow({ session }: { session: number }) {
 	}
 
 	function go() {
-		const url = address.trim()
+		// The address bar takes the same input as the settings field: a bare domain becomes https
+		// (and an http link is upgraded), which is the only scheme the page webview loads.
+		const url = normalizeMeetingUrl(address.trim()).replace(/^http:\/\//i, 'https://')
 		if (!url) return
 		void run(() => loadMeetingBrowserUrl(session, url))
 	}
@@ -265,11 +305,14 @@ export default function BrowserWindow({ session }: { session: number }) {
 		setChromeExpanded(expanded)
 	}
 
-	/** A pick is written under the main window's keys; the config store carries it across windows. */
+	/**
+	 * A pick is written under the main window's keys; the config store carries it across windows.
+	 * Hidden entries are filtered out of the select, so a device un-hidden from here is not
+	 * reachable: the main window's picker is where a hidden device is restored.
+	 */
 	function pickDevice(type: 'input' | 'output', entry: DeviceMenuEntry) {
-		if (entry.kind === 'unavailable') return
-		if (entry.kind === 'hidden') restoreRecordingDevice(type, entry.label)
-		else writeRecordingDeviceSelection(type, entry.kind === 'none' ? null : entry.label)
+		if (entry.kind === 'unavailable' || entry.kind === 'hidden') return
+		writeRecordingDeviceSelection(type, entry.kind === 'none' ? null : entry.label)
 		void refreshDevices()
 	}
 
@@ -302,6 +345,12 @@ export default function BrowserWindow({ session }: { session: number }) {
 							spellCheck={false}
 							className="h-8 font-mono text-xs"
 							onChange={(event) => setAddress(event.target.value)}
+							onFocus={() => {
+								addressFocused.current = true
+							}}
+							onBlur={() => {
+								addressFocused.current = false
+							}}
 						/>
 					</form>
 					{/* Strict only: the region below the toolbar is hidden in trusted-site mode. */}
@@ -332,44 +381,40 @@ export default function BrowserWindow({ session }: { session: number }) {
 					</Button>
 				</div>
 				<div className="flex min-w-0 items-center gap-2" dir="ltr">
-					{
-						<>
-							<div role="group" aria-label={m.recordingDevices()} className="flex min-w-0 items-center gap-2">
-								<DevicePicker
-									type="input"
-									label={m.microphone()}
-									devices={recordingDevices?.devices ?? []}
-									device={recordingDevices?.input ?? null}
-									unavailableName={recordingDevices?.inputUnavailableName ?? null}
-									hiddenNames={recordingDevices?.hiddenInputDevices ?? []}
-									disabled={recording}
-									onPick={(entry) => pickDevice('input', entry)}
-								/>
-								<DevicePicker
-									type="output"
-									label={m.systemAudio()}
-									devices={recordingDevices?.devices ?? []}
-									device={recordingDevices?.output ?? null}
-									unavailableName={recordingDevices?.outputUnavailableName ?? null}
-									hiddenNames={recordingDevices?.hiddenOutputDevices ?? []}
-									disabled={recording}
-									onPick={(entry) => pickDevice('output', entry)}
-								/>
-							</div>
-							{recording ? (
-								<Button size="sm" variant="secondary" onClick={() => void run(() => emit(RECORDING_TOGGLE_EVENT, { stop: true }))}>
-									<Square />
-									{m.meetingBrowserStop()}
-								</Button>
-							) : (
-								<Button size="sm" onClick={() => void run(() => emit(RECORDING_TOGGLE_EVENT, { stop: false }))}>
-									<Mic />
-									{m.meetingBrowserRecord()}
-								</Button>
-							)}
-							{recording && <RecordingIndicator compact startedAt={recordingStartedAt} microphoneName={microphoneName} systemName={systemName} />}
-						</>
-					}
+					<div role="group" aria-label={m.recordingDevices()} className="flex min-w-0 items-center gap-2">
+						<DevicePicker
+							type="input"
+							label={m.microphone()}
+							devices={recordingDevices?.devices ?? []}
+							device={recordingDevices?.input ?? null}
+							unavailableName={recordingDevices?.inputUnavailableName ?? null}
+							hiddenNames={recordingDevices?.hiddenInputDevices ?? []}
+							disabled={recording}
+							onPick={(entry) => pickDevice('input', entry)}
+						/>
+						<DevicePicker
+							type="output"
+							label={m.systemAudio()}
+							devices={recordingDevices?.devices ?? []}
+							device={recordingDevices?.output ?? null}
+							unavailableName={recordingDevices?.outputUnavailableName ?? null}
+							hiddenNames={recordingDevices?.hiddenOutputDevices ?? []}
+							disabled={recording}
+							onPick={(entry) => pickDevice('output', entry)}
+						/>
+					</div>
+					{recording ? (
+						<Button size="sm" variant="secondary" onClick={() => void run(() => emit(RECORDING_TOGGLE_EVENT, { stop: true }))}>
+							<Square />
+							{m.meetingBrowserStop()}
+						</Button>
+					) : (
+						<Button size="sm" onClick={() => void run(() => emit(RECORDING_TOGGLE_EVENT, { stop: false }))}>
+							<Mic />
+							{m.meetingBrowserRecord()}
+						</Button>
+					)}
+					{recording && <RecordingIndicator compact startedAt={recordingStartedAt} microphoneName={microphoneName} systemName={systemName} />}
 					{blockedHost ? (
 						<div className="flex min-w-0 items-center gap-2">
 							<span className="min-w-0 truncate text-xs text-destructive">{error ?? m.browserNavigationBlocked({ host: blockedHost })}</span>

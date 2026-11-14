@@ -14,8 +14,9 @@ on:
     workflow_dispatch:
 
 permissions:
-    contents: write
-    pull-requests: write
+    # The checkout needs read; Renovate opens its PRs through RENOVATE_TOKEN,
+    # which carries its own contents and pull-requests write access.
+    contents: read
 
 jobs:
     renovate:
@@ -35,7 +36,9 @@ jobs:
                   fi
 
             - name: Renovate
-              uses: renovatebot/github-action@v41
+              # v41.0.22, pinned to a commit SHA: this job runs on a schedule with
+              # a PAT and no reviewer sees the code it downloads.
+              uses: renovatebot/github-action@8ac70de2fe55752c573155866e30735411e3b61c
               with:
                   token: ${{ secrets.RENOVATE_TOKEN }}
                   # Same version as mise.toml, so a local dry run matches this run.

@@ -121,5 +121,7 @@
   "roadmap-description": "次のリリースで実現する内容です。各項目はリポジトリ内で進行中の OpenSpec 変更です。",
   "roadmap-note": "これらの変更は計画中であり、まだリリースされていません。一覧はリポジトリの未アーカイブの OpenSpec 提案から生成されています。",
   "roadmap-empty": "記録されている予定変更はまだありません。",
-  "roadmap-load-failed": "ロードマップを読み込めませんでした。"
+  "roadmap-load-failed": "ロードマップを読み込めませんでした。",
+  "dev-preview-banner": "開発プレビュー — dev ブランチからビルドされています。",
+  "dev-preview-link": "リリースサイトを開く"
 }

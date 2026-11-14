@@ -26,6 +26,15 @@ ggml_git="https://github.com/ggml-org/ggml.git"
 os="$(uname -s)"
 arch="$(uname -m)"
 
+# uname reports MINGW64_NT-* / MSYS_* / CYGWIN_* under the Windows shells, never
+# the string `windows`; platform_id and lib_flavor normalize those the same way.
+is_windows() {
+    case "$os" in
+    MINGW* | MSYS* | CYGWIN*) return 0 ;;
+    *) return 1 ;;
+    esac
+}
+
 platform_id() {
     local id_os="" id_arch="$arch"
     case "$os" in
@@ -74,7 +83,6 @@ fetch_headers() {
         curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 \
             -o "$out/$name.raw" "https://raw.githubusercontent.com/ggml-org/ggml/$version/include/$name"
         {
-            echo "// Fetched: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "// Source: https://github.com/ggml-org/ggml/blob/$version/include/$name"
             echo "// Version: $version"
             echo ""
@@ -110,15 +118,30 @@ fetch_libs() {
 }
 
 build_libs() {
-    local platform flavor src build pkg build_x64
+    local platform flavor src build pkg build_x64 tool
     platform="$(platform_id)"
     flavor="$(lib_flavor)"
-    src="$ROOT/ggml-src"
-    build="$ROOT/ggml-build"
-    build_x64="$ROOT/ggml-build-x64"
-    pkg="$ROOT/ggml-build/pkg"
+    # Everything this path writes lives under target/, which is already ignored:
+    # a clone plus two cmake trees at the repository root would show up as
+    # gigabytes of untracked files in `git status`.
+    src="$ROOT/target/ggml-src"
+    build="$ROOT/target/ggml-build"
+    build_x64="$ROOT/target/ggml-build-x64"
+    pkg="$ROOT/target/ggml-build/pkg"
     echo "ggml: $version"
     echo "platform: $platform"
+
+    # The CPU-variant staging renames symbols with the LLVM binutils on Intel
+    # macOS and for the msvc flavor. Fail here, before the clone and the two
+    # compiles, rather than at the end of the build with `command not found`.
+    if { [ "$os" = "Darwin" ] && [ "$arch" = "x86_64" ]; } || [ "$flavor" = "msvc" ]; then
+        for tool in llvm-nm llvm-objcopy; do
+            command -v "$tool" >/dev/null 2>&1 || {
+                echo "$tool not found; install the LLVM binutils (Xcode CLT or llvm.org)" >&2
+                exit 1
+            }
+        done
+    fi
 
     rm -rf "$src"
     mkdir -p "$src"
@@ -151,7 +174,7 @@ build_libs() {
     # with an illegal instruction on a 2012 Core i5. With GGML_NATIVE off, ggml
     # turns on SSE4.2 through AVX2, FMA and BMI2 (Haswell, 2013).
     if [ "$arch" = "x86_64" ]; then flags+=(-DGGML_NATIVE=OFF); fi
-    if [ "$os" = "windows" ] && [ "$flavor" = "gnu" ]; then
+    if is_windows && [ "$flavor" = "gnu" ]; then
         cmake -S "$src" -B "$build" "${flags[@]}" -G "MinGW Makefiles"
     else
         cmake -S "$src" -B "$build" "${flags[@]}"
@@ -165,7 +188,7 @@ build_libs() {
     if [ "$arch" = "x86_64" ]; then
         rm -rf "$build_x64"
         local -a x64flags=("${flags[@]}" -DGGML_VULKAN=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF)
-        if [ "$os" = "windows" ] && [ "$flavor" = "gnu" ]; then
+        if is_windows && [ "$flavor" = "gnu" ]; then
             cmake -S "$src" -B "$build_x64" "${x64flags[@]}" -G "MinGW Makefiles"
         else
             cmake -S "$src" -B "$build_x64" "${x64flags[@]}"
@@ -175,13 +198,13 @@ build_libs() {
 
     rm -rf "$pkg"
     mkdir -p "$pkg/lib" "$pkg/include"
-    if [ "$os" = "windows" ] && [ "$flavor" = "msvc" ]; then
+    if is_windows && [ "$flavor" = "msvc" ]; then
         stage_lib "$build" "$pkg" ggml.lib ggml.lib
         stage_lib "$build" "$pkg" ggml-base.lib ggml-base.lib
         stage_cpu_variant "$build" "$pkg" hsw ggml-cpu.lib ggml-cpu-hsw.lib
         stage_cpu_variant "$build_x64" "$pkg" x64 ggml-cpu.lib ggml-cpu-x64.lib
         stage_lib "$build" "$pkg" ggml-vulkan.lib ggml-vulkan.lib
-    elif [ "$os" = "windows" ]; then
+    elif is_windows; then
         stage_lib "$build" "$pkg" libggml.a ggml.a
         stage_lib "$build" "$pkg" libggml-base.a ggml-base.a
         # MinGW's cmake writes ggml-cpu.a, without the lib prefix the linker looks for.
@@ -219,12 +242,12 @@ build_libs() {
     # lib/ and include/ are the archive's top-level entries; fetch relies on that layout.
     # Relative names on purpose, for the reason given in fetch_libs; the destination is
     # spelled relative to the repository root so `upload` finds it where it expects.
-    (cd "$ROOT" && tar -czf "ggml-libs-$platform.tar.gz" -C "${pkg#"$ROOT"/}" lib include)
-    echo "packaged $ROOT/ggml-libs-$platform.tar.gz"
+    (cd "$ROOT" && tar -czf "target/ggml-libs-$platform.tar.gz" -C "${pkg#"$ROOT"/}" lib include)
+    echo "packaged $ROOT/target/ggml-libs-$platform.tar.gz"
 }
 
 upload_libs() {
-    local platform tag id archive existing
+    local platform tag id archive existing create_out
     platform="$(platform_id)"
     # The tag names the committed inputs, so an archive built from edited ones
     # would be filed under a name that does not describe it.
@@ -234,17 +257,32 @@ upload_libs() {
     fi
     tag="$(libs_tag)"
     id="$(libs_id)"
-    existing="$(gh api "repos/$repo/releases?per_page=100" --jq ".[] | select(.tag_name == \"$tag\") | .body" || true)"
-    if [ -n "$existing" ] && ! grep -q "tree $id" <<<"$existing"; then
+    # Fail closed: a transient API error leaves `existing` empty, and uploading
+    # blind would put this build over another tree's release.
+    existing="$(gh api "repos/$repo/releases?per_page=100" --jq ".[] | select(.tag_name == \"$tag\") | .body")" ||
+        {
+            echo "could not read the releases to check $tag; refusing to upload blind" >&2
+            exit 1
+        }
+    # The boundary keeps a short id from matching as a prefix of a longer hash.
+    if [ -n "$existing" ] && ! grep -qE "tree $id([^0-9a-f]|$)" <<<"$existing"; then
         echo "release $tag exists for another server/libs tree; bump server/libs/revision" >&2
         exit 1
     fi
     build_libs
-    archive="$ROOT/ggml-libs-$platform.tar.gz"
-    gh release create "$tag" --repo "$repo" --prerelease \
+    archive="$ROOT/target/ggml-libs-$platform.tar.gz"
+    if ! create_out="$(gh release create "$tag" --repo "$repo" --prerelease \
         --title "ggml $version libraries r$revision" \
         --notes "ggml $version, server/libs tree $id, revision $revision, built from vibe $(git -C "$ROOT" rev-parse --short=12 HEAD)." \
-        2>/dev/null || true
+        2>&1)"; then
+        # An existing release is the expected case; anything else means there is
+        # no release to upload to, and --clobber would otherwise hide it.
+        gh release view "$tag" --repo "$repo" >/dev/null 2>&1 || {
+            printf '%s\n' "$create_out" >&2
+            echo "could not create release $tag" >&2
+            exit 1
+        }
+    fi
     gh release upload "$tag" "$archive" --repo "$repo" --clobber
     echo "uploaded $archive to release $tag"
 }
@@ -252,7 +290,7 @@ upload_libs() {
 # Copy one built library out of the cmake tree: stage_lib <build> <pkg> <name> <alt>.
 stage_lib() {
     local build="$1" pkg="$2" name="$3" alt="$4" found
-    found="$(find "$build" -name "$name" -o -name "$alt" | head -1)"
+    found="$(find "$build" \( -name "$name" -o -name "$alt" \) -print -quit)"
     [ -n "$found" ] || {
         echo "$name not found under $build" >&2
         exit 1
@@ -275,7 +313,7 @@ stage_cpu_variant() {
         objcopy_tool=llvm-objcopy
     fi
 
-    found="$(find "$build" -name "$name" | head -1)"
+    found="$(find "$build" -name "$name" -print -quit)"
     [ -n "$found" ] || {
         echo "$name not found under $build" >&2
         exit 1

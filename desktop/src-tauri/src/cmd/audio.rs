@@ -7,7 +7,7 @@ use serde_json::json;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Listener};
@@ -17,21 +17,23 @@ use crate::ffmpeg::{get_local_time, random_string};
 
 type WavWriterHandle = Arc<Mutex<Option<hound::WavWriter<BufWriter<File>>>>>;
 
-/// True from the moment `start_record` has all of its streams until its stop closure returns.
-static RECORDING: AtomicBool = AtomicBool::new(false);
+/// How many recordings are active. A count, not a flag: `start_record` reserves a slot and its
+/// stop closure releases it, and an older closure cannot clear the count of a newer recording.
+static RECORDING_SESSIONS: AtomicUsize = AtomicUsize::new(0);
 
-/// Clears the flag even if the stop closure exits early (or unwinds).
-struct RecordingFlagGuard;
+/// Owns one reserved recording slot. Dropped on every early return from `start_record`, and
+/// moved into its stop closure so the slot lives exactly as long as the recording does.
+struct RecordingSlot;
 
-impl Drop for RecordingFlagGuard {
+impl Drop for RecordingSlot {
     fn drop(&mut self) {
-        RECORDING.store(false, Ordering::SeqCst);
+        RECORDING_SESSIONS.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
 #[tauri::command]
 pub fn recording_active() -> bool {
-    RECORDING.load(Ordering::SeqCst)
+    RECORDING_SESSIONS.load(Ordering::Acquire) > 0
 }
 
 #[derive(Serialize, Deserialize)]
@@ -201,6 +203,15 @@ fn remove_recording_intermediates(paths: impl IntoIterator<Item = PathBuf>, keep
 #[tauri::command]
 /// Record audio from the given devices, store to wav, merge with ffmpeg, and return path
 pub async fn start_record(app_handle: AppHandle, devices: Vec<AudioDevice>, recording_name: Option<String>) -> CommandResult<()> {
+    // One recording at a time, reserved atomically: the record gate and the browser close gate
+    // read `recording_active`, and a plain check-then-set would let two invokes start together.
+    if RECORDING_SESSIONS
+        .compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        return Err(eyre!("A recording is already in progress").into());
+    }
+    let recording_slot = RecordingSlot;
     if devices.is_empty() {
         return Err(eyre!("At least one audio device is required").into());
     }
@@ -245,11 +256,10 @@ pub async fn start_record(app_handle: AppHandle, devices: Vec<AudioDevice>, reco
         stream_handles.push(stream_handle.clone());
         tracing::debug!("Stream handle created");
     }
-    RECORDING.store(true, Ordering::SeqCst);
-
     let app_handle_clone = app_handle.clone();
     let stop = std::sync::Mutex::new(Some(move || {
-        let _recording_flag = RecordingFlagGuard;
+        // The reserved slot is released only when the stop closure finishes (or unwinds).
+        let _recording_slot = recording_slot;
         for (i, stream_handle) in stream_handles.iter().enumerate() {
             let stream_handle = stream_handle.lock().map_err(|e| eyre!("{:?}", e)).log_error();
             if let Some(mut stream_handle) = stream_handle {

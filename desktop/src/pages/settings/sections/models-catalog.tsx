@@ -14,7 +14,7 @@ import {
 	type CatalogFileEntry,
 	type CatalogModel,
 } from '~/lib/catalog'
-import { deleteModelFile, downloadModel, getFriendlyModelName, getModelDisplayName } from '~/lib/model'
+import { deleteModelFile, downloadModel, getModelDisplayName } from '~/lib/model'
 import type { ModelDownload } from '~/lib/config'
 import { cn } from '~/lib/style'
 import { Badge } from '~/components/ui/badge'
@@ -533,7 +533,7 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 					onDelete={removeFiles}
 					onSelect={vm.selectModel}
 					onOpenFolder={vm.openSelectedModel}
-					renaming={renamingFor(entry.path, vm.preference.modelDisplayNames[entry.path] ?? getFriendlyModelName(entry.name))}
+					renaming={renamingFor(entry.path, vm.preference.modelDisplayNames[entry.path] ?? getModelDisplayName(entry.name))}
 				/>
 			))}
 
@@ -556,7 +556,7 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 									installedEntry
 										? renamingFor(
 												installedEntry.path,
-												vm.preference.modelDisplayNames[installedEntry.path] ?? getFriendlyModelName(installedEntry.name),
+												vm.preference.modelDisplayNames[installedEntry.path] ?? getModelDisplayName(installedEntry.name),
 											)
 										: undefined
 								}

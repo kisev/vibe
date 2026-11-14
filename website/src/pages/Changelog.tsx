@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { cn } from '~/lib/style'
 import {
+	devAlias,
 	findDevRelease,
 	findRelease,
 	hasTranslations,
@@ -52,9 +53,11 @@ function formatDate(date: string, locale: string) {
 
 function Entry({ release, single, dev }: { release: Release; single: boolean; dev: boolean }) {
 	// The unreleased entry has no version number yet — it is the dev line in progress.
-	const id = release.version === 'unreleased' ? m.changelogUnreleased() : `v${release.version}`
+	// The id stays machine-made and language-independent so anchors survive a locale switch.
+	const id = release.version === 'unreleased' ? 'unreleased' : `v${release.version}`
+	const versionLabel = release.version === 'unreleased' ? m.changelogUnreleased() : `v${release.version}`
 	// The unreleased entry is the dev line, so its heading opens the permanent alias.
-	const href = release.version === 'unreleased' ? '/changelog/dev' : `/changelog/${release.version}`
+	const href = release.version === 'unreleased' ? `/changelog/${devAlias}` : `/changelog/${release.version}`
 	return (
 		<article
 			id={id}
@@ -64,7 +67,7 @@ function Entry({ release, single, dev }: { release: Release; single: boolean; de
 			<div className="lg:sticky lg:top-24 lg:self-start">
 				<div className="flex items-baseline gap-2">
 					<Link to={href} className="text-[15px] font-medium text-foreground transition-colors hover:text-primary">
-						{id}
+						{versionLabel}
 					</Link>
 					{dev && (
 						<span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -122,7 +125,9 @@ export default function Changelog() {
 	const [list, setList] = useState<Release[] | null>(() => (hasTranslations(locale) ? null : releases))
 	const devEntry = dev && list ? findDevRelease(list) : undefined
 	const one = !dev && version && list ? findRelease(version, list) : undefined
-	const shown = dev ? (devEntry ? [devEntry.release] : []) : one ? [one] : (list ?? [])
+	let shown: Release[] = list ?? []
+	if (dev) shown = devEntry ? [devEntry.release] : []
+	else if (one) shown = [one]
 
 	// A versioned dev URL keeps working, but the address bar gives back the permanent alias.
 	useEffect(() => {
@@ -147,12 +152,15 @@ export default function Changelog() {
 		}
 	}, [locale])
 
+	const headline = one ?? devEntry?.release
 	useEffect(() => {
-		document.title = one ? `Vibe v${one.version}: ${one.title}` : `Vibe ${m.changelog()}`
+		document.title = headline
+			? `Vibe ${headline.version === 'unreleased' ? m.changelogUnreleased() : `v${headline.version}`}: ${headline.title}`
+			: `Vibe ${m.changelog()}`
 		return () => {
 			document.title = 'Vibe'
 		}
-	}, [one])
+	}, [headline])
 
 	return (
 		<main className="mx-auto w-full max-w-[1065px] px-5 pb-24 pt-14 lg:pt-20">

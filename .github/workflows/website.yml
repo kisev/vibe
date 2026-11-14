@@ -79,6 +79,10 @@ jobs:
         needs: probe
         if: needs.probe.outputs.present == 'true'
         runs-on: ubuntu-latest
+        env:
+            # Setup mise installs only `task`; the wasm toolchain comes from the
+            # actions below.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -122,7 +126,7 @@ jobs:
                 echo "$PWD/binaryen-version_132/bin" >> "$GITHUB_PATH"
 
             - name: setup mise
-              uses: jdx/mise-action@v2
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
                   install: true
                   install_args: aqua:go-task/task
@@ -144,6 +148,10 @@ jobs:
         # without the handoff skips `pwa` and still publishes the two sites.
         if: ${{ !cancelled() && needs.probe.result == 'success' }}
         runs-on: ubuntu-latest
+        env:
+            # Setup mise installs only `task`; pnpm, Node and uv come from the
+            # actions below.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - name: Checkout main
               uses: actions/checkout@v4
@@ -173,10 +181,10 @@ jobs:
                   cache-dependency-path: website/pnpm-lock.yaml
 
             - name: setup uv
-              uses: astral-sh/setup-uv@v5
+              uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
 
             - name: setup mise
-              uses: jdx/mise-action@v2
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
                   install: true
                   install_args: aqua:go-task/task

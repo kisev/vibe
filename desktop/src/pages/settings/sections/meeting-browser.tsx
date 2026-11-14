@@ -16,6 +16,7 @@ import {
 	normalizeAllowedHost,
 	normalizeMeetingUrl,
 	openMeetingBrowser,
+	openMeetingLink,
 	removeBrowserAllowedHost,
 	setBrowserPolicy,
 	setMeetingSchemesEnabled,
@@ -135,11 +136,14 @@ export function MeetingBrowserSettings() {
 	}
 
 	async function openLink() {
-		const url = normalizeMeetingUrl(link)
+		// The embedded page loads https only: a pasted http link is upgraded, and a Zoom/Teams/Webex
+		// scheme link is mapped by Rust the same way it maps one arriving from the system.
+		const url = normalizeMeetingUrl(link).replace(/^http:\/\//i, 'https://')
 		if (!url || opening) return
 		setOpening(true)
 		try {
-			await openMeetingBrowser(url)
+			if (url.startsWith('https://')) await openMeetingBrowser(url)
+			else await openMeetingLink(url)
 			setLink('')
 		} catch (reason) {
 			console.error('Failed to open the link in Vibe:', reason)
@@ -211,7 +215,9 @@ export function MeetingBrowserSettings() {
 				</SettingsField>
 			</SettingsGroup>
 
-			{/* Nothing is recorded while trusted-site skips the resource filter. */}
+			{/* Scoped to strict mode by design: trusted-site leaves resources unfiltered.
+				Refused navigations are still recorded in both modes, so a host refused
+				under trusted-site shows up here after switching back. */}
 			{policy === 'strict' && (
 				<SettingsGroup title={m.browserBlockedHosts()} description={m.browserBlockedHostsInfo()}>
 					{blocked.length === 0 && <SettingsNote>{m.browserBlockedHostsEmpty()}</SettingsNote>}

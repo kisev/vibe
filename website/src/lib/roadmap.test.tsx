@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { BrowserRouter, MemoryRouter, Route, Routes } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Roadmap from '../pages/Roadmap'
-import { localizeRoadmap } from './roadmap'
+import { clearRoadmapCache, localizeRoadmap } from './roadmap'
 import { m } from '../paraglide/messages.js'
 import { setLocale } from '../paraglide/runtime.js'
 
@@ -43,6 +43,8 @@ function renderRoadmap() {
 
 beforeEach(() => {
 	cleanup()
+	// The response is shared across locales, so each test starts from a fresh request.
+	clearRoadmapCache()
 	setLocale('en-US', { reload: false })
 })
 

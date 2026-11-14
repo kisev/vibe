@@ -76,7 +76,7 @@ When Vibe runs on Windows but the repository lives in WSL, the Windows host buil
 task app:build:windows
 ```
 
-The target syncs the tree to `VIBE_WIN_CHECKOUT` (default: your Windows profile's `vibe-build`, so nothing depends on a user name), fetches the Windows ggml libraries and diarization helper, and runs `pnpm tauri build --bundles nsis` there. The installer lands in that checkout under `desktop/src-tauri/target/release/bundle/nsis/`; the output of the task prints the path.
+The target syncs the tree to `VIBE_WIN_CHECKOUT` (default: your Windows profile's `vibe-build`, so nothing depends on a user name), fetches the Windows ggml libraries and diarization helper, and runs `pnpm tauri build --bundles nsis` there. The installer lands in that checkout under `target/release/bundle/nsis/` (the workspace root owns the target directory); the output of the task prints the path.
 
 The build carries `1.0.0-local.<date>.<sha>` and publishes nothing: no tag, no release, no signature. The updater ignores a version containing `-local`, so a local build is never moved onto a release or dev line. `task app:build:windows:verified` runs `task verify` first.
 

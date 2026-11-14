@@ -32,6 +32,7 @@ jobs:
         # Dev builds belong to the dev branch: a dev tag cut anywhere else is a
         # mistake, and so is a manual dispatch on another branch.
         runs-on: ubuntu-latest
+        timeout-minutes: 10
         env:
             # Setup mise installs only `task`; do not let `mise exec` pull the
             # rest of the toolchain into jobs that do not lint or format.
@@ -41,7 +42,7 @@ jobs:
               with:
                   fetch-depth: 0
             - name: Setup mise
-              uses: jdx/mise-action@v2
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
                   install: true
                   install_args: aqua:go-task/task
@@ -99,7 +100,7 @@ jobs:
             - uses: actions/checkout@v4
 
             - name: Setup mise
-              uses: jdx/mise-action@v2
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
                   install: true
                   install_args: aqua:go-task/task
@@ -195,6 +196,9 @@ jobs:
               shell: bash
               env:
                   TRIPLE: ${{ matrix.triple }}
+                  # The bundle lives in a GitHub release; `gh release download`
+                  # needs an authenticated client even for a public repository.
+                  GH_TOKEN: ${{ github.token }}
               run: mise exec -- task ci:ggml-libs
 
             - name: Build the native diarization helper
@@ -259,7 +263,7 @@ jobs:
             - uses: actions/checkout@v4
 
             - name: Setup mise
-              uses: jdx/mise-action@v2
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
                   install: true
                   install_args: aqua:go-task/task

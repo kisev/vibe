@@ -3,6 +3,10 @@
     "title": "Controles de atualização do app",
     "why": "As atualizações são verificadas em segundo plano e o único controle é um interruptor “Atualizações Beta” não explicado, escondido em Geral: não há um “verificar agora” explícito, nenhum canal dev (as builds de dev são publicadas sem artefatos de atualizador) e nenhuma regra declarada sobre o que cada canal significa."
   },
+  "comparison-failed-runs": {
+    "title": "Execuções com falha na comparação",
+    "why": "Com três modelos selecionados, a janela de resultados mostrou dois: a terceira execução falhou e a janela filtra por status === 'done', então uma falha desaparece em vez de ser explicada."
+  },
   "dependency-hygiene": {
     "title": "Higiene de dependências",
     "why": "As dependências são atualizadas manualmente, quando são, e não há um único lugar que responda “o que está desatualizado?”."
@@ -35,9 +39,21 @@
     "title": "Assistente de conversa ao vivo",
     "why": "O app transcreve reuniões, mas a ajuda chega depois da chamada: resumos e perguntas são feitos sobre uma transcrição concluída."
   },
+  "local-windows-build": {
+    "title": "Build local para Windows",
+    "why": "A aceitação manual das alterações do app depende do pool de runners do GitHub: uma tag de dev custa uma build de matriz, e as células do macOS em particular são canceladas ao acaso, enquanto as células do Linux e do Windows levam dezenas de minutos."
+  },
+  "meeting-browser-rework": {
+    "title": "Retrabalho do navegador de reuniões",
+    "why": "No Windows 11, o navegador de reuniões integrado abre uma janela branca que nunca é renderizada, e depois nem a janela nem o Vibe podem ser fechados."
+  },
   "model-comparison": {
     "title": "Comparação de modelos",
     "why": "A página de modelos avalia cada entrada do catálogo com barras publicadas de precisão/velocidade, mas esses benchmarks vêm do áudio de outras pessoas e do hardware de outras pessoas — em uma 5070 Ti contra a CPU de um notebook a ordem pode se inverter, e os números não dizem nada sobre como um modelo lida com o idioma e o sotaque do usuário."
+  },
+  "post-release-hardening": {
+    "title": "Endurecimento pós-lançamento",
+    "why": "Reverificar as alterações arquivadas depois da v1.0.0 encontrou defeitos que os gates automatizados não pegaram: o guia publicado de como publicar um lançamento promove um lançamento sem reconstruir seu corpo, então um lançamento estável é enviado sem as notas em inglês embutidas que a especificação exige; o task verify omite dois jobs de CI executáveis localmente (a build do site e o spike de transcrição); a CI executa cargo fmt/clippy diretamente em vez dos alvos task, então os comandos locais e remotos podem divergir; a build do roteiro ignora openspec/changes/**; o arquivo ggml pré-construído é empacotado em ggml-build/ enquanto o upload lê a raiz do repositório; e o filtro de caminhos do job E2E não cobre os arquivos que a suíte lê."
   },
   "remove-upstream-ties": {
     "title": "Remover os laços com o upstream",
@@ -50,6 +66,10 @@
   "show-speaker-model": {
     "title": "Exibir o modelo de falantes",
     "why": "O modelo de separação de falantes é auxiliar: listInstalledModels o filtra do catálogo, então nada nas configurações diz qual modelo o app usa para separação de falantes, se ele está baixado ou que o app puxou um."
+  },
+  "site-localization": {
+    "title": "Localização do site",
+    "why": "Trocar o idioma do site faz a página ser renderizada novamente, mas duas superfícies mantêm o conteúdo em inglês: o registro de alterações de dev (/changelog/dev) não tem i18n/changelog/<locale>/unreleased.md, e os cartões do roteiro vêm de roadmap.json, que é gerado a partir de arquivos proposal.md em inglês."
   },
   "speaker-voice-memory": {
     "title": "Memória de voz dos falantes",
@@ -66,25 +86,5 @@
   "website-language-selector": {
     "title": "Seletor de idioma do site",
     "why": "O site já tem um runtime Paraglide, catálogos por idioma, um LanguageSelector na navegação e documentação e registro de alterações totalmente traduzidos — mas a cobertura é irregular (Início e Recursos ainda carregam inglês fixo no código), a escolha vive apenas no localStorage, então um link compartilhado sempre abre no idioma do destinatário em vez do remetente, e o seletor é fácil de passar despercebido em telas pequenas."
-  },
-  "comparison-failed-runs": {
-    "title": "Execuções com falha na comparação",
-    "why": "Com três modelos selecionados, a janela de resultados mostrou dois: a terceira execução falhou e a janela filtra por status === 'done', então uma falha desaparece em vez de ser explicada."
-  },
-  "local-windows-build": {
-    "title": "Build local para Windows",
-    "why": "A aceitação manual das alterações do app depende do pool de runners do GitHub: uma tag de dev custa uma build de matriz, e as células do macOS em particular são canceladas ao acaso, enquanto as células do Linux e do Windows levam dezenas de minutos."
-  },
-  "meeting-browser-rework": {
-    "title": "Retrabalho do navegador de reuniões",
-    "why": "No Windows 11, o navegador de reuniões integrado abre uma janela branca que nunca é renderizada, e depois nem a janela nem o Vibe podem ser fechados."
-  },
-  "post-release-hardening": {
-    "title": "Endurecimento pós-lançamento",
-    "why": "Reverificar as alterações arquivadas depois da v1.0.0 encontrou defeitos que os gates automatizados não pegaram: o guia publicado de como publicar um lançamento promove um lançamento sem reconstruir seu corpo, então um lançamento estável é enviado sem as notas em inglês embutidas que a especificação exige; o task verify omite dois jobs de CI executáveis localmente (a build do site e o spike de transcrição); a CI executa cargo fmt/clippy diretamente em vez dos alvos task, então os comandos locais e remotos podem divergir; a build do roteiro ignora openspec/changes/**; o arquivo ggml pré-construído é empacotado em ggml-build/ enquanto o upload lê a raiz do repositório; e o filtro de caminhos do job E2E não cobre os arquivos que a suíte lê."
-  },
-  "site-localization": {
-    "title": "Localização do site",
-    "why": "Trocar o idioma do site faz a página ser renderizada novamente, mas duas superfícies mantêm o conteúdo em inglês: o registro de alterações de dev (/changelog/dev) não tem i18n/changelog/<locale>/unreleased.md, e os cartões do roteiro vêm de roadmap.json, que é gerado a partir de arquivos proposal.md em inglês."
   }
 }

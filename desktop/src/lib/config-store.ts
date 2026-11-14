@@ -58,15 +58,7 @@ export async function loadConfigStore() {
 /** Replace the cache with a config file edited from outside, waking only the keys that moved. */
 function applyExternalConfig(next: Record<string, unknown> | null) {
 	const incoming = next ?? {}
-	const keys = new Set([...cache.keys(), ...Object.keys(incoming)])
-	for (const key of keys) {
-		const before = cache.get(key)
-		const after = incoming[key]
-		if (JSON.stringify(before) === JSON.stringify(after)) continue
-		if (key in incoming) cache.set(key, after)
-		else cache.delete(key)
-		notify(key)
-	}
+	for (const key of new Set([...cache.keys(), ...Object.keys(incoming)])) applyConfigValue(key, incoming[key])
 }
 
 export function readConfig<T>(key: string, fallback: T): T {

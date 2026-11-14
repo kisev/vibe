@@ -6,7 +6,8 @@
 #
 # Reads VULKAN_VERSION (e.g. 1.4.357.0) from the environment.
 
-curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
+curl.exe -f -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
+if ($LASTEXITCODE -ne 0) { throw "Vulkan SDK download failed with exit code $LASTEXITCODE" }
 & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
 if (-not (Test-Path "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin\glslc.exe")) { throw 'glslc.exe not found after the SDK install' }
 "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}" | Out-File -FilePath $env:GITHUB_ENV -Append

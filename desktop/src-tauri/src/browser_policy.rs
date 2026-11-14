@@ -7,7 +7,7 @@
 
 use crate::config::STORE_FILENAME;
 use once_cell::sync::Lazy;
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use tauri::{AppHandle, Emitter, Url};
 use tauri_plugin_store::StoreExt;
 
@@ -66,7 +66,10 @@ impl Policy {
 }
 
 /// Last saved allowlist, so the resource-request hot path never touches the store.
-static ALLOWED: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
+///
+/// Held behind an `Arc` so a request handler clones a pointer instead of the whole list: the
+/// Windows filter asks for it on every resource request of every open page.
+static ALLOWED: Lazy<Mutex<Arc<Vec<String>>>> = Lazy::new(|| Mutex::new(Arc::default()));
 /// The mode in effect, seeded from the store at startup and replaced by [`save_policy`].
 ///
 /// Request handlers consult this instead of the store, so a Settings change applies to a page
@@ -75,7 +78,8 @@ static POLICY: Lazy<RwLock<Policy>> = Lazy::new(|| RwLock::new(Policy::default()
 /// Unique blocked hosts, newest first. Per app run, cleared only by allowing a host.
 static BLOCKED: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
-/// Accepts a bare host name or a pasted URL and returns a lowercase host name.
+/// Accepts a bare host name or a pasted URL and returns a lowercase host name, or `None` when
+/// nothing usable is left (empty input, or a single label other than `localhost`).
 pub fn normalize_host(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -88,7 +92,10 @@ pub fn normalize_host(raw: &str) -> Option<String> {
     };
     let parsed = Url::parse(&candidate).ok()?;
     let host = parsed.host_str()?.trim_end_matches('.').to_ascii_lowercase();
-    (!host.is_empty()).then_some(host)
+    // A single label such as `com` would make "this host and its subdomains" allow every site
+    // under that suffix. `localhost` is the one bare name a self-hosted server can use.
+    // (The frontend's `normalizeAllowedHost` and the mock follow the same rule.)
+    (host == "localhost" || host.contains('.')).then_some(host)
 }
 
 /// Normalize and dedupe a list of hosts, dropping anything that is not a host name.
@@ -123,9 +130,10 @@ pub fn host_of(url: &str) -> String {
 /// A host matches itself and its subdomains; an entry never matches a parent domain.
 pub fn is_allowed_host(host: &str, allowed: &[String]) -> bool {
     let host = host.trim_end_matches('.').to_ascii_lowercase();
+    // `host.ends_with(&format!(".{entry}"))` without the per-entry allocation.
     allowed
         .iter()
-        .any(|entry| host == *entry || host.ends_with(&format!(".{entry}")))
+        .any(|entry| host == *entry || host.strip_suffix(entry.as_str()).is_some_and(|rest| rest.ends_with('.')))
 }
 
 /// Only https URLs load; the rule is a host rule, so a port does not change the decision.
@@ -145,27 +153,33 @@ pub fn is_allowed_url(url: &str, allowed: &[String]) -> bool {
 /// Whether an engine event should be refused. Engine-internal schemes (`about:`, `data:`,
 /// `blob:`) stay untouched; plain http and ws are refused outright, and https/wss must point at
 /// an allowed host (so a page's secure socket to an allowed origin keeps working).
+///
+/// Everything else — `file:`, `javascript:`, a custom scheme, a URL the parser rejects — is
+/// refused too: navigation is gated in every mode, so the only schemes that pass without a host
+/// check are the engine's own internals.
 pub fn should_block(url: &str, allowed: &[String]) -> bool {
     let Ok(parsed) = Url::parse(url) else {
-        return false;
+        return true;
     };
     match parsed.scheme() {
         "http" | "ws" => true,
         "https" | "wss" => parsed.host_str().map(|host| !is_allowed_host(host, allowed)).unwrap_or(true),
-        _ => false,
+        "about" | "data" | "blob" => false,
+        _ => true,
     }
 }
 
 fn set_cache(hosts: Vec<String>) -> Vec<String> {
     if let Ok(mut cache) = ALLOWED.lock() {
-        *cache = hosts.clone();
+        *cache = Arc::new(hosts.clone());
     }
     hosts
 }
 
-/// The current allowlist from memory. Call [`load_allowed`] first to refresh from the store.
-pub fn allowed() -> Vec<String> {
-    ALLOWED.lock().map(|cache| cache.clone()).unwrap_or_default()
+/// A snapshot of the current allowlist from memory. Call [`load_allowed`] first to refresh from
+/// the store. The snapshot is shared, so a hot-path caller pays for an `Arc` clone, not the list.
+pub fn allowed() -> Arc<Vec<String>> {
+    ALLOWED.lock().map(|cache| Arc::clone(&cache)).unwrap_or_default()
 }
 
 /// Read the allowlist from the store and refresh the in-memory copy.
@@ -390,7 +404,12 @@ mod tests {
         assert!(!should_block("about:blank", &allowed));
         assert!(!should_block("data:text/plain,hi", &allowed));
         assert!(!should_block("blob:https://example.com/abc", &allowed));
-        assert!(!should_block("not a url", &allowed));
+        // Only the engine's own internals pass without a host check; every other scheme,
+        // including a URL the parser rejects, is refused.
+        assert!(should_block("file:///etc/passwd", &allowed));
+        assert!(should_block("javascript:alert(1)", &allowed));
+        assert!(should_block("zoommtg://zoom.us/join?confno=1", &allowed));
+        assert!(should_block("not a url", &allowed));
     }
 
     #[test]
@@ -402,6 +421,17 @@ mod tests {
             "   ".to_string(),
         ]);
         assert_eq!(normalized, hosts(&["meet.example.com"]));
+    }
+
+    #[test]
+    fn a_bare_label_is_refused_but_localhost_is_allowed() {
+        // `com` would allow every `.com` site through the subdomain rule.
+        assert_eq!(normalize_host("com"), None);
+        assert_eq!(normalize_host("https://com/"), None);
+        assert_eq!(normalize_host("localhost"), Some("localhost".to_string()));
+        // A name or an address literal with a dot still works.
+        assert_eq!(normalize_host("intranet.example"), Some("intranet.example".to_string()));
+        assert_eq!(normalize_host("192.168.1.5"), Some("192.168.1.5".to_string()));
     }
 
     #[test]

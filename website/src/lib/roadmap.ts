@@ -57,10 +57,39 @@ export function localizeRoadmap(entries: RoadmapEntry[], locale: string): Roadma
 	})
 }
 
+let roadmapData: Promise<unknown> | undefined
+
+/**
+ * The JSON is locale-independent — the translations ship in the bundle — so one
+ * response serves every language. The request is not tied to a caller's signal:
+ * one page unmounting must not cancel the load another page is waiting on.
+ */
+function fetchRoadmap(): Promise<unknown> {
+	if (roadmapData) return roadmapData
+	const request = fetch(`${import.meta.env.BASE_URL}roadmap.json`)
+		.then((response) => {
+			if (!response.ok) throw new Error(`roadmap: ${response.status}`)
+			return response.json()
+		})
+		.catch((error: unknown) => {
+			roadmapData = undefined
+			throw error
+		})
+	roadmapData = request
+	return request
+}
+
+/** Drops the shared response so the next load asks the server again. */
+export function clearRoadmapCache(): void {
+	roadmapData = undefined
+}
+
 export async function loadRoadmap(locale: string, signal?: AbortSignal): Promise<RoadmapEntry[]> {
-	const response = await fetch(`${import.meta.env.BASE_URL}roadmap.json`, { signal })
-	if (!response.ok) throw new Error(`roadmap: ${response.status}`)
-	const data: unknown = await response.json()
-	if (!Array.isArray(data) || !data.every(isEntry)) throw new Error('roadmap: unexpected JSON')
+	if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+	const data = await fetchRoadmap()
+	if (!Array.isArray(data) || !data.every(isEntry)) {
+		roadmapData = undefined
+		throw new Error('roadmap: unexpected JSON')
+	}
 	return localizeRoadmap(data, locale)
 }
