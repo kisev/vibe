@@ -7,7 +7,7 @@ The Whisper options surface offers beam search (sampling strategy, best-of, beam
 ## What Changes
 
 - The placeholder controls are removed from the desktop: sampling strategy, greedy/beam, best-of, beam size and max sentence length disappear, along with their strings and hints. A control that cannot change anything is worse than no control.
-- n-threads is wired where the engine accepts it: the server opens its transcription sessions with `SessionOptions { n_threads }` taken from the request. This requires a server release, since the desktop ships the pinned sidecar.
+- n-threads is wired where the engine accepts it: the server opens its transcription sessions with `SessionOptions { n_threads }` taken from the request.
 - The server keeps tolerating the removed fields so an older desktop still works; the one warning that remains names only what is truly ignored.
 
 ## Capabilities
@@ -16,8 +16,9 @@ The Whisper options surface offers beam search (sampling strategy, best-of, beam
 
 ## Impact
 
-- `desktop/src/pages/settings/sections/whisper-options.tsx`, `desktop/src/lib/config.ts` defaults, `server/crates/vibe-server/src/engine.rs`, catalogs, tests, `server/libs`/`.server-version` only when the server release is cut.
+- `desktop/src/pages/settings/sections/whisper-options.tsx`, `desktop/src/lib/config.ts` defaults, `server/crates/vibe-server/src/engine.rs`, catalogs, tests.
+- Cutting the `server-v*` release and bumping `.server-version` are operational steps outside this change; see `docs/how-to/publish-a-release.md`.
 
-## Open question
+## Operational follow-up
 
-The server change needs a `server-v*` release before a desktop build can use it. Threads stay exposed until then, because the setting is honest once the sidecar catches up.
+The desktop only uses the wiring once a `server-v*` release carrying it exists and `.server-version` points at that release. Cutting the release and bumping the pin are operational steps outside this change — a change makes or fixes something, it does not publish. The change ends with the code and its tests.
