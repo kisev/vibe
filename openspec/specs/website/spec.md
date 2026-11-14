@@ -1,6 +1,10 @@
-# Spec Delta
+# website Specification
 
-## ADDED Requirements
+## Purpose
+
+How the public site is built and deployed: which refs may publish it, what a release event does, and whether the phone handoff is part of the artifact.
+
+## Requirements
 
 ### Requirement: Only `main` deploys the public site
 
