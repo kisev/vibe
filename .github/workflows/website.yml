@@ -17,7 +17,6 @@ on:
             - "scripts/dev_manifest.py"
             - "scripts/website_build.sh"
             - "scripts/website_assemble.sh"
-            - "scripts/website_probe_phone.sh"
             - "scripts/website_links.py"
             - "handoff/pwa/**"
             - "handoff/wasm/**"
@@ -55,9 +54,18 @@ jobs:
               with:
                   ref: main
 
+            # Inline on purpose: the checkout under test is main, which carries
+            # neither this workflow's newer steps nor any probe script of its
+            # own — a `task` or script call here would test the wrong tree.
             - name: Does the release line carry the phone handoff?
               id: probe
-              run: bash scripts/website_probe_phone.sh
+              run: |
+                  if grep -q '^  phone:pwa:' taskfile.yml && [ -f handoff/pwa/package.json ]; then
+                    echo "present=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "present=false" >> "$GITHUB_OUTPUT"
+                    echo "::notice::main carries no phone handoff; the release site ships without /phone/"
+                  fi
 
     # Built on Linux on purpose: the iroh client pulls in `ring`, which compiles C
     # for wasm32, and the macOS runners' Apple clang has no wasm target.
