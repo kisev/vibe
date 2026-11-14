@@ -10,4 +10,4 @@
 - [ ] 6. The main window applies locale and theme before its first paint.
 - [ ] 7. Tests: defaults, the moved note, the absence of the Discord entry, the info tooltip text, first-paint locale.
 - [x] 8. Audit every settings hint: each names the consequence and, where a choice exists, how to choose; weak restatements are rewritten in en-US.
-- [ ] 9. The rewritten hints are translated into every desktop locale.
+- [x] 9. The rewritten hints are translated into every desktop locale.
