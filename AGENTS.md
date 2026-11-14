@@ -40,7 +40,9 @@ GitHub workflows are thin: checkout, toolchain setup, and a call to a `task` tar
 
 ## Release discipline
 
-A `dev.<n>` tag publishes a release — it is never a validation vehicle. Tag only from a revision whose Lint run finished green; never tag "to see if it builds". A dev revision is validated in place with `gh workflow run lint.yml --ref dev` (server clippy + desktop cargo check + tests), so no throwaway commit on `main` is needed; a `main` push still triggers Lint for what must live on the release line.
+A tag publishes a release — it is never a validation vehicle, for the app and for the server alike. The gate is the same sentence in both cases: **the whole pipeline must already have finished green on that exact commit before the tag exists.** Concretely: dispatch every workflow that can run without the tag (`lint.yml` for a dev revision, `server-test.yml` and the local packaging task for a server revision), wait for success, and only then create and push the tag. Never tag "to see if it builds", never tag a commit whose CI is still running, and never treat a tag push as the first place a packaging step gets exercised.
+
+A dev revision is validated in place with `gh workflow run lint.yml --ref dev` (server clippy + desktop cargo check + tests), so no throwaway commit on `main` is needed; a `main` push still triggers Lint for what must live on the release line.
 
 Dev builds live on the `dev` branch: `main` carries the release line and advances only through a release pull request from `dev` (version bump and notes included) — never `git push origin dev:main`, however tempting a "sync" looks; and every `dev.<n>` tag is cut on `dev` only — `task dev:tag` refuses off `dev`, and the Dev Build workflow fails a tag whose commit is not contained in `dev`.
 
