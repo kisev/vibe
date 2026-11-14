@@ -27,6 +27,7 @@ function renderWith(overrides: Partial<UpdaterContextType> = {}) {
 		checkNow: vi.fn(async () => {}),
 		checkState: 'current',
 		checkError: null,
+		errorStage: null,
 		lastCheckedAt: null,
 		progress: null,
 		fakeUpdate: false,
@@ -92,6 +93,13 @@ describe('update controls', () => {
 		expect(screen.getByText('manifest unreachable')).toBeTruthy()
 		const check = screen.getByRole('button', { name: m.checkForUpdates() }) as HTMLButtonElement
 		expect(check.disabled).toBe(false)
+	})
+
+	it('names the install step when the download or install failed', () => {
+		renderWith({ checkState: 'error', checkError: 'disk full', errorStage: 'install' })
+
+		expect(screen.getByText(m.updateInstallFailed())).toBeTruthy()
+		expect(screen.queryByText(m.updateFailed())).toBeNull()
 	})
 
 	it('explains the semver boundary when a release install selects Dev', async () => {

@@ -4,7 +4,7 @@ import { unregisterAll } from '@tauri-apps/plugin-global-shortcut'
 import './globals.css'
 import { CONFIG_KEYS } from './lib/config-keys'
 import { loadConfigStore, readConfig } from './lib/config-store'
-import { getLocale, getTextDirection, setLocale } from './paraglide/runtime.js'
+import { getLocale, getTextDirection, isLocale, setLocale } from './paraglide/runtime.js'
 import { runMigrations } from './lib/migrations'
 import Root from './root'
 import BrowserWindow from './windows/browser-window'
@@ -26,7 +26,7 @@ function applyAppearanceUnsafe() {
 	// Only a stored preference wins: with none, Paraglide's own resolved locale (the persisted
 	// Paraglide key, then the browser) is already right, and forcing a default would override it.
 	const stored = readConfig<string | null>(CONFIG_KEYS.displayLanguage, null)
-	if (stored) setLocale(stored as never, { reload: false })
+	if (stored && isLocale(stored)) setLocale(stored, { reload: false })
 	const locale = getLocale()
 	const theme = readConfig<'light' | 'dark'>(CONFIG_KEYS.theme, window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
 	document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -42,22 +42,31 @@ function applyAppearanceUnsafe() {
 async function start() {
 	const params = new URLSearchParams(window.location.search)
 	const root = document.getElementById('root') as HTMLElement
-	// The browser chrome is a chrome-only surface. Booting the whole app here would run the
-	// startup migrations, device enumeration and server supervision a second time, which is
-	// exactly what the main window already does — and what made the chrome behave like a second
-	// app. It mounts before the config store and migrations, which only the main window needs.
+	// The browser chrome is a chrome-only surface. Booting the whole app here would run device
+	// enumeration and server supervision a second time, which is exactly what the main window
+	// already does — and what made the chrome behave like a second app. It loads the config
+	// store (theme and language must be right before the first paint) but leaves the startup
+	// migrations to the non-browser windows below.
 	if (params.get('window') === 'browser') {
 		// The chrome follows the app's theme and language, so the store must be in memory before
-		// the first paint — but migrations stay with the main window only.
+		// the first paint — but it never runs the startup migrations the full boot below owns.
 		await loadConfigStore()
 		applyAppearance()
-		ReactDOM.createRoot(root).render(<BrowserWindow session={Number(params.get('session'))} />)
+		const rawSession = params.get('session')
+		const session = Number(rawSession)
+		if (rawSession === null || rawSession === '' || !Number.isSafeInteger(session) || session < 0) {
+			console.error('browser window opened without a valid session id:', window.location.search)
+			return
+		}
+		ReactDOM.createRoot(root).render(<BrowserWindow session={session} />)
 		return
 	}
 	await loadConfigStore()
+	// Migrations write through the same store and can change the saved locale, so the
+	// appearance is applied after them — both still run before the first paint.
+	runMigrations()
 	// Before the first paint: a wrong-language frame on every launch reads as a reset setting.
 	applyAppearance()
-	runMigrations()
 	// Native registrations outlive a webview reload, including their dead JS callbacks.
 	// Clear them before either shortcut provider mounts. Auxiliary windows must never
 	// clear the main window's live shortcuts when their own webviews start.

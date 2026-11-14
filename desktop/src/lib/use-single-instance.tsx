@@ -7,7 +7,7 @@ import { listen } from '@tauri-apps/api/event'
 import { useNavigate } from 'react-router-dom'
 import * as config from '~/lib/config'
 import * as os from '@tauri-apps/plugin-os'
-import { handOffMeetingLink, isMeetingLaunchArg } from './meeting-browser'
+import { handOffMeetingLaunchArg } from './meeting-browser'
 
 interface UseSingleInstanceProps {
 	setFiles: ModifyState<NamedPath[]>
@@ -23,9 +23,7 @@ export function useSingleInstance({ setFiles }: UseSingleInstanceProps) {
 			const action = argv?.[1]
 
 			// A meeting scheme or https link handed over by the system's handler.
-			if (action && isMeetingLaunchArg(action)) {
-				await handOffMeetingLink(action)
-			}
+			if (action) await handOffMeetingLaunchArg(action)
 
 			// vibe://download/?url=google.com
 			// already handled in deep links in macos

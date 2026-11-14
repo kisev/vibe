@@ -14,8 +14,14 @@ const categoryLabel: Record<Category, () => string> = {
 }
 
 function slugFromHash(hash: string) {
-	const wanted = decodeURIComponent(hash.replace(/^#/, '')).toLowerCase()
-	return englishDocs.find((doc) => doc.slug === wanted)?.slug ?? englishDocs[0].slug
+	const raw = hash.replace(/^#/, '')
+	let wanted = raw
+	try {
+		wanted = decodeURIComponent(raw)
+	} catch {
+		// A malformed %-sequence (a hand-edited `#100%`, say) must not take the page down.
+	}
+	return englishDocs.find((doc) => doc.slug === wanted.toLowerCase())?.slug ?? englishDocs[0].slug
 }
 
 export default function Docs() {

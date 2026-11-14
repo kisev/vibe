@@ -442,6 +442,7 @@
   "updateDevBoundary": "開発ビルドはインストール済みのバージョンより下に位置するため、開発ラインを始めるには開発ビルドを1回手動でインストールする必要があります。",
   "updateDownloading": "アップデートをダウンロード中…",
   "updateFailed": "前回のアップデート確認に失敗しました",
+  "updateInstallFailed": "アップデートをインストールできませんでした。新しいバージョンをサイトからダウンロードしてください。",
   "updateInstalling": "アップデートをインストール中…",
   "updateLastChecked": "最終確認: {time}",
   "updateNoCandidate": "このラインにリリース候補はありません",

@@ -113,4 +113,4 @@ echo "==> building on Windows"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$checkout_win\local-build.ps1"
 
 echo "==> installer:"
-find "$checkout/desktop/src-tauri/target/release/bundle/nsis" -name '*.exe' -maxdepth 1 -print 2>/dev/null | sed 's|^|    |' || true
+find "$checkout/target/release/bundle/nsis" -name '*.exe' -maxdepth 1 -print 2>/dev/null | sed 's|^|    |' || true

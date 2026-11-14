@@ -13,6 +13,14 @@ describe('allowed host normalization', () => {
 			expect(normalizeAllowedHost(value)).toBeNull()
 		}
 	})
+
+	it('rejects a single label, which would allow a whole top-level domain', () => {
+		for (const value of ['com', 'net', 'io']) {
+			expect(normalizeAllowedHost(value)).toBeNull()
+		}
+		// The local development host stays usable.
+		expect(normalizeAllowedHost('localhost')).toBe('localhost')
+	})
 })
 
 describe('meeting launch arguments', () => {

@@ -442,6 +442,7 @@
   "updateDevBoundary": "Dev-byggen sorteras under din installerade version, så dev-linjen börjar med en manuell installation av ett dev-bygge.",
   "updateDownloading": "Laddar ner uppdateringen…",
   "updateFailed": "Den senaste uppdateringskontrollen misslyckades",
+  "updateInstallFailed": "Uppdateringen kunde inte installeras. Ladda ner den nya versionen från webbplatsen.",
   "updateInstalling": "Installerar uppdateringen…",
   "updateLastChecked": "Senast kontrollerad {time}",
   "updateNoCandidate": "Ingen releasekandidat i denna linje",

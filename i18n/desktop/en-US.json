@@ -441,6 +441,7 @@
   "updateDevBoundary": "Dev builds sort below your installed version, so the dev line starts with one manual install of a dev build.",
   "updateDownloading": "Downloading the update…",
   "updateFailed": "The last update check failed",
+  "updateInstallFailed": "The update could not be installed. Download the new version from the site.",
   "updateInstalling": "Installing the update…",
   "updateLastChecked": "Last checked {time}",
   "updateNoCandidate": "No candidate on this line",

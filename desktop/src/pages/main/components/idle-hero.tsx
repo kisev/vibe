@@ -4,14 +4,14 @@ import { siFacebook, siInstagram, siTiktok, siX, siYoutube } from 'simple-icons'
 import { useEffect, useState } from 'react'
 import { m } from '~/paraglide/messages.js'
 import AudioDeviceInput from '~/components/audio-device-input'
-import RecordingIndicator, { useRecordingStartedAt } from '~/components/recording-feedback'
+import RecordingIndicator from '~/components/recording-feedback'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Spinner } from '~/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/style'
 import { parseMediaLinks } from '~/lib/ytdlp'
-import { normalizeMeetingUrl, openMeetingBrowser } from '~/lib/meeting-browser'
+import { normalizeMeetingUrl, openMeetingBrowser, openMeetingLink } from '~/lib/meeting-browser'
 import { useSession, type IdlePanel } from '../session'
 import QuietRow from './quiet-row'
 
@@ -39,7 +39,6 @@ function Segment({ active, label, onClick, children }: { active?: boolean; label
 
 function RecordPanel() {
 	const { recording, preference } = useSession()
-	const startedAt = useRecordingStartedAt(recording.isRecording)
 
 	useEffect(() => {
 		// The recording hook loads audio devices for this tab only.
@@ -50,7 +49,7 @@ function RecordPanel() {
 		return (
 			<div className="flex w-full flex-col items-center gap-4 py-2.5">
 				<RecordingIndicator
-					startedAt={startedAt}
+					startedAt={recording.startedAt}
 					microphoneName={recording.inputDevice?.name ?? m.noRecord()}
 					systemName={recording.outputDevice?.name ?? m.noRecord()}
 				/>
@@ -127,14 +126,17 @@ function BrowserPanel() {
 	const [error, setError] = useState<string | null>(null)
 
 	async function open() {
-		const normalized = normalizeMeetingUrl(url)
+		// The embedded page loads https only: a pasted http link is upgraded, and a Zoom/Teams/Webex
+		// scheme link is mapped by Rust the same way it maps one arriving from the system.
+		const normalized = normalizeMeetingUrl(url).replace(/^http:\/\//i, 'https://')
 		if (!normalized) {
 			setError(m.meetingBrowserInvalidLink({ reason: url.trim() }))
 			return
 		}
 		setError(null)
 		try {
-			await openMeetingBrowser(normalized)
+			if (normalized.startsWith('https://')) await openMeetingBrowser(normalized)
+			else await openMeetingLink(normalized)
 			setUrl('')
 		} catch (reason) {
 			setError(reason instanceof Error ? reason.message : String(reason))
@@ -147,7 +149,9 @@ function BrowserPanel() {
 				<Input
 					value={url}
 					onChange={(event) => setUrl(event.target.value)}
-					onKeyDown={(event) => (event.key === 'Enter' ? void open() : null)}
+					onKeyDown={(event) => {
+						if (event.key === 'Enter' && url.trim()) void open()
+					}}
 					placeholder={m.meetingBarAddress()}
 					className="h-10 min-w-0 rounded-xl px-3.5 text-sm"
 				/>
@@ -393,7 +397,9 @@ export default function IdleHero() {
 							transition={{ duration: 0.18, ease: 'easeOut' }}
 							// Same footprint as the drop zone so the composition stays anchored.
 							className="flex min-h-[220px] w-full flex-col justify-center rounded-[1.25rem] border border-border bg-muted/30 px-7">
-							{panel === 'record' ? <RecordPanel /> : panel === 'link' ? <LinkPanel /> : <BrowserPanel />}
+							{panel === 'record' && <RecordPanel />}
+							{panel === 'link' && <LinkPanel />}
+							{panel === 'browser' && <BrowserPanel />}
 						</motion.div>
 					)}
 				</AnimatePresence>

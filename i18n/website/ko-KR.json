@@ -121,5 +121,7 @@
   "roadmap-description": "다음 릴리스에서 선보일 내용입니다. 각 항목은 저장소의 진행 중인 OpenSpec 변경 사항입니다.",
   "roadmap-note": "이 변경 사항은 계획된 것으로 아직 출시되지 않았습니다. 목록은 저장소의 아카이브되지 않은 OpenSpec 제안에서 생성됩니다.",
   "roadmap-empty": "아직 기록된 예정 변경 사항이 없습니다.",
-  "roadmap-load-failed": "로드맵을 불러오지 못했습니다."
+  "roadmap-load-failed": "로드맵을 불러오지 못했습니다.",
+  "dev-preview-banner": "개발 미리보기 — dev 브랜치에서 빌드되었습니다.",
+  "dev-preview-link": "릴리스 사이트 열기"
 }

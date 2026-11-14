@@ -442,6 +442,7 @@
   "updateDevBoundary": "Las compilaciones de Dev se ordenan por debajo de tu versión instalada, así que la línea Dev empieza con una instalación manual de una compilación de Dev.",
   "updateDownloading": "Descargando la actualización…",
   "updateFailed": "La última comprobación de actualizaciones falló",
+  "updateInstallFailed": "No se pudo instalar la actualización. Descarga la nueva versión desde el sitio web.",
   "updateInstalling": "Instalando la actualización…",
   "updateLastChecked": "Última comprobación: {time}",
   "updateNoCandidate": "Sin candidata en esta línea",

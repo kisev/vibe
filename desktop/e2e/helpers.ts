@@ -72,6 +72,7 @@ export async function overrideCommand(page: Page, cmd: string, value: unknown): 
 
 /** Replace one command's return value with a different value on each call (last one repeats). */
 export async function overrideCommandSequence(page: Page, cmd: string, values: unknown[]): Promise<void> {
+	if (values.length === 0) throw new Error(`overrideCommandSequence: empty sequence for command "${cmd}"`)
 	await page.evaluate(
 		({ cmd, values }) => {
 			let index = 0

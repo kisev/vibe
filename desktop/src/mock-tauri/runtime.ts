@@ -43,6 +43,14 @@ export interface MockTauriControls {
 
 const STATE_KEY = '__vibeMockTauriRuntime__'
 
+/** The log is an inspection aid for a dev session, not a transcript: keep only the newest. */
+const MAX_LOGGED_CALLS = 5_000
+
+/** A log entry a spec may mutate without corrupting what the app actually sent. */
+function copyInvocation(call: MockInvocation): MockInvocation {
+	return { cmd: call.cmd, args: structuredClone(call.args) }
+}
+
 function getState(): RuntimeState {
 	const holder = globalThis as typeof globalThis & { [STATE_KEY]?: RuntimeState }
 	if (!holder[STATE_KEY]) {
@@ -100,6 +108,8 @@ function isWindowSurfaceCommand(cmd: string): boolean {
 async function route(cmd: string, args: Record<string, unknown>): Promise<unknown> {
 	const state = getState()
 	state.calls.push({ cmd, args })
+	// A dev session runs for hours and nothing clears the log mid-session, so it is bounded.
+	if (state.calls.length > MAX_LOGGED_CALLS) state.calls.splice(0, state.calls.length - MAX_LOGGED_CALLS)
 
 	if (cmd.startsWith('plugin:event|')) {
 		return handleEventPluginCommand(cmd, args)
@@ -165,8 +175,8 @@ function installTestControls(): void {
 		return
 	}
 	target.__vibeMockTauri = {
-		calls: () => state.calls.map((call) => ({ ...call })),
-		callsFor: (cmd) => state.calls.filter((call) => call.cmd === cmd).map((call) => ({ ...call })),
+		calls: () => state.calls.map(copyInvocation),
+		callsFor: (cmd) => state.calls.filter((call) => call.cmd === cmd).map(copyInvocation),
 		clearCalls: () => {
 			state.calls.length = 0
 		},

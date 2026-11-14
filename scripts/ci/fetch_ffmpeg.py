@@ -28,10 +28,15 @@ def main() -> None:
     urllib.request.urlretrieve(url, archive)
     with zipfile.ZipFile(archive) as bundle:
         member = next(
-            name
-            for name in bundle.namelist()
-            if pathlib.PurePosixPath(name).name == "ffmpeg" + exe
+            (
+                name
+                for name in bundle.namelist()
+                if pathlib.PurePosixPath(name).name == "ffmpeg" + exe
+            ),
+            None,
         )
+        if member is None:
+            raise SystemExit(f"no ffmpeg{exe} member in the archive from {url}")
         bundle.extract(member, tmp / "out")
     target = pathlib.Path("desktop/src-tauri/binaries") / f"ffmpeg-{triple}{exe}"
     target.parent.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,7 @@
 // The speaker-separation model is auxiliary: it is not a transcription model, so
 // it never appears in the catalog. This row is the one place in the app where its
 // identity, size, and download state are visible.
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { join } from '@tauri-apps/api/path'
 import { FolderOpen, Loader2 } from 'lucide-react'
@@ -21,40 +21,81 @@ const speakerModelName = getModelDisplayName(config.diarizeModelFilename)
 /** The published size, as the catalog labels its files (whole MB). */
 const speakerModelSize = config.diarizeModelIntegrity.size ? `${sizeMb(config.diarizeModelIntegrity.size)} MB` : null
 
-export function SpeakerSeparationModelGroup() {
-	const [state, setState] = useState<SpeakerModelState>('checking')
-	const [modelPath, setModelPath] = useState<string | null>(null)
+/** Fired in this window after the model lands, so every section that mirrors it revalidates. */
+const DIARIZE_MODEL_CHANGED_EVENT = 'vibe:diarize-model-changed'
 
-	useEffect(() => {
-		let active = true
-		void (async () => {
-			const folder = await invoke<string>('get_models_folder')
-			const path = await join(folder, config.diarizeModelFilename)
-			const usable = await isModelFileUsable(path)
-			if (!active) return
-			setModelPath(path)
-			setState(usable ? 'installed' : 'missing')
-		})()
-		return () => {
-			active = false
+function announceDiarizeModelChanged() {
+	window.dispatchEvent(new Event(DIARIZE_MODEL_CHANGED_EVENT))
+}
+
+export interface DiarizationModel {
+	/** Absolute path of the file in the configured models folder, or null when the check failed. */
+	path: string | null
+	installed: boolean
+	/** False until the first check resolves, so a row shows a spinner instead of a false "missing". */
+	checked: boolean
+	refresh: () => Promise<void>
+}
+
+/**
+ * Availability of the bundled speaker-separation model, shared by the group that downloads it and
+ * the comparison lab that only needs to know whether it can offer separation. One hook owns the
+ * check so a download or a removal in one section is visible in the other without leaving Settings.
+ */
+export function useDiarizationModel(): DiarizationModel {
+	const [state, setState] = useState<Omit<DiarizationModel, 'refresh'>>({ path: null, installed: false, checked: false })
+
+	const refresh = useCallback(async () => {
+		try {
+			const path = await join(await invoke<string>('get_models_folder'), config.diarizeModelFilename)
+			const installed = await isModelFileUsable(path)
+			setState({ path, installed, checked: true })
+		} catch (error) {
+			// A refused check is not an installed model: fall back to the download offer, not a spinner.
+			console.error('failed to check the speaker-separation model:', error)
+			setState({ path: null, installed: false, checked: true })
 		}
 	}, [])
 
+	useEffect(() => {
+		void refresh()
+		// The file can be downloaded by another section, or copied in while the app was in the background.
+		const onChanged = () => void refresh()
+		window.addEventListener(DIARIZE_MODEL_CHANGED_EVENT, onChanged)
+		window.addEventListener('focus', onChanged)
+		return () => {
+			window.removeEventListener(DIARIZE_MODEL_CHANGED_EVENT, onChanged)
+			window.removeEventListener('focus', onChanged)
+		}
+	}, [refresh])
+
+	return { ...state, refresh }
+}
+
+export function SpeakerSeparationModelGroup() {
+	const { path: modelPath, installed, checked } = useDiarizationModel()
+	const [downloading, setDownloading] = useState(false)
+
 	async function download() {
 		if (!modelPath) return
-		setState('downloading')
+		setDownloading(true)
 		try {
 			const downloaded = await downloadModel(
 				{ url: config.diarizeModelUrl, ...config.diarizeModelIntegrity },
 				{ displayName: config.diarizeModelFilename },
 			)
-			if (downloaded) toast.success(m.downloadComplete())
-			setState(downloaded ? 'installed' : 'missing')
+			if (downloaded) {
+				toast.success(m.downloadComplete())
+				announceDiarizeModelChanged()
+			}
 		} catch (error) {
 			toast.error(String(error))
-			setState('missing')
+		} finally {
+			setDownloading(false)
 		}
 	}
+
+	const state: SpeakerModelState = downloading ? 'downloading' : !checked ? 'checking' : installed ? 'installed' : 'missing'
 
 	return (
 		<SettingsGroup title={m.diarization()}>

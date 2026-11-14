@@ -40,7 +40,9 @@ function AppContent() {
 
 	useEffect(() => {
 		document.body.dir = dir
-	}, [dir])
+		// Both attributes describe the language in use; screen readers and translators read `lang`.
+		document.documentElement.lang = displayLanguage
+	}, [dir, displayLanguage])
 
 	useEffect(() => {
 		setMeetingDetectionEnabled(meetingDetectionEnabled).catch((error) => console.error('Failed to sync meeting detection:', error))

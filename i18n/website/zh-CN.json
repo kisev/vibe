@@ -121,5 +121,7 @@
   "roadmap-description": "接下来的版本会带来什么。每条记录都是仓库中一个活跃的 OpenSpec 变更。",
   "roadmap-note": "这些变更只是计划，尚未发布。列表由仓库中未归档的 OpenSpec 提案生成。",
   "roadmap-empty": "尚未记录任何计划变更。",
-  "roadmap-load-failed": "无法加载路线图。"
+  "roadmap-load-failed": "无法加载路线图。",
+  "dev-preview-banner": "开发预览 — 由 dev 分支构建。",
+  "dev-preview-link": "打开发布网站"
 }

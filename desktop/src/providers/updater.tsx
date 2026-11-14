@@ -47,6 +47,8 @@ export type UpdaterContextType = {
 	checkState: CheckState
 	/** Why the last check failed; cleared when a later check starts. */
 	checkError: string | null
+	/** Which step produced `checkState: 'error'`: the check itself or the download/install. */
+	errorStage: 'check' | 'install' | null
 	/** Epoch milliseconds of the last finished check, or null before the first one. */
 	lastCheckedAt: number | null
 	progress: number | null
@@ -68,6 +70,7 @@ export const UpdaterContext = createContext<UpdaterContextType>({
 	checkNow: async () => {},
 	checkState: 'idle',
 	checkError: null,
+	errorStage: null,
 	lastCheckedAt: null,
 	progress: null,
 	fakeUpdate: false,
@@ -84,11 +87,12 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 	const [progress, setProgress] = useState<number | null>(null)
 	const [checkState, setCheckState] = useState<CheckState>('idle')
 	const [checkError, setCheckError] = useState<string | null>(null)
+	const [errorStage, setErrorStage] = useState<'check' | 'install' | null>(null)
 	const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null)
 	const [channel, setChannel] = usePersisted<UpdateChannel>(CONFIG_KEYS.updateChannel, 'stable')
-	// A slow check on the previous channel must not overwrite the result of the new one.
-	const channelRef = useRef(channel)
-	channelRef.current = channel
+	// A slow check must not overwrite the result of a newer one — including a switch back to a
+	// channel whose first check is still in flight. Each invocation owns an id; only the latest writes.
+	const checkIdRef = useRef(0)
 	const [fakeUpdate, setFakeUpdateState] = useState(() => {
 		if (!devToolsEnabled) return false
 		try {
@@ -112,11 +116,13 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 	 * button share it, so both report through the same state.
 	 */
 	const checkNow = useCallback(async () => {
+		const checkId = ++checkIdRef.current
 		setCheckState('checking')
 		setCheckError(null)
+		setErrorStage(null)
 		try {
 			const found = await invoke<Update | null>('update_check', { channel })
-			if (channelRef.current !== channel) return
+			if (checkIdRef.current !== checkId) return
 			// A manifest without a version is a line with nothing on it, not an
 			// update whose version happens to be blank.
 			const candidate = found && typeof found.version === 'string' && found.version.trim() !== '' ? found : null
@@ -124,12 +130,13 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 			setUpdate(candidate ?? undefined)
 			setCheckState(candidate ? 'available' : 'current')
 		} catch (error) {
-			if (channelRef.current !== channel) return
+			if (checkIdRef.current !== checkId) return
 			console.error(error)
 			setCheckError(String(error))
+			setErrorStage('check')
 			setCheckState('error')
 		} finally {
-			if (channelRef.current === channel) setLastCheckedAt(Date.now())
+			if (checkIdRef.current === checkId) setLastCheckedAt(Date.now())
 		}
 	}, [channel])
 
@@ -177,6 +184,9 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 		setCheckState('available')
 		await askForRelaunch()
 		setAvailableUpdate(false)
+		// The pending update was consumed by `update_install`. Ask again so a declined relaunch
+		// leaves a working "update now" instead of one that fails with "no update to download".
+		await checkNow()
 	}
 
 	async function updateApp() {
@@ -197,6 +207,7 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 				console.error(e)
 				setUpdating(false)
 				setCheckError(String(e))
+				setErrorStage('install')
 				setCheckState('error')
 				setErrorModal?.({ open: true, log: String(e) })
 			}
@@ -220,6 +231,7 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
 				checkNow,
 				checkState,
 				checkError,
+				errorStage,
 				lastCheckedAt,
 				progress,
 			}}>

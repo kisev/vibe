@@ -442,6 +442,7 @@
   "updateDevBoundary": "Dev-Builds liegen unter Ihrer installierten Version, daher beginnt die Dev-Linie mit einer manuellen Installation eines Dev-Builds.",
   "updateDownloading": "Update wird heruntergeladen…",
   "updateFailed": "Die letzte Update-Prüfung ist fehlgeschlagen",
+  "updateInstallFailed": "Das Update konnte nicht installiert werden. Laden Sie die neue Version von der Website herunter.",
   "updateInstalling": "Update wird installiert…",
   "updateLastChecked": "Zuletzt geprüft: {time}",
   "updateNoCandidate": "Kein Release Candidate in dieser Linie",

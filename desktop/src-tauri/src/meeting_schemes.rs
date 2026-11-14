@@ -5,6 +5,8 @@
 //! schemes is opt-in; when it is on, the app receives the scheme URL and needs the
 //! equivalent web address to load in the meeting window.
 
+use url::form_urlencoded;
+
 /// The web URL a meeting scheme stands for, or `None` for anything this module
 /// does not understand (the caller then falls back to the system browser or
 /// ignores the launch).
@@ -26,10 +28,16 @@ fn zoom_url(rest: &str) -> Option<String> {
     let (host, tail) = split_host(rest)?;
     let query = tail.split_once('?').map(|(_, query)| query).unwrap_or_default();
     let confno = form_value(query, "confno")?;
+    // Any program can hand the app a zoommtg: link, so the number is untrusted: `/`, `?` or
+    // `#` in it would rewrite the path or inject a query while the host stays allowed.
+    if confno.is_empty() || !confno.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
     let mut url = format!("https://{host}/j/{confno}");
     if let Some(pwd) = form_value(query, "pwd") {
+        // The password rides in a query value: encode it so `#`, `&` or `=` cannot escape it.
         url.push_str("?pwd=");
-        url.push_str(pwd);
+        url.push_str(&form_urlencoded::byte_serialize(pwd.as_bytes()).collect::<String>());
     }
     Some(url)
 }
@@ -75,6 +83,14 @@ mod tests {
         assert_eq!(
             meeting_url("zoommtg://zoom.us/join?confno=987654321"),
             Some("https://zoom.us/j/987654321".to_string())
+        );
+        // Meeting numbers are digits: anything that could rewrite the path or inject a query is
+        // declined, and the password is encoded so it cannot escape the query value.
+        assert_eq!(meeting_url("zoommtg://zoom.us/join?confno=../../settings"), None);
+        assert_eq!(meeting_url("zoommtg://zoom.us/join?confno=12a"), None);
+        assert_eq!(
+            meeting_url("zoommtg://zoom.us/join?confno=1&pwd=a#b"),
+            Some("https://zoom.us/j/1?pwd=a%23b".to_string())
         );
     }
 

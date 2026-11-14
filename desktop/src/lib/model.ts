@@ -55,8 +55,8 @@ const NAME_TOKENS: Record<string, string> = {
 }
 /** Auxiliary models the catalog does not list, named as their projects do. */
 const AUXILIARY_NAMES: Record<string, string> = {
-	'nemotron-3-diarization-q8_0.gguf': 'Nemotron-3-Diarization Q8_0',
-	'ggml-silero-v6.2.0.bin': 'Silero VAD v6.2.0',
+	[diarizeModelFilename.toLowerCase()]: 'Nemotron-3-Diarization Q8_0',
+	[vadModelFilename.toLowerCase()]: 'Silero VAD v6.2.0',
 }
 
 function nameTokens(bare: string) {

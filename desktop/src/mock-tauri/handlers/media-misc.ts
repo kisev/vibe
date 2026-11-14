@@ -25,6 +25,8 @@ const YTDLP_TICK_MS = 100
 let dictationIndicatorEnabled = false
 let meetingDetectionEnabled = false
 let meetingPromptState: { source: 'meet' | 'zoom' | 'teams' } | null = null
+/** What `recording_active` reports: the capture the mock is pretending to run. */
+let recordingActive = false
 
 function sleep(ms: number) {
 	return new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -75,8 +77,11 @@ export const mediaMiscHandlers: CommandHandlerMap = {
 
 	get_audio_devices: () => MOCK_AUDIO_DEVICES,
 
+	recording_active: () => recordingActive,
+
 	start_record: (args) => {
 		console.info('[mock] start_record', args)
+		recordingActive = true
 		const path = `${APP_LOCAL_DATA}/recording.wav`
 		// Stand in for the capture callbacks: one event per source every 100ms, like the throttled
 		// Rust side, tagged with the device so the UI can keep two meters.
@@ -89,6 +94,7 @@ export const mediaMiscHandlers: CommandHandlerMap = {
 		// The frontend stops recording by emitting `stop_record` on the event bus.
 		const unsub = onMockEvent('stop_record', () => {
 			unsub()
+			recordingActive = false
 			window.clearInterval(levelTimer)
 			setTimeout(() => {
 				virtualFs.set(path, null)

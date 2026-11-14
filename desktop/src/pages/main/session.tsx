@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { webviewWindow } from '@tauri-apps/api'
 import * as dialog from '@tauri-apps/plugin-dialog'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -13,6 +13,7 @@ import { autoProjectName } from '~/lib/project-name'
 import { notifyTranscriptsChanged, saveTranscript, TRANSCRIPT_VERSION, type TranscriptRecord } from '~/lib/transcripts-store'
 import type { NamedPath, ProjectSource } from '~/lib/types'
 import { useConfirmExit } from '~/lib/use-confirm-exit'
+import { RECORDING_STATE_EVENT, type RecordingStatePayload } from '~/lib/meeting-browser'
 import { hotkeyRecordingActive } from '~/providers/hotkey'
 import { useRecordingShortcut } from '~/providers/recording-shortcut'
 import { ErrorModalContext } from '~/providers/error-modal'
@@ -127,10 +128,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 	const manualRecording = useRecording(() => setPanel('record'))
 	const recording = useMemo(
-		() => ({ ...manualRecording, isRecording: manualRecording.isRecording || recordingShortcut.isShortcutRecording }),
-		[manualRecording, recordingShortcut.isShortcutRecording],
+		() => ({
+			...manualRecording,
+			isRecording: manualRecording.isRecording || recordingShortcut.isShortcutRecording,
+			// The clock lives with the recording, not with the panel showing it: a remounted
+			// indicator continues from the real start instead of beginning at 00:00.
+			startedAt: manualRecording.isRecording ? manualRecording.startedAt : recordingShortcut.shortcutStartedAt,
+		}),
+		[manualRecording, recordingShortcut.isShortcutRecording, recordingShortcut.shortcutStartedAt],
 	)
 	const link = useAudioDownload(transcribeDownloads)
+
+	// The meeting chrome starts and stops the same recorder through its own hook. Adopting its
+	// reports gives the whole app one recording state, so the main window shows a chrome-started
+	// run and a second start is impossible from either side.
+	useEffect(() => {
+		const unlisten = listen<RecordingStatePayload>(RECORDING_STATE_EVENT, ({ payload }) => {
+			manualRecording.adoptRecording(payload.recording, payload.startedAt)
+		})
+		return () => {
+			unlisten.then((fn) => fn())
+		}
+	}, [manualRecording.adoptRecording])
+
+	// ...and publishing our own changes reaches a chrome that is already open.
+	useEffect(() => {
+		void emit(RECORDING_STATE_EVENT, { recording: recording.isRecording, startedAt: recording.startedAt })
+	}, [recording.isRecording, recording.startedAt])
 
 	useEffect(() => {
 		recordingShortcut.setNormalRecordingActive(recording.isRecording)

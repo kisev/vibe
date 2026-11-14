@@ -8,11 +8,13 @@ export const modelsDocURL = 'https://kisev.github.io/vibe/docs#models'
  * dev releases are swept. No version opens the whole list — the page falls back to
  * English for a release this locale has not translated.
  */
+const changelogBaseURL = 'https://kisev.github.io/vibe/changelog'
+
 export const changelogURL = (version?: string) => {
-	if (!version) return 'https://kisev.github.io/vibe/changelog'
+	if (!version) return changelogBaseURL
 	const wanted = version.replace(/^v/, '')
-	if (wanted === 'dev' || wanted === 'unreleased' || wanted.includes('-dev.')) return 'https://kisev.github.io/vibe/changelog/dev'
-	return `https://kisev.github.io/vibe/changelog/${version}`
+	if (wanted === 'dev' || wanted === 'unreleased' || wanted.includes('-dev.')) return `${changelogBaseURL}/dev`
+	return `${changelogBaseURL}/${version}`
 }
 export const privacyPolicyURL = 'https://kisev.github.io/vibe/?action=open-privacy-policy'
 export const storeFilename = 'app_config.json'

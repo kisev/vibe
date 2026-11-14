@@ -442,6 +442,7 @@
   "updateDevBoundary": "Các bản dựng Dev được xếp thấp hơn phiên bản đã cài, nên dòng Dev cần cài thủ công một bản dựng Dev trước.",
   "updateDownloading": "Đang tải bản cập nhật…",
   "updateFailed": "Lần kiểm tra cập nhật gần nhất đã thất bại",
+  "updateInstallFailed": "Không thể cài đặt bản cập nhật. Hãy tải phiên bản mới từ trang web.",
   "updateInstalling": "Đang cài đặt bản cập nhật…",
   "updateLastChecked": "Kiểm tra lần cuối: {time}",
   "updateNoCandidate": "Dòng này không có bản ứng viên",

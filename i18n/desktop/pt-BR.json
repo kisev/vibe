@@ -444,6 +444,7 @@
   "updateDevBoundary": "As compilações Dev ficam abaixo da sua versão instalada, então a linha dev começa com uma instalação manual de uma build dev.",
   "updateDownloading": "Baixando a atualização…",
   "updateFailed": "A última verificação de atualização falhou",
+  "updateInstallFailed": "Não foi possível instalar a atualização. Baixe a nova versão do site.",
   "updateInstalling": "Instalando a atualização…",
   "updateLastChecked": "Última verificação: {time}",
   "updateNoCandidate": "Nenhuma versão candidata nesta linha",

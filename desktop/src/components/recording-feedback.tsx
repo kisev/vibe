@@ -29,15 +29,6 @@ export interface SourceFeedback {
 
 const DEVICES: RecordLevelDevice[] = ['microphone', 'system']
 
-/** Epoch ms when the recording this component mirrors began, or null when idle. */
-export function useRecordingStartedAt(recording: boolean): number | null {
-	const [startedAt, setStartedAt] = useState<number | null>(null)
-	useEffect(() => {
-		setStartedAt(recording ? Date.now() : null)
-	}, [recording])
-	return startedAt
-}
-
 /** Elapsed whole seconds since `startedAt`, ticking twice a second so the clock never lags. */
 export function useElapsedSeconds(startedAt: number | null): number {
 	const [elapsed, setElapsed] = useState(0)
@@ -81,6 +72,9 @@ export function useSourceFeedback(active: boolean, startedAt: number | null): Re
 		const target: Record<RecordLevelDevice, number> = { microphone: 0, system: 0 }
 		const lastEvent: Record<RecordLevelDevice, number> = { microphone: begin, system: begin }
 		const lastSound: Record<RecordLevelDevice, number> = { microphone: begin, system: begin }
+		// A source that never sent a single event is not captured at all (the recorder was started
+		// without it); an open but quiet source trickles level 0. Only the latter can be "silent".
+		const captured: Record<RecordLevelDevice, boolean> = { microphone: false, system: false }
 		setLevels({ microphone: 0, system: 0 })
 		setSilent({ microphone: false, system: false })
 
@@ -90,28 +84,35 @@ export function useSourceFeedback(active: boolean, startedAt: number | null): Re
 			const next = typeof payload.level === 'number' && Number.isFinite(payload.level) ? Math.min(Math.max(payload.level, 0), 1) : 0
 			target[device] = next
 			lastEvent[device] = Date.now()
+			captured[device] = true
 			if (next > SILENCE_LEVEL) lastSound[device] = Date.now()
 		})
 
 		const timer = window.setInterval(() => {
 			const now = Date.now()
+			// Decay outside the updater: React may call it more than once, and a doubled decay
+			// would drop a dead device twice per tick.
+			for (const device of DEVICES) {
+				// A dead device emits nothing at all — decay so it can't freeze mid-bar.
+				if (now - lastEvent[device] > LEVEL_STALE_MS) target[device] *= 0.6
+			}
 			setLevels((previous) => {
+				let changed = false
 				const next = { ...previous }
 				for (const device of DEVICES) {
-					// A dead device emits nothing at all — decay so it can't freeze mid-bar.
-					if (now - lastEvent[device] > LEVEL_STALE_MS) target[device] *= 0.6
 					// Fast attack, slower release: peaks stay legible, the fall stays calm.
 					const goal = target[device]
 					const eased = previous[device] + (goal - previous[device]) * (goal > previous[device] ? 0.7 : 0.3)
 					next[device] = Math.abs(eased - goal) < 0.004 ? goal : eased
+					changed ||= next[device] !== previous[device]
 				}
-				return next
+				return changed ? next : previous
 			})
 			const runningFor = now - begin
 			setSilent((previous) => {
 				const next = {
-					microphone: runningFor >= SILENCE_HOLD_MS && now - lastSound.microphone >= SILENCE_HOLD_MS,
-					system: runningFor >= SILENCE_HOLD_MS && now - lastSound.system >= SILENCE_HOLD_MS,
+					microphone: captured.microphone && runningFor >= SILENCE_HOLD_MS && now - lastSound.microphone >= SILENCE_HOLD_MS,
+					system: captured.system && runningFor >= SILENCE_HOLD_MS && now - lastSound.system >= SILENCE_HOLD_MS,
 				}
 				return next.microphone === previous.microphone && next.system === previous.system ? previous : next
 			})
@@ -204,6 +205,14 @@ const LONG_SILENCE_MS = 5 * 60 * 1000
 function useLongSilenceAlert(active: boolean, feedback: Record<RecordLevelDevice, SourceFeedback>, names: Record<RecordLevelDevice, string>, enabled: boolean) {
 	const silentSince = useRef<Record<RecordLevelDevice, number | null>>({ microphone: null, system: null })
 	const alerted = useRef<Record<RecordLevelDevice, boolean>>({ microphone: false, system: false })
+	// Both objects are rebuilt on every render (a level tick, a clock tick). Reading them through
+	// refs keeps the 15-second interval alive long enough to ever reach the five-minute window.
+	const feedbackRef = useRef(feedback)
+	const namesRef = useRef(names)
+	useEffect(() => {
+		feedbackRef.current = feedback
+		namesRef.current = names
+	})
 
 	useEffect(() => {
 		if (!active) {
@@ -213,6 +222,8 @@ function useLongSilenceAlert(active: boolean, feedback: Record<RecordLevelDevice
 		}
 		const timer = window.setInterval(() => {
 			const now = Date.now()
+			const feedback = feedbackRef.current
+			const names = namesRef.current
 			for (const device of DEVICES) {
 				if (!feedback[device].silent) {
 					silentSince.current[device] = null
@@ -228,7 +239,7 @@ function useLongSilenceAlert(active: boolean, feedback: Record<RecordLevelDevice
 			}
 		}, 15_000)
 		return () => window.clearInterval(timer)
-	}, [active, enabled, feedback, names])
+	}, [active, enabled])
 }
 
 /** Elapsed time and one meter per source — the same indicator in the main window and the chrome. */

@@ -331,8 +331,8 @@ describe('translated surfaces after a locale switch', () => {
 		const englishTitle = boldLead(rawFile(englishChangelog, '/i18n/changelog/unreleased.md'))
 		const frenchTitle = boldLead(rawFile(translatedChangelog, '/fr-FR/unreleased.md'))
 
-		// Opened from a shared link: the router's cached location still says en-US
-		// after the switch, so the page must read the live URL instead.
+		// Opened from a shared link: after switching away from the link's language,
+		// the page must follow the switch rather than the locale captured on load.
 		renderSite('/vibe/changelog/dev?lang=en-US')
 		await waitFor(() => expect(document.body.textContent).toContain(englishTitle))
 

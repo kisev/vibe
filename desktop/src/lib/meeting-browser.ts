@@ -83,13 +83,15 @@ export const isRecordingActive = () => invoke<boolean>('recording_active')
 /**
  * A host is stored as the bare lowercase host name: no scheme, path, port or credentials.
  * Anything that is not one DNS-shaped name (letters, digits and inner hyphens, dot-separated)
- * is refused rather than silently cleaned up.
+ * is refused rather than silently cleaned up. A single-label entry is refused too — allowing
+ * `com` would match every `*.com` host — except `localhost`.
  */
 const HOSTNAME_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 
 export function normalizeAllowedHost(value: string): string | null {
 	const host = value.trim().toLowerCase().replace(/\.$/, '')
 	if (!host || host.length > 253) return null
+	if (host !== 'localhost' && !host.includes('.')) return null
 	if (!host.split('.').every((label) => HOSTNAME_LABEL.test(label))) return null
 	return host
 }
@@ -136,20 +138,11 @@ export async function handOffMeetingLink(raw: string): Promise<void> {
 	}
 }
 
-/**
- * Hand a deep-linked URL to the browser window. The Rust side validates it; a rejection is
- * reported with its reason and nothing is opened.
- */
-export async function handOffMeetingUrl(url: string | null): Promise<void> {
-	if (!url) {
-		await message(m.meetingBrowserMissingLink(), { title: m.meetingBrowserTitle(), kind: 'error' })
-		return
-	}
-	try {
-		await openMeetingBrowser(url)
-	} catch (error) {
-		await message(m.meetingBrowserInvalidLink({ reason: String(error) }), { title: m.meetingBrowserTitle(), kind: 'error' })
-	}
+/** Hand over a launch argument when it is a meeting link; true when it was handled. */
+export async function handOffMeetingLaunchArg(raw: string): Promise<boolean> {
+	if (!isMeetingLaunchArg(raw)) return false
+	await handOffMeetingLink(raw)
+	return true
 }
 
 /** Everything a chrome-only picker needs: the device snapshot and the configured selection. */
@@ -191,12 +184,6 @@ export async function readRecordingDeviceState(): Promise<RecordingDeviceState> 
 		hiddenInputDevices,
 		hiddenOutputDevices,
 	}
-}
-
-/** The configured device selection, resolved exactly like the main recording path. */
-export async function readConfiguredRecordingDevices(): Promise<{ input: AudioDevice | null; output: AudioDevice | null }> {
-	const state = await readRecordingDeviceState()
-	return { input: state.input, output: state.output }
 }
 
 /**

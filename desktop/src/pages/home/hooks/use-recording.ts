@@ -29,7 +29,14 @@ export function useRecording(onBeforeStart: () => void) {
 	const [inputUnavailableName, setInputUnavailableName] = useState<string | null>(null)
 	const [outputUnavailableName, setOutputUnavailableName] = useState<string | null>(null)
 	const [isRecording, setIsRecording] = useState(false)
+	// When the running recording began, so a remounted indicator keeps its clock and its silence
+	// window instead of restarting them. Null whenever no recording is active.
+	const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null)
 	const [recordingName, setRecordingName] = useState('')
+
+	useEffect(() => {
+		if (!isRecording) setRecordingStartedAt(null)
+	}, [isRecording])
 
 	function setInputDeviceAndSave(value: SetStateAction<AudioDevice | null>) {
 		const device = typeof value === 'function' ? value(inputDevice) : value
@@ -109,6 +116,7 @@ export function useRecording(onBeforeStart: () => void) {
 				devices: selectedDevices,
 				recordingName: recordingName.trim() || null,
 			})
+			setRecordingStartedAt(Date.now())
 		} catch (error) {
 			stopKeepAwake(KEEP_AWAKE.record)
 			setIsRecording(false)
@@ -118,6 +126,15 @@ export function useRecording(onBeforeStart: () => void) {
 			void loadAudioDevices()
 		}
 	}
+
+	/**
+	 * Adopt a recording this hook did not start (the meeting chrome starts the same recorder).
+	 * Keeps one flag and one start time for every surface showing the recorder.
+	 */
+	const adoptRecording = useCallback((active: boolean, startedAt: number | null) => {
+		setIsRecording(active)
+		setRecordingStartedAt(active ? startedAt : null)
+	}, [])
 
 	async function stopRecord() {
 		try {
@@ -146,11 +163,14 @@ export function useRecording(onBeforeStart: () => void) {
 		refreshDevices: loadAudioDevices,
 		isRecording,
 		setIsRecording,
+		/** Epoch ms the running recording began; null when idle. */
+		startedAt: recordingStartedAt,
 		recordingName,
 		setRecordingName,
 		setInputDevice: setInputDeviceAndSave,
 		setOutputDevice: setOutputDeviceAndSave,
 		startRecord,
 		stopRecord,
+		adoptRecording,
 	}
 }

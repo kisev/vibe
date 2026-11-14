@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { TooltipProvider } from '~/components/ui/tooltip'
 import { m } from '~/paraglide/messages.js'
-import { SettingsRow } from './shared'
+import { ActionRow, SettingsRow } from './shared'
 
 afterEach(cleanup)
 
@@ -34,5 +34,19 @@ describe('settings row help', () => {
 	it('renders no info icon when the row has no description', () => {
 		renderRow()
 		expect(screen.queryByRole('button', { name: m.parameterHelp() })).toBeNull()
+	})
+
+	it('keeps the description visible on an action row without nesting a help button', () => {
+		render(
+			<TooltipProvider>
+				<ActionRow label="Reset app" description={m.infoTheme()} onClick={() => {}} />
+			</TooltipProvider>,
+		)
+
+		// The row itself is the only control: a help button nested inside it would be invalid
+		// markup and its clicks would run the row action instead of showing the hint.
+		expect(screen.getAllByRole('button')).toHaveLength(1)
+		expect(screen.queryByRole('button', { name: m.parameterHelp() })).toBeNull()
+		expect(screen.getByText(m.infoTheme())).toBeTruthy()
 	})
 })

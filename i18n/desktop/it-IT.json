@@ -442,6 +442,7 @@
   "updateDevBoundary": "Le build Dev risultano precedenti alla versione installata, quindi la linea dev inizia con un'installazione manuale di una build dev.",
   "updateDownloading": "Download dell'aggiornamento in corso…",
   "updateFailed": "L'ultimo controllo degli aggiornamenti non è riuscito",
+  "updateInstallFailed": "Non è stato possibile installare l'aggiornamento. Scarica la nuova versione dal sito web.",
   "updateInstalling": "Installazione dell'aggiornamento in corso…",
   "updateLastChecked": "Ultimo controllo {time}",
   "updateNoCandidate": "Nessun release candidate su questa linea",

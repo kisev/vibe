@@ -59,6 +59,14 @@ describe('tokenize', () => {
 	it('returns nothing for empty input', () => {
 		expect(tokenize('   ')).toEqual([])
 	})
+
+	it('segments a run of an unspaced script into words and reads back unchanged', () => {
+		const text = '今天天气很好。\n明天见 '
+		const tokens = tokenize(text)
+
+		expect(tokens.length).toBeGreaterThan(2)
+		expect(tokens.join('')).toBe(text)
+	})
 })
 
 describe('segmentsText', () => {

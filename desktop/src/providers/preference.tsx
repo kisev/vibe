@@ -244,7 +244,9 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 	})
 
 	const [recentLanguages, setRecentLanguages] = usePersisted<{ code: string; ts: number }[]>(CONFIG_KEYS.recentLanguages, [])
-	// On by default; the missing-model migration still switches it off when the model is absent.
+	// On by default. The migration below only revalidates a preference the user persisted, so a
+	// fresh install keeps the flag on without downloading anything; until the switch is toggled,
+	// buildSharedOptions drops the missing model and transcribes without speakers.
 	const [diarizeEnabled, setDiarizeEnabled] = usePersisted<boolean>(CONFIG_KEYS.diarizeEnabled, true)
 	const [stableTimestampsEnabled, setStableTimestampsEnabled] = usePersisted<boolean>(CONFIG_KEYS.stableTimestampsEnabled, false)
 	// Once per session: the diarization model changed format with the unified

@@ -259,9 +259,11 @@ tasks:
       - cargo test -p vibe-server
 
   rust:fmt-check:
-    desc: Format check over the root workspace (desktop app, CLI, server)
+    desc: Format check over both Rust workspaces (desktop app, CLI and server)
     cmds:
       - mise exec -- cargo fmt --all -- --check
+      # server/ is its own workspace, excluded by the root manifest.
+      - mise exec -- cargo fmt --all --manifest-path server/Cargo.toml -- --check
 
   # The mirror of lint_rust.yml's clippy job: the desktop workspace is where a
   # warning reaches CI as an error, and nothing else lints it locally.
@@ -551,8 +553,7 @@ tasks:
   ci:fetch-ffmpeg:
     desc: Fetch the bundled ffmpeg sidecar (FFMPEG_URL, TRIPLE, EXE, RUNNER_TEMP)
     cmds:
-      # `python` is what the old Actions `shell: python` used on every platform.
-      - python scripts/ci/fetch_ffmpeg.py
+      - '{{.PYTHON}} scripts/ci/fetch_ffmpeg.py'
 
   ci:build-server:
     desc: Build vibe-server and stage it as the desktop sidecar (TRIPLE, EXE, VIBE_SERVER_VERSION, VIBE_SERVER_COMMIT, TRANSCRIBE_CMAKE_ARGS)
@@ -613,7 +614,7 @@ tasks:
   release:set-version:
     desc: Validate and apply the release version override to tauri.conf.json (VERSION, GITHUB_REF)
     cmds:
-      - python3 scripts/release_set_version.py
+      - '{{.PYTHON}} scripts/release_set_version.py'
 
   release:notes:
     desc: Assemble the GitHub release body - English notes under the website changelog link (VERSION defaults to tauri.conf.json; RELEASE_NOTES; --github-output appends to $GITHUB_OUTPUT)

@@ -10,10 +10,12 @@
   "schedule": ["* 5-8 * * 1"],
   "ignorePaths": ["server/crates/*/scripts/**", "server/libs/**"],
   "automerge": false,
-  "mise": {
-    "enabled": false
-  },
   "packageRules": [
+    {
+      "description": "The built-in mise manager is off; the regex managers below cover every [tools] pin.",
+      "matchManagers": ["mise"],
+      "enabled": false
+    },
     {
       "matchManagers": ["cargo"],
       "groupName": "cargo dependencies",

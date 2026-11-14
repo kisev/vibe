@@ -442,6 +442,7 @@
   "updateDevBoundary": "Kompilacje Dev sortują się poniżej zainstalowanej wersji, więc kanał Dev zaczyna się od jednej ręcznej instalacji kompilacji Dev.",
   "updateDownloading": "Pobieranie aktualizacji…",
   "updateFailed": "Ostatnie sprawdzenie aktualizacji nie powiodło się",
+  "updateInstallFailed": "Nie udało się zainstalować aktualizacji. Pobierz nową wersję ze strony.",
   "updateInstalling": "Instalowanie aktualizacji…",
   "updateLastChecked": "Ostatnio sprawdzono {time}",
   "updateNoCandidate": "Brak wersji kandydującej w tej linii",

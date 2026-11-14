@@ -121,5 +121,7 @@
   "roadmap-description": "O que as próximas versões trarão. Cada entrada é uma mudança OpenSpec ativa no repositório.",
   "roadmap-note": "Essas mudanças estão planejadas, não lançadas. A lista é gerada a partir das propostas OpenSpec não arquivadas do repositório.",
   "roadmap-empty": "Nenhuma mudança planejada foi registrada ainda.",
-  "roadmap-load-failed": "Não foi possível carregar o roteiro."
+  "roadmap-load-failed": "Não foi possível carregar o roteiro.",
+  "dev-preview-banner": "Prévia de desenvolvimento — compilada a partir da branch dev.",
+  "dev-preview-link": "Abrir o site de lançamentos"
 }

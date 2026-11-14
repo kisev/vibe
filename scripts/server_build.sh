@@ -18,10 +18,10 @@ case "$triple" in
 *windows*) exe=".exe" ;;
 esac
 
-cargo build --manifest-path server/Cargo.toml -p vibe-server --release
+cargo build --manifest-path server/Cargo.toml -p vibe-server --release --target "$triple"
 
 bin="$ROOT/desktop/src-tauri/binaries"
 mkdir -p "$bin"
-cp "server/target/release/vibe-server$exe" "$bin/vibe-server-$triple$exe"
+cp "server/target/$triple/release/vibe-server$exe" "$bin/vibe-server-$triple$exe"
 chmod 755 "$bin/vibe-server-$triple$exe"
 echo "built vibe-server-$triple from server/"

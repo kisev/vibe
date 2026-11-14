@@ -121,5 +121,7 @@
   "roadmap-description": "Co przyniosą kolejne wydania. Każdy wpis to aktywna zmiana OpenSpec w repozytorium.",
   "roadmap-note": "Te zmiany są planowane, a nie wydane. Lista jest generowana z niearchiwizowanych propozycji OpenSpec z repozytorium.",
   "roadmap-empty": "Nie zapisano jeszcze żadnych planowanych zmian.",
-  "roadmap-load-failed": "Nie udało się wczytać planu rozwoju."
+  "roadmap-load-failed": "Nie udało się wczytać planu rozwoju.",
+  "dev-preview-banner": "Podgląd deweloperski — zbudowany z gałęzi dev.",
+  "dev-preview-link": "Otwórz stronę wydań"
 }

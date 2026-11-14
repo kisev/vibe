@@ -36,6 +36,9 @@ export default function Roadmap() {
 				<p className="mt-3 text-[13.5px] leading-6 text-muted-foreground">{m['roadmap-note']()}</p>
 			</header>
 
+			{/* Holds the page's height while roadmap.json loads, so the footer does not jump up and back. */}
+			{entries === null && !failed && <div className="mt-14 min-h-[60vh]" aria-hidden="true" />}
+
 			{failed && (
 				<p role="alert" className="mt-14 rounded-2xl border border-border/70 bg-card p-6 text-sm text-muted-foreground">
 					{m['roadmap-load-failed']()}

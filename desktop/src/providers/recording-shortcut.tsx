@@ -23,6 +23,8 @@ interface RecordingShortcutContextValue {
 	/** Keep the global toggle synchronized with recordings started from the regular UI. */
 	setNormalRecordingActive: (active: boolean) => void
 	isShortcutRecording: boolean
+	/** Epoch ms the shortcut-started recording began; null when idle. */
+	shortcutStartedAt: number | null
 }
 
 const RecordingShortcutContext = createContext<RecordingShortcutContextValue | null>(null)
@@ -44,6 +46,7 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 	const [recordingShortcut, setRecordingShortcut] = usePersisted(CONFIG_KEYS.recordingShortcut, getDefaultRecordingShortcut())
 	const [capturing, setCapturing] = useState(false)
 	const [isShortcutRecording, setIsShortcutRecording] = useState(false)
+	const [shortcutStartedAt, setShortcutStartedAt] = useState<number | null>(null)
 	const recordingRef = useRef(false)
 	const normalRecordingActiveRef = useRef(false)
 	const startingRef = useRef(false)
@@ -84,6 +87,7 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 			recordingRef.current = true
 			normalRecordingActiveRef.current = true
 			setIsShortcutRecording(true)
+			setShortcutStartedAt(Date.now())
 			return true
 		} catch (error) {
 			console.error('Recording shortcut failed to start:', error)
@@ -123,6 +127,7 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 			if (!recordingRef.current) return
 			recordingRef.current = false
 			setIsShortcutRecording(false)
+			setShortcutStartedAt(null)
 		}
 		const unlistenFinish = listen('record_finish', resetRecording)
 		const unlistenError = listen('record_error', resetRecording)
@@ -210,6 +215,7 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 				setRecordingShortcutCapturing,
 				setNormalRecordingActive,
 				isShortcutRecording,
+				shortcutStartedAt,
 			}}>
 			{children}
 		</RecordingShortcutContext.Provider>

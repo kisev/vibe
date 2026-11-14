@@ -71,6 +71,9 @@ describe('recording indicator', () => {
 		render(<RecordingIndicator startedAt={Date.now()} microphoneName="Camera Mic" systemName="Speakers" />)
 		await settle()
 
+		// Both sources are captured but open and quiet: the recorder sends level 0 for each.
+		level('microphone', 0)
+		level('system', 0)
 		act(() => vi.advanceTimersByTime(1600))
 		expect(screen.getAllByText(m.recordingSilent())).toHaveLength(2)
 

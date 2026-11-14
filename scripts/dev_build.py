@@ -76,10 +76,13 @@ def unreleased_changelog() -> bytes:
     body: list[bytes] = []
     delimiters = 0
     for record in records:
-        if delimiters == 2:
-            body.append(record + b"\n")
-        if record == b"---":
-            delimiters += 1
+        if delimiters < 2:
+            if record == b"---":
+                delimiters += 1
+            continue
+        # A `---` inside the body is content (a thematic break, a setext
+        # heading), not another delimiter.
+        body.append(record + b"\n")
     text = b"".join(body).lstrip(b"\n")[:CHANGELOG_LIMIT]
     return text.rstrip(b"\n")
 

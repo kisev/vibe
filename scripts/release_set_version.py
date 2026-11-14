@@ -8,7 +8,6 @@ forward. Overrides are cut from main only. Reads VERSION and GITHUB_REF.
 
 from __future__ import annotations
 
-import json
 import os
 import re
 import sys
@@ -18,18 +17,35 @@ TAURI_CONFIG = Path("desktop/src-tauri/tauri.conf.json")
 VERSION_PATTERN = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?")
 
 
+def env(name: str) -> str:
+    value = os.environ.get(name)
+    if value is None:
+        raise SystemExit(f"{name} is required")
+    return value
+
+
 def main() -> int:
-    version = os.environ["VERSION"]
-    ref = os.environ["GITHUB_REF"]
+    version = env("VERSION")
+    ref = env("GITHUB_REF")
     if ref != "refs/heads/main":
         print(f"::error::release overrides are cut from main only (on {ref})")
         return 1
     if not VERSION_PATTERN.fullmatch(version):
         print(f"::error::version must be X.Y.Z or X.Y.Z-rc.N, got {version}")
         return 1
-    config = json.loads(TAURI_CONFIG.read_text())
-    config["version"] = version
-    TAURI_CONFIG.write_text(json.dumps(config, indent=2) + "\n")
+    # Replace the field in place: json.dumps would reflow every one-line array
+    # in the file, turning a local run into a diff of the whole config.
+    text = TAURI_CONFIG.read_text(encoding="utf-8")
+    updated, count = re.subn(
+        r'("version"\s*:\s*")[^"]*"',
+        lambda match: f'{match.group(1)}{version}"',
+        text,
+        count=1,
+    )
+    if count != 1:
+        print("::error::no version field to override in tauri.conf.json")
+        return 1
+    TAURI_CONFIG.write_text(updated, encoding="utf-8")
     return 0
 
 

@@ -442,6 +442,7 @@
   "updateDevBoundary": "Dev 构建的版本号排序低于您已安装的版本，因此进入 Dev 线需先手动安装一次 Dev 构建。",
   "updateDownloading": "正在下载更新…",
   "updateFailed": "上次检查更新失败",
+  "updateInstallFailed": "无法安装更新。请从网站下载新版本。",
   "updateInstalling": "正在安装更新…",
   "updateLastChecked": "上次检查：{time}",
   "updateNoCandidate": "此线路暂无候选版本",

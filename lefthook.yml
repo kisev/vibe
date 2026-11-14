@@ -76,9 +76,10 @@ pre-commit:
       run: mise exec -- editorconfig-checker {staged_files}
     rust-format:
       # rustfmt needs no compilation, so every commit checks it; the lint
-      # workflow runs the same command tree-wide
+      # workflow runs the same command tree-wide. server/ is its own workspace,
+      # which the root manifest excludes, so it needs its own invocation.
       glob: "**/*.rs"
-      run: cargo fmt --all -- --check
+      run: cargo fmt --all -- --check && cargo fmt --all --manifest-path server/Cargo.toml -- --check
 
     prettier:
       # The pages and style sheets had no pre-commit formatter, so an

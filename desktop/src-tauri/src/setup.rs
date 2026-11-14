@@ -38,19 +38,21 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
     let store = app.store(STORE_FILENAME)?;
 
-    // The allowlist replaced the meeting-host list; carry over whatever the user had stored.
-    if let Err(error) = crate::browser_policy::migrate(app.handle()) {
-        tracing::warn!("could not migrate the browser allowlist: {error}");
-    }
-    // Seed the cache the resource filter reads, so the first request needs no store access.
-    crate::browser_policy::seed_policy(app.handle());
-
     // Setup logging to terminal
     {
         let mut app_handle = STATIC_APP.lock().expect("lock");
         *app_handle = Some(app.handle().clone());
     }
     crate::logging::setup_logging(app.handle(), store).unwrap();
+
+    // The allowlist replaced the meeting-host list; carry over whatever the user had stored.
+    // Both this and the policy seed report failures through `tracing`, so they run only once the
+    // global subscriber exists: a warning emitted before that is silently dropped.
+    if let Err(error) = crate::browser_policy::migrate(app.handle()) {
+        tracing::warn!("could not migrate the browser allowlist: {error}");
+    }
+    // Seed the cache the resource filter reads, so the first request needs no store access.
+    crate::browser_policy::seed_policy(app.handle());
     crate::cleaner::clean_old_logs(app.handle()).log_error();
     crate::cleaner::clean_old_files().log_error();
     crate::cleaner::clean_updater_files().log_error();
@@ -77,17 +79,51 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // The local API is a persisted intent, not a side effect: only a user who left the switch on
-    // gets a server at launch. The spawn handshakes with the sidecar, so it runs in the background
-    // rather than delaying the window; a failure is logged and retried on the next launch.
-    if crate::cmd::config::api_server_enabled(app.handle()) {
+    // gets a server at launch. A CLI launch exits through `std::process::exit`, which runs no
+    // destructors and fires no `RunEvent::Exit`, so a server started here would be orphaned with
+    // its base URL left published in the config: the autostart is GUI-only.
+    if !is_cli_detected() && crate::cmd::config::api_server_enabled(app.handle()) {
         let app_handle = app.app_handle().clone();
         let unload_timeout_minutes = crate::cmd::config::unload_timeout_minutes(&app_handle);
         tauri::async_runtime::spawn(async move {
+            // The sidecar handshake blocks for up to `READY_TIMEOUT`, so it runs on a blocking
+            // thread and happens before the lock: taking the state lock first would queue every
+            // other server command (metadata, model load) behind a sidecar that may never answer.
+            let spawn_handle = app_handle.clone();
+            let spawned = tauri::async_runtime::spawn_blocking(move || {
+                let cpu_variant = crate::cmd::config::cpu_variant(&spawn_handle);
+                crate::cmd::server_cmd::spawn_process(&spawn_handle, unload_timeout_minutes, cpu_variant)
+            })
+            .await;
+            let process = match spawned {
+                Ok(Ok(process)) => process,
+                Ok(Err(error)) => {
+                    tracing::error!("could not start the local API server at launch: {:#}", error);
+                    return;
+                }
+                Err(error) => {
+                    tracing::error!("could not run the local API server start task: {error}");
+                    return;
+                }
+            };
             let state = app_handle.state::<Mutex<ServerState>>();
             let mut guard = state.lock().await;
-            if let Err(error) = crate::cmd::server_cmd::start_process(&app_handle, &mut guard, unload_timeout_minutes) {
-                tracing::error!("could not start the local API server at launch: {:#}", error);
+            // A command may have brought a server up while this one handshook; that process
+            // serves, and the one just spawned is dropped (and killed) unused.
+            let mut served = None;
+            if let Some(existing) = guard.process.as_mut() {
+                if existing.is_alive() {
+                    served = Some(existing.base_url());
+                }
             }
+            let base_url = match served {
+                Some(base_url) => base_url,
+                None => {
+                    guard.process = Some(process);
+                    guard.process.as_ref().map(|process| process.base_url()).unwrap_or_default()
+                }
+            };
+            crate::cmd::config::set_api_base_url(&app_handle, Some(&base_url)).log_error();
         });
     }
 

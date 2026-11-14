@@ -28,9 +28,45 @@ export const MAX_DIFF_TOKENS = 20_000
  */
 export const MAX_DIFF_EDITS = 2_000
 
+/**
+ * `Intl.Segmenter` is typed in `ES2022.Intl`, which this tsconfig does not load, so only the
+ * shape used here is declared. WebView2 and WebKit both provide it; older engines fall back to
+ * the whitespace regex below.
+ */
+interface WordSegment {
+	segment: string
+	isWordLike?: boolean
+}
+type WordSegmenter = { segment(input: string): Iterable<WordSegment> }
+const Segmenter = (
+	Intl as unknown as { Segmenter?: new (locale?: string, options?: { granularity: 'word' }) => WordSegmenter }
+).Segmenter
+const wordSegmenter = Segmenter ? new Segmenter(undefined, { granularity: 'word' }) : null
+
+/** Scripts written without spaces between words, where the whitespace regex is one token. */
+const UNSPACED_SCRIPT = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff66-\uff9f]/
+
 /** Words with their trailing whitespace, so joining the tokens restores the text. */
 export function tokenize(text: string): string[] {
-	return text.match(/\S+\s*/g) ?? []
+	const tokens = text.match(/\S+\s*/g)
+	if (!tokens) return []
+	if (!wordSegmenter) return tokens
+	return tokens.flatMap((token) => {
+		const trailing = token.match(/\s*$/)?.[0] ?? ''
+		const body = token.slice(0, token.length - trailing.length)
+		// Spaced scripts are already split by the regex; only a run of an unspaced script
+		// needs the segmenter, and leaving the rest on the regex keeps its tokens stable.
+		if (!UNSPACED_SCRIPT.test(body)) return [token]
+		const pieces: string[] = []
+		for (const part of wordSegmenter.segment(body)) {
+			// Punctuation joins the word before it, so it does not become a token of its own.
+			if (part.isWordLike === false && pieces.length > 0) pieces[pieces.length - 1] += part.segment
+			else pieces.push(part.segment)
+		}
+		if (pieces.length === 0) return [token]
+		pieces[pieces.length - 1] += trailing
+		return pieces
+	})
 }
 
 interface Edit {

@@ -40,6 +40,12 @@ function wordCount(parts: DiffPart[], kind: DiffPart['kind']): number {
 	return parts.filter((part) => part.kind === kind).reduce((count, part) => count + tokenize(part.text).length, 0)
 }
 
+/** Highlighting for the two kinds of change, so the render stays a single condition. */
+const DIFF_CLASS: Record<'added' | 'removed', string> = {
+	added: 'rounded-[2px] bg-emerald-500/25 text-emerald-800 dark:text-emerald-200',
+	removed: 'rounded-[2px] bg-red-500/20 text-red-700 line-through decoration-red-500/70 dark:text-red-300',
+}
+
 /** The diff is baseline → candidate: words the model missed are struck out, extra words are green. */
 function DiffText({ parts }: { parts: DiffPart[] }) {
 	return (
@@ -48,13 +54,7 @@ function DiffText({ parts }: { parts: DiffPart[] }) {
 				part.kind === 'same' ? (
 					<span key={index}>{part.text}</span>
 				) : (
-					<span
-						key={index}
-						className={
-							part.kind === 'added'
-								? 'rounded-[2px] bg-emerald-500/25 text-emerald-800 dark:text-emerald-200'
-								: 'rounded-[2px] bg-red-500/20 text-red-700 line-through decoration-red-500/70 dark:text-red-300'
-						}>
+					<span key={index} className={DIFF_CLASS[part.kind]}>
 						{part.text}
 					</span>
 				),
@@ -64,7 +64,7 @@ function DiffText({ parts }: { parts: DiffPart[] }) {
 }
 
 export function ModelsComparisonResults({ input, runs, open, onOpenChange }: ComparisonResultsProps) {
-	const done = runs.filter((run) => run.status === 'done')
+	const done = useMemo(() => runs.filter((run) => run.status === 'done'), [runs])
 	// A failed run still gets a column: dropping it makes the model look unselected
 	// rather than broken, and the error is the one thing that explains the gap.
 	const failed = runs.filter((run) => run.status === 'error')
@@ -72,6 +72,18 @@ export function ModelsComparisonResults({ input, runs, open, onOpenChange }: Com
 	const [highlight, setHighlight] = useState(true)
 	const baseline = done.find((run) => run.model.path === baselinePath) ?? done[0]
 	const baselineText = useMemo(() => transcriptText(baseline?.segments ?? []), [baseline])
+	// The word diff is the expensive part of this view (up to MAX_DIFF_TOKENS per pair). Text and
+	// diffs are computed once per result set instead of on every highlight toggle or re-render.
+	const texts = useMemo(() => new Map(done.map((run) => [run.model.path, transcriptText(run.segments ?? [])])), [done])
+	const diffs = useMemo(() => {
+		const baselineModelPath = baseline?.model.path
+		return new Map(
+			done.map((run) => [
+				run.model.path,
+				run.model.path === baselineModelPath ? null : diffWords(baselineText, texts.get(run.model.path) ?? ''),
+			]),
+		)
+	}, [done, baseline, baselineText, texts])
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -135,9 +147,9 @@ export function ModelsComparisonResults({ input, runs, open, onOpenChange }: Com
 								)
 							}
 							const isBaseline = run.model.path === baseline?.model.path
-							const text = transcriptText(run.segments ?? [])
+							const text = texts.get(run.model.path) ?? ''
 							const words = tokenize(text).length
-							const diff = isBaseline ? null : diffWords(baselineText, text)
+							const diff = diffs.get(run.model.path) ?? null
 							const added = diff?.complete ? wordCount(diff.parts, 'added') : 0
 							const removed = diff?.complete ? wordCount(diff.parts, 'removed') : 0
 							return (

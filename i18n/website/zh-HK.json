@@ -121,5 +121,7 @@
   "roadmap-description": "接下來的版本會帶來什麼。每條記錄都是倉庫中一個活躍的 OpenSpec 變更。",
   "roadmap-note": "這些變更只是計劃，尚未發佈。列表由倉庫中未封存的 OpenSpec 提案產生。",
   "roadmap-empty": "尚未記錄任何計劃變更。",
-  "roadmap-load-failed": "無法載入路線圖。"
+  "roadmap-load-failed": "無法載入路線圖。",
+  "dev-preview-banner": "開發預覽 — 由 dev 分支構建。",
+  "dev-preview-link": "開啟發佈網站"
 }

@@ -11,15 +11,23 @@ on:
             - "i18n/desktop/**"
             - "scripts/ci/e2e.sh"
             - "taskfile.yml"
+            - ".github/workflows/e2e.yml"
     workflow_dispatch:
 
 permissions:
     contents: read
 
+concurrency:
+    group: e2e-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
     e2e:
         runs-on: ubuntu-latest
         timeout-minutes: 25
+        env:
+            # Setup mise installs only `task`; the suite needs no other lint tool.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - uses: actions/checkout@v4
             - uses: pnpm/action-setup@v4
@@ -28,7 +36,7 @@ jobs:
                   node-version: 22
                   cache: pnpm
             - name: Setup mise
-              uses: jdx/mise-action@v2
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
                   install: true
                   install_args: aqua:go-task/task

@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import * as os from '@tauri-apps/plugin-os'
 import { invoke } from '@tauri-apps/api/core'
-import { handOffMeetingLink, isMeetingLaunchArg } from './meeting-browser'
+import { handOffMeetingLaunchArg } from './meeting-browser'
 
 interface UseDeepLinksProps {
 	setFiles: ModifyState<NamedPath[]>
@@ -21,8 +21,7 @@ export function useDeepLinks({ setFiles }: UseDeepLinksProps) {
 		const newFiles: NamedPath[] = []
 		for (let url of urls) {
 			// A meeting scheme or https link delivered by the system's handler.
-			if (isMeetingLaunchArg(url) && !url.startsWith('vibe://')) {
-				await handOffMeetingLink(url)
+			if (await handOffMeetingLaunchArg(url)) {
 				continue
 			}
 			if (url.startsWith('vibe://download/?url=')) {

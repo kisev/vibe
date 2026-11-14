@@ -449,6 +449,7 @@
   "updateDownloading": "Téléchargement de la mise à jour…",
   "updateInstalling": "Installation de la mise à jour…",
   "updateFailed": "La dernière recherche de mise à jour a échoué",
+  "updateInstallFailed": "La mise à jour n'a pas pu être installée. Téléchargez la nouvelle version depuis le site Web.",
   "updateLastChecked": "Dernière vérification {time}",
   "updateNoCandidate": "Aucune candidate sur cette ligne",
   "updatingModalBody": "Mise à jour de Vibe vers la version {version}",

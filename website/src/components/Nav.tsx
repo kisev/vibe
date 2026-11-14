@@ -51,9 +51,9 @@ export default function Nav({ locale, availableLocales, onLocaleChange }: NavPro
 							<Moon className="hidden size-4 dark:block" />
 						</button>
 					)}
-					{/* The same selector at both breakpoints: compact in the small-screen header, full in the desktop nav. */}
-					<LanguageSelector compact className="sm:hidden" locale={locale} availableLocales={availableLocales} onLocaleChange={onLocaleChange} />
-					<LanguageSelector className="hidden sm:block" locale={locale} availableLocales={availableLocales} onLocaleChange={onLocaleChange} />
+					{/* The same selector at both breakpoints; only the parent's classes decide which slot shows it. */}
+					<LanguageSelector placement="mobile" className="sm:hidden" locale={locale} availableLocales={availableLocales} onLocaleChange={onLocaleChange} />
+					<LanguageSelector placement="desktop" className="hidden sm:block" locale={locale} availableLocales={availableLocales} onLocaleChange={onLocaleChange} />
 					<li>
 						<Button size="sm" asChild>
 							<a href="#download" onClick={onDownloadClick}>

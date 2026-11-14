@@ -159,21 +159,21 @@ export async function buildSharedOptions(preference: Preference) {
 			: null
 	// A preference can be on while the model is not on disk yet (it is the default, and the
 	// download is a separate step); sending a missing path would fail the whole transcription.
-	const diarizePath = preference.diarizeEnabled && modelsFolder ? `${modelsFolder}/${config.diarizeModelFilename}` : null
-	let diarizeUsable = diarizePath !== null
-	if (diarizePath) {
+	// Null it out when the model is not usable, so the type itself carries the invariant and the
+	// spread below cannot send a path that failed the check.
+	let diarizeModel = preference.diarizeEnabled && modelsFolder ? `${modelsFolder}/${config.diarizeModelFilename}` : null
+	if (diarizeModel) {
 		try {
-			diarizeUsable = await isModelFileUsable(diarizePath)
+			if (!(await isModelFileUsable(diarizeModel))) diarizeModel = null
 		} catch {
 			// The check is a guard, not a gate: if it cannot run, behave as before and send it.
-			diarizeUsable = true
 		}
 	}
 	const ffmpeg = preference.ffmpegOptions
 	const wantsProcessing = Boolean(ffmpeg) && (ffmpeg.normalize_loudness || (ffmpeg.custom_command ?? '').trim().length > 0)
 	return {
 		...(wantsProcessing && ffmpeg ? { ffmpeg_options: { normalize_loudness: ffmpeg.normalize_loudness, custom_command: ffmpeg.custom_command } } : {}),
-		...(diarizeUsable ? { diarize_model: diarizePath } : {}),
+		...(diarizeModel ? { diarize_model: diarizeModel } : {}),
 		...(stableTimestamps || requiresVad ? { vad_model: `${modelsFolder}/${config.vadModelFilename}` } : {}),
 		...(stableTimestamps ? { stable_timestamps: true } : {}),
 		...(chunkSeconds != null ? { chunk_seconds: chunkSeconds } : {}),

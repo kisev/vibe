@@ -161,6 +161,11 @@ def docs_audit() -> tuple[list[str], list[str]]:
                 issues.append(f"docs: {locale}/{relative} is not a page the site shows")
                 continue
             english = DOCS / "en-US" / relative
+            # A translation whose English original is gone is already an issue
+            # above; hashing the missing file must not abort the audit.
+            if not english.exists():
+                issues.append(f"docs: {locale}/{relative} has no English original")
+                continue
             match = DOC_STAMP.match((directory / relative).read_text())
             if not match or match.group(1) != source_hash(english):
                 stale.append(relative)
