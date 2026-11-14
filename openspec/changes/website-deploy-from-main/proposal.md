@@ -8,17 +8,18 @@ The trigger is also wrong on its own terms. A release event deploys whatever ref
 
 ## What Changes
 
-- `.github/workflows/website.yml` no longer triggers on `release: published`. Deployment stays on push to `main` and on manual `workflow_dispatch`.
-- Nothing else about the build changes: the `pwa`, `build` and `deploy` jobs, the `pages` concurrency group and the environment name stay as they are.
+- `.github/workflows/website.yml` no longer triggers on `release: published`. The release site stays on push to `main` and on manual `workflow_dispatch`; a push to `dev` keeps refreshing the `/vibe/dev/` preview while `/vibe/` is built from `main`.
+- The phone PWA job no longer assumes the checked-out branch ships `handoff/`: `scripts/website_probe_phone.sh` reports whether it does, `pwa` runs only then, and `build` depends on the probe rather than on the phone job, so the site publishes without `/phone/` until a release includes it.
+- The `pages` concurrency group and the environment name stay as they are.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `website`: how the public site is built and deployed — which refs may deploy it and what a release event does to it.
+- `website`: how the public site is built and deployed — which refs may deploy it, what a release event does to it, and whether the phone handoff is part of the artifact.
 
 ## Impact
 
-- `.github/workflows/website.yml` (trigger block only).
-- No app, server, script or content change.
+- `.github/workflows/website.yml` (trigger block and the phone job wiring), `scripts/website_probe_phone.sh`.
+- No app, server or content change.
 - The janitor stops receiving failed Deploy Website runs caused by tags; it keeps its Dev Build healing path.
