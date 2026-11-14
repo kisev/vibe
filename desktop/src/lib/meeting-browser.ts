@@ -45,6 +45,18 @@ export const allowBrowserHost = (host: string) => invoke<string[]>('browser_allo
 
 export const removeBrowserAllowedHost = (host: string) => invoke<string[]>('browser_remove_allowed_host', { host })
 
+/**
+ * How far the allowlist reaches. `strict` checks every origin; `trusted-site` lets an allowed
+ * page load resources from anywhere, but navigation is gated in both modes.
+ */
+export type BrowserPolicy = 'strict' | 'trusted-site'
+
+/** The stored policy; a missing value means `strict`. */
+export const getBrowserPolicy = () => invoke<BrowserPolicy>('get_browser_policy')
+
+/** Persist the policy. The backend refuses anything but the two known values. */
+export const setBrowserPolicy = (policy: BrowserPolicy) => invoke<BrowserPolicy>('set_browser_policy', { policy })
+
 /** The full blocked list, emitted whenever a new host is refused. */
 export const BROWSER_BLOCKED_HOSTS_EVENT = 'browser-blocked-hosts'
 

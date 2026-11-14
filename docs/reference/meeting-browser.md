@@ -27,6 +27,8 @@ The embedded browser is an allowlist. Only hosts in `browser.allowedHosts` (edit
 
 Every top-level navigation and every resource request from an unlisted origin is refused and the origin is recorded once under **Blocked**, newest first. Allowing a blocked host adds it to the list and reloads the open pages. Windows enforces resource blocking through WebView2's `WebResourceRequested`; Linux and macOS currently enforce top-level navigation only.
 
+Two modes decide how far that reaches, under `browser.policy` (**Settings → Recording → Blocking policy**). `strict` is the default: every origin, whether a navigation or a resource, must be on the list. `trusted-site` lets a page opened on an allowed host load its resources from anywhere — useful when a site pulls scripts and fonts from a CDN — while links to other domains are still refused. Navigation is gated in both modes; there is no mode that drops the allowlist. The mode is read when a browser window opens, so a change applies to windows opened afterwards. While the strict mode has blocked something, the chrome shows the blocked hosts behind one button and allows any of them in place, without visiting Settings.
+
 ## Settings and actions
 
 | Where | What |

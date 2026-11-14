@@ -10,13 +10,16 @@ import {
 	BROWSER_BLOCKED_HOSTS_EVENT,
 	getBrowserAllowedHosts,
 	getBrowserBlockedHosts,
+	getBrowserPolicy,
 	getMeetingSchemesEnabled,
 	meetingSchemesSupported,
 	normalizeAllowedHost,
 	normalizeMeetingUrl,
 	openMeetingBrowser,
 	removeBrowserAllowedHost,
+	setBrowserPolicy,
 	setMeetingSchemesEnabled,
+	type BrowserPolicy,
 } from '~/lib/meeting-browser'
 import { m } from '~/paraglide/messages.js'
 import { IconAction, SettingsField, SettingsGroup, SettingsNote, SettingsRow } from './shared'
@@ -33,6 +36,7 @@ function errorText(error: unknown) {
 export function MeetingBrowserSettings() {
 	const [hosts, setHosts] = useState<string[]>([])
 	const [blocked, setBlocked] = useState<string[]>([])
+	const [policy, setPolicy] = useState<BrowserPolicy>('strict')
 	const [draft, setDraft] = useState('')
 	const [error, setError] = useState<string | null>(null)
 	const [link, setLink] = useState('')
@@ -64,11 +68,12 @@ export function MeetingBrowserSettings() {
 	useEffect(() => {
 		let cancelled = false
 		let unlisten: (() => void) | undefined
-		Promise.all([getBrowserAllowedHosts(), getBrowserBlockedHosts()])
-			.then(([allowed, blockedHosts]) => {
+		Promise.all([getBrowserAllowedHosts(), getBrowserBlockedHosts(), getBrowserPolicy()])
+			.then(([allowed, blockedHosts, storedPolicy]) => {
 				if (cancelled) return
 				setHosts(allowed)
 				setBlocked(blockedHosts)
+				setPolicy(storedPolicy)
 			})
 			.catch((reason) => console.error('Failed to read the browser allowlist:', reason))
 		// The blocked registry changes from the page webview, not only from this screen.
@@ -105,6 +110,18 @@ export function MeetingBrowserSettings() {
 		}
 	}
 
+	/** The backend refuses anything but the two known modes; the selected value is authoritative. */
+	async function changePolicy(next: BrowserPolicy) {
+		const previous = policy
+		setPolicy(next)
+		try {
+			setPolicy(await setBrowserPolicy(next))
+		} catch (reason) {
+			setPolicy(previous)
+			toast.error(errorText(reason))
+		}
+	}
+
 	function addHost() {
 		const host = normalizeAllowedHost(draft)
 		if (!host) {
@@ -135,9 +152,7 @@ export function MeetingBrowserSettings() {
 	return (
 		<div className="space-y-6">
 			{/* Taking a scheme from the application that owns it is opt-in and reversible. */}
-			<SettingsGroup
-				title={m.meetingHandlers()}
-				description={handlers && !handlers.supported ? m.meetingHandlersUnavailable() : m.meetingHandlersInfo()}>
+			<SettingsGroup title={m.meetingHandlers()} description={handlers && !handlers.supported ? m.meetingHandlersUnavailable() : m.meetingHandlersInfo()}>
 				<SettingsRow label={m.meetingHandlers()} description={m.infoMeetingHandlers()}>
 					<Switch
 						checked={handlers?.enabled ?? false}
@@ -148,14 +163,24 @@ export function MeetingBrowserSettings() {
 				</SettingsRow>
 			</SettingsGroup>
 
+			{/* Two modes only; navigation is always gated. */}
+			<SettingsGroup>
+				<SettingsRow label={m.browserPolicy()} description={m.browserPolicyInfo()}>
+					<select
+						aria-label={m.browserPolicy()}
+						value={policy}
+						onChange={(event) => void changePolicy(event.target.value as BrowserPolicy)}
+						className="h-9 w-40 cursor-pointer rounded-lg border border-input/60 bg-muted/40 px-2 text-sm text-foreground">
+						<option value="strict">{m.browserPolicyStrict()}</option>
+						<option value="trusted-site">{m.browserPolicyTrustedSite()}</option>
+					</select>
+				</SettingsRow>
+			</SettingsGroup>
+
 			<SettingsGroup title={m.browserAllowedHosts()} description={m.browserAllowedHostsInfo()}>
 				{hosts.map((host) => (
 					<SettingsRow key={host} label={<span className="font-mono text-sm">{host}</span>}>
-						<IconAction
-							label={m.browserAllowedHostRemove({ host })}
-							icon={<X className="h-4 w-4" />}
-							onClick={() => void remove(host)}
-						/>
+						<IconAction label={m.browserAllowedHostRemove({ host })} icon={<X className="h-4 w-4" />} onClick={() => void remove(host)} />
 					</SettingsRow>
 				))}
 				<SettingsField
@@ -186,16 +211,19 @@ export function MeetingBrowserSettings() {
 				</SettingsField>
 			</SettingsGroup>
 
-			<SettingsGroup title={m.browserBlockedHosts()} description={m.browserBlockedHostsInfo()}>
-				{blocked.length === 0 && <SettingsNote>{m.browserBlockedHostsEmpty()}</SettingsNote>}
-				{blocked.map((host) => (
-					<SettingsRow key={host} label={<span className="font-mono text-sm">{host}</span>}>
-						<Button type="button" variant="outline" size="sm" className="h-9 rounded-lg" onClick={() => void allow(host)}>
-							{m.browserBlockedHostAllow()}
-						</Button>
-					</SettingsRow>
-				))}
-			</SettingsGroup>
+			{/* Nothing is recorded while trusted-site skips the resource filter. */}
+			{policy === 'strict' && (
+				<SettingsGroup title={m.browserBlockedHosts()} description={m.browserBlockedHostsInfo()}>
+					{blocked.length === 0 && <SettingsNote>{m.browserBlockedHostsEmpty()}</SettingsNote>}
+					{blocked.map((host) => (
+						<SettingsRow key={host} label={<span className="font-mono text-sm">{host}</span>}>
+							<Button type="button" variant="outline" size="sm" className="h-9 rounded-lg" onClick={() => void allow(host)}>
+								{m.browserBlockedHostAllow()}
+							</Button>
+						</SettingsRow>
+					))}
+				</SettingsGroup>
+			)}
 
 			<SettingsGroup title={m.openInVibe()} description={m.openInVibeInfo()}>
 				<SettingsField label={m.openInVibeUrlLabel()} description={m.infoOpenInVibeLink()}>

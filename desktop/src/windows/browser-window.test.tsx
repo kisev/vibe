@@ -62,6 +62,8 @@ beforeEach(() => {
 		if (command === 'meeting_browser_session') return session
 		if (command === 'meeting_browser_load') return { ...session, url: 'https://example.com/' }
 		if (command === 'get_audio_devices') return devices
+		if (command === 'get_browser_policy') return 'strict'
+		if (command === 'browser_blocked_hosts') return []
 		return undefined
 	})
 	mocks.listen.mockImplementation(async (event: string, callback: (event: { payload: any }) => void) => {
@@ -165,5 +167,38 @@ describe('browser chrome', () => {
 		await screen.findByLabelText(m.meetingBarAddress())
 		await userEvent.click(screen.getByRole('button', { name: m.meetingBarClose() }))
 		await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('meeting_browser_close', { session: 7 }))
+	})
+})
+
+describe('blocked hosts in the chrome', () => {
+	function withBlocked(hosts: string[], policy: 'strict' | 'trusted-site' = 'strict') {
+		mocks.invoke.mockImplementation(async (command: string) => {
+			if (command === 'meeting_browser_session') return session
+			if (command === 'get_audio_devices') return devices
+			if (command === 'get_browser_policy') return policy
+			if (command === 'browser_blocked_hosts') return hosts
+			if (command === 'browser_allow_host') return []
+			return undefined
+		})
+	}
+
+	it('lists the blocked hosts in a popover and allows one without leaving the browser', async () => {
+		withBlocked(['cdn.other.test'])
+		render(<BrowserWindow session={7} />)
+
+		const trigger = await screen.findByRole('button', { name: m.browserBlockedHostsCount({ count: 1 }) })
+		await userEvent.click(trigger)
+		expect(await screen.findByText('cdn.other.test')).toBeTruthy()
+
+		await userEvent.click(screen.getByRole('button', { name: m.browserBlockedHostAllowHost({ host: 'cdn.other.test' }) }))
+		await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('browser_allow_host', { host: 'cdn.other.test' }))
+		await waitFor(() => expect(screen.queryByText('cdn.other.test')).toBeNull())
+	})
+
+	it('hides the blocked control while the policy is trusted-site', async () => {
+		withBlocked(['cdn.other.test'], 'trusted-site')
+		render(<BrowserWindow session={7} />)
+		await screen.findByLabelText(m.meetingBarAddress())
+		expect(screen.queryByRole('button', { name: m.browserBlockedHostsCount({ count: 1 }) })).toBeNull()
 	})
 })

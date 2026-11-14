@@ -6,6 +6,8 @@ import type { CommandHandlerMap } from '../types'
 /** Starts empty, like the Rust side: what the user stored is the only source of entries. */
 let allowedHosts: string[] = []
 let blockedHosts: string[] = []
+/** `strict` checks every origin; `trusted-site` skips the (mock) resource filter only. */
+let policy = 'strict'
 let schemesEnabled = false
 let nextSession = 0
 const sessions = new Map<number, { session: number; url: string; host: string; canBack: boolean; canForward: boolean }>()
@@ -51,6 +53,18 @@ export const meetingHandlers: CommandHandlerMap = {
 		const host = String(args.host ?? '').trim().toLowerCase()
 		allowedHosts = allowedHosts.filter((item) => item !== host)
 		return [...allowedHosts]
+	},
+
+	// Like the Rust command: only the two known modes are accepted, and there is no "off".
+	get_browser_policy: () => policy,
+
+	set_browser_policy: (args) => {
+		const next = String(args.policy ?? '')
+		if (next !== 'strict' && next !== 'trusted-site') {
+			throw `[mock-meeting] unknown browser policy: ${next}`
+		}
+		policy = next
+		return policy
 	},
 
 	meeting_schemes_enabled: () => schemesEnabled,

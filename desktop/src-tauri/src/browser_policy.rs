@@ -15,8 +15,57 @@ use tauri_plugin_store::StoreExt;
 pub const ALLOWED_HOSTS_KEY: &str = "browser.allowedHosts";
 /// The key the previous release wrote; migrated into [`ALLOWED_HOSTS_KEY`] on startup.
 pub const LEGACY_HOSTS_KEY: &str = "meeting.browserHosts";
+/// The strictness setting. There is deliberately no "off": navigation is always gated.
+pub const POLICY_KEY: &str = "browser.policy";
 /// Emitted with the full blocked list whenever it changes.
 pub const BLOCKED_HOSTS_EVENT: &str = "browser-blocked-hosts";
+
+/// How far the allowlist reaches. `strict` checks every origin; `trusted-site` lets an allowed
+/// page load its resources from anywhere but never relaxes the navigation gate.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Policy {
+    #[default]
+    Strict,
+    TrustedSite,
+}
+
+impl Policy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Strict => "strict",
+            Self::TrustedSite => "trusted-site",
+        }
+    }
+
+    /// Reject anything that is not one of the two known modes; there is no third value.
+    pub fn parse(raw: &str) -> Result<Self, String> {
+        match raw.trim() {
+            "strict" => Ok(Self::Strict),
+            "trusted-site" => Ok(Self::TrustedSite),
+            other => Err(format!(
+                "Unknown browser policy {other:?}; expected \"strict\" or \"trusted-site\""
+            )),
+        }
+    }
+
+    /// Navigation is gated identically in both modes.
+    pub fn blocks_navigation(self, url: &str, allowed: &[String]) -> bool {
+        should_block(url, allowed)
+    }
+
+    /// Only `strict` filters resources; `trusted-site` leaves them to the engine.
+    pub fn blocks_resource(self, url: &str, allowed: &[String]) -> bool {
+        match self {
+            Self::Strict => should_block(url, allowed),
+            Self::TrustedSite => false,
+        }
+    }
+
+    /// Whether a page window needs the per-origin resource filter at all.
+    pub fn filters_resources(self) -> bool {
+        matches!(self, Self::Strict)
+    }
+}
 
 /// Last saved allowlist, so the resource-request hot path never touches the store.
 static ALLOWED: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
@@ -124,6 +173,38 @@ pub fn load_allowed(app: &AppHandle) -> Vec<String> {
         .map(|store| parse_host_list(store.get(ALLOWED_HOSTS_KEY)))
         .unwrap_or_default();
     set_cache(hosts)
+}
+
+/// Decode the stored policy: missing means `strict`, and an unknown or non-string value is an
+/// error rather than a silent third mode.
+pub fn parse_stored_policy(value: Option<serde_json::Value>) -> Result<Policy, String> {
+    match value {
+        None => Ok(Policy::default()),
+        Some(serde_json::Value::String(raw)) => Policy::parse(&raw),
+        Some(other) => Err(format!("Stored browser policy must be a string, found {other}")),
+    }
+}
+
+/// Read the policy from the store. A corrupt value falls back to `strict` (the safe mode) and
+/// leaves the stored value alone so the user can still see and fix it.
+pub fn load_policy(app: &AppHandle) -> Policy {
+    let stored = app.store(STORE_FILENAME).ok().and_then(|store| store.get(POLICY_KEY));
+    match parse_stored_policy(stored) {
+        Ok(policy) => policy,
+        Err(error) => {
+            tracing::warn!("{error}; using the strict browser policy");
+            Policy::default()
+        }
+    }
+}
+
+/// Persist one of the two known policies; anything else is refused before it touches the store.
+pub fn save_policy(app: &AppHandle, raw: &str) -> Result<Policy, String> {
+    let policy = Policy::parse(raw)?;
+    let store = app.store(STORE_FILENAME).map_err(|error| error.to_string())?;
+    store.set(POLICY_KEY, serde_json::json!(policy.as_str()));
+    store.save().map_err(|error| error.to_string())?;
+    Ok(policy)
 }
 
 fn save_allowed(app: &AppHandle, hosts: Vec<String>) -> Result<Vec<String>, String> {
@@ -311,5 +392,41 @@ mod tests {
         assert!(!push_blocked(&mut blocked, "https://second.example.com/path"));
         assert!(!push_blocked(&mut blocked, "   "));
         assert_eq!(blocked.len(), 2);
+    }
+
+    #[test]
+    fn policy_modes_gate_resources_but_never_navigation() {
+        let allowed = hosts(&["example.com"]);
+        let third_party = "https://cdn.other.test/app.js";
+
+        // Strict refuses a resource from an origin outside the list.
+        assert!(Policy::Strict.blocks_resource(third_party, &allowed));
+        // Trusted-site leaves resources to the engine, whatever their origin.
+        assert!(!Policy::TrustedSite.blocks_resource(third_party, &allowed));
+
+        // Navigation is refused identically in both modes.
+        for policy in [Policy::Strict, Policy::TrustedSite] {
+            assert!(policy.blocks_navigation("https://other.test/room", &allowed));
+            assert!(policy.blocks_navigation("http://example.com/room", &allowed));
+            assert!(!policy.blocks_navigation("https://meet.example.com/room", &allowed));
+        }
+
+        assert!(Policy::Strict.filters_resources());
+        assert!(!Policy::TrustedSite.filters_resources());
+    }
+
+    #[test]
+    fn stored_policy_defaults_to_strict_and_refuses_unknown_values() {
+        assert_eq!(parse_stored_policy(None), Ok(Policy::Strict));
+        assert_eq!(parse_stored_policy(Some(serde_json::json!("strict"))), Ok(Policy::Strict));
+        assert_eq!(
+            parse_stored_policy(Some(serde_json::json!("trusted-site"))),
+            Ok(Policy::TrustedSite)
+        );
+        // No "off", no unknown string, no non-string value.
+        assert!(parse_stored_policy(Some(serde_json::json!("off"))).is_err());
+        assert!(parse_stored_policy(Some(serde_json::json!(""))).is_err());
+        assert!(parse_stored_policy(Some(serde_json::json!(true))).is_err());
+        assert!(Policy::parse("nonsense").is_err());
     }
 }

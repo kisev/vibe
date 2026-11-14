@@ -170,6 +170,8 @@ async fn main() -> Result<()> {
             meeting_browser::browser_blocked_hosts,
             meeting_browser::browser_allow_host,
             meeting_browser::browser_remove_allowed_host,
+            meeting_browser::get_browser_policy,
+            meeting_browser::set_browser_policy,
             meeting_browser::open_meeting_link,
             meeting_browser::meeting_browser_retry,
             meeting_browser::meeting_schemes_supported,

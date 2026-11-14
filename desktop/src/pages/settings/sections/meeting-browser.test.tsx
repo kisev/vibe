@@ -32,6 +32,8 @@ beforeEach(() => {
 		if (command === 'browser_blocked_hosts') return [...blocked]
 		if (command === 'browser_allow_host') return [...new Set([...stored, String(args?.host ?? '')])]
 		if (command === 'browser_remove_allowed_host') return stored.filter((host) => host !== args?.host)
+		if (command === 'get_browser_policy') return 'strict'
+		if (command === 'set_browser_policy') return String((args as { policy?: string } | undefined)?.policy ?? 'strict')
 		return undefined
 	})
 })
@@ -108,5 +110,23 @@ describe('browser allowlist settings', () => {
 		await user.click(screen.getByRole('button', { name: m.openInVibeAction() }))
 
 		await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('open_meeting_browser', { url: 'https://meet.example.com/j/1' }))
+	})
+})
+
+describe('blocking policy', () => {
+	it('starts strict and persists a change to trusted-site', async () => {
+		renderSettings()
+		const select = (await screen.findByLabelText(m.browserPolicy())) as HTMLSelectElement
+		expect(select.value).toBe('strict')
+
+		await userEvent.selectOptions(select, 'trusted-site')
+		await waitFor(() => expect(lastCall('set_browser_policy')?.[1]).toMatchObject({ policy: 'trusted-site' }))
+	})
+
+	it('hides the blocked hosts while the policy is trusted-site', async () => {
+		renderSettings()
+		const select = (await screen.findByLabelText(m.browserPolicy())) as HTMLSelectElement
+		await userEvent.selectOptions(select, 'trusted-site')
+		await waitFor(() => expect(screen.queryByText(m.browserBlockedHosts())).toBeNull())
 	})
 })

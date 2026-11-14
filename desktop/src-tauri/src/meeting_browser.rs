@@ -262,8 +262,12 @@ fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo
         .map_err(|error| format!("Could not open the browser page: {error}"))?;
 
     // Windows intercepts every resource request; other platforms are navigation-only for now.
+    // The policy is read here, once per window: changing it in Settings applies to windows
+    // opened afterwards, never to a page that is already loaded.
     #[cfg(windows)]
-    install_resource_interceptor(&page, app.clone());
+    if browser_policy::load_policy(app).filters_resources() {
+        install_resource_interceptor(&page, app.clone());
+    }
     #[cfg(not(windows))]
     let _ = page;
 
@@ -280,7 +284,9 @@ fn allow_navigation(app: &AppHandle, session: u64, url: &Url) -> bool {
 /// navigation must be stopped.
 fn refuse_if_blocked(app: &AppHandle, session: u64, url: &str) -> bool {
     let allowed = browser_policy::allowed();
-    if !browser_policy::should_block(url, &allowed) {
+    // Navigation is gated the same way in every policy mode; trusted-site only skips resources.
+    let policy = browser_policy::load_policy(app);
+    if !policy.blocks_navigation(url, &allowed) {
         return false;
     }
     let host = browser_policy::host_of(url);
@@ -697,6 +703,18 @@ pub fn browser_allow_host(app: AppHandle, host: String) -> Result<Vec<String>, S
 #[tauri::command]
 pub fn browser_remove_allowed_host(app: AppHandle, host: String) -> Result<Vec<String>, String> {
     browser_policy::remove_allowed_host(&app, &host)
+}
+
+/// The stored strictness mode (`strict` or `trusted-site`); missing means `strict`.
+#[tauri::command]
+pub fn get_browser_policy(app: AppHandle) -> String {
+    browser_policy::load_policy(&app).as_str().to_string()
+}
+
+/// Persist the strictness mode; anything but the two known values is refused.
+#[tauri::command]
+pub fn set_browser_policy(app: AppHandle, policy: String) -> Result<String, String> {
+    browser_policy::save_policy(&app, &policy).map(|policy| policy.as_str().to_string())
 }
 
 /// Reload every page webview that is open, on the main thread where the engine expects it.

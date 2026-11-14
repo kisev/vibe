@@ -47,3 +47,12 @@ Each settings parameter SHALL offer an info affordance that shows a short explan
 
 - **WHEN** the interface language changes
 - **THEN** the explanations are shown in that language, with no English fallback where a translation exists
+
+### Requirement: A hint earns its place
+
+Each parameter's explanation SHALL say what the option changes and, where a real choice exists, how to choose it. A restatement of the label, or text that names the control without explaining the consequence, is not acceptable; such hints SHALL be rewritten rather than copied into the tooltip.
+
+#### Scenario: Reviewing a hint
+
+- **WHEN** a hint only repeats the label or states the obvious
+- **THEN** it is rewritten to name the consequence and the trade-off, or the row keeps no info icon until one exists

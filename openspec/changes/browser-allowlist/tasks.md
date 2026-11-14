@@ -14,3 +14,5 @@
 
 - New desktop strings (`browserAllowedHosts*`, `browserBlockedHosts*`, `browserNavigationBlocked`) exist only in `i18n/desktop/en-US.json`; another pass translates them with `/translate`.
 - The Windows COM path (`desktop/src-tauri/src/meeting_browser.rs`, `install_resource_interceptor`) is `cfg(windows)` and was not compiled on the Linux host that implemented this change.
+- [x] 10. Strictness setting `browser.policy` (`strict` default, `trusted-site` skips the per-origin resource filter, never the navigation gate) with a Settings selector.
+- [x] 11. The chrome lists blocked hosts with Allow in a popover of its own, hidden when empty or off-policy.

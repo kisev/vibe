@@ -8,16 +8,20 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { emit, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { ArrowLeft, ArrowRight, ExternalLink, Mic, RotateCw, Square, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ExternalLink, Mic, RotateCw, ShieldAlert, Square, X } from 'lucide-react'
 import RecordingIndicator from '~/components/recording-feedback'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import type { AudioDevice } from '~/lib/audio'
 import { deviceMenuEntries, type DeviceMenuEntry } from '~/lib/device-selection'
 import {
 	allowBrowserHost,
+	BROWSER_BLOCKED_HOSTS_EVENT,
 	BROWSER_NAVIGATION_BLOCKED_EVENT,
 	closeMeetingBrowser,
+	getBrowserBlockedHosts,
+	getBrowserPolicy,
 	getMeetingBrowserSession,
 	navigateMeetingBrowser,
 	openMeetingBrowserExternal,
@@ -30,6 +34,7 @@ import {
 	RECORDING_TOGGLE_EVENT,
 	type BrowserNavigationAction,
 	type BrowserNavigationBlocked,
+	type BrowserPolicy,
 	type BrowserSessionInfo,
 	type RecordingDeviceState,
 	type RecordingStatePayload,
@@ -115,6 +120,9 @@ export default function BrowserWindow({ session }: { session: number }) {
 	const [error, setError] = useState<string | null>(null)
 	/** A host the allowlist refused in this window; the notice offers to allow it. */
 	const [blockedHost, setBlockedHost] = useState<string | null>(null)
+	/** Every host the strict policy refused; the toolbar popover offers to allow them. */
+	const [blockedHosts, setBlockedHosts] = useState<string[]>([])
+	const [policy, setPolicy] = useState<BrowserPolicy>('strict')
 	const [recording, setRecording] = useState(false)
 	const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null)
 	const [recordingDevices, setRecordingDevices] = useState<RecordingDeviceState | null>(null)
@@ -136,8 +144,21 @@ export default function BrowserWindow({ session }: { session: number }) {
 				if (current) setAddress(current.url)
 			})
 			.catch((reason) => console.error('could not read the browser session:', reason))
+		// The policy is read when this window opens: a change applies to windows opened
+		// afterwards, matching the Rust side that installs the resource filter.
+		getBrowserPolicy()
+			.then((storedPolicy) => {
+				if (active) setPolicy(storedPolicy)
+			})
+			.catch((reason) => console.error('could not read the browser policy:', reason))
+		getBrowserBlockedHosts()
+			.then((hosts) => {
+				if (active) setBlockedHosts(hosts)
+			})
+			.catch((reason) => console.error('could not read the blocked hosts:', reason))
 
 		const unlisteners: (() => void)[] = []
+		listen<string[]>(BROWSER_BLOCKED_HOSTS_EVENT, (event) => setBlockedHosts(event.payload)).then((fn) => unlisteners.push(fn))
 		listen<BrowserSessionInfo>('meeting-browser-session', (event) => {
 			if (event.payload.session !== session) return
 			setInfo(event.payload)
@@ -194,6 +215,7 @@ export default function BrowserWindow({ session }: { session: number }) {
 	function allowHost(host: string) {
 		void run(async () => {
 			await allowBrowserHost(host)
+			setBlockedHosts((current) => current.filter((item) => item !== host))
 			setBlockedHost(null)
 		})
 	}
@@ -237,6 +259,43 @@ export default function BrowserWindow({ session }: { session: number }) {
 							onChange={(event) => setAddress(event.target.value)}
 						/>
 					</form>
+					{/* Strict only; the popover may extend over the page area. */}
+					{policy === 'strict' && blockedHosts.length > 0 && (
+						<Popover>
+							<PopoverTrigger asChild>
+								<Button
+									variant="ghost"
+									size="icon"
+									className="relative"
+									aria-label={m.browserBlockedHostsCount({ count: blockedHosts.length })}
+									title={m.browserBlockedHostsCount({ count: blockedHosts.length })}>
+									<ShieldAlert className="h-4 w-4 text-destructive" />
+									<span className="pointer-events-none absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground">
+										{blockedHosts.length}
+									</span>
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent align="end" className="w-64 p-2">
+								<p className="px-2 pb-1 pt-0.5 text-xs font-medium text-foreground">{m.browserBlockedHosts()}</p>
+								<div className="max-h-56 space-y-0.5 overflow-y-auto">
+									{blockedHosts.map((host) => (
+										<div key={host} className="flex items-center justify-between gap-2 rounded-md px-2 py-1 hover:bg-accent/45">
+											<span className="min-w-0 truncate font-mono text-xs">{host}</span>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												className="h-7 shrink-0 px-2 text-xs"
+												aria-label={m.browserBlockedHostAllowHost({ host })}
+												onClick={() => allowHost(host)}>
+												{m.browserBlockedHostAllow()}
+											</Button>
+										</div>
+									))}
+								</div>
+							</PopoverContent>
+						</Popover>
+					)}
 					<Button
 						variant="ghost"
 						size="icon"

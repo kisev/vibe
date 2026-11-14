@@ -9,3 +9,5 @@
   - Verified: `parameterHelp` plus the 23 new keys exist in all 21 non-English catalogs (837 keys each); `pnpm --dir desktop i18n:generate`, `pnpm --dir desktop exec tsc --noEmit` and `mise exec -- oxfmt --check i18n/desktop` pass. `task i18n:audit` passes with one fallback warning for `recordingLongSilence`, a key added to `en-US` concurrently by another change, outside this task's strings.
 - [ ] 6. The main window applies locale and theme before its first paint.
 - [ ] 7. Tests: defaults, the moved note, the absence of the Discord entry, the info tooltip text, first-paint locale.
+- [ ] 8. Audit every settings hint: each names the consequence and, where a choice exists, how to choose; weak restatements are rewritten in en-US.
+- [ ] 9. The rewritten hints are translated into every desktop locale.
