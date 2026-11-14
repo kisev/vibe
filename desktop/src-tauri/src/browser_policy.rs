@@ -54,6 +54,7 @@ impl Policy {
     }
 
     /// Only `strict` filters resources; `trusted-site` leaves them to the engine.
+    #[cfg_attr(not(windows), allow(dead_code))]
     pub fn blocks_resource(self, url: &str, allowed: &[String]) -> bool {
         match self {
             Self::Strict => should_block(url, allowed),
@@ -62,6 +63,7 @@ impl Policy {
     }
 
     /// Whether a page window needs the per-origin resource filter at all.
+    #[cfg_attr(not(windows), allow(dead_code))]
     pub fn filters_resources(self) -> bool {
         matches!(self, Self::Strict)
     }

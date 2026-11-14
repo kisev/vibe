@@ -791,6 +791,8 @@ unsafe fn block_resource_request(
     let mut uri = PWSTR::null();
     request.Uri(&mut uri).map_err(|error| error.to_string())?;
     let uri = webview2_com::take_pwstr(uri);
+    // The filter is only installed for a strict window, so every request here is checked against
+    // the allowlist; reading the policy per request would put a store read on the hot path.
     if !browser_policy::should_block(&uri, &browser_policy::allowed()) {
         return Ok(());
     }
