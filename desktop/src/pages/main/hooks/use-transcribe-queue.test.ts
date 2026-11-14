@@ -36,13 +36,19 @@ const whisper: ModelCapabilities = {
 
 function preferenceWith(
 	capabilities: ModelCapabilities,
-	overrides: { diarizeEnabled?: boolean; stableTimestampsEnabled?: boolean; chunkSeconds?: number | null } = {},
+	overrides: {
+		diarizeEnabled?: boolean
+		stableTimestampsEnabled?: boolean
+		chunkSeconds?: number | null
+		ffmpegOptions?: { normalize_loudness: boolean; custom_command: string | null }
+	} = {},
 ) {
 	return {
 		modelMetadata: { format: 'gguf', capabilities },
 		diarizeEnabled: false,
 		stableTimestampsEnabled: false,
 		chunkSeconds: null,
+		ffmpegOptions: { normalize_loudness: false, custom_command: null },
 		...overrides,
 	} as unknown as Preference
 }
@@ -50,6 +56,18 @@ function preferenceWith(
 describe('shared transcription options', () => {
 	it('passes the required VAD model to GigaAM', async () => {
 		expect(await buildSharedOptions(preferenceWith(gigaam))).toEqual({ vad_model: '/models/ggml-silero-v6.2.0.bin' })
+	})
+
+	it('carries the audio-processing settings when they do something', async () => {
+		const options = await buildSharedOptions(
+			preferenceWith(gigaam, { ffmpegOptions: { normalize_loudness: true, custom_command: null } }),
+		)
+		expect(options.ffmpeg_options).toEqual({ normalize_loudness: true, custom_command: null })
+	})
+
+	it('sends no processing when both settings are off', async () => {
+		const options = await buildSharedOptions(preferenceWith(gigaam))
+		expect(options).not.toHaveProperty('ffmpeg_options')
 	})
 
 	it('keeps diarization working for GigaAM', async () => {

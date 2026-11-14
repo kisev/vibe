@@ -139,6 +139,8 @@ export interface ComparisonLoadOptions {
 	gpuDevice: number | null
 	noGpu: boolean
 	unloadTimeoutMinutes: number
+	/** The audio-processing settings, applied before upload as everywhere else. */
+	ffmpegOptions?: { normalize_loudness: boolean; custom_command: string | null }
 }
 
 /** The Tauri-backed world: the same `load_model` / `transcribe` commands the transcription queue uses. */
@@ -160,10 +162,13 @@ export function tauriComparisonIo(load: ComparisonLoadOptions, projectsPath?: st
 		// model differences. Every run of one comparison gets the same set.
 		transcribe: async (modelPath, path, language) => {
 			const vadModel = await comparisonVadModel(modelPath)
+			const ffmpeg = load.ffmpegOptions
+			const wantsProcessing = ffmpeg ? ffmpeg.normalize_loudness || (ffmpeg.custom_command ?? '').trim().length > 0 : false
 			const result = await invoke<{ segments: Segment[] }>('transcribe', {
 				options: {
 					path,
 					lang: language,
+					...(wantsProcessing && ffmpeg ? { ffmpeg_options: ffmpeg } : {}),
 					...(vadModel ? { vad_model: vadModel } : {}),
 					...(diarizeModelPath ? { diarize_model: diarizeModelPath } : {}),
 				},

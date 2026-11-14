@@ -138,6 +138,10 @@ impl HandoffHandler {
         let vad_model = required_vad_model(metadata.capabilities.requires_vad, &models_folder)?;
 
         let options = crate::cmd::TranscribeOptions {
+            // Phone handoff recordings are transcribed as they arrived; the desktop settings
+            // live on the device that receives them, and adding preprocessing here would need
+            // its own setting decision.
+            ffmpeg_options: None,
             path: audio_path.to_string_lossy().to_string(),
             lang: header.lang.clone(),
             verbose: None,

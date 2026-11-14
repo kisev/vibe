@@ -188,6 +188,7 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 				gpuDevice: vm.preference.gpuDevice,
 				noGpu: vm.preference.noGpu,
 				unloadTimeoutMinutes: vm.preference.unloadTimeoutMinutes,
+				ffmpegOptions: vm.preference.ffmpegOptions,
 			},
 			vm.preference.projectsPath,
 			diarize ? diarizeModelPath : null,

@@ -169,7 +169,10 @@ export async function buildSharedOptions(preference: Preference) {
 			diarizeUsable = true
 		}
 	}
+	const ffmpeg = preference.ffmpegOptions
+	const wantsProcessing = Boolean(ffmpeg) && (ffmpeg.normalize_loudness || (ffmpeg.custom_command ?? '').trim().length > 0)
 	return {
+		...(wantsProcessing && ffmpeg ? { ffmpeg_options: { normalize_loudness: ffmpeg.normalize_loudness, custom_command: ffmpeg.custom_command } } : {}),
 		...(diarizeUsable ? { diarize_model: diarizePath } : {}),
 		...(stableTimestamps || requiresVad ? { vad_model: `${modelsFolder}/${config.vadModelFilename}` } : {}),
 		...(stableTimestamps ? { stable_timestamps: true } : {}),

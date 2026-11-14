@@ -15,8 +15,7 @@ use tokio::sync::Mutex;
 
 use super::{ui::set_progress_bar, CommandError};
 
-#[allow(dead_code)]
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct FfmpegOptions {
     pub normalize_loudness: bool,
     pub custom_command: Option<String>,
@@ -51,6 +50,37 @@ pub struct TranscribeOptions {
     pub vad_model: Option<String>,
     /// Upper bound per model input for long recordings; None uses the engine maximum.
     pub chunk_seconds: Option<f64>,
+    /// Audio processing applied before upload; None sends the file untouched.
+    pub ffmpeg_options: Option<FfmpegOptions>,
+}
+
+/// The ffmpeg arguments the saved settings ask for, or `None` when nothing is requested.
+///
+/// The filter mirrors the placeholder the settings field shows, so what the user reads is what
+/// runs; a custom command is appended after it and split on whitespace like the field itself.
+pub fn processing_args(options: &FfmpegOptions) -> Option<Vec<String>> {
+    let mut args = Vec::new();
+    if options.normalize_loudness {
+        args.push("-af".to_string());
+        args.push("loudnorm=I=-16:TP=-1.5:LRA=11".to_string());
+    }
+    if let Some(custom) = options.custom_command.as_deref() {
+        args.extend(custom.split_whitespace().map(str::to_string));
+    }
+    (!args.is_empty()).then_some(args)
+}
+
+/// Deletes the preprocessed copy however the run ends, including an early error.
+struct TempAudio(Option<PathBuf>);
+
+impl Drop for TempAudio {
+    fn drop(&mut self) {
+        if let Some(path) = self.0.take() {
+            if let Err(error) = std::fs::remove_file(&path) {
+                tracing::warn!("could not remove the processed audio {}: {error}", path.display());
+            }
+        }
+    }
 }
 
 pub(crate) const SERVER_DIED: &str = "vibe-server process died during transcription";
@@ -84,7 +114,7 @@ async fn transcribe_error(server_state: &State<'_, Mutex<ServerState>>, error: e
 #[tauri::command]
 pub async fn transcribe(
     app_handle: tauri::AppHandle,
-    options: TranscribeOptions,
+    mut options: TranscribeOptions,
     server_state: State<'_, Mutex<ServerState>>,
 ) -> Result<Transcript, CommandError> {
     // Validate file exists before attempting transcription
@@ -100,6 +130,19 @@ pub async fn transcribe(
             code: "invalid_request".to_string(),
             message: format!("Path is not a file: {}", options.path),
         });
+    }
+
+    // Audio processing happens on this side, before upload: the pinned server converts to WAV
+    // without a filter, so a setting it never sees is a setting that does nothing.
+    let mut processed = TempAudio(None);
+    if let Some(args) = options.ffmpeg_options.as_ref().and_then(processing_args) {
+        let output = crate::ffmpeg::get_vibe_temp_folder().join(format!("{}.wav", crate::ffmpeg::random_string(10)));
+        crate::ffmpeg::normalize(audio_path.clone(), output.clone(), Some(args)).map_err(|error| CommandError {
+            code: "ffmpeg_failed".to_string(),
+            message: format!("Audio processing failed: {error}"),
+        })?;
+        options.path = output.to_string_lossy().into_owned();
+        processed.0 = Some(output);
     }
 
     let (client, base_url) = {
@@ -202,4 +245,41 @@ pub async fn transcribe(
     };
 
     Ok(transcript)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalization_alone_mirrors_the_field_placeholder() {
+        let options = FfmpegOptions {
+            normalize_loudness: true,
+            custom_command: None,
+        };
+        assert_eq!(
+            processing_args(&options),
+            Some(vec!["-af".to_string(), "loudnorm=I=-16:TP=-1.5:LRA=11".to_string()])
+        );
+    }
+
+    #[test]
+    fn a_custom_command_is_appended_after_the_filter() {
+        let options = FfmpegOptions {
+            normalize_loudness: true,
+            custom_command: Some("-af volume=2dB -ar 44100".to_string()),
+        };
+        let args = processing_args(&options).unwrap_or_default();
+        assert_eq!(args.last().map(String::as_str), Some("44100"));
+        assert!(args.windows(2).any(|pair| pair == ["-af", "volume=2dB"]));
+    }
+
+    #[test]
+    fn nothing_asked_for_means_the_file_is_untouched() {
+        let options = FfmpegOptions {
+            normalize_loudness: false,
+            custom_command: Some("   ".to_string()),
+        };
+        assert_eq!(processing_args(&options), None);
+    }
 }
