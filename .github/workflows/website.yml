@@ -1,14 +1,20 @@
 name: Deploy Website
 
 # One deploy publishes two builds: the release site at /vibe/ from main and the
-# dev preview at /vibe/dev/ from dev. A push to either branch that touches the
-# site (or a manual dispatch) rebuilds both, so the preview is always the current
-# dev tree and the release site only moves when main does.
+# dev preview at /vibe/dev/ from dev. A push to main that touches the site (or a
+# manual dispatch) rebuilds both, so the preview follows the dev tree even though
+# the run itself belongs to the release line, and the release site only moves
+# when main does.
+#
+# Deploys start from `main` only. The github-pages environment's branch policy
+# lists `main` and `dev`, but GitHub still skips the deploy job of a run on a
+# `dev` ref — with no error, while the run reads success — so a dev start there
+# is a silent no-deploy. Until that is understood, the dev push builds nothing
+# on the site; /vibe/dev/ first appears when this pipeline reaches `main`.
 on:
     push:
         branches:
             - main
-            - dev
         paths:
             - "website/**"
             - "i18n/**"
@@ -17,16 +23,15 @@ on:
             - "scripts/dev_manifest.py"
             - "scripts/website_build.sh"
             - "scripts/website_assemble.sh"
-            - "scripts/website_probe_phone.sh"
             - "scripts/website_links.py"
             - "handoff/pwa/**"
             - "handoff/wasm/**"
             - "taskfile.yml"
             - ".github/workflows/website.yml"
-    # No `release` trigger: the github-pages environment's branch policy admits
-    # branches, so a tag ref fails the deploy job before its first step, and a dev
-    # tag would publish the dev branch. A release's content reaches the site
-    # through the main push that precedes it; workflow_dispatch covers the rest.
+    # No `release` trigger: the environment's branch policy admits branches, so
+    # a tag ref leaves the deploy job skipped, and a dev tag would publish the
+    # dev branch. A release's content reaches the site through the main push
+    # that precedes it; workflow_dispatch covers the rest.
     workflow_dispatch:
 
 # Allow this job to clone the repo and create a page deployment
@@ -55,9 +60,18 @@ jobs:
               with:
                   ref: main
 
+            # Inline on purpose: the checkout under test is main, which carries
+            # neither this workflow's newer steps nor any probe script of its
+            # own — a `task` or script call here would test the wrong tree.
             - name: Does the release line carry the phone handoff?
               id: probe
-              run: bash scripts/website_probe_phone.sh
+              run: |
+                  if grep -q '^  phone:pwa:' taskfile.yml && [ -f handoff/pwa/package.json ]; then
+                    echo "present=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "present=false" >> "$GITHUB_OUTPUT"
+                    echo "::notice::main carries no phone handoff; the release site ships without /phone/"
+                  fi
 
     # Built on Linux on purpose: the iroh client pulls in `ring`, which compiles C
     # for wasm32, and the macOS runners' Apple clang has no wasm target.
@@ -144,6 +158,16 @@ jobs:
               with:
                   ref: main
 
+            # The release site's content comes from main, its pipeline from dev.
+            # Main lags a release behind: right after a rollback it carries no
+            # `website:build` task, no assembly script and no uv project at all,
+            # and using its own taskfile failed the deploy with "task does not
+            # exist" before the Python helpers failed on a missing httpx.
+            - name: Take the deploy pipeline from dev
+              run: |
+                  git fetch --depth 1 origin dev
+                  git checkout FETCH_HEAD -- taskfile.yml scripts/ pyproject.toml uv.lock
+
             - name: setup pnpm
               uses: pnpm/action-setup@v4
               with:
@@ -211,8 +235,21 @@ jobs:
               with:
                   path: website/dist-site
 
+    # A deploy job on a ref GitHub will not admit is skipped, not failed, and the
+    # run still reads "success". Fail loudly instead of reporting a deploy that
+    # never happened.
+    guard:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Require a main ref
+              run: |
+                  if [ "$GITHUB_REF_NAME" != "main" ]; then
+                    echo "::error::Deploy Website publishes from main only; dispatch it on main."
+                    exit 1
+                  fi
+
     deploy:
-        needs: build
+        needs: [guard, build]
         runs-on: ubuntu-latest
 
         environment:

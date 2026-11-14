@@ -6,7 +6,10 @@ set -euo pipefail
 
 mkdir -p desktop/dist desktop/src-tauri/binaries
 triple="$(rustc -vV | sed -n 's/host: //p')"
+# The macOS config swaps the diarization helper for ffmpeg, so a check on that
+# platform needs that placeholder too; elsewhere it is simply unused.
 touch "desktop/src-tauri/binaries/vibe-server-$triple" \
-    "desktop/src-tauri/binaries/vibe-diarize-native-$triple"
+    "desktop/src-tauri/binaries/vibe-diarize-native-$triple" \
+    "desktop/src-tauri/binaries/ffmpeg-$triple"
 chmod +x desktop/src-tauri/binaries/*
 cargo check --manifest-path desktop/src-tauri/Cargo.toml --all-targets

@@ -175,3 +175,36 @@ jobs:
 
             - name: Type-check the desktop crate
               run: mise exec -- task ci:desktop-check
+
+    # Same check on macOS, for one reason: the crate's macOS-only blocks compile
+    # nowhere else, and four dev releases in a row (dev.81–dev.84) went out with
+    # every macOS cell failing on a `bail!` this crate never imported while every
+    # other cell was green. The check takes minutes; a failed release takes a
+    # matrix and a janitor rerun chain.
+    desktop-check-macos:
+        timeout-minutes: 30
+        runs-on: macos-latest
+        env:
+            # Setup mise installs only `task`; this job does not need the
+            # lint/format toolchain.
+            MISE_EXEC_AUTO_INSTALL: "false"
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
+
+            - name: Setup Rust stable
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Cache cargo
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: desktop/src-tauri
+
+            - name: Type-check the desktop crate
+              run: mise exec -- task ci:desktop-check

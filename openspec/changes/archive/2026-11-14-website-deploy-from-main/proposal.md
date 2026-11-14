@@ -8,8 +8,9 @@ The trigger is also wrong on its own terms. A release event deploys whatever ref
 
 ## What Changes
 
-- `.github/workflows/website.yml` no longer triggers on `release: published`. The release site stays on push to `main` and on manual `workflow_dispatch`; a push to `dev` keeps refreshing the `/vibe/dev/` preview while `/vibe/` is built from `main`.
-- The phone PWA job no longer assumes the checked-out branch ships `handoff/`: `scripts/website_probe_phone.sh` reports whether it does, `pwa` runs only then, and `build` depends on the probe rather than on the phone job, so the site publishes without `/phone/` until a release includes it.
+- `.github/workflows/website.yml` no longer triggers on `release: published`, and deployments start from `main` only: a `dev` push creates no run, and a `guard` job fails a dispatch on any other ref instead of reporting a skipped deploy as success. The release site is built from `main`; the dev preview is built from the `dev` tree inside that deploy.
+- The phone PWA job no longer assumes the release line ships `handoff/`: the workflow greps the checked-out `main` inline, `pwa` runs only when the handoff is there, and `build` depends on the probe rather than on the phone job, so the site publishes without `/phone/` until a release includes it.
+- The deploy takes `taskfile.yml`, `scripts/`, `pyproject.toml` and `uv.lock` from `dev`, so a release line that predates the site pipeline still builds its own content.
 - The `pages` concurrency group and the environment name stay as they are.
 
 ## Capabilities
@@ -20,6 +21,6 @@ The trigger is also wrong on its own terms. A release event deploys whatever ref
 
 ## Impact
 
-- `.github/workflows/website.yml` (trigger block and the phone job wiring), `scripts/website_probe_phone.sh`.
+- `.github/workflows/website.yml` (triggers, guard, inline phone probe and pipeline sourcing).
 - No app, server or content change.
 - The janitor stops receiving failed Deploy Website runs caused by tags; it keeps its Dev Build healing path.

@@ -1,8 +1,6 @@
 use crate::ffmpeg::get_vibe_temp_folder;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, FromSample, Sample, SizedSample, Stream, SupportedStreamConfig};
-#[cfg(target_os = "macos")]
-use eyre::bail;
 use eyre::{eyre, Context, ContextCompat, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -388,7 +386,7 @@ fn get_output_device_and_config(host: &cpal::Host, audio_device: &AudioDevice) -
         // Without the permission CoreAudio still opens the stream and records silence, so fail
         // clearly instead of handing back an empty recording.
         if !crate::system_audio::is_granted() {
-            bail!("System audio recording permission is required to record system audio; grant it in System Settings → Privacy & Security → Screen & System Audio Recording");
+            eyre::bail!("System audio recording permission is required to record system audio; grant it in System Settings → Privacy & Security → Screen & System Audio Recording");
         }
         let device = host.default_output_device().context("Failed to get default output device")?;
         let config = device
