@@ -1,18 +1,20 @@
 name: Deploy Website
 
 # One deploy publishes two builds: the release site at /vibe/ from main and the
-# dev preview at /vibe/dev/ from dev. A push to either branch that touches the
-# site (or a manual dispatch) rebuilds both, so the preview is always the current
-# dev tree and the release site only moves when main does.
+# dev preview at /vibe/dev/ from dev. A push to main that touches the site (or a
+# manual dispatch) rebuilds both, so the preview follows the dev tree even though
+# the run itself belongs to the release line, and the release site only moves
+# when main does.
 #
-# The github-pages environment admits deployments from `main` and `dev`. Any
-# other ref has its deploy job skipped while the run still reports success — a
-# silent no-deploy — so tags are not a trigger here.
+# Deploys start from `main` only. The github-pages environment's branch policy
+# lists `main` and `dev`, but GitHub still skips the deploy job of a run on a
+# `dev` ref — with no error, while the run reads success — so a dev start there
+# is a silent no-deploy. Until that is understood, the dev push builds nothing
+# on the site; /vibe/dev/ first appears when this pipeline reaches `main`.
 on:
     push:
         branches:
             - main
-            - dev
         paths:
             - "website/**"
             - "i18n/**"
@@ -225,8 +227,21 @@ jobs:
               with:
                   path: website/dist-site
 
+    # A deploy job on a ref GitHub will not admit is skipped, not failed, and the
+    # run still reads "success". Fail loudly instead of reporting a deploy that
+    # never happened.
+    guard:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Require a main ref
+              run: |
+                  if [ "$GITHUB_REF_NAME" != "main" ]; then
+                    echo "::error::Deploy Website publishes from main only; dispatch it on main."
+                    exit 1
+                  fi
+
     deploy:
-        needs: build
+        needs: [guard, build]
         runs-on: ubuntu-latest
 
         environment:
