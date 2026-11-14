@@ -1,6 +1,10 @@
-# Spec Delta
+# model-comparison Specification
 
-## ADDED Requirements
+## Purpose
+
+Users pick a model on their own audio, not on borrowed benchmarks: the models page runs the same short input through the selected models one by one and leaves comparable markdown transcripts with the processing time of each run, with every selected model accounted for even when its run fails.
+
+## Requirements
 
 ### Requirement: A failed run is shown, not dropped
 
