@@ -47,6 +47,30 @@ task desktop:typecheck
 task website:typecheck   # runs the website build
 ```
 
+## Review at commit time
+
+The pre-commit hook reviews exactly the staged snapshot with [OCR](https://open-codereview.ai): the commit is blocked when the review reports a `critical`, `medium` or `high` finding, while `low` findings are printed and allowed through. Run it by hand before staging, or to see the full report:
+
+```console
+task review:staged
+```
+
+Only staged content is sent: unstaged and untracked files are not reviewed and cannot block. A docs-only or translation-only commit calls no model. The result is cached per staged diff, so retrying a commit after a failing lint does not pay for the same review twice.
+
+The gate fails open on purpose. If the provider is unreachable, the review times out, or OCR is not configured, it prints `ocr commit gate skipped: <reason>` and lets the commit through: an LLM outage must not stop local work. Configure the provider once with `ocr config provider` (the settings live in `~/.opencodereview/config.json`, not in the repository) and install the pinned CLI with `mise install`.
+
+Bypasses, in order of scope:
+
+```console
+OCR_SKIP=1 git commit ...               # this commit only
+LEFTHOOK_EXCLUDE=review git commit ...  # skip the review while keeping the other hooks
+git commit --no-verify ...              # skip every hook
+```
+
+Say in the commit body why a bypass was used; the same severity policy makes a silent bypass look like a clean review.
+
+The review is deliberately thorough (`--effort high`, a 15-minute budget), so a commit with code can take minutes. Staged code is sent to the provider configured for OCR — with the default local `claude-code-router` that is a model you configure yourself; a remote provider means the diff leaves the machine at commit time.
+
 ## Before you push
 
 ```console

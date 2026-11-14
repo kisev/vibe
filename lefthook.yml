@@ -92,6 +92,12 @@ pre-commit:
       glob: ".github/workflows/*.{yml,yaml}"
       run: mise exec -- actionlint
 
+    review:
+      # Reviews exactly the staged snapshot with OCR. A medium/high finding
+      # blocks the commit; an unreachable provider only warns. OCR_SKIP=1
+      # bypasses the gate for a commit whose findings are already understood.
+      run: task review:staged
+
 pre-push:
   commands:
     # The same set the workflows run: lint, format:check, rustfmt, clippy over
