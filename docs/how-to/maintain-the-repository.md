@@ -13,6 +13,19 @@ task docs:models:check    # fail when the generated page is stale
 
 The model catalog itself is refreshed and checked with `task sync:catalog` and `task sync:catalog:check`.
 
+## Read the development site
+
+The Pages deploy at <https://kisev.github.io> publishes two builds from one artifact:
+
+| Address | Built from | Routing |
+| --- | --- | --- |
+| `/vibe/` | `main` | Paths, for example `/vibe/roadmap` |
+| `/vibe/dev/` | `dev` | Hashes, for example `/vibe/dev/#/roadmap` |
+
+A push to either branch that touches the site, or a manual dispatch, rebuilds both. The workflow checks out `main` for the production build, then `dev` for the preview it places under `dev/`, and deploys the combined artifact once. GitHub Pages has a single root `404.html`, so the dev build uses hash routing; the root fallback stays the production one and `/vibe/` behaves as before.
+
+Build the two halves locally with `task website:build` (into `website/dist`) and `task website:build:dev` (into `website/dist-dev`), then combine them with `task website:assemble`.
+
 ## Clear GitHub Actions caches
 
 ```console

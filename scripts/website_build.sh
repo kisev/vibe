@@ -1,9 +1,24 @@
 #!/usr/bin/env bash
-# Build the site into website/dist the way the deploy workflow does: link the
-# download buttons at the current release, point the dev channel at the newest
-# complete dev build, publish the roadmap, copy the repository docs in, and run
-# the Vite build.
+# Build the site the way the deploy workflow does: link the download buttons at
+# the current release, point the dev channel at the newest complete dev build,
+# publish the roadmap, copy the repository docs in, and run the Vite build.
+#
+#     scripts/website_build.sh [prod|dev]
+#
+# prod (the default) builds the release site into website/dist at /vibe/ with
+# path routing. dev builds the preview into website/dist-dev at /vibe/dev/ with
+# hash routing, so every dev route stays inside its own base: GitHub Pages has
+# one root 404.html, which path routes under a subdirectory cannot use.
 set -euo pipefail
+
+VARIANT="${1:-prod}"
+case "$VARIANT" in
+prod | dev) ;;
+*)
+    echo "unknown variant: $VARIANT (expected prod or dev)" >&2
+    exit 2
+    ;;
+esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT/website"
@@ -22,4 +37,11 @@ uv run ../scripts/roadmap.py
 # Removed first so a deleted page does not survive in dist.
 rm -rf public/docs
 cp -R ../docs public/docs
-pnpm build
+
+if [ "$VARIANT" = "dev" ]; then
+    export VITE_SITE_BASE=/vibe/dev/
+    export VITE_SITE_ROUTER=hash
+    pnpm build:dev
+else
+    pnpm build
+fi

@@ -86,7 +86,17 @@ tasks:
   website:build:
     desc: Build the site into website/dist the way the deploy workflow does
     cmds:
-      - bash scripts/website_build.sh
+      - bash scripts/website_build.sh prod
+
+  website:build:dev:
+    desc: Build the dev preview into website/dist-dev at /vibe/dev/ with hash routing
+    cmds:
+      - bash scripts/website_build.sh dev
+
+  website:assemble:
+    desc: Assemble the Pages artifact from both builds (WEBSITE_PROD_DIR, WEBSITE_DEV_DIR, WEBSITE_SITE_DIR)
+    cmds:
+      - bash scripts/website_assemble.sh
 
   phone:wasm:
     desc: Build the phone handoff's browser client into handoff/pwa/public/wasm

@@ -4,6 +4,12 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
+// The deploy builds the site twice: production at the root of the Pages site and
+// a preview under /vibe/dev/. The base is a build input, so both come from the
+// same source with no runtime switch; the default keeps the production build
+// exactly where it has always been.
+const siteBase = process.env.VITE_SITE_BASE ?? '/vibe/'
+
 export default defineConfig({
 	plugins: [
 		paraglideVitePlugin({
@@ -15,7 +21,7 @@ export default defineConfig({
 		react(),
 		tailwindcss(),
 	],
-	base: '/vibe/',
+	base: siteBase,
 	server: {
 		fs: {
 			// Docs and changelog translations live in ../i18n and load lazily; without this the dev server refuses to transform them.

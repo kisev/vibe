@@ -121,5 +121,7 @@
   "roadmap-description": "What the next releases will bring. Each entry is an active OpenSpec change in the repository.",
   "roadmap-note": "These changes are planned, not shipped. The list is generated from the repository's unarchived OpenSpec proposals.",
   "roadmap-empty": "No planned changes are recorded yet.",
-  "roadmap-load-failed": "The roadmap could not be loaded."
+  "roadmap-load-failed": "The roadmap could not be loaded.",
+  "dev-preview-banner": "Development preview — built from the dev branch.",
+  "dev-preview-link": "Open the release site"
 }

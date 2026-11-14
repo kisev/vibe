@@ -1,14 +1,22 @@
 name: Deploy Website
 
+# One deploy publishes two builds: the release site at /vibe/ from main and the
+# dev preview at /vibe/dev/ from dev. A push to either branch that touches the
+# site (or a manual dispatch) rebuilds both, so the preview is always the current
+# dev tree and the release site only moves when main does.
 on:
     push:
         branches:
             - main
+            - dev
         paths:
             - "website/**"
             - "i18n/**"
             - "openspec/changes/**"
             - "scripts/roadmap.py"
+            - "scripts/dev_manifest.py"
+            - "scripts/website_build.sh"
+            - "scripts/website_assemble.sh"
             - "scripts/website_links.py"
             - "handoff/pwa/**"
             - "handoff/wasm/**"
@@ -40,6 +48,10 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@v4
+              with:
+                  # The phone handoff is served from the release site, so it is
+                  # built from main even when a dev push started this run.
+                  ref: main
 
             - name: setup pnpm
               uses: pnpm/action-setup@v4
@@ -96,8 +108,10 @@ jobs:
         needs: pwa
         runs-on: ubuntu-latest
         steps:
-            - name: Checkout
+            - name: Checkout main
               uses: actions/checkout@v4
+              with:
+                  ref: main
 
             - name: setup pnpm
               uses: pnpm/action-setup@v4
@@ -121,7 +135,7 @@ jobs:
                   install_args: aqua:go-task/task
                   cache: true
 
-            - name: Build
+            - name: Build production site
               run: mise exec -- task website:build
               env:
                   GH_TOKEN: ${{ github.token }}
@@ -132,13 +146,38 @@ jobs:
                   name: pwa-dist
                   path: website/dist/phone
 
+            # A separate checkout path keeps the production build intact: the
+            # default checkout would clean untracked files, dist included.
+            - name: Checkout dev
+              uses: actions/checkout@v4
+              with:
+                  ref: dev
+                  path: dev-src
+
+            - name: Build dev site
+              working-directory: dev-src
+              run: mise exec -- task website:build:dev
+              env:
+                  GH_TOKEN: ${{ github.token }}
+
+            # Run from the dev checkout: dev is the integration branch, so it
+            # carries the current deploy pipeline even while main still lags a
+            # release behind.
+            - name: Assemble the deploy artifact
+              working-directory: dev-src
+              env:
+                  WEBSITE_PROD_DIR: ../website/dist
+                  WEBSITE_DEV_DIR: website/dist-dev
+                  WEBSITE_SITE_DIR: ../website/dist-site
+              run: mise exec -- task website:assemble
+
             - name: Setup Pages
               uses: actions/configure-pages@v6
 
             - name: Upload Artifacts
               uses: actions/upload-pages-artifact@v5
               with:
-                  path: website/dist
+                  path: website/dist-site
 
     deploy:
         needs: build

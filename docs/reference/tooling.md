@@ -13,7 +13,7 @@ The project's task scheme is `taskfile.yml` and `lefthook`; `task --list` is the
 | `server:*` | Build the engine sidecar, fetch pinned headers, package a release archive, and run its tests, clippy, deny, machete |
 | `linux-deps` | Install the Linux build packages with apt, zypper or dnf |
 | `libs:*` | ggml library fetch/build/upload, tree id, release tag, platform id |
-| `website:dev`, `website:build`, `phone:*` | Website dev/build and the phone handoff |
+| `website:*`, `phone:*` | Website dev, production and dev-preview builds, artifact assembly, and the phone handoff |
 | `upstream:*` | Remote isolation, branch fetches, namespaced tag fetches |
 | `i18n:*`, `stamp-translations` | Paraglide generation, source-hash stamping, coverage audit |
 | `docs:models*` | Regenerate or check the generated models page |

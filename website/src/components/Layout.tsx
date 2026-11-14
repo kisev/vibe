@@ -3,6 +3,7 @@ import { getLocale, getTextDirection, setLocale, type Locale } from '../paraglid
 import { localeFromSearch, supportedWebsiteLocales, writeLocaleToUrl } from '~/lib/i18n'
 import { Outlet, useLocation } from 'react-router-dom'
 import useUrlActions from '~/lib/useUrlActions'
+import DevBanner from './DevBanner'
 import Footer from './Footer'
 import Nav from './Nav'
 import PrivacyPolicy from './PrivacyPolicy'
@@ -54,6 +55,7 @@ export default function Layout() {
 
 	return (
 		<div dir={direction} className="flex min-h-dvh flex-col bg-background text-foreground">
+			<DevBanner />
 			<Nav locale={locale} availableLocales={availableLocales} onLocaleChange={onLocaleChange} />
 			<main className="flex-1">
 				{/* Paraglide reads the locale at call time, so a language switch remounts the page. */}
