@@ -29,3 +29,5 @@
 - [ ] 9. `task verify` green, `openspec validate --all --strict` passes.
 
 - [x] 9. `scripts/ci/fetch_ffmpeg.py` moves the downloaded ffmpeg with `shutil.move`: `os.replace` cannot cross drives, which is exactly the Windows runner layout (`RUNNER_TEMP` on C:, workspace on D:).
+
+- [x] 10. The bootstrap tests no longer race the runner: a dynamic import plus the start chain can take seconds under a loaded suite, and the default five-second limit left a pending start that called the next test's mocks — one slow run failed two assertions and blocked a push. They now wait with a realistic budget, verified by two consecutive full desktop runs.
