@@ -146,12 +146,13 @@ jobs:
 
             # The release site's content comes from main, its pipeline from dev.
             # Main lags a release behind: right after a rollback it carries no
-            # `website:build` task and no assembly script at all, and using its
-            # own taskfile failed the deploy with "task does not exist".
+            # `website:build` task, no assembly script and no uv project at all,
+            # and using its own taskfile failed the deploy with "task does not
+            # exist" before the Python helpers failed on a missing httpx.
             - name: Take the deploy pipeline from dev
               run: |
                   git fetch --depth 1 origin dev
-                  git checkout FETCH_HEAD -- taskfile.yml scripts/
+                  git checkout FETCH_HEAD -- taskfile.yml scripts/ pyproject.toml uv.lock
 
             - name: setup pnpm
               uses: pnpm/action-setup@v4
