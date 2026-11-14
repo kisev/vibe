@@ -41,7 +41,7 @@ function vmWith(capabilities: ModelCapabilities) {
 	return {
 		preference: {
 			modelMetadata: { format: 'gguf', capabilities },
-			modelOptions: { lang: 'en', verbose: false, sampling_strategy: 'beam search', best_of: 5, beam_size: 5 },
+			modelOptions: { lang: 'en', verbose: false },
 			diarizeEnabled: false,
 			stableTimestampsEnabled: false,
 			chunkSeconds: null,

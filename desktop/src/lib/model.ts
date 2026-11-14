@@ -291,24 +291,12 @@ interface EngineSpecificOptions {
 	init_prompt?: string
 	translate?: boolean
 	word_timestamps?: boolean
-	max_sentence_len?: number
-	sampling_strategy?: 'greedy' | 'beam search'
-	best_of?: number
-	beam_size?: number
 	temperature?: number
 	max_text_ctx?: number
 }
 
 /** Decoding knobs the server only reads for models that report `decoding_options`. */
-const WHISPER_ONLY_OPTIONS = [
-	'word_timestamps',
-	'max_sentence_len',
-	'sampling_strategy',
-	'best_of',
-	'beam_size',
-	'temperature',
-	'max_text_ctx',
-] as const satisfies readonly (keyof EngineSpecificOptions)[]
+const WHISPER_ONLY_OPTIONS = ['word_timestamps', 'temperature', 'max_text_ctx'] as const satisfies readonly (keyof EngineSpecificOptions)[]
 
 /**
  * Drop the Whisper-only options a model cannot use instead of letting server reject the run.

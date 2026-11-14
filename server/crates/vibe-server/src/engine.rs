@@ -67,8 +67,9 @@ pub struct StreamCallbacks<'a> {
 }
 
 /// The request options the CLI and the HTTP form build. Every field maps onto
-/// the unified engine where an equivalent exists; the whisper beam-search
-/// knobs are accepted for API compatibility and honored as greedy decoding.
+/// the unified engine where an equivalent exists. The retired whisper
+/// beam-search knobs and max segment length stay on the struct so an older
+/// desktop's request still parses; the engine warns and ignores them.
 #[derive(Debug, Clone, Default)]
 pub struct TranscribeOptions {
     pub language: Option<String>,
@@ -244,7 +245,10 @@ impl Engine {
             let callbacks = StreamCallbacks::default();
             return self.transcribe_chunks_with(samples, &flat, options, callbacks);
         }
-        let mut session = self.model.session().context("session init failed")?;
+        let mut session = self
+            .model
+            .session_with(&session_options(options.threads))
+            .context("session init failed")?;
         let run = self.run_options(&options);
         let transcript = session.run(samples, &run).context("inference failed")?;
         let segments = segments_for(&transcript, 0, samples.len());
@@ -315,7 +319,10 @@ impl Engine {
             mut on_segment,
             mut should_abort,
         } = callbacks;
-        let mut session = self.model.session().context("session init failed")?;
+        let mut session = self
+            .model
+            .session_with(&session_options(options.threads))
+            .context("session init failed")?;
         let run = self.run_options(&options);
         let mut segments = Vec::new();
         for (index, (start, end)) in ranges.iter().enumerate() {
@@ -352,7 +359,10 @@ impl Engine {
             mut on_segment,
             mut should_abort,
         } = callbacks;
-        let mut session = self.model.session().context("session init failed")?;
+        let mut session = self
+            .model
+            .session_with(&session_options(options.threads))
+            .context("session init failed")?;
         let run = self.run_options(&options);
         let mut seen = 0usize;
         if self.caps.streaming {
@@ -617,17 +627,26 @@ fn requested_timestamps(word_timestamps: bool, max_kind: TimestampKind) -> Times
     }
 }
 
+/// The session options a transcription asks for. Threads of 0 keep the library
+/// default, as the crate documents.
+fn session_options(threads: i32) -> transcribe_cpp::SessionOptions {
+    transcribe_cpp::SessionOptions {
+        n_threads: threads,
+        ..Default::default()
+    }
+}
+
+/// The desktop no longer offers these knobs, but an older build still sends
+/// them; log once per group so the request is accepted and the retirement is
+/// visible, rather than silently dropping a value someone meant to set.
 fn warn_ignored(options: &TranscribeOptions) {
-    static WARNED: OnceLock<()> = OnceLock::new();
-    if WARNED.set(()).is_ok() {
-        if !options.sampling_greedy || options.beam_size != 0 || options.best_of != 0 {
-            log::warn!(
-                "beam-search decoding is not available in the unified engine; decoding greedily with temperature fallback"
-            );
-        }
-        if options.max_segment_len != 0 || options.threads != 0 {
-            log::warn!("max_segment_len and n_threads are engine-internal in the unified engine and are ignored");
-        }
+    static BEAM: OnceLock<()> = OnceLock::new();
+    static SEGMENT: OnceLock<()> = OnceLock::new();
+    if (!options.sampling_greedy || options.beam_size != 0 || options.best_of != 0) && BEAM.set(()).is_ok() {
+        log::warn!("beam-search decoding is not available in the unified engine; decoding greedily with temperature fallback");
+    }
+    if options.max_segment_len != 0 && SEGMENT.set(()).is_ok() {
+        log::warn!("max_segment_len is not used by the unified engine; word timestamps decide the granularity");
     }
 }
 

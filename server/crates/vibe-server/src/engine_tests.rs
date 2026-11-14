@@ -71,6 +71,13 @@ fn assert_timestamped(segments: &[Segment]) {
 }
 
 #[test]
+fn session_options_carry_the_requested_thread_count() {
+    assert_eq!(session_options(4).n_threads, 4);
+    // 0 is the library's "choose a default", not a request for no threads.
+    assert_eq!(session_options(0), transcribe_cpp::SessionOptions::default());
+}
+
+#[test]
 fn vad_options_split_speech_below_the_family_window() {
     let gigaam = vad_options_for(25_000.0);
     assert_eq!(gigaam.max_speech_ms, 24_500);

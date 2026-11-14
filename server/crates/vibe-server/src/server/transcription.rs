@@ -266,6 +266,22 @@ mod tests {
     }
 
     #[test]
+    fn retired_decoding_fields_from_an_older_desktop_are_accepted() {
+        let form = HashMap::from([
+            ("sampling_strategy".to_string(), "beam_search".to_string()),
+            ("best_of".to_string(), "5".to_string()),
+            ("beam_size".to_string(), "5".to_string()),
+            ("max_segment_len".to_string(), "32".to_string()),
+        ]);
+        // The engine ignores these, but the request must still build and reach it.
+        let options = build_options(&form, false, false, None);
+        assert!(!options.sampling_greedy);
+        assert_eq!(options.best_of, 5);
+        assert_eq!(options.beam_size, 5);
+        assert_eq!(options.max_segment_len, 32);
+    }
+
+    #[test]
     fn a_chunk_duration_above_the_engine_maximum_is_rejected() {
         let message = chunk_seconds_error(Some(30.0), Some(25.0)).expect("rejected");
         assert!(message.contains("25"), "{message}");

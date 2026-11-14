@@ -41,10 +41,6 @@ const options = { lang: 'en', init_prompt: 'Punctuate. Use full sentences.', tra
 const decodingOptions = {
 	...options,
 	word_timestamps: true,
-	max_sentence_len: 32,
-	sampling_strategy: 'greedy' as const,
-	best_of: 3,
-	beam_size: 3,
 	temperature: 0.4,
 	max_text_ctx: 512,
 }
