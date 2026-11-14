@@ -58,7 +58,24 @@ case "$archive" in
 *) out="$PWD/$archive" ;;
 esac
 case "$archive" in
-*.zip) (cd "$stage" && zip -q -r "$out" .) ;;
+*.zip)
+    # Git Bash on the Windows runners has no `zip`; Python is the one tool every runner has,
+    # and its members sit at the archive root, which setup_sidecars expects.
+    py="$(command -v python3 || command -v python)"
+    [ -n "$py" ] || {
+        echo "no python to build $archive" >&2
+        exit 1
+    }
+    "$py" - "$out" "$stage" <<'PY'
+import pathlib, sys, zipfile
+
+out, stage = sys.argv[1], pathlib.Path(sys.argv[2])
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
+    for path in sorted(stage.rglob("*")):
+        if path.is_file() and not path.name.endswith(".zip"):
+            archive.write(path, path.relative_to(stage).as_posix())
+PY
+    ;;
 *) tar -czf "$out" -C "$stage" . ;;
 esac
 echo "packaged $archive"
