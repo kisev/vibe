@@ -17,6 +17,7 @@ on:
             - "scripts/dev_manifest.py"
             - "scripts/website_build.sh"
             - "scripts/website_assemble.sh"
+            - "scripts/website_probe_phone.sh"
             - "scripts/website_links.py"
             - "handoff/pwa/**"
             - "handoff/wasm/**"
@@ -41,9 +42,28 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
+    # The phone handoff ships with the release site, which is built from main.
+    # Main only carries it once a release includes it, so ask before building:
+    # a release line without the handoff simply serves no /phone/.
+    probe:
+        runs-on: ubuntu-latest
+        outputs:
+            present: ${{ steps.probe.outputs.present }}
+        steps:
+            - name: Checkout main
+              uses: actions/checkout@v4
+              with:
+                  ref: main
+
+            - name: Does the release line carry the phone handoff?
+              id: probe
+              run: bash scripts/website_probe_phone.sh
+
     # Built on Linux on purpose: the iroh client pulls in `ring`, which compiles C
     # for wasm32, and the macOS runners' Apple clang has no wasm target.
     pwa:
+        needs: probe
+        if: needs.probe.outputs.present == 'true'
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
@@ -105,7 +125,10 @@ jobs:
                   if-no-files-found: error
 
     build:
-        needs: pwa
+        needs: [probe, pwa]
+        # The site deploy must not hinge on the phone job: a release line
+        # without the handoff skips `pwa` and still publishes the two sites.
+        if: ${{ !cancelled() && needs.probe.result == 'success' }}
         runs-on: ubuntu-latest
         steps:
             - name: Checkout main
@@ -141,6 +164,7 @@ jobs:
                   GH_TOKEN: ${{ github.token }}
 
             - name: Download phone PWA
+              if: needs.probe.outputs.present == 'true'
               uses: actions/download-artifact@v5
               with:
                   name: pwa-dist
