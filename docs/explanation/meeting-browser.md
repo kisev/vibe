@@ -23,7 +23,9 @@ The chrome offers address, back, forward, reload, close, and **Open in system br
 
 The embedded browser originally loaded whatever a page asked for; the meeting-host list only decided which links got the record bar. It is now a real boundary: only allowed domains and their subdomains may load over https, both for top-level pages and for every resource they request. A refused resource gets an error response, so the page treats the origin as unavailable instead of retrying forever.
 
-Strictness has a cost: a page pulling fonts or scripts from a CDN breaks until that CDN is allowed. The blocked list is the remedy — unique hosts, newest first, each with an **Allow** action that adds the domain and reloads the page. The chrome makes the same offer when it refuses a navigation. Windows enforces resource blocking with WebView2's `WebResourceRequested`; Linux and macOS currently block top-level navigation only.
+Strictness has a cost: a page pulling fonts or scripts from a CDN breaks until that CDN is allowed. The blocked list is the remedy — unique hosts, newest first, each with an **Allow** action that adds the domain and reloads the page. The list is drawn inside the chrome and the chrome grows to fit it, because a popup inside a 104-pixel webview would be clipped by the page below. The chrome makes the same offer when it refuses a navigation. Windows enforces resource blocking with WebView2's `WebResourceRequested`; Linux and macOS currently block top-level navigation only.
+
+The mode is cached rather than read per window, and the resource filter is installed in both modes, so switching between `strict` and `trusted-site` reaches a page that is already open on its next request instead of requiring a reopen.
 
 ## Why recording stays manual
 

@@ -7,7 +7,7 @@
 
 use crate::config::STORE_FILENAME;
 use once_cell::sync::Lazy;
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 use tauri::{AppHandle, Emitter, Url};
 use tauri_plugin_store::StoreExt;
 
@@ -19,6 +19,8 @@ pub const LEGACY_HOSTS_KEY: &str = "meeting.browserHosts";
 pub const POLICY_KEY: &str = "browser.policy";
 /// Emitted with the full blocked list whenever it changes.
 pub const BLOCKED_HOSTS_EVENT: &str = "browser-blocked-hosts";
+/// Emitted with the new mode whenever the policy is saved, so an already-open chrome updates.
+pub const POLICY_CHANGED_EVENT: &str = "browser-policy";
 
 /// How far the allowlist reaches. `strict` checks every origin; `trusted-site` lets an allowed
 /// page load its resources from anywhere but never relaxes the navigation gate.
@@ -53,7 +55,7 @@ impl Policy {
         should_block(url, allowed)
     }
 
-    /// Only `strict` filters resources; `trusted-site` leaves them to the engine.
+    /// Only `strict` blocks resources; `trusted-site` leaves them to the engine.
     #[cfg_attr(not(windows), allow(dead_code))]
     pub fn blocks_resource(self, url: &str, allowed: &[String]) -> bool {
         match self {
@@ -61,16 +63,15 @@ impl Policy {
             Self::TrustedSite => false,
         }
     }
-
-    /// Whether a page window needs the per-origin resource filter at all.
-    #[cfg_attr(not(windows), allow(dead_code))]
-    pub fn filters_resources(self) -> bool {
-        matches!(self, Self::Strict)
-    }
 }
 
 /// Last saved allowlist, so the resource-request hot path never touches the store.
 static ALLOWED: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
+/// The mode in effect, seeded from the store at startup and replaced by [`save_policy`].
+///
+/// Request handlers consult this instead of the store, so a Settings change applies to a page
+/// that is already open on its next request.
+static POLICY: Lazy<RwLock<Policy>> = Lazy::new(|| RwLock::new(Policy::default()));
 /// Unique blocked hosts, newest first. Per app run, cleared only by allowing a host.
 static BLOCKED: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
@@ -187,6 +188,19 @@ pub fn parse_stored_policy(value: Option<serde_json::Value>) -> Result<Policy, S
     }
 }
 
+/// The policy in effect, without touching the store. Seeded at startup by [`seed_policy`] and
+/// replaced by [`save_policy`].
+pub fn cached_policy() -> Policy {
+    POLICY.read().map(|policy| *policy).unwrap_or_default()
+}
+
+fn set_policy_cache(policy: Policy) -> Policy {
+    if let Ok(mut cache) = POLICY.write() {
+        *cache = policy;
+    }
+    policy
+}
+
 /// Read the policy from the store. A corrupt value falls back to `strict` (the safe mode) and
 /// leaves the stored value alone so the user can still see and fix it.
 pub fn load_policy(app: &AppHandle) -> Policy {
@@ -200,12 +214,29 @@ pub fn load_policy(app: &AppHandle) -> Policy {
     }
 }
 
+/// Read the stored policy once at startup into the cache the request handlers use.
+pub fn seed_policy(app: &AppHandle) -> Policy {
+    set_policy_cache(load_policy(app))
+}
+
+/// Whether the cached policy refuses this resource request. Reads no store, so it is safe on
+/// the request hot path and follows a Settings change without reopening the page.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn blocks_resource(url: &str, allowed: &[String]) -> bool {
+    cached_policy().blocks_resource(url, allowed)
+}
+
 /// Persist one of the two known policies; anything else is refused before it touches the store.
+/// The cache is replaced only after the store accepted the value, and listeners are told.
 pub fn save_policy(app: &AppHandle, raw: &str) -> Result<Policy, String> {
     let policy = Policy::parse(raw)?;
     let store = app.store(STORE_FILENAME).map_err(|error| error.to_string())?;
     store.set(POLICY_KEY, serde_json::json!(policy.as_str()));
     store.save().map_err(|error| error.to_string())?;
+    set_policy_cache(policy);
+    if let Err(error) = app.emit(POLICY_CHANGED_EVENT, policy.as_str()) {
+        tracing::warn!("could not emit the browser policy change: {error}");
+    }
     Ok(policy)
 }
 
@@ -412,9 +443,25 @@ mod tests {
             assert!(policy.blocks_navigation("http://example.com/room", &allowed));
             assert!(!policy.blocks_navigation("https://meet.example.com/room", &allowed));
         }
+    }
 
-        assert!(Policy::Strict.filters_resources());
-        assert!(!Policy::TrustedSite.filters_resources());
+    #[test]
+    fn cached_policy_decides_resource_requests_without_the_store() {
+        // The cache is process-wide; put back whatever another test left so this stays isolated.
+        let previous = cached_policy();
+        let allowed = hosts(&["example.com"]);
+        let third_party = "https://cdn.other.test/app.js";
+
+        // No store or AppHandle is involved: the cached mode alone decides.
+        set_policy_cache(Policy::Strict);
+        assert!(blocks_resource(third_party, &allowed));
+
+        set_policy_cache(Policy::TrustedSite);
+        assert!(!blocks_resource(third_party, &allowed));
+        // The page's own origin keeps loading in either mode.
+        assert!(!blocks_resource("https://example.com/app.js", &allowed));
+
+        set_policy_cache(previous);
     }
 
     #[test]

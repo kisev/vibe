@@ -31,6 +31,13 @@ export const openMeetingBrowserExternal = (session: number) => invoke<void>('mee
 
 export const closeMeetingBrowser = (session: number) => invoke<void>('meeting_browser_close', { session })
 
+/**
+ * Grow the chrome webview so the blocked-hosts region fits inside it (the page moves down), or
+ * restore the toolbar height. The Rust side applies the same bounds helper as a window resize.
+ */
+export const setBrowserChromeExpanded = (session: number, expanded: boolean) =>
+	invoke<void>('browser_set_chrome_expanded', { session, expanded })
+
 export const confirmMeetingBrowserClose = (session: number, stopRecording: boolean) =>
 	invoke<void>('meeting_browser_confirm_close', { session, stopRecording })
 
@@ -59,6 +66,9 @@ export const setBrowserPolicy = (policy: BrowserPolicy) => invoke<BrowserPolicy>
 
 /** The full blocked list, emitted whenever a new host is refused. */
 export const BROWSER_BLOCKED_HOSTS_EVENT = 'browser-blocked-hosts'
+
+/** The new mode, emitted when Settings saves the policy, so an open chrome updates. */
+export const BROWSER_POLICY_EVENT = 'browser-policy'
 
 /** A refused top-level navigation for one session, so its chrome can offer to allow the host. */
 export const BROWSER_NAVIGATION_BLOCKED_EVENT = 'meeting-browser-navigation-blocked'

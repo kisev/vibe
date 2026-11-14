@@ -122,6 +122,9 @@ export const meetingHandlers: CommandHandlerMap = {
 		sessions.delete(Number(args.session))
 	},
 
+	// The mock has no second webview to resize; accept the toggle so the chrome can call it.
+	browser_set_chrome_expanded: () => undefined,
+
 	meeting_browser_confirm_close: (args) => {
 		sessions.delete(Number(args.session))
 	},

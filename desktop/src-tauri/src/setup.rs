@@ -42,6 +42,8 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     if let Err(error) = crate::browser_policy::migrate(app.handle()) {
         tracing::warn!("could not migrate the browser allowlist: {error}");
     }
+    // Seed the cache the resource filter reads, so the first request needs no store access.
+    crate::browser_policy::seed_policy(app.handle());
 
     // Setup logging to terminal
     {

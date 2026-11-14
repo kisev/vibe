@@ -182,7 +182,30 @@ describe('blocked hosts in the chrome', () => {
 		})
 	}
 
-	it('lists the blocked hosts in a popover and allows one without leaving the browser', async () => {
+	it('grows the chrome for the blocked list and allows a host without leaving the browser', async () => {
+		withBlocked(['cdn.other.test'])
+		render(<BrowserWindow session={7} />)
+
+		const trigger = await screen.findByRole('button', { name: m.browserBlockedHostsCount({ count: 1 }) })
+		// The region is not a popover: it does not exist until the chrome has been grown for it.
+		expect(screen.queryByText('cdn.other.test')).toBeNull()
+		await userEvent.click(trigger)
+		expect(await screen.findByRole('region', { name: m.browserBlockedHosts() })).toBeTruthy()
+		expect(await screen.findByText('cdn.other.test')).toBeTruthy()
+		await waitFor(() =>
+			expect(mocks.invoke).toHaveBeenCalledWith('browser_set_chrome_expanded', { session: 7, expanded: true }),
+		)
+
+		await userEvent.click(screen.getByRole('button', { name: m.browserBlockedHostAllowHost({ host: 'cdn.other.test' }) }))
+		await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('browser_allow_host', { host: 'cdn.other.test' }))
+		await waitFor(() => expect(screen.queryByText('cdn.other.test')).toBeNull())
+		// Allow folds the chrome back, so the page takes the space again.
+		await waitFor(() =>
+			expect(mocks.invoke).toHaveBeenCalledWith('browser_set_chrome_expanded', { session: 7, expanded: false }),
+		)
+	})
+
+	it('folds the list back when the shield is pressed a second time', async () => {
 		withBlocked(['cdn.other.test'])
 		render(<BrowserWindow session={7} />)
 
@@ -190,9 +213,11 @@ describe('blocked hosts in the chrome', () => {
 		await userEvent.click(trigger)
 		expect(await screen.findByText('cdn.other.test')).toBeTruthy()
 
-		await userEvent.click(screen.getByRole('button', { name: m.browserBlockedHostAllowHost({ host: 'cdn.other.test' }) }))
-		await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('browser_allow_host', { host: 'cdn.other.test' }))
+		await userEvent.click(trigger)
 		await waitFor(() => expect(screen.queryByText('cdn.other.test')).toBeNull())
+		await waitFor(() =>
+			expect(mocks.invoke).toHaveBeenCalledWith('browser_set_chrome_expanded', { session: 7, expanded: false }),
+		)
 	})
 
 	it('hides the blocked control while the policy is trusted-site', async () => {
@@ -200,5 +225,28 @@ describe('blocked hosts in the chrome', () => {
 		render(<BrowserWindow session={7} />)
 		await screen.findByLabelText(m.meetingBarAddress())
 		expect(screen.queryByRole('button', { name: m.browserBlockedHostsCount({ count: 1 }) })).toBeNull()
+	})
+
+	it('hides an open list when the policy changes to trusted-site', async () => {
+		withBlocked(['cdn.other.test'])
+		render(<BrowserWindow session={7} />)
+
+		await userEvent.click(await screen.findByRole('button', { name: m.browserBlockedHostsCount({ count: 1 }) }))
+		expect(await screen.findByText('cdn.other.test')).toBeTruthy()
+
+		act(() => mocks.listeners.get('browser-policy')?.({ payload: 'trusted-site' }))
+
+		await waitFor(() => expect(screen.queryByText('cdn.other.test')).toBeNull())
+		expect(screen.queryByRole('button', { name: m.browserBlockedHostsCount({ count: 1 }) })).toBeNull()
+		await waitFor(() =>
+			expect(mocks.invoke).toHaveBeenCalledWith('browser_set_chrome_expanded', { session: 7, expanded: false }),
+		)
+	})
+
+	it('hides the blocked control when nothing was blocked', async () => {
+		withBlocked([])
+		render(<BrowserWindow session={7} />)
+		await screen.findByLabelText(m.meetingBarAddress())
+		expect(screen.queryByRole('region', { name: m.browserBlockedHosts() })).toBeNull()
 	})
 })

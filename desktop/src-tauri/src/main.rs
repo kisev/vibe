@@ -166,6 +166,7 @@ async fn main() -> Result<()> {
             meeting_browser::meeting_browser_open_external,
             meeting_browser::meeting_browser_close,
             meeting_browser::meeting_browser_confirm_close,
+            meeting_browser::browser_set_chrome_expanded,
             meeting_browser::browser_allowed_hosts,
             meeting_browser::browser_blocked_hosts,
             meeting_browser::browser_allow_host,

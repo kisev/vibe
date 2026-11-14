@@ -32,6 +32,13 @@ const CONTENT_HEIGHT: f64 = 760.0;
 /// component (`TOOLBAR_HEIGHT` in `desktop/src/windows/browser-window.tsx`).
 // Wide enough for two rows (address and recording) without the page clipping the button.
 const TOOLBAR_H: f64 = 104.0;
+/// Height of the blocked-hosts region that grows out of the toolbar, in logical pixels.
+///
+/// The list is part of the chrome webview rather than a portal, so the chrome grows by this
+/// much while it is open and the page moves down; the region can never be clipped by the page.
+/// Wide enough for a handful of hosts; the region scrolls past that.
+/// This must match `BLOCKED_LIST_HEIGHT` in `desktop/src/windows/browser-window.tsx`.
+const BLOCKED_LIST_H: f64 = 200.0;
 const WINDOW_HEIGHT: f64 = CONTENT_HEIGHT + TOOLBAR_H;
 /// How long a page may stay unloaded before the window offers a retry instead of white.
 const LOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
@@ -55,6 +62,8 @@ struct BrowserSession {
     force_close: bool,
     /// A page load finished in this window at least once.
     loaded: bool,
+    /// The chrome is showing the blocked-hosts region, so the page sits lower.
+    expanded: bool,
 }
 
 #[derive(Default)]
@@ -188,18 +197,52 @@ fn close_session(app: &AppHandle, session: u64) -> Result<(), String> {
     Ok(())
 }
 
+/// The child webview bounds for a window of `size`, in physical pixels.
+///
+/// One function decides both webviews' geometry so the window resize handler, a scale-factor
+/// change and the blocked-list expansion can never drift apart.
+#[cfg(not(target_os = "macos"))]
+#[derive(Debug, PartialEq, Eq)]
+struct ChildBounds {
+    width: u32,
+    /// Chrome spans the full width at the top and holds the toolbar, plus the list when open.
+    chrome_height: u32,
+    /// The page starts exactly where the chrome ends.
+    page_y: u32,
+    page_height: u32,
+}
+
+/// Compute the shared bounds. `scale` turns the logical heights into physical pixels, which is
+/// what the window reports for both its size and its events.
+#[cfg(not(target_os = "macos"))]
+fn child_bounds(size: PhysicalSize<u32>, scale: f64, expanded: bool) -> ChildBounds {
+    let chrome_logical = TOOLBAR_H + if expanded { BLOCKED_LIST_H } else { 0.0 };
+    let chrome_height = ((chrome_logical * scale).round() as u32).min(size.height);
+    ChildBounds {
+        width: size.width,
+        chrome_height,
+        page_y: chrome_height,
+        page_height: size.height.saturating_sub(chrome_height),
+    }
+}
+
 /// Keep the chrome and the page filling the window: the chrome spans the whole surface, and the
-/// page starts below the toolbar, so its top edge never covers the controls.
+/// page starts below the toolbar (or below the open blocked list), so its top edge never covers
+/// the controls.
 #[cfg(not(target_os = "macos"))]
 fn resize_children(app: &AppHandle, session: u64, size: PhysicalSize<u32>) {
     let scale = app
         .get_window(&browser_label(session))
         .and_then(|window| window.scale_factor().ok())
         .unwrap_or(1.0);
-    let toolbar = (TOOLBAR_H * scale).round() as u32;
-    let page_height = size.height.saturating_sub(toolbar);
+    let expanded = RUNTIME
+        .lock()
+        .ok()
+        .and_then(|runtime| runtime.sessions.get(&session).map(|state| state.expanded))
+        .unwrap_or(false);
+    let bounds = child_bounds(size, scale, expanded);
     if let Some(chrome) = app.get_webview(&chrome_label(session)) {
-        if let Err(error) = chrome.set_size(PhysicalSize::new(size.width, size.height)) {
+        if let Err(error) = chrome.set_size(PhysicalSize::new(bounds.width, bounds.chrome_height)) {
             tracing::warn!(session, "could not resize the browser chrome: {error}");
         }
         if let Err(error) = chrome.set_position(PhysicalPosition::new(0, 0)) {
@@ -207,13 +250,27 @@ fn resize_children(app: &AppHandle, session: u64, size: PhysicalSize<u32>) {
         }
     }
     if let Some(page) = app.get_webview(&page_label(session)) {
-        if let Err(error) = page.set_size(PhysicalSize::new(size.width, page_height)) {
+        if let Err(error) = page.set_size(PhysicalSize::new(bounds.width, bounds.page_height)) {
             tracing::warn!(session, "could not resize the browser page: {error}");
         }
-        if let Err(error) = page.set_position(PhysicalPosition::new(0, toolbar)) {
+        if let Err(error) = page.set_position(PhysicalPosition::new(0, bounds.page_y)) {
             tracing::warn!(session, "could not place the browser page: {error}");
         }
     }
+}
+
+/// Re-apply the shared bounds to an open window, reading its current physical size. Used when
+/// the chrome expands or collapses, so no math is repeated outside [`child_bounds`].
+#[cfg(not(target_os = "macos"))]
+fn resize_to_window(app: &AppHandle, session: u64) -> Result<(), String> {
+    let window = app
+        .get_window(&browser_label(session))
+        .ok_or_else(|| format!("Browser window for session {session} is not open"))?;
+    let size = window
+        .inner_size()
+        .map_err(|error| format!("Could not read the browser window size: {error}"))?;
+    resize_children(app, session, size);
+    Ok(())
 }
 
 /// Build the single browser window: our chrome webview on top, the remote page below it.
@@ -261,13 +318,17 @@ fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo
         )
         .map_err(|error| format!("Could not open the browser page: {error}"))?;
 
-    // Windows intercepts every resource request; other platforms are navigation-only for now.
-    // The policy is read here, once per window: changing it in Settings applies to windows
-    // opened afterwards, never to a page that is already loaded.
-    #[cfg(windows)]
-    if browser_policy::load_policy(app).filters_resources() {
-        install_resource_interceptor(&page, app.clone());
+    // The children were built from logical sizes, but events carry physical ones: apply the
+    // shared bounds once here so a page opened on a scaled display never paints oversized.
+    if let Ok(size) = window.inner_size() {
+        resize_children(app, session, size);
     }
+
+    // Windows intercepts every resource request; other platforms are navigation-only for now.
+    // The filter is installed in every mode: its handler asks the cached policy, so switching
+    // to trusted-site applies to this page on the next request instead of a new window.
+    #[cfg(windows)]
+    install_resource_interceptor(&page, app.clone());
     #[cfg(not(windows))]
     let _ = page;
 
@@ -285,7 +346,8 @@ fn allow_navigation(app: &AppHandle, session: u64, url: &Url) -> bool {
 fn refuse_if_blocked(app: &AppHandle, session: u64, url: &str) -> bool {
     let allowed = browser_policy::allowed();
     // Navigation is gated the same way in every policy mode; trusted-site only skips resources.
-    let policy = browser_policy::load_policy(app);
+    // The cached mode keeps the store off the navigation path and follows a Settings change.
+    let policy = browser_policy::cached_policy();
     if !policy.blocks_navigation(url, &allowed) {
         return false;
     }
@@ -390,6 +452,7 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
                 index: 0,
                 force_close: false,
                 loaded: false,
+                expanded: false,
             },
         );
     }
@@ -441,6 +504,10 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
         WindowEvent::Destroyed => finalize_session(&handler_app, session),
         #[cfg(not(target_os = "macos"))]
         WindowEvent::Resized(size) => resize_children(&handler_app, session, *size),
+        // A display change reports the new physical inner size; the helper re-reads the
+        // scale factor, so the children follow the new factor instead of the old one.
+        #[cfg(not(target_os = "macos"))]
+        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => resize_children(&handler_app, session, *new_inner_size),
         _ => {}
     });
 
@@ -609,6 +676,26 @@ pub fn meeting_browser_open_external(session: u64) -> Result<(), String> {
 #[tauri::command]
 pub fn meeting_browser_close(app: AppHandle, session: u64) -> Result<(), String> {
     close_session(&app, session)
+}
+
+/// Grow or restore the chrome so the blocked-hosts region fits inside it; the page takes the
+/// remaining height. Both webviews are repositioned through the same bounds helper as a resize.
+#[tauri::command]
+pub fn browser_set_chrome_expanded(app: AppHandle, session: u64, expanded: bool) -> Result<(), String> {
+    {
+        let mut runtime = lock_runtime()?;
+        let state = runtime
+            .sessions
+            .get_mut(&session)
+            .ok_or_else(|| format!("Unknown browser session {session}"))?;
+        state.expanded = expanded;
+    }
+    // macOS has a single page window and no chrome webview to grow.
+    #[cfg(not(target_os = "macos"))]
+    resize_to_window(&app, session)?;
+    #[cfg(target_os = "macos")]
+    let _ = &app;
+    Ok(())
 }
 
 #[tauri::command]
@@ -791,9 +878,9 @@ unsafe fn block_resource_request(
     let mut uri = PWSTR::null();
     request.Uri(&mut uri).map_err(|error| error.to_string())?;
     let uri = webview2_com::take_pwstr(uri);
-    // The filter is only installed for a strict window, so every request here is checked against
-    // the allowlist; reading the policy per request would put a store read on the hot path.
-    if !browser_policy::should_block(&uri, &browser_policy::allowed()) {
+    // The filter is installed in every mode; the cached policy decides whether this request is
+    // refused, so a Settings change applies without reopening the page and no store is read here.
+    if !browser_policy::blocks_resource(&uri, &browser_policy::allowed()) {
         return Ok(());
     }
     let host = browser_policy::host_of(&uri);
@@ -807,4 +894,61 @@ unsafe fn block_resource_request(
         .map_err(|error| error.to_string())?;
     args.SetResponse(&response).map_err(|error| error.to_string())?;
     Ok(())
+}
+
+#[cfg(all(test, not(target_os = "macos")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn initial_and_expanded_bounds_are_physical() {
+        // A fresh window: the page starts under the toolbar at both scale factors.
+        let size = PhysicalSize::new(1100, 864);
+        assert_eq!(
+            child_bounds(size, 1.0, false),
+            ChildBounds {
+                width: 1100,
+                chrome_height: 104,
+                page_y: 104,
+                page_height: 760,
+            }
+        );
+        // At 1.5 the events are physical, so the logical heights are scaled and rounded.
+        assert_eq!(
+            child_bounds(PhysicalSize::new(1650, 1296), 1.5, false),
+            ChildBounds {
+                width: 1650,
+                chrome_height: 156,
+                page_y: 156,
+                page_height: 1140,
+            }
+        );
+    }
+
+    #[test]
+    fn expansion_adds_the_blocked_list_height_and_shrinks_the_page() {
+        let size = PhysicalSize::new(1100, 864);
+        let collapsed = child_bounds(size, 1.0, false);
+        let expanded = child_bounds(size, 1.0, true);
+
+        assert_eq!(expanded.chrome_height, collapsed.chrome_height + BLOCKED_LIST_H as u32);
+        assert_eq!(expanded.page_y, expanded.chrome_height);
+        assert_eq!(expanded.page_height, collapsed.page_height - BLOCKED_LIST_H as u32);
+        assert_eq!(expanded.width, collapsed.width);
+
+        // 1.5 scale: the growth is scaled too, and the two heights still tile the window.
+        let scaled = child_bounds(PhysicalSize::new(1650, 1296), 1.5, true);
+        assert_eq!(scaled.chrome_height, 456);
+        assert_eq!(scaled.page_y, 456);
+        assert_eq!(scaled.page_height, 840);
+        assert_eq!(scaled.chrome_height + scaled.page_height, 1296);
+    }
+
+    #[test]
+    fn bounds_never_overflow_a_window_shorter_than_the_chrome() {
+        let bounds = child_bounds(PhysicalSize::new(800, 100), 1.0, true);
+        assert_eq!(bounds.chrome_height, 100);
+        assert_eq!(bounds.page_y, 100);
+        assert_eq!(bounds.page_height, 0);
+    }
 }

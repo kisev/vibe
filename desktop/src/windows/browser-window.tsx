@@ -12,13 +12,13 @@ import { ArrowLeft, ArrowRight, ExternalLink, Mic, RotateCw, ShieldAlert, Square
 import RecordingIndicator from '~/components/recording-feedback'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import type { AudioDevice } from '~/lib/audio'
 import { deviceMenuEntries, type DeviceMenuEntry } from '~/lib/device-selection'
 import {
 	allowBrowserHost,
 	BROWSER_BLOCKED_HOSTS_EVENT,
 	BROWSER_NAVIGATION_BLOCKED_EVENT,
+	BROWSER_POLICY_EVENT,
 	closeMeetingBrowser,
 	getBrowserBlockedHosts,
 	getBrowserPolicy,
@@ -28,6 +28,7 @@ import {
 	loadMeetingBrowserUrl,
 	readRecordingDeviceState,
 	restoreRecordingDevice,
+	setBrowserChromeExpanded,
 	writeRecordingDeviceSelection,
 	RECORDING_STATE_EVENT,
 	RECORDING_STATE_REQUEST_EVENT,
@@ -47,6 +48,11 @@ import { cn } from '~/lib/style'
 
 /** Must match `TOOLBAR_H` in `desktop/src-tauri/src/meeting_browser.rs`. */
 const TOOLBAR_HEIGHT = 104
+/**
+ * Height of the blocked-hosts region below the toolbar. The chrome webview grows by this much
+ * while the list is open, and the page moves down; must match `BLOCKED_LIST_H` in Rust.
+ */
+const BLOCKED_LIST_HEIGHT = 200
 
 /**
  * A compact device picker: the same device list, hidden lists and "none" entry the main window's
@@ -120,12 +126,31 @@ export default function BrowserWindow({ session }: { session: number }) {
 	const [error, setError] = useState<string | null>(null)
 	/** A host the allowlist refused in this window; the notice offers to allow it. */
 	const [blockedHost, setBlockedHost] = useState<string | null>(null)
-	/** Every host the strict policy refused; the toolbar popover offers to allow them. */
+	/** Every host the strict policy refused; the toolbar offers to allow them. */
 	const [blockedHosts, setBlockedHosts] = useState<string[]>([])
+	/** The list is an in-chrome region, not a popup: open means the chrome has grown. */
+	const [listExpanded, setListExpanded] = useState(false)
 	const [policy, setPolicy] = useState<BrowserPolicy>('strict')
 	const [recording, setRecording] = useState(false)
 	const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null)
 	const [recordingDevices, setRecordingDevices] = useState<RecordingDeviceState | null>(null)
+
+	/** Hidden with no hosts to show, or when the policy leaves resources unfiltered. */
+	const showBlockedList = policy === 'strict' && blockedHosts.length > 0
+
+	/** Ask the Rust side to grow or restore the chrome; the page follows to the remaining height. */
+	const setChromeExpanded = useCallback(
+		(expanded: boolean) => {
+			void setBrowserChromeExpanded(session, expanded).catch((reason) => console.error('could not resize the browser chrome:', reason))
+		},
+		[session],
+	)
+
+	/** A close or an empty list must never leave the page displaced by an open region. */
+	const collapseList = useCallback(() => {
+		setListExpanded(false)
+		setChromeExpanded(false)
+	}, [setChromeExpanded])
 
 	const refreshDevices = useCallback(async () => {
 		try {
@@ -144,8 +169,8 @@ export default function BrowserWindow({ session }: { session: number }) {
 				if (current) setAddress(current.url)
 			})
 			.catch((reason) => console.error('could not read the browser session:', reason))
-		// The policy is read when this window opens: a change applies to windows opened
-		// afterwards, matching the Rust side that installs the resource filter.
+		// The stored mode only seeds the chrome: the Rust filter follows the cached policy, and
+		// BROWSER_POLICY_EVENT below updates an open window when Settings saves a change.
 		getBrowserPolicy()
 			.then((storedPolicy) => {
 				if (active) setPolicy(storedPolicy)
@@ -159,6 +184,7 @@ export default function BrowserWindow({ session }: { session: number }) {
 
 		const unlisteners: (() => void)[] = []
 		listen<string[]>(BROWSER_BLOCKED_HOSTS_EVENT, (event) => setBlockedHosts(event.payload)).then((fn) => unlisteners.push(fn))
+		listen<BrowserPolicy>(BROWSER_POLICY_EVENT, (event) => setPolicy(event.payload)).then((fn) => unlisteners.push(fn))
 		listen<BrowserSessionInfo>('meeting-browser-session', (event) => {
 			if (event.payload.session !== session) return
 			setInfo(event.payload)
@@ -171,6 +197,8 @@ export default function BrowserWindow({ session }: { session: number }) {
 		}).then((fn) => unlisteners.push(fn))
 		listen<{ session: number }>('meeting-browser-closed', (event) => {
 			if (event.payload.session !== session) return
+			// Restore the page before the window goes away, in case unmount never runs.
+			setChromeExpanded(false)
 			void getCurrentWindow().close()
 		}).then((fn) => unlisteners.push(fn))
 		listen<RecordingStatePayload>(RECORDING_STATE_EVENT, (event) => {
@@ -190,7 +218,15 @@ export default function BrowserWindow({ session }: { session: number }) {
 			window.removeEventListener('focus', onFocus)
 			for (const unlisten of unlisteners) unlisten()
 		}
-	}, [session, refreshDevices])
+	}, [session, refreshDevices, setChromeExpanded])
+
+	// Nothing left to show (every host allowed, or trusted-site): hide and restore the toolbar.
+	useEffect(() => {
+		if (listExpanded && !showBlockedList) collapseList()
+	}, [listExpanded, showBlockedList, collapseList])
+
+	// A chrome that unmounts must not leave the page shoved down by a region nobody can see.
+	useEffect(() => () => setChromeExpanded(false), [setChromeExpanded])
 
 	async function run(action: () => Promise<unknown>) {
 		try {
@@ -218,6 +254,15 @@ export default function BrowserWindow({ session }: { session: number }) {
 			setBlockedHosts((current) => current.filter((item) => item !== host))
 			setBlockedHost(null)
 		})
+		// The action the region existed for is done; fold the chrome back to the toolbar.
+		collapseList()
+	}
+
+	/** The shield grows the chrome to show the list and folds it back on the second press. */
+	function toggleBlockedList() {
+		const expanded = !listExpanded
+		setListExpanded(expanded)
+		setChromeExpanded(expanded)
 	}
 
 	/** A pick is written under the main window's keys; the config store carries it across windows. */
@@ -259,42 +304,21 @@ export default function BrowserWindow({ session }: { session: number }) {
 							onChange={(event) => setAddress(event.target.value)}
 						/>
 					</form>
-					{/* Strict only; the popover may extend over the page area. */}
-					{policy === 'strict' && blockedHosts.length > 0 && (
-						<Popover>
-							<PopoverTrigger asChild>
-								<Button
-									variant="ghost"
-									size="icon"
-									className="relative"
-									aria-label={m.browserBlockedHostsCount({ count: blockedHosts.length })}
-									title={m.browserBlockedHostsCount({ count: blockedHosts.length })}>
-									<ShieldAlert className="h-4 w-4 text-destructive" />
-									<span className="pointer-events-none absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground">
-										{blockedHosts.length}
-									</span>
-								</Button>
-							</PopoverTrigger>
-							<PopoverContent align="end" className="w-64 p-2">
-								<p className="px-2 pb-1 pt-0.5 text-xs font-medium text-foreground">{m.browserBlockedHosts()}</p>
-								<div className="max-h-56 space-y-0.5 overflow-y-auto">
-									{blockedHosts.map((host) => (
-										<div key={host} className="flex items-center justify-between gap-2 rounded-md px-2 py-1 hover:bg-accent/45">
-											<span className="min-w-0 truncate font-mono text-xs">{host}</span>
-											<Button
-												type="button"
-												variant="outline"
-												size="sm"
-												className="h-7 shrink-0 px-2 text-xs"
-												aria-label={m.browserBlockedHostAllowHost({ host })}
-												onClick={() => allowHost(host)}>
-												{m.browserBlockedHostAllow()}
-											</Button>
-										</div>
-									))}
-								</div>
-							</PopoverContent>
-						</Popover>
+					{/* Strict only: the region below the toolbar is hidden in trusted-site mode. */}
+					{showBlockedList && (
+						<Button
+							variant="ghost"
+							size="icon"
+							className="relative"
+							aria-label={m.browserBlockedHostsCount({ count: blockedHosts.length })}
+							aria-expanded={listExpanded}
+							title={m.browserBlockedHostsCount({ count: blockedHosts.length })}
+							onClick={toggleBlockedList}>
+							<ShieldAlert className="h-4 w-4 text-destructive" />
+							<span className="pointer-events-none absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground">
+								{blockedHosts.length}
+							</span>
+						</Button>
 					)}
 					<Button
 						variant="ghost"
@@ -360,6 +384,32 @@ export default function BrowserWindow({ session }: { session: number }) {
 					)}
 				</div>
 			</div>
+			{/* In the chrome webview, which has grown so the page cannot clip it. */}
+			{listExpanded && showBlockedList && (
+				<div
+					role="region"
+					aria-label={m.browserBlockedHosts()}
+					className="flex shrink-0 flex-col overflow-hidden border-t bg-background px-3 py-2"
+					style={{ height: BLOCKED_LIST_HEIGHT }}>
+					<p className="px-1 pb-1 text-xs font-medium text-foreground">{m.browserBlockedHosts()}</p>
+					<div className="min-h-0 space-y-0.5 overflow-y-auto">
+						{blockedHosts.map((host) => (
+							<div key={host} className="flex items-center justify-between gap-2 rounded-md px-1 py-1 hover:bg-accent/45">
+								<span className="min-w-0 truncate font-mono text-xs">{host}</span>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="h-7 shrink-0 px-2 text-xs"
+									aria-label={m.browserBlockedHostAllowHost({ host })}
+									onClick={() => allowHost(host)}>
+									{m.browserBlockedHostAllow()}
+								</Button>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
 			{/* Native page webview covers this area; it is only a neutral backdrop while it loads. */}
 			<div className="min-h-0 flex-1 bg-background" />
 		</div>
