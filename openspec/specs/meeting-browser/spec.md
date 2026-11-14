@@ -1,15 +1,19 @@
-# Spec Delta
+# meeting-browser Specification
 
-## ADDED Requirements
+## Purpose
+
+The in-app meeting browser: one window holding the app's chrome above a remote page, which loads meeting pages only from an allowlist, applies a strictness policy to every navigation and resource request, and resolves refused hosts in place.
+
+## Requirements
 
 ### Requirement: The blocked list grows the chrome instead of a popup
 
-The chrome SHALL show blocked hosts in a region that is part of the chrome webview: pressing the shield grows it to the height the list needs and shrinks the page below it, and pressing again restores the toolbar. The list SHALL never be clipped by the page.
+The chrome SHALL show blocked hosts in a region that is part of the chrome webview: pressing the shield grows the chrome by one fixed blocked-list region height and shrinks the page below it, and pressing again restores the toolbar. The region is tall enough for a handful of hosts and scrolls past that, so the list SHALL never be clipped by the page.
 
 #### Scenario: Opening the blocked list
 
 - **WHEN** the shield is pressed
-- **THEN** the chrome grows, every blocked host and its Allow button are visible, and the page occupies the remaining height
+- **THEN** the chrome grows by the blocked-list region height, the blocked hosts with their Allow buttons are shown in the region, and the page occupies the remaining height
 
 #### Scenario: Closing the list
 
