@@ -1,7 +1,6 @@
----
-name: release
-description: Ship a Vibe release end to end — decide whether server/ needs its own release first, bump the version, PR and squash-merge, run release.yml unsigned, promote the prerelease, deploy the website. Use when the user asks to cut, ship or publish a release, or invokes /release.
----
+______________________________________________________________________
+
+## name: release description: Ship a Vibe release end to end — decide whether server/ needs its own release first, bump the version, PR and squash-merge, run release.yml unsigned, promote the prerelease, deploy the website. Use when the user asks to cut, ship or publish a release, or invokes /release.
 
 # Release
 
@@ -24,7 +23,10 @@ git status --short          # must be empty
 ## 1. Does `server/` need a release first?
 
 The desktop app downloads a pinned engine, so engine fixes only reach users
-through a new server release.
+through a new server release. The server has its own version line: it starts at
+`server-v1.0.0` and never follows upstream's 0.x numbers, and `.server-version`
+takes the new tag only once that release exists — pulling it ahead makes every
+build point at a release that is not there.
 
 ```
 pin=$(cat .server-version)                          # e.g. v0.6.9
@@ -86,8 +88,7 @@ gh pr create --fill
 
 **Gate:** `fmt` and `clippy` pass, then `gh pr merge <n> --squash --delete-branch`.
 Repo-level auto-merge is **off** (`allow_auto_merge: false`), so `--auto` silently
-does nothing — poll the checks and merge when they settle. Then `git switch main
-&& git pull`.
+does nothing — poll the checks and merge when they settle. Then `git switch main && git pull`.
 
 ## 4. Release
 
@@ -115,8 +116,7 @@ gh release edit vX.Y.Z --prerelease=false --latest --notes-file /tmp/notes.md
 ```
 
 The body is the versioned English entry, so GitHub and the website never
-disagree, under `Read this changelog in your language:
-https://kisev.github.io/vibe/changelog/<version>` — the same entry in the
+disagree, under `Read this changelog in your language: https://kisev.github.io/vibe/changelog/<version>` — the same entry in the
 reader's own language. Dev releases pick the body up from `unreleased.md`
 automatically and link to `/changelog/dev` instead.
 

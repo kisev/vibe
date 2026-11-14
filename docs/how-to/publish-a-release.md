@@ -67,3 +67,7 @@ The updater artifacts are signed by Tauri with `TAURI_PRIVATE_KEY` regardless; t
 ## If something is wrong
 
 The updater only moves forward. Fix a bad release by shipping a newer one, which is what the beta line is for: catch the problem before stable gets it. See [Update channels](../explanation/update-channels.md).
+
+## The server has its own version line
+
+The engine ships as a separate product: its releases are tagged `server-v<version>`, start at `server-v1.0.0`, and advance independently of the app and of upstream. Bump `vibe-server`'s crate version for the next release, cut the tag, and only then set `.server-version` to it — a pin that points ahead of the release breaks every build that downloads the sidecar.
