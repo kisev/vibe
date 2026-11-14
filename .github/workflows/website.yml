@@ -144,6 +144,15 @@ jobs:
               with:
                   ref: main
 
+            # The release site's content comes from main, its pipeline from dev.
+            # Main lags a release behind: right after a rollback it carries no
+            # `website:build` task and no assembly script at all, and using its
+            # own taskfile failed the deploy with "task does not exist".
+            - name: Take the deploy pipeline from dev
+              run: |
+                  git fetch --depth 1 origin dev
+                  git checkout FETCH_HEAD -- taskfile.yml scripts/
+
             - name: setup pnpm
               uses: pnpm/action-setup@v4
               with:
