@@ -60,8 +60,10 @@ export function UpdateControls() {
 
 	return (
 		<SettingsGroup title={m.updates()}>
-			<SettingsRow label={m.updatesCurrentVersion()} description={m.infoUpdatesCurrentVersion()}>
-				<span className="text-sm tabular-nums text-muted-foreground">{version || '—'}</span>
+			{/* A local build's version is long: shrink the value and break it anywhere. */}
+			{/* Left as `shrink-0` it would overflow the row and be clipped by the group. */}
+			<SettingsRow label={m.updatesCurrentVersion()} description={m.infoUpdatesCurrentVersion()} valueClassName="min-w-0 shrink">
+				<span className="min-w-0 break-all text-sm tabular-nums text-muted-foreground select-text">{version || '—'}</span>
 			</SettingsRow>
 
 			<SettingsField label={m.updateChannel()} description={devLineBelow ? m.updateDevBoundary() : m.updateChannelInfo()}>

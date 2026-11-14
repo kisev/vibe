@@ -177,7 +177,8 @@ export default function SettingsPage({ setVisible, scrollTo }: SettingsPageProps
 									onClick={() => openUrl(config.changelogURL(vm.appVersionNumber))}
 									className="group flex w-full cursor-pointer items-start gap-1.5 rounded-md px-2.5 py-1 text-start font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/60 transition-colors hover:text-foreground">
 									{/* A local build's version is long; wrap it whole instead of clipping the build id. */}
-									<span className="min-w-0 break-all leading-tight">{vm.appVersion}</span>
+									{/* `select-text` undoes the browser's unselectable button text so it can be copied. */}
+									<span className="min-w-0 break-all leading-tight select-text">{vm.appVersion}</span>
 									<ArrowUpRight
 										aria-hidden="true"
 										className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"

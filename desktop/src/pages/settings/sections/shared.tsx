@@ -85,17 +85,20 @@ export function SettingsRow({
 	children,
 	className,
 	clampDescription = true,
+	valueClassName,
 }: {
 	label: ReactNode
 	description?: ReactNode
 	children?: ReactNode
 	className?: string
 	clampDescription?: boolean
+	/** Overrides the value container's sizing, e.g. to let long text shrink and wrap. */
+	valueClassName?: string
 }) {
 	return (
 		<div className={cn('flex min-h-[52px] items-center justify-between gap-4 px-4 py-2.5', className)}>
 			<RowLabel label={label} description={description} clamp={clampDescription} />
-			{children && <div className="flex shrink-0 items-center gap-1.5">{children}</div>}
+			{children && <div className={cn('flex shrink-0 items-center gap-1.5', valueClassName)}>{children}</div>}
 		</div>
 	)
 }

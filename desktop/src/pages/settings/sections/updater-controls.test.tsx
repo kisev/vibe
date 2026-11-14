@@ -4,14 +4,16 @@
 // context value directly, so every phase is reachable without the Tauri updater.
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '~/components/ui/tooltip'
 import { m } from '~/paraglide/messages.js'
 import { UpdaterContext, type UpdaterContextType } from '~/providers/updater'
 import { UpdateControls } from './updater-controls'
 
+const appVersion = vi.hoisted(() => ({ value: '1.0.0' }))
+
 vi.mock('@tauri-apps/api/app', () => ({
-	getVersion: async () => '1.0.0',
+	getVersion: async () => appVersion.value,
 }))
 
 const noop = () => {}
@@ -45,6 +47,10 @@ function renderWith(overrides: Partial<UpdaterContextType> = {}) {
 	)
 	return { ...utils, value }
 }
+
+beforeEach(() => {
+	appVersion.value = '1.0.0'
+})
 
 afterEach(cleanup)
 
@@ -106,5 +112,21 @@ describe('update controls', () => {
 		renderWith({ channel: 'dev' })
 
 		expect(await screen.findByText(m.updateDevBoundary())).toBeTruthy()
+	})
+
+	it('renders a long local build version whole, wrapped and selectable', async () => {
+		const localVersion = '1.0.0-local.20261113.e3d2b9d7'
+		appVersion.value = localVersion
+		renderWith()
+
+		const value = await screen.findByText(localVersion)
+		// jsdom has no layout, so the no-clipping contract is made of classes: the row lets the
+		// value shrink, the text breaks anywhere instead of being cut off with an ellipsis, and
+		// it stays selectable so the build id can go into a bug report.
+		expect(value.className).toContain('min-w-0')
+		expect(value.className).toContain('break-all')
+		expect(value.className).toContain('select-text')
+		expect(value.className).not.toContain('truncate')
+		expect(value.parentElement?.className).not.toContain('shrink-0')
 	})
 })

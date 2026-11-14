@@ -1,5 +1,9 @@
 # Spec Delta
 
+## Purpose
+
+Presents the settings surfaces so every value the user needs — including long build identifiers — is fully readable, selectable and copyable.
+
 ## ADDED Requirements
 
 ### Requirement: A long version is fully readable
