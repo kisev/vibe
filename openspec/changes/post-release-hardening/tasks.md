@@ -27,3 +27,5 @@
 - [x] 8. Dev retention scenarios name the tag number the build actually uses; the archived `dev-build-retention` task list has no unchecked item.
 
 - [ ] 9. `task verify` green, `openspec validate --all --strict` passes.
+
+- [x] 9. `scripts/ci/fetch_ffmpeg.py` moves the downloaded ffmpeg with `shutil.move`: `os.replace` cannot cross drives, which is exactly the Windows runner layout (`RUNNER_TEMP` on C:, workspace on D:).

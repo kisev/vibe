@@ -12,6 +12,7 @@ Reads FFMPEG_URL, TRIPLE, EXE and RUNNER_TEMP from the environment.
 from __future__ import annotations
 
 import os
+import shutil
 import pathlib
 import urllib.request
 import zipfile
@@ -34,7 +35,9 @@ def main() -> None:
         bundle.extract(member, tmp / "out")
     target = pathlib.Path("desktop/src-tauri/binaries") / f"ffmpeg-{triple}{exe}"
     target.parent.mkdir(parents=True, exist_ok=True)
-    os.replace(tmp / "out" / member, target)
+    # RUNNER_TEMP and the workspace sit on different drives on Windows runners, and
+    # os.replace cannot cross devices; shutil.move copies and removes instead.
+    shutil.move(str(tmp / "out" / member), str(target))
     os.chmod(target, 0o755)
     print(f"installed {target}")
 
