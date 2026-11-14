@@ -1,0 +1,43 @@
+name: Refresh Dev Site
+
+# A push to dev asks for Deploy Website on the main ref: the github-pages
+# environment admits deployments from main alone, so the deploy job of a run
+# started by a dev push would be skipped and the run would still say success.
+# Deploy Website builds the dev preview from the dev branch whatever ref it was
+# started on, so asking for it on main publishes the current dev tree without
+# widening the environment's policy.
+on:
+    push:
+        branches:
+            - dev
+        paths:
+            - "website/**"
+            - "i18n/**"
+            - "openspec/changes/**"
+            - "scripts/roadmap.py"
+            - "scripts/dev_manifest.py"
+            - "scripts/website_build.sh"
+            - "scripts/website_assemble.sh"
+            - "scripts/website_links.py"
+            - "handoff/pwa/**"
+            - "handoff/wasm/**"
+            - "taskfile.yml"
+            - ".github/workflows/website.yml"
+
+permissions:
+    actions: write
+    contents: read
+
+concurrency:
+    group: "site-refresh"
+    cancel-in-progress: false
+
+jobs:
+    dispatch:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Ask for a deploy on main
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+              run: gh workflow run website.yml --ref main
