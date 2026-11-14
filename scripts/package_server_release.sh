@@ -44,9 +44,12 @@ found="$(find "$stage" -type f \( -name ffmpeg -o -name ffmpeg.exe \) ! -name '*
     echo "the ffmpeg archive holds no binary" >&2
     exit 1
 }
-mv "$found" "$stage/ffmpeg"
+# Windows resolves the sidecar by its full name, so the extension is part of the contract.
+ffmpeg_name="ffmpeg"
+[ "$goos" = "windows" ] && ffmpeg_name="ffmpeg.exe"
+mv "$found" "$stage/$ffmpeg_name"
 rm -f "$stage/ffmpeg.zip"
-chmod 755 "$stage/ffmpeg"
+chmod 755 "$stage/$ffmpeg_name"
 
 # Everything at the staging root goes into the archive root, so the app finds the
 # two files by name whether it unpacks a .zip or a .tar.gz.

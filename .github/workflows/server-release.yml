@@ -121,7 +121,9 @@ jobs:
         if: matrix.archive != ''
         shell: bash
         run: |
-          mise exec -- task server:package-release -- "${{ matrix.binary }}" "${{ matrix.package_os }}" "${{ matrix.package_arch }}" "${{ matrix.archive }}"
+          # The task runs from the repository root while this job's default working directory is
+          # `server`; the paths are made explicit so the binary and the archive agree with the upload step.
+          mise exec -- task server:package-release -- "server/${{ matrix.binary }}" "${{ matrix.package_os }}" "${{ matrix.package_arch }}" "server/${{ matrix.archive }}"
       - name: Upload packaged archive to release
         if: matrix.archive != ''
         shell: pwsh
