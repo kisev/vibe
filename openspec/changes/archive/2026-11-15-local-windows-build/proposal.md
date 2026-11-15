@@ -8,11 +8,11 @@ WSL is used for the terminal and the repository; the GUI the app is tested in is
 
 ## What Changes
 
-- New `scripts/local_windows_build.sh`, driven by `task app:build`: sync the working tree to a Windows checkout (path from `VIBE_WIN_CHECKOUT`, default `<Windows home>\vibe-build`), install dependencies there, and run `pnpm tauri build --bundles nsis` through `powershell.exe`.
+- New `scripts/local_windows_build.sh`, driven by `task app:build:windows`: sync the working tree to a Windows checkout (path from `VIBE_WIN_CHECKOUT`, default `<Windows home>\vibe-build`), install dependencies there, and run `pnpm exec tauri build --config local-build.json --bundles nsis` through `powershell.exe`.
 - The build carries `1.0.0-local.<YYYYMMDD>.<sha>` through a Tauri `--config` override, so a local build is always distinguishable from a release or a dev build.
 - `update_check` returns no update when the running version contains `-local`: a local build must never be moved onto a release line by the updater.
-- `task app:build:verified` runs `task verify` first; `task app:build` builds immediately for the fast loop.
-- `docs/how-to/build-and-run.md` documents the local build, the path knob and what it does not do (no tag, no signature).
+- `task app:build:windows:verified` runs `task verify` first; `task app:build:windows` builds immediately for the fast loop.
+- `docs/tutorials/build-and-run.md` documents the local build, the path knob and what it does not do (no tag, no signature).
 
 ## Capabilities
 
@@ -20,6 +20,6 @@ WSL is used for the terminal and the repository; the GUI the app is tested in is
 
 ## Impact
 
-- `scripts/local_windows_build.sh`, `taskfile.yml`, `desktop/src-tauri/src/updater.rs`, `docs/how-to/build-and-run.md`.
+- `scripts/local_windows_build.sh`, `taskfile.yml`, `desktop/src-tauri/src/updater.rs`, `docs/tutorials/build-and-run.md`.
 - No release pipeline change: tags and uploads still come from `dev-build.yml`; a local build publishes nothing.
 - Disk: the Windows checkout holds its own `target/` (several GB) at the configured path.

@@ -74,15 +74,19 @@ async fn channel_absent(url: &str) -> bool {
     absent_status(status)
 }
 
+/// A locally built app (`1.0.0-local.<date>.<sha>`) is not on any channel: offering it a
+/// release or dev build would move the tester off the revision they are checking.
+fn is_local_build(version: &str) -> bool {
+    version.contains("-local")
+}
+
 #[tauri::command]
 pub async fn update_check(
     app: AppHandle,
     pending: State<'_, PendingUpdate>,
     channel: Channel,
 ) -> Result<Option<AvailableUpdate>, String> {
-    // A locally built app (`1.0.0-local.<date>.<sha>`) is not on any channel: offering it a
-    // release or dev build would move the tester off the revision they are checking.
-    if app.package_info().version.to_string().contains("-local") {
+    if is_local_build(&app.package_info().version.to_string()) {
         return Ok(None);
     }
     let url = tauri::Url::parse(&channel.url()).map_err(|error| format!("{error}"))?;
@@ -165,7 +169,7 @@ pub async fn update_install(pending: State<'_, PendingUpdate>) -> Result<(), Str
 
 #[cfg(test)]
 mod tests {
-    use super::{absent_status, Channel, CHANNELS_URL};
+    use super::{absent_status, is_local_build, Channel, CHANNELS_URL};
 
     fn from_json(name: &str) -> Channel {
         serde_json::from_value(serde_json::Value::String(name.into())).unwrap()
@@ -181,6 +185,14 @@ mod tests {
     #[test]
     fn an_unknown_channel_does_not_deserialize() {
         assert!(serde_json::from_value::<Channel>(serde_json::Value::String("nightly".into())).is_err());
+    }
+
+    #[test]
+    fn a_local_build_never_joins_a_channel() {
+        assert!(is_local_build("1.0.0-local.20261113.c5302d1f"));
+        assert!(!is_local_build("1.0.0"));
+        assert!(!is_local_build("1.0.0-rc.1"));
+        assert!(!is_local_build("1.0.0-dev.3"));
     }
 
     #[test]
