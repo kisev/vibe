@@ -9,12 +9,17 @@ The deployed site SHALL serve the production build at `/vibe/` and a build of `d
 #### Scenario: A dev change reaches the dev site
 
 - **WHEN** a website change lands on `dev`
-- **THEN** the next deploy publishes the production site from `main` and the dev site from `dev` together
+- **THEN** the next deploy from `main`, or a manual dispatch, publishes the production site from `main` and the dev site from `dev` together
 
 #### Scenario: A dev deep link
 
 - **WHEN** the dev site is opened at `/vibe/dev/#/roadmap`
 - **THEN** the dev app renders its roadmap inside the dev base, without falling back to the production app
+
+#### Scenario: A dev page that keeps its own anchor state
+
+- **WHEN** the dev preview opens a documentation page or a swept `-dev.` changelog version
+- **THEN** its navigation stays inside `/vibe/dev/#/` and the address bar is never rewritten to a path outside the dev base
 
 #### Scenario: The production site is unaffected
 

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import DocViewer from '~/components/DocViewer'
 import { cn } from '~/lib/style'
 import { categories, docs as englishDocs, loadDocs, type Category, type Doc } from '~/lib/docs'
 import { useLocale } from '~/lib/useLocale'
+import { siteRouter } from '~/lib/site'
 import { m } from '~/paraglide/messages.js'
 import { getTextDirection, type Locale } from '~/paraglide/runtime.js'
 
@@ -13,8 +15,8 @@ const categoryLabel: Record<Category, () => string> = {
 	explanation: () => m.docsExplanation(),
 }
 
-function slugFromHash(hash: string) {
-	const raw = hash.replace(/^#/, '')
+/** The page a slug names, falling back to the first one for an unknown or malformed slug. */
+function resolveSlug(raw: string) {
 	let wanted = raw
 	try {
 		wanted = decodeURIComponent(raw)
@@ -24,14 +26,23 @@ function slugFromHash(hash: string) {
 	return englishDocs.find((doc) => doc.slug === wanted.toLowerCase())?.slug ?? englishDocs[0].slug
 }
 
+function slugFromHash(hash: string) {
+	return resolveSlug(hash.replace(/^#/, ''))
+}
+
 export default function Docs() {
 	// The language switcher remounts this page; reading the locale from the router
 	// keeps the fetch in step with the switch instead of a value captured once.
 	const locale = useLocale()
+	// The dev preview's router owns the address hash, so its doc slug is a route
+	// segment; the path build keeps the `/docs#slug` anchors it has always had.
+	const hashRouting = siteRouter() === 'hash'
+	const navigate = useNavigate()
+	const { slug: routeSlug } = useParams()
 	// A locale's page waits for its translation rather than painting English first:
 	// swapping the whole article a moment later reflows and may flip direction.
 	const [pages, setPages] = useState<Doc[] | null>(null)
-	const [slug, setSlug] = useState<Doc['slug']>(() => slugFromHash(window.location.hash))
+	const [slug, setSlug] = useState<Doc['slug']>(() => (hashRouting ? resolveSlug(routeSlug ?? '') : slugFromHash(window.location.hash)))
 	const shown = pages?.find((doc) => doc.slug === slug) ?? pages?.[0]
 
 	useEffect(() => {
@@ -46,16 +57,25 @@ export default function Docs() {
 	}, [locale])
 
 	useEffect(() => {
+		if (hashRouting) {
+			// Back/forward changes the route param; keep the article in step with it.
+			setSlug(resolveSlug(routeSlug ?? ''))
+			return
+		}
 		if (window.location.hash) setSlug(slugFromHash(window.location.hash))
 
 		const onHashChange = () => setSlug(slugFromHash(window.location.hash))
 		window.addEventListener('hashchange', onHashChange)
 
 		return () => window.removeEventListener('hashchange', onHashChange)
-	}, [])
+	}, [hashRouting, routeSlug])
 
 	function open(next: Doc['slug']) {
 		setSlug(next)
+		if (hashRouting) {
+			navigate(`/docs/${next}`)
+			return
+		}
 		window.location.hash = next
 	}
 

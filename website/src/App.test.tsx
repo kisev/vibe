@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
 import DevBanner from './components/DevBanner'
+import DocViewer from './components/DocViewer'
+import { docs } from './lib/docs'
 import { siteRouter } from './lib/site'
 import { m } from './paraglide/messages.js'
 
@@ -36,6 +38,7 @@ beforeEach(() => {
 afterEach(() => {
 	cleanup()
 	vi.unstubAllEnvs()
+	vi.unstubAllGlobals()
 })
 
 describe('site build variants', () => {
@@ -78,5 +81,63 @@ describe('site build variants', () => {
 		await waitFor(() => expect(window.location.hash).toBe('#/features'))
 		expect(window.location.pathname).toBe('/vibe/dev/')
 		expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(m.features())
+	})
+
+	it('renders a dev deep link inside the dev base', () => {
+		vi.stubEnv('VITE_SITE_ROUTER', 'hash')
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })),
+		)
+		window.history.replaceState({}, '', '/vibe/dev/#/roadmap')
+		render(createElement(App))
+
+		expect(window.location.pathname).toBe('/vibe/dev/')
+		expect(window.location.hash).toBe('#/roadmap')
+		expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(m.roadmap())
+	})
+
+	it('keeps dev documentation pages and their nav inside the dev base', async () => {
+		const models = docs.find((doc) => doc.slug === 'models')!
+		const install = docs.find((doc) => doc.slug === 'install')!
+
+		vi.stubEnv('VITE_SITE_ROUTER', 'hash')
+		window.history.replaceState({}, '', '/vibe/dev/#/docs/models')
+		render(createElement(App))
+
+		// The article's own H1 follows the route, so a dev deep link opens the named page.
+		await waitFor(() =>
+			expect(screen.getAllByRole('heading', { level: 1 }).map((heading) => heading.textContent)).toContain(models.title),
+		)
+
+		fireEvent.click(screen.getByRole('button', { name: install.title }))
+
+		await waitFor(() => expect(window.location.hash).toBe('#/docs/install'))
+		expect(window.location.pathname).toBe('/vibe/dev/')
+		await waitFor(() =>
+			expect(screen.getAllByRole('heading', { level: 1 }).map((heading) => heading.textContent)).toContain(install.title),
+		)
+	})
+
+	it('keeps the dev changelog alias inside the dev base', async () => {
+		vi.stubEnv('VITE_SITE_ROUTER', 'hash')
+		window.history.replaceState({}, '', '/vibe/dev/#/changelog/1.0.0-dev.42')
+		render(createElement(App))
+
+		await waitFor(() => expect(window.location.hash).toBe('#/changelog/dev'))
+		expect(window.location.pathname).toBe('/vibe/dev/')
+	})
+
+	it('rewrites documentation cross-links for the dev build only', async () => {
+		const content = 'See [Models](/vibe/docs#models) for the alternatives.'
+
+		vi.stubEnv('VITE_SITE_ROUTER', 'hash')
+		render(createElement(DocViewer, { content }))
+		await waitFor(() => expect(screen.getByRole('link', { name: 'Models' }).getAttribute('href')).toBe('#/docs/models'))
+
+		cleanup()
+		vi.unstubAllEnvs()
+		render(createElement(DocViewer, { content }))
+		await waitFor(() => expect(screen.getByRole('link', { name: 'Models' }).getAttribute('href')).toBe('/vibe/docs#models'))
 	})
 })

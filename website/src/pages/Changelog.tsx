@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { cn } from '~/lib/style'
+import { siteRouter } from '~/lib/site'
 import {
 	devAlias,
 	findDevRelease,
@@ -115,6 +116,7 @@ function Entry({ release, single, dev }: { release: Release; single: boolean; de
 
 export default function Changelog() {
 	const { version } = useParams()
+	const navigate = useNavigate()
 	// The language switcher remounts this page; reading the locale from the router
 	// keeps the fetch in step with the switch instead of a value captured once.
 	const locale = useLocale()
@@ -131,9 +133,17 @@ export default function Changelog() {
 
 	// A versioned dev URL keeps working, but the address bar gives back the permanent alias.
 	useEffect(() => {
-		if (!dev || window.location.pathname === devPath) return
+		if (!dev) return
+		// The dev preview's router owns the hash, so the alias is a route there. Writing
+		// `devPath` — a path under the dev base — would move the address bar out of
+		// `/vibe/dev/`, where only the production site answers.
+		if (siteRouter() === 'hash') {
+			if (version !== devAlias) navigate(`/changelog/${devAlias}`, { replace: true })
+			return
+		}
+		if (window.location.pathname === devPath) return
 		window.history.replaceState(window.history.state, '', `${devPath}${window.location.search}${window.location.hash}`)
-	}, [dev])
+	}, [dev, version, navigate])
 
 	useEffect(() => {
 		let live = true
