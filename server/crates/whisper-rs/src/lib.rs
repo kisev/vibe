@@ -84,7 +84,13 @@ pub struct Segment {
 }
 
 /// One word of a [`Segment`]. Times are centiseconds. The text keeps its
-/// leading space, so concatenating a segment's words rebuilds its text.
+/// leading space, so concatenating a segment's words rebuilds its text when
+/// special tokens are not printed (that is, when `verbose` is off).
+///
+/// Words are split on tokens whose bytes begin with a space, the whisper.cpp
+/// heuristic. Languages that do not separate words with spaces (Chinese,
+/// Japanese, Thai), and text that continues after a line break without a
+/// leading space, therefore yield a single `Word` spanning the whole segment.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Word {
     pub start: i64,

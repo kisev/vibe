@@ -8,6 +8,14 @@
 //!
 //! Nothing is created until a [`Cache`] is built from a root directory, which
 //! keeps the cache purely opt-in.
+//!
+//! Retention is the operator's responsibility, not the cache's: an entry is
+//! content-addressed and never rewritten, so entries accumulate until the root
+//! is cleared. The desktop app prunes entries untouched for 30 days on start;
+//! `--cache-dir` on the command line or the server names a folder the operator
+//! deletes to clear. Cache writes are best-effort: a full disk or a vanished
+//! directory is reported and the run continues uncached, so the cache can
+//! never fail a transcription that would otherwise succeed.
 
 use std::fs::{File, OpenOptions};
 use std::io::Write as _;
@@ -293,7 +301,17 @@ fn write_json<T: Serialize + ?Sized>(path: &Path, value: &T) -> Result<()> {
         file.write_all(&bytes).map_err(io(&tmp))?;
         file.sync_all().map_err(io(&tmp))?;
     }
-    std::fs::rename(&tmp, path).map_err(io(path))
+    std::fs::rename(&tmp, path).map_err(io(path))?;
+    // The rename itself has to reach the disk: otherwise a power loss can undo
+    // it and drop a chunk the run reported finished. Windows cannot open a
+    // directory as a file, so a failure here is ignored — the entry is still
+    // consistent, only its durability is unproven.
+    if let Some(dir) = path.parent() {
+        if let Ok(dir) = File::open(dir) {
+            let _ = dir.sync_all();
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

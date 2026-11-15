@@ -36,14 +36,12 @@ fn main() -> ExitCode {
 
 fn run(model_path: &std::ffi::OsStr, wav_path: &std::ffi::OsStr) -> anyhow::Result<()> {
     let samples = read_wav(Path::new(wav_path))?;
-    let mut diarizer = nemotron_diarize_rs::Diarizer::new(Path::new(model_path)).map_err(|error| anyhow::anyhow!("{error}"))?;
+    let mut diarizer = nemotron_diarize_rs::Diarizer::new(Path::new(model_path))?;
     let expected_rate = diarizer.sample_rate();
     if expected_rate != 16_000 {
         anyhow::bail!("the model expects {expected_rate} Hz audio; the server decodes 16 kHz");
     }
-    let segments = diarizer
-        .diarize_samples(&samples)
-        .map_err(|error| anyhow::anyhow!("{error}"))?;
+    let segments = diarizer.diarize_samples(&samples)?;
     // Hand-rolled: the array is flat and this tool deliberately carries no
     // serializer dependency.
     let mut stdout = String::from("[");
@@ -79,6 +77,13 @@ fn read_wav(path: &Path) -> anyhow::Result<Vec<f32>> {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| anyhow::anyhow!("wav decode: {error}")),
         hound::SampleFormat::Int => {
+            // hound sign-extends into i32 without scaling, so the divisor is
+            // the file's own bit depth; only these widths are decodable.
+            anyhow::ensure!(
+                matches!(spec.bits_per_sample, 8 | 16 | 24 | 32),
+                "unsupported bit depth {}",
+                spec.bits_per_sample
+            );
             let scale = 1.0 / (1i64 << (spec.bits_per_sample - 1)) as f32;
             Ok(reader
                 .samples::<i32>()

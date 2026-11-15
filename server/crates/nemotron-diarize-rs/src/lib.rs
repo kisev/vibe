@@ -94,8 +94,13 @@ impl Diarizer {
         })
     }
 
-    /// Speaker probability above which a frame counts as that speaker's speech. Defaults to 0.5.
+    /// Speaker probability above which a frame counts as that speaker's speech.
+    /// Defaults to 0.5; must be finite and within `[0, 1]`.
     pub fn with_threshold(mut self, threshold: f32) -> Self {
+        debug_assert!(
+            threshold.is_finite() && (0.0..=1.0).contains(&threshold),
+            "threshold must be finite and within [0, 1]"
+        );
         self.threshold = threshold;
         self
     }
@@ -187,11 +192,8 @@ impl Diarizer {
                 build_ms += build_started.elapsed().as_secs_f64() * 1e3;
             }
             let compute_started = Instant::now();
-            let step_logits = self
-                .step
-                .as_mut()
-                .expect("step graph")
-                .run(&self.runtime, &step_embeds, &valid)?;
+            let step = self.step.as_mut().ok_or(Error::Ggml("step graph"))?;
+            let step_logits = step.run(&self.runtime, &step_embeds, &valid)?;
             let step_compute_ms = compute_started.elapsed().as_secs_f64() * 1e3;
             compute_ms += step_compute_ms;
 
@@ -270,6 +272,11 @@ fn read_wav(path: &Path, sample_rate: u32) -> Result<Vec<f32>> {
     let interleaved = match spec.sample_format {
         hound::SampleFormat::Float => reader.samples::<f32>().collect::<std::result::Result<Vec<_>, _>>(),
         hound::SampleFormat::Int => {
+            // hound sign-extends into `i32` without scaling (16-bit stays in
+            // ±2^15), so the divisor is the file's own bit depth.
+            if !matches!(spec.bits_per_sample, 8 | 16 | 24 | 32) {
+                return Err(error(format!("unsupported bit depth {}", spec.bits_per_sample)));
+            }
             let scale = 1.0 / (1i64 << (spec.bits_per_sample - 1)) as f32;
             reader
                 .samples::<i32>()
@@ -295,4 +302,50 @@ fn read_wav(path: &Path, sample_rate: u32) -> Result<Vec<f32>> {
         "wav read"
     );
     Ok(samples)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_int_wav(path: &Path, bits_per_sample: u16, samples: &[i32]) -> std::io::Result<()> {
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 16_000,
+            bits_per_sample,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(path, spec).map_err(|error| std::io::Error::other(error.to_string()))?;
+        for &sample in samples {
+            writer
+                .write_sample(sample)
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
+        }
+        writer.finalize().map_err(|error| std::io::Error::other(error.to_string()))
+    }
+
+    /// hound sign-extends integer samples into `i32` without rescaling, so the
+    /// divisor must follow the file's bit depth: a full-scale 16-bit sample
+    /// arrives as 32767, not 32767 << 16.
+    #[test]
+    fn integer_wavs_are_normalized_by_their_bit_depth() -> std::io::Result<()> {
+        for (bits, full_scale, expected) in [
+            (8u16, 127i32, 127.0f32 / 128.0),
+            (16, 32_767, 32_767.0 / 32_768.0),
+            (24, 8_388_607, 8_388_607.0 / 8_388_608.0),
+        ] {
+            let path = std::env::temp_dir().join(format!("nemotron-read-wav-{}-{bits}.wav", std::process::id()));
+            write_int_wav(&path, bits, &[0, full_scale, -full_scale - 1])?;
+            let samples = read_wav(&path, 16_000).map_err(|error| std::io::Error::other(error.to_string()))?;
+            let _ = std::fs::remove_file(&path);
+            assert!(
+                (samples[1] - expected).abs() < 1e-6,
+                "{bits}-bit full scale decoded to {}",
+                samples[1]
+            );
+            assert!((0.0..1.0).contains(&samples[1]), "{bits}-bit peak {}", samples[1]);
+            assert!((-1.0..=0.0).contains(&samples[2]), "{bits}-bit trough {}", samples[2]);
+        }
+        Ok(())
+    }
 }

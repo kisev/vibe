@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 use std::io::{BufReader, Read};
 use std::path::Path;
+use std::sync::Arc;
 
 use ggml_rs_sys as sys;
 
@@ -92,7 +93,8 @@ pub(crate) struct Model {
     buffers: Vec<sys::ggml_backend_buffer_t>,
     pub hparams: Hparams,
     pub filters: Filters,
-    pub vocab: Vocab,
+    /// Shared with `Context`, which keeps it across `&mut Whisper` calls.
+    pub vocab: Arc<Vocab>,
 
     pub e_pe: Tensor,
     pub e_conv_1_w: Tensor,
@@ -519,7 +521,7 @@ impl Model {
         Ok(Self {
             hparams,
             filters,
-            vocab,
+            vocab: Arc::new(vocab),
             e_pe: get("encoder.positional_embedding"),
             e_conv_1_w: get("encoder.conv1.weight"),
             e_conv_1_b: get("encoder.conv1.bias"),

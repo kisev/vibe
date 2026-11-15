@@ -28,6 +28,9 @@ pub(crate) struct Runtime {
     name: String,
 }
 
+// SAFETY: the backend (its CPU thread pool or device context) may only be
+// accessed from one thread at a time. Every `Diarizer` method takes `&mut self`,
+// so ownership can move between threads but the runtime is never shared.
 unsafe impl Send for Runtime {}
 
 impl Runtime {
@@ -37,6 +40,8 @@ impl Runtime {
             Some(backend) => (backend, false),
             None => {
                 let threads = cpu_threads();
+                // SAFETY: the backend registry owns the returned handle and
+                // nothing else references it before `Runtime` takes ownership.
                 let backend = unsafe { init_cpu_backend(threads as i32) };
                 if backend.is_null() {
                     return Err(Error::Ggml("cpu backend init"));
@@ -45,6 +50,8 @@ impl Runtime {
                 (backend, true)
             }
         };
+        // SAFETY: the name is a NUL-terminated string owned by the backend,
+        // which stays alive for the lifetime of `Runtime`.
         let name = unsafe { backend_name(backend) };
         Ok(Self { backend, owned, name })
     }
@@ -62,6 +69,13 @@ impl Runtime {
             }
             graph.allocator = sys::ggml_gallocr_new(sys::ggml_backend_get_default_buffer_type(self.backend));
             if graph.allocator.is_null() || !sys::ggml_gallocr_alloc_graph(graph.allocator, graph.graph) {
+                // A failed allocation must not leave the half-built allocator
+                // behind: the next `execute` skips the block and uploads into
+                // tensors that have no buffer.
+                if !graph.allocator.is_null() {
+                    sys::ggml_gallocr_free(graph.allocator);
+                    graph.allocator = ptr::null_mut();
+                }
                 return Err(Error::Ggml("ggml_gallocr_alloc_graph"));
             }
             tracing::debug!(
@@ -73,7 +87,11 @@ impl Runtime {
         }
         for (tensor, input) in inputs {
             let (data, size) = input.bytes();
-            debug_assert_eq!(size, sys::ggml_nbytes(*tensor));
+            // `tensor_set` copies `size` bytes unconditionally; a mismatch would
+            // write past the tensor's buffer across the FFI boundary.
+            if size != sys::ggml_nbytes(*tensor) {
+                return Err(Error::Ggml("input tensor size mismatch"));
+            }
             sys::ggml_backend_tensor_set(*tensor, data, 0, size);
         }
         if sys::ggml_backend_graph_compute(self.backend, graph.graph) == sys::ggml_status_GGML_STATUS_SUCCESS {
@@ -87,18 +105,29 @@ impl Runtime {
 impl Drop for Runtime {
     fn drop(&mut self) {
         if self.owned {
+            // SAFETY: `owned` marks a backend created by this `Runtime`; it is
+            // freed exactly once and no reference outlives the drop.
             unsafe { sys::ggml_backend_free(self.backend) };
         }
     }
 }
 
 /// Reads an F32 output tensor back to the host.
-pub(crate) unsafe fn read_f32(tensor: Tensor) -> Vec<f32> {
+pub(crate) unsafe fn read_f32(tensor: Tensor) -> Result<Vec<f32>> {
+    if (*tensor).type_ != sys::ggml_type_GGML_TYPE_F32 {
+        return Err(Error::Ggml("output tensor is not F32"));
+    }
     let count = sys::ggml_nelements(tensor) as usize;
     let mut data = vec![0.0f32; count];
-    sys::ggml_backend_tensor_get(tensor, data.as_mut_ptr().cast(), 0, count * 4);
-    data
+    sys::ggml_backend_tensor_get(tensor, data.as_mut_ptr().cast(), 0, count * std::mem::size_of::<f32>());
+    Ok(data)
 }
+
+/// Metadata arena for one graph context. A 31-layer step needs well under this;
+/// ggml aborts the process rather than returning an error when it runs out.
+const GRAPH_META_BYTES: usize = 32 * 1024 * 1024;
+/// Node ceiling for `ggml_new_graph_custom`; the model graph is ~1.1k nodes.
+const GRAPH_MAX_NODES: usize = 8192;
 
 pub(crate) struct Graph {
     pub ctx: *mut sys::ggml_context,
@@ -108,9 +137,11 @@ pub(crate) struct Graph {
 
 impl Graph {
     pub fn new() -> Result<Self> {
+        // SAFETY: `ggml_init` only reads the parameter block and allocates a
+        // fresh metadata context; no pointer aliases another context.
         let ctx = unsafe {
             sys::ggml_init(sys::ggml_init_params {
-                mem_size: 32 * 1024 * 1024,
+                mem_size: GRAPH_META_BYTES,
                 mem_buffer: ptr::null_mut(),
                 no_alloc: true,
             })
@@ -118,8 +149,11 @@ impl Graph {
         if ctx.is_null() {
             return Err(Error::Ggml("ggml_init"));
         }
-        let graph = unsafe { sys::ggml_new_graph_custom(ctx, 8192, false) };
+        // SAFETY: `ctx` is the live context created above; the graph refers to it.
+        let graph = unsafe { sys::ggml_new_graph_custom(ctx, GRAPH_MAX_NODES, false) };
         if graph.is_null() {
+            // SAFETY: freeing the context created in this function after its
+            // graph could not be created.
             unsafe { sys::ggml_free(ctx) };
             return Err(Error::Ggml("ggml_new_graph_custom"));
         }
@@ -138,6 +172,8 @@ impl Graph {
 
 impl Drop for Graph {
     fn drop(&mut self) {
+        // SAFETY: both handles were created by this `Graph` and are freed once,
+        // after the allocator that owns the graph's buffers.
         unsafe {
             if !self.allocator.is_null() {
                 sys::ggml_gallocr_free(self.allocator);
@@ -171,6 +207,8 @@ fn cpu_threads() -> usize {
 /// Loads dynamically built backends once per process (a no-op on static builds).
 pub(crate) fn load_backends_once() {
     static LOAD: std::sync::Once = std::sync::Once::new();
+    // SAFETY: loading backends mutates process-global registry state; the
+    // `Once` guarantees a single, synchronized call.
     LOAD.call_once(|| unsafe { sys::ggml_backend_load_all() });
 }
 

@@ -12,9 +12,12 @@ pub struct Segment {
     pub speaker_id: usize,
 }
 
-/// Diarizes on whichever engine owns the model's architecture. Both engines
-/// number speakers from 1 here: the planner's speaker ids are 1-based, and 0
-/// marks an unattributed stretch.
+/// Diarizes on whichever engine owns the model's architecture.
+///
+/// The server's speaker ids are one-based along the whole path: the
+/// diarization engine's ids below, the planner's chunk speaker sets, and the
+/// transcript's `speaker` fields all use 1 for the first speaker, and 0 means
+/// "unattributed". `format::speaker_label` prints the id unchanged.
 pub fn diarize(model_path: &str, samples: &[f32]) -> Vec<Segment> {
     if native_diarization(model_path) {
         diarize_native(model_path, samples)
@@ -41,6 +44,11 @@ fn diarize_transcribe_cpp(model_path: &str, samples: &[f32]) -> Vec<Segment> {
             .map(|segment| Segment {
                 start: segment.t0_ms as f64 / 1000.0,
                 end: segment.t1_ms as f64 / 1000.0,
+                // transcribe.cpp numbers diarization turns from 1 (its
+                // `probs_to_segments` writes `s + 1`) and documents
+                // `[1, max_speakers]`, so no shift is applied; the clamp only
+                // keeps a malformed 0 out of the planner, where it would read
+                // as an unattributed stretch.
                 speaker_id: segment.speaker_id.max(1) as usize,
             })
             .collect())
@@ -56,13 +64,13 @@ fn diarize_transcribe_cpp(model_path: &str, samples: &[f32]) -> Vec<Segment> {
 
 /// Nemotron-3-Diarization GGUFs on the native GGML stack, in the
 /// vibe-diarize-native helper beside the executable. The helper numbers
-/// speakers from 0; the shift to the planner's 1-based ids happens here.
+/// speakers from 0; [`one_based`] shifts them to the server's contract.
 fn diarize_native(model_path: &str, samples: &[f32]) -> Vec<Segment> {
     let result = native::run(model_path, samples);
     match result {
         Ok(mut segments) => {
             for segment in &mut segments {
-                segment.speaker_id += 1;
+                segment.speaker_id = one_based(segment.speaker_id);
             }
             segments
         }
@@ -73,10 +81,21 @@ fn diarize_native(model_path: &str, samples: &[f32]) -> Vec<Segment> {
     }
 }
 
+/// The one-based id the rest of the server uses, from an engine that numbers
+/// its turns from zero. transcribe.cpp already reports `[1, max_speakers]` and
+/// must not pass through here.
+fn one_based(engine_id: usize) -> usize {
+    engine_id + 1
+}
+
 /// The process boundary to vibe-diarize-native: samples go over as a mono
 /// 16 kHz float WAV, segments come back as JSON. Kept in one place so the
 /// helper's contract has exactly one description.
 mod native {
+    use std::io::Read;
+    use std::process::{Child, Command, ExitStatus, Stdio};
+    use std::time::{Duration, Instant};
+
     use anyhow::Context as _;
 
     use super::Segment;
@@ -85,6 +104,13 @@ mod native {
     const HELPER: &str = "vibe-diarize-native.exe";
     #[cfg(not(target_os = "windows"))]
     const HELPER: &str = "vibe-diarize-native";
+
+    /// A whole recording is diarized in one helper call, so the deadline has to
+    /// leave room for a long meeting on a CPU. It exists to break a hung helper
+    /// — a stuck GPU driver would otherwise block the request forever while it
+    /// holds the model lease — not to bound normal work.
+    const HELPER_TIMEOUT: Duration = Duration::from_secs(1800);
+    const HELPER_POLL: Duration = Duration::from_millis(200);
 
     #[derive(serde::Deserialize)]
     struct NativeSegment {
@@ -97,16 +123,29 @@ mod native {
         let helper = helper_path()?;
         let wav = tempfile::NamedTempFile::new()?;
         write_wav(wav.path(), samples)?;
-        let output = std::process::Command::new(&helper)
+        let mut child = Command::new(&helper)
             .arg(model_path)
             .arg(wav.path())
-            .output()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .with_context(|| format!("running {} failed", helper.display()))?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("vibe-diarize-native exited {}: {}", output.status, stderr.trim());
+        // Drain both pipes on their own threads: a helper that writes more
+        // than a pipe buffer must not look hung to the deadline below.
+        let stdout = drain(child.stdout.take().context("helper stdout is unavailable")?);
+        let stderr = drain(child.stderr.take().context("helper stderr is unavailable")?);
+        let status =
+            wait_with_deadline(&mut child, HELPER_TIMEOUT).with_context(|| format!("running {} failed", helper.display()))?;
+        let stdout = stdout.join().unwrap_or_default();
+        let stderr = stderr.join().unwrap_or_default();
+        if !status.success() {
+            anyhow::bail!(
+                "vibe-diarize-native exited {}: {}",
+                status,
+                String::from_utf8_lossy(&stderr).trim()
+            );
         }
-        let native: Vec<NativeSegment> = serde_json::from_slice(&output.stdout)?;
+        let native: Vec<NativeSegment> = serde_json::from_slice(&stdout)?;
         Ok(native
             .into_iter()
             .map(|segment| Segment {
@@ -115,6 +154,32 @@ mod native {
                 speaker_id: segment.speaker,
             })
             .collect())
+    }
+
+    /// Read one of the helper's pipes to the end on a thread of its own.
+    fn drain(mut reader: impl Read + Send + 'static) -> std::thread::JoinHandle<Vec<u8>> {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let _ = reader.read_to_end(&mut bytes);
+            bytes
+        })
+    }
+
+    /// Wait for `child`, killing it once `timeout` passes. Returns the exit
+    /// status so the caller can report a helper that failed on its own.
+    pub(super) fn wait_with_deadline(child: &mut Child, timeout: Duration) -> anyhow::Result<ExitStatus> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if let Some(status) = child.try_wait()? {
+                return Ok(status);
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                anyhow::bail!("helper did not finish within {timeout:?} and was killed");
+            }
+            std::thread::sleep(HELPER_POLL);
+        }
     }
 
     fn helper_path() -> anyhow::Result<std::path::PathBuf> {
@@ -165,6 +230,61 @@ mod tests {
         let nemotron = dir.path().join("nemotron.gguf");
         std::fs::write(&nemotron, gguf_header("nemotron3_diar")).expect("write");
         assert!(diarize(nemotron.to_str().expect("utf-8 path"), &[]).is_empty());
+    }
+
+    #[test]
+    fn two_native_speakers_keep_two_distinct_labels() {
+        // The native helper numbers its turns from 0. The planner sees ids 1
+        // and 2 and the markdown labels print them unchanged, so speakers 0
+        // and 1 are never collapsed into one label.
+        let speaker_ids = [0usize, 1].map(one_based);
+        let labels: Vec<String> = speaker_ids
+            .iter()
+            .map(|id| crate::server::format::speaker_label(*id))
+            .collect();
+        assert_eq!(labels, ["Speaker 1", "Speaker 2"]);
+    }
+
+    #[test]
+    fn transcribe_cpp_ids_are_already_one_based_and_not_shifted_again() {
+        // transcribe.cpp documents diarization ids in [1, max_speakers]; the
+        // server keeps them, so its first speaker is labelled "Speaker 1".
+        let engine_ids = [1usize, 2];
+        let labels: Vec<String> = engine_ids
+            .iter()
+            .map(|id| crate::server::format::speaker_label((*id).max(1)))
+            .collect();
+        assert_eq!(labels, ["Speaker 1", "Speaker 2"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_hung_helper_is_killed_at_the_deadline() {
+        let mut child = std::process::Command::new("sleep")
+            .arg("60")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("spawn a hanging child");
+        let started = std::time::Instant::now();
+        let error = native::wait_with_deadline(&mut child, std::time::Duration::from_millis(100)).expect_err("the child hangs");
+        assert!(error.to_string().contains("killed"), "{error}");
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(10),
+            "the wait returned at its deadline"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_finished_helper_reports_its_status() {
+        let mut child = std::process::Command::new("true")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("spawn");
+        let status = native::wait_with_deadline(&mut child, std::time::Duration::from_secs(10)).expect("finishes");
+        assert!(status.success());
     }
 
     /// A minimal GGUF container whose only metadata key is the architecture.

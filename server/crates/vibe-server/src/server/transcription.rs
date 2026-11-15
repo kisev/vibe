@@ -28,7 +28,7 @@ pub(super) async fn transcribe(
     request: TranscriptionRequest,
 ) -> Result<Response, Box<Response>> {
     let TranscriptionRequest { file, form } = request;
-    let (diarize_model, enhance_audio, stable_timestamps, vad_model_path, stream, response_format, chunk_seconds) = {
+    let (diarize_model, enhance_audio, stable_timestamps, vad_model_path, stream, response_format) = {
         let values = FormValues::new(&form);
         (
             values.string("diarize_model"),
@@ -37,16 +37,24 @@ pub(super) async fn transcribe(
             values.string("vad_model"),
             values.bool("stream"),
             values.str_or("response_format", "json").to_string(),
-            values.f32("chunk_seconds"),
         )
     };
-    let chunk_seconds = (chunk_seconds > 0.0).then_some(f64::from(chunk_seconds));
+    // chunk_seconds decides the transcription strategy, so a value that does
+    // not parse is an error rather than a silent "unchunked" run.
+    let chunk_seconds = chunk_seconds_from(&form)?;
 
     // The bound is known before any audio is decoded, so a request that can
     // never succeed is refused here.
     if let Some(ctx) = model.ctx.as_ref() {
         if let Some(message) = chunk_seconds_error(chunk_seconds, ctx.max_input_seconds()) {
             return Err(Box::new(error(StatusCode::BAD_REQUEST, "invalid_request", &message)));
+        }
+        if ctx.requires_vad() && vad_model_path.is_none() {
+            return Err(Box::new(error(
+                StatusCode::BAD_REQUEST,
+                "invalid_request",
+                "'vad_model' is required for this transcription engine",
+            )));
         }
     }
     let audio_options = audio::ReadOptions {
@@ -60,10 +68,6 @@ pub(super) async fn transcribe(
             &format!("invalid audio file: {err}"),
         ))
     })?;
-
-    let diar_segments = diarize_model
-        .as_deref()
-        .map_or_else(Vec::new, |model_path| diarization::diarize(model_path, &samples));
 
     if stable_timestamps && vad_model_path.is_none() {
         return Err(Box::new(error(
@@ -88,11 +92,25 @@ pub(super) async fn transcribe(
         }
     }
 
+    // Diarization, VAD planning and inference are blocking work that can run
+    // for minutes (and a hung diarization helper would block forever), so none
+    // of it may occupy an async worker: the streaming path already hands its
+    // inference to `spawn_blocking`, and the plain path does the same for the
+    // whole request.
     if stream {
-        let plan = model
-            .ctx
-            .as_mut()
-            .and_then(|ctx| plan_for(ctx, &samples, &diar_segments, vad_model_path.as_deref(), chunk_seconds));
+        let vad_for_plan = vad_model_path.clone();
+        let (model, samples, diar_segments, plan) = tokio::task::spawn_blocking(move || {
+            let diar_segments = diarize_model
+                .as_deref()
+                .map_or_else(Vec::new, |model_path| diarization::diarize(model_path, &samples));
+            let plan = model
+                .ctx
+                .as_mut()
+                .and_then(|ctx| plan_for(ctx, &samples, &diar_segments, vad_for_plan.as_deref(), chunk_seconds));
+            (model, samples, diar_segments, plan)
+        })
+        .await
+        .map_err(blocking_failure)?;
         let request = StreamRequest {
             config,
             model,
@@ -106,37 +124,64 @@ pub(super) async fn transcribe(
         return stream_transcription(request);
     }
 
-    let model_path = model.model_path.clone();
-    let ctx = model
-        .ctx
-        .as_mut()
-        .ok_or_else(|| Box::new(error(StatusCode::SERVICE_UNAVAILABLE, "no_model", "no model loaded")))?;
+    tokio::task::spawn_blocking(move || {
+        let diar_segments = diarize_model
+            .as_deref()
+            .map_or_else(Vec::new, |model_path| diarization::diarize(model_path, &samples));
+        let model_path = model.model_path.clone();
+        let ctx = model
+            .ctx
+            .as_mut()
+            .ok_or_else(|| Box::new(error(StatusCode::SERVICE_UNAVAILABLE, "no_model", "no model loaded")))?;
 
-    if ctx.requires_vad() && vad_model_path.is_none() {
-        return Err(Box::new(error(
+        let plan = plan_for(ctx, &samples, &diar_segments, vad_model_path.as_deref(), chunk_seconds);
+        let result = match (plan.as_ref(), config.cache_dir()) {
+            (Some(plan), Some(root)) => super::chunk_cache::transcribe_cached(ctx, &model_path, &samples, plan, &options, root),
+            (Some(plan), None) => ctx.transcribe_chunks(&samples, plan, options),
+            (None, _) => ctx.transcribe(&samples, options),
+        }
+        .map_err(|err| {
+            tracing::error!(samples = samples.len(), "transcription failed: {err:#}");
+            Box::new(error(
+                super::engine_error_status(&err),
+                super::engine_error_code(&err),
+                &format!("transcription failed: {err}"),
+            ))
+        })?;
+
+        Ok(format_response(&response_format, &result, &diar_segments, plan.as_ref()))
+    })
+    .await
+    .map_err(blocking_failure)?
+}
+
+/// A panic or cancellation inside the blocking transcription task: report it
+/// instead of propagating a join error into the router.
+fn blocking_failure(err: tokio::task::JoinError) -> Box<Response> {
+    tracing::error!("transcription task failed: {err}");
+    Box::new(error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "internal_error",
+        &format!("transcription task failed: {err}"),
+    ))
+}
+
+/// `chunk_seconds` decides the transcription strategy, so a value that does
+/// not parse is a 400 rather than a silently unchunked run. An empty or
+/// non-positive value still means "unset", matching the other form fields.
+fn chunk_seconds_from(form: &HashMap<String, String>) -> Result<Option<f64>, Box<Response>> {
+    let Some(raw) = form.get("chunk_seconds").filter(|raw| !raw.is_empty()) else {
+        return Ok(None);
+    };
+    match raw.parse::<f32>() {
+        Ok(value) if value > 0.0 => Ok(Some(f64::from(value))),
+        Ok(_) => Ok(None),
+        Err(_) => Err(Box::new(error(
             StatusCode::BAD_REQUEST,
             "invalid_request",
-            "'vad_model' is required for this transcription engine",
-        )));
+            "'chunk_seconds' must be a positive number",
+        ))),
     }
-
-    let opts = options;
-    let plan = plan_for(ctx, &samples, &diar_segments, vad_model_path.as_deref(), chunk_seconds);
-    let result = match (plan.as_ref(), config.cache_dir()) {
-        (Some(plan), Some(root)) => super::chunk_cache::transcribe_cached(ctx, &model_path, &samples, plan, &opts, root),
-        (Some(plan), None) => ctx.transcribe_chunks(&samples, plan, opts),
-        (None, _) => ctx.transcribe(&samples, opts),
-    }
-    .map_err(|err| {
-        tracing::error!(samples = samples.len(), "transcription failed: {err:#}");
-        Box::new(error(
-            super::engine_error_status(&err),
-            super::engine_error_code(&err),
-            &format!("transcription failed: {err}"),
-        ))
-    })?;
-
-    Ok(format_response(&response_format, &result, &diar_segments, plan.as_ref()))
 }
 
 /// A message when the requested chunk duration cannot be honoured by this
@@ -289,6 +334,20 @@ mod tests {
         // Whisper advertises no bound, so nothing to validate against.
         assert!(chunk_seconds_error(Some(30.0), None).is_none());
         assert!(chunk_seconds_error(None, Some(25.0)).is_none());
+    }
+
+    #[test]
+    fn a_non_numeric_chunk_seconds_is_a_bad_request_not_an_unchunked_run() {
+        let form = HashMap::from([("chunk_seconds".to_string(), "25s".to_string())]);
+        assert!(chunk_seconds_from(&form).is_err(), "a typo must be reported");
+
+        let form = HashMap::from([("chunk_seconds".to_string(), "25".to_string())]);
+        assert_eq!(chunk_seconds_from(&form).ok().flatten(), Some(25.0));
+
+        // Zero and an empty field keep their historical "unset" meaning.
+        let form = HashMap::from([("chunk_seconds".to_string(), "0".to_string())]);
+        assert_eq!(chunk_seconds_from(&form).ok().flatten(), None);
+        assert_eq!(chunk_seconds_from(&HashMap::new()).ok().flatten(), None);
     }
 
     #[test]

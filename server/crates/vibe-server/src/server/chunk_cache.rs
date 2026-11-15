@@ -69,19 +69,26 @@ pub(crate) fn transcribe_cached(
         plan,
     };
     let store = cache::Cache::new(root);
-    let entry = store.open(&identity.key()).map_err(anyhow::Error::from)?;
+    let Ok(entry) = store.open(&identity.key()) else {
+        // The cache is an optimization: a busy entry (a duplicate request) or
+        // an unusable directory must degrade to an uncached run, never fail a
+        // request that would otherwise succeed.
+        tracing::warn!(root, "cache entry unavailable; transcribing without the cache");
+        return ctx.transcribe_chunks(samples, plan, options.clone());
+    };
     if entry.manifest().is_none() {
-        entry
-            .write_manifest(&cache::Manifest {
+        warn_cache_write(
+            "writing the cache manifest",
+            entry.write_manifest(&cache::Manifest {
                 schema: cache::SCHEMA_VERSION,
                 audio_hash: cache::audio_hash(samples),
                 model: cache::ModelStamp::of(model_path),
                 engine,
                 options: options_json,
                 plan: plan.clone(),
-            })
-            .map_err(anyhow::Error::from)?;
-        entry.write_plan(plan).map_err(anyhow::Error::from)?;
+            }),
+        );
+        warn_cache_write("writing the cache plan", entry.write_plan(plan));
     }
 
     let mut splits = entry.splits().unwrap_or_default();
@@ -109,20 +116,20 @@ pub(crate) fn transcribe_cached(
     })
 }
 
-/// The output-affecting options an entry is keyed by. Built here so the CLI and
-/// the HTTP route cannot drift apart.
+/// The output-affecting options an entry is keyed by. The whole option set is
+/// serialized rather than a hand-picked list: a field the engine honours must
+/// move the key, and the next option added cannot be forgotten here.
 fn options_json(options: &crate::engine::TranscribeOptions) -> serde_json::Value {
-    serde_json::json!({
-        "language": options.language,
-        "detect_language": options.detect_language,
-        "translate": options.translate,
-        "prompt": options.prompt,
-        "temperature": options.temperature,
-        "word_timestamps": options.word_timestamps,
-        "max_segment_len": options.max_segment_len,
-        "stable_timestamps": options.stable_timestamps,
-        "vad_model": options.vad_model_path,
-    })
+    serde_json::to_value(options).unwrap_or(serde_json::Value::Null)
+}
+
+/// Cache writes are an optimization: a full disk, a vanished directory, or a
+/// transient I/O error must not turn an already successful transcription into
+/// a failure. Report and continue.
+fn warn_cache_write(context: &str, result: std::result::Result<(), cache::Error>) {
+    if let Err(err) = result {
+        tracing::warn!("{context}: {err}; continuing without the cache");
+    }
 }
 
 /// What one chunk's resolution shares across its split tree: the opened cache
@@ -162,18 +169,19 @@ impl Resolution<'_> {
             .map(|split| split.halves.clone())
         {
             tracing::debug!(chunk = self.index, part = %tag, "resuming a split chunk");
-            return self.halves(&chunk.speakers, &halves, slot, depth, run);
+            return self.halves(chunk, &halves, slot, depth, run);
         }
 
         match run(chunk) {
             Ok(finished) => {
-                self.entry
-                    .write_part_at(
+                warn_cache_write(
+                    "storing a finished chunk",
+                    self.entry.write_part_at(
                         self.index,
                         &tag,
                         &finished.iter().map(StoredSegment::from).collect::<Vec<_>>(),
-                    )
-                    .map_err(anyhow::Error::from)?;
+                    ),
+                );
                 Ok(finished)
             }
             Err(err) if is_out_of_memory(&err) && depth < MAX_SPLIT_DEPTH => {
@@ -186,8 +194,8 @@ impl Resolution<'_> {
                     core_end: chunk.core_end,
                     halves: halves.clone(),
                 });
-                self.entry.write_splits(self.splits).map_err(anyhow::Error::from)?;
-                self.halves(&chunk.speakers, &halves, slot, depth, run)
+                warn_cache_write("remembering a chunk split", self.entry.write_splits(self.splits));
+                self.halves(chunk, &halves, slot, depth, run)
             }
             // The depth cap is reached: this size cannot be made to fit either.
             Err(err) if is_out_of_memory(&err) => Err(with_range(err, chunk)),
@@ -197,7 +205,7 @@ impl Resolution<'_> {
 
     fn halves<F>(
         &mut self,
-        speakers: &[u16],
+        parent: &crate::plan::Chunk,
         halves: &[(f64, f64)],
         slot: &mut Vec<usize>,
         depth: usize,
@@ -208,12 +216,13 @@ impl Resolution<'_> {
     {
         let mut segments = Vec::new();
         for (half_index, (start, end)) in halves.iter().enumerate() {
+            let (input_start, input_end) = half_input(parent, half_index, halves.len(), *start, *end);
             let half = crate::plan::Chunk {
-                input_start: *start,
-                input_end: *end,
+                input_start,
+                input_end,
                 core_start: *start,
                 core_end: *end,
-                speakers: speakers.to_vec(),
+                speakers: parent.speakers.clone(),
             };
             slot.push(half_index);
             segments.extend(self.chunk(&half, slot, depth + 1, run)?);
@@ -221,6 +230,26 @@ impl Resolution<'_> {
         }
         Ok(segments)
     }
+}
+
+/// The audio a split half hears: its core plus the parent's padding on the
+/// outer edges, keeping both inside the parent's input range. The seam between
+/// two halves is not padded on either side — overlapping inputs would
+/// transcribe the same audio twice and duplicate the text at the cut.
+fn half_input(parent: &crate::plan::Chunk, index: usize, count: usize, start: f64, end: f64) -> (f64, f64) {
+    let pad_before = parent.core_start - parent.input_start;
+    let pad_after = parent.input_end - parent.core_end;
+    let left = if index == 0 {
+        (start - pad_before).max(parent.input_start)
+    } else {
+        start
+    };
+    let right = if index + 1 == count {
+        (end + pad_after).min(parent.input_end)
+    } else {
+        end
+    };
+    (left, right)
 }
 
 /// Name the span the engine could not process. The message keeps the engine's
@@ -249,11 +278,12 @@ fn slot_tag(slot: &[usize]) -> String {
     slot.iter().map(|half| format!("-h{half}")).collect()
 }
 
+/// Whether an engine error is an allocation failure that a smaller chunk may
+/// survive. One marker list classifies both this decision and the HTTP error
+/// code (see `engine::allocation_failure`), so a "room" in an ordinary error
+/// can no longer persist a split.
 fn is_out_of_memory(error: &anyhow::Error) -> bool {
-    let message = format!("{error:#}").to_ascii_lowercase();
-    ["out of memory", "outofmemory", "oom", "failed to allocate"]
-        .iter()
-        .any(|marker| message.contains(marker))
+    crate::engine::allocation_failure(error).is_some()
 }
 
 #[cfg(test)]
@@ -578,6 +608,54 @@ mod tests {
         let message = format!("{error:#}");
         assert!(message.contains("0.0s..1.9s"), "{message}");
         assert!(!message.contains("0.0s..30.0s"), "the whole chunk is not blamed: {message}");
+    }
+
+    #[test]
+    fn an_ordinary_error_is_not_an_allocation_failure() {
+        // A bare "oom" used to match any word containing it ("room", "boom"),
+        // and a false positive persisted a split that lowered quality for good.
+        let error = anyhow::anyhow!("the driver reported the room is unavailable");
+        assert!(!is_out_of_memory(&error), "a substring of an ordinary word is not OOM");
+
+        let cuda = anyhow::anyhow!("ggml_backend_cuda_buffer_type_alloc_buffer: CUDA error: out of memory");
+        assert!(is_out_of_memory(&cuda), "the canonical CUDA message is OOM");
+        let vulkan = anyhow::anyhow!("vk::OutOfDeviceMemoryError");
+        assert!(is_out_of_memory(&vulkan), "Vulkan's spelling is OOM");
+    }
+
+    #[test]
+    fn a_split_keeps_the_parent_padding_on_its_outer_edges() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = cache::Cache::new(dir.path());
+        let entry = store.open("key").unwrap();
+        let mut splits = Vec::new();
+        // The planner padded the parent by 0.25 s on both sides.
+        let parent = crate::plan::Chunk {
+            input_start: 0.75,
+            input_end: 11.25,
+            core_start: 1.0,
+            core_end: 11.0,
+            speakers: vec![1],
+        };
+        let mut inputs = Vec::new();
+        let mut run = |chunk: &crate::plan::Chunk| -> anyhow::Result<Vec<crate::engine::Segment>> {
+            inputs.push((chunk.input_start, chunk.input_end));
+            if chunk.core_end - chunk.core_start > 5.0 {
+                anyhow::bail!("CUDA out of memory");
+            }
+            Ok(Vec::new())
+        };
+        Resolution {
+            entry: &entry,
+            splits: &mut splits,
+            index: 0,
+        }
+        .chunk(&parent, &mut Vec::new(), 0, &mut run)
+        .expect("split run");
+
+        // The outer halves keep the parent's padding; the seam is not padded
+        // in either direction, so the seam audio is never transcribed twice.
+        assert_eq!(inputs, vec![(0.75, 11.25), (0.75, 6.0), (6.0, 11.25)]);
     }
 
     #[test]

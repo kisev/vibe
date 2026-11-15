@@ -33,7 +33,7 @@ version = 2
 yanked = "deny"
 
 # Baseline: the server tree is locked to deliberate versions (see
-# desktop/BUILDING notes on upgrades). These are the known-unpatched ones,
+# docs/how-to/update-dependencies.md). These are the known-unpatched ones,
 # each with why it is acceptable today; drop the entry when a patch lands.
 
 # zip 3.0 is a build-dependency of utoipa-swagger-ui: it unpacks the pinned
@@ -64,18 +64,21 @@ reason = "tokio unsoundness, no patch released; server does not use the unsafe c
 [bans]
 multiple-versions = "deny"
 
-# Accepted transitive duplicates: windows-sys rides in on three different
-# major-versioned dependents (reqwest, notify and the tauri-era system crates
-# have not converged), core-foundation comes via both objc2 (0.10) and
-# reqwest's security-framework line (0.9). Both are compile-time-only for the
-# non-native target, so the cost is build time, not correctness.
+# Accepted transitive duplicates (per server/Cargo.lock and `cargo tree`):
+# windows-sys rides in as 0.52 (errno/rustix via fs4 and tempfile, plus
+# winapi-util via walkdir), 0.59 (fs4 and nu-ansi-term via
+# tracing-subscriber) and 0.61 (clap's anstream, mio, schannel via
+# native-tls, and the direct pin in vibe-server); core-foundation as 0.10.1
+# (security-framework via native-tls) and 0.9.4 (system-configuration via
+# hyper-util) — both on reqwest's macOS TLS line. Both crates are only
+# compiled for their platform, so the cost is build time, not correctness.
 [[bans.skip]]
 name = "windows-sys"
 reason = "three transitive majors pending upstream convergence"
 
 [[bans.skip]]
 name = "core-foundation"
-reason = "objc2 0.10 vs security-framework 0.9 lines"
+reason = "security-framework 0.10.1 vs system-configuration 0.9.4 (both via reqwest on macOS)"
 
 # bindgen (ggml-rs-sys build) pins shlex 1.x while cc takes 2.x; the majors
 # cannot converge until bindgen releases a 2.x line

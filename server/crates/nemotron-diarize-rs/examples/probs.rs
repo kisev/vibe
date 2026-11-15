@@ -26,10 +26,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut diarizer = Diarizer::new(model)?;
     let probs = diarizer.probabilities(&samples)?;
-    let mut file = std::fs::File::create(out)?;
+    let mut file = std::io::BufWriter::new(std::fs::File::create(out)?);
     for value in &probs.data[..probs.num_valid * probs.num_speakers] {
         file.write_all(&value.to_le_bytes())?;
     }
+    file.flush()?;
     println!("{} frames x {} speakers -> {out}", probs.num_valid, probs.num_speakers);
     Ok(())
 }

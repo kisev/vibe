@@ -7,7 +7,7 @@ use std::ffi::{c_char, c_void, CStr};
 use std::io::Write;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Once;
+use std::sync::{Arc, Once};
 
 use ggml_rs_sys as ffi;
 
@@ -19,9 +19,9 @@ use crate::{
 
 pub struct Context {
     whisper: Whisper,
-    /// A copy of the model's vocabulary, so segments can be turned into words
-    /// from inside the engine's segment callback, which holds the engine.
-    vocab: Vocab,
+    /// The model's vocabulary, so segments can be turned into words from inside
+    /// the engine's segment callback, which holds the engine.
+    vocab: Arc<Vocab>,
 }
 
 impl Context {
@@ -43,7 +43,7 @@ impl Context {
         }
 
         let whisper = Whisper::with_options(path, engine_options)?;
-        let vocab = whisper.model.vocab.clone();
+        let vocab = Arc::clone(&whisper.model.vocab);
         Ok(Self { whisper, vocab })
     }
 
@@ -186,12 +186,7 @@ fn transcribe_stable_timestamps(
 
         for segment in &decoded {
             let mut segment = convert(segment, vocab);
-            segment.start += t0cs;
-            segment.end += t0cs;
-            for word in &mut segment.words {
-                word.start += t0cs;
-                word.end += t0cs;
-            }
+            shift_segment(&mut segment, t0cs);
             if let Some(on_segment) = callbacks.on_segment.as_mut() {
                 on_segment(segment.clone());
             }
@@ -204,6 +199,16 @@ fn transcribe_stable_timestamps(
     }
 
     Ok(result)
+}
+
+/// Moves a segment and its word timings onto the full-recording timeline.
+fn shift_segment(segment: &mut Segment, t0cs: i64) {
+    segment.start += t0cs;
+    segment.end += t0cs;
+    for word in &mut segment.words {
+        word.start += t0cs;
+        word.end += t0cs;
+    }
 }
 
 /// Maps the historical `TranscribeOptions` onto the engine's `FullParams`,
@@ -333,6 +338,7 @@ extern "C" fn ggml_abort_callback(message: *const c_char) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::TokenData;
 
     #[test]
     fn decoder_options_are_capped_for_both_sampling_strategies() {
@@ -364,6 +370,79 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn test_vocab() -> Vocab {
+        Vocab::new(
+            vec![b"he".to_vec(), b"llo".to_vec(), b" world".to_vec(), vec![0xC3], vec![0xA9]],
+            5,
+        )
+    }
+
+    fn tokens(entries: &[(i32, i64, i64)]) -> Vec<TokenData> {
+        entries
+            .iter()
+            .map(|&(id, t0, t1)| TokenData {
+                id,
+                t0,
+                t1,
+                ..TokenData::empty()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn words_are_empty_without_token_timestamps() {
+        // `token_timestamps` off leaves every token at t0 = t1 = -1.
+        let segment = FullSegment {
+            tokens: tokens(&[(0, 0, 10), (1, -1, -1)]),
+            ..Default::default()
+        };
+        assert!(words(&segment, &test_vocab()).is_empty());
+    }
+
+    #[test]
+    fn words_join_split_multibyte_tokens() {
+        // 0xC3 0xA9 are the two halves of U+00E9; joining the bytes first is
+        // what keeps a BPE split from decoding to U+FFFD.
+        let segment = FullSegment {
+            tokens: tokens(&[(3, 0, 5), (4, 5, 10)]),
+            ..Default::default()
+        };
+        let words = words(&segment, &test_vocab());
+        assert_eq!(words.len(), 1);
+        assert_eq!(words[0].text, "\u{e9}");
+    }
+
+    #[test]
+    fn words_split_on_leading_space_and_keep_it() {
+        let segment = FullSegment {
+            tokens: tokens(&[(0, 0, 10), (1, 10, 20), (2, 20, 30)]),
+            ..Default::default()
+        };
+        let words = words(&segment, &test_vocab());
+        let texts = words.iter().map(|word| word.text.as_str()).collect::<Vec<_>>();
+        assert_eq!(texts, ["hello", " world"]);
+        assert_eq!((words[1].start, words[1].end), (20, 30));
+    }
+
+    #[test]
+    fn stable_segments_shift_words_with_the_segment() {
+        let mut segment = Segment {
+            start: 10,
+            end: 20,
+            text: String::new(),
+            no_speech_prob: 0.0,
+            words: vec![Word {
+                start: 10,
+                end: 20,
+                text: "hi".into(),
+            }],
+        };
+        shift_segment(&mut segment, 300);
+        assert_eq!((segment.start, segment.end), (310, 320));
+        let word = &segment.words[0];
+        assert_eq!((word.start, word.end), (310, 320));
     }
 
     #[test]

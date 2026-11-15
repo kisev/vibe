@@ -55,8 +55,11 @@ pub fn format_vtt(segments: &[Segment]) -> String {
     out
 }
 
-fn speaker_label(speaker_id: usize) -> String {
-    format!("Speaker {}", speaker_id + 1)
+/// The markdown label for a speaker. Ids are one-based along the whole path
+/// (see `diarization::diarize`), so the id is printed unchanged; 0 names an
+/// unattributed stretch and never reaches this function.
+pub(crate) fn speaker_label(speaker_id: usize) -> String {
+    format!("Speaker {speaker_id}")
 }
 
 /// Markdown transcript with one timestamped block per segment run. Speaker
@@ -103,6 +106,7 @@ pub struct VerboseSegment {
     pub start: f64,
     pub end: f64,
     pub text: String,
+    /// One-based speaker id, matching the planner's chunk speaker sets.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub speaker: Option<usize>,
     /// Present only when the chunk plan supplied the speakers; a boundary chunk
@@ -255,7 +259,7 @@ mod tests {
             no_speech_prob: 0.0,
             words: Vec::new(),
         }];
-        let turns = [turn(0.5, 3.0, 0)];
+        let turns = [turn(0.5, 3.0, 1)];
         let markdown = format_markdown(&segments, &turns);
         assert!(markdown.contains("**[00:00:01.000 --> 00:00:02.500] Speaker 1**"));
         assert!(markdown.contains("привет"));
@@ -295,10 +299,10 @@ mod tests {
     #[test]
     fn markdown_carries_synthetic_speaker_labels() {
         let segments = [segment(100, 250, "привет"), segment(300, 400, "пока")];
-        let turns = [turn(1.0, 2.5, 1), turn(3.0, 4.0, 0)];
+        let turns = [turn(1.0, 2.5, 1), turn(3.0, 4.0, 2)];
         let markdown = format_markdown(&segments, &turns);
-        assert!(markdown.contains("**[00:00:01.000 --> 00:00:02.500] Speaker 2**"));
-        assert!(markdown.contains("**[00:00:03.000 --> 00:00:04.000] Speaker 1**"));
+        assert!(markdown.contains("**[00:00:01.000 --> 00:00:02.500] Speaker 1**"));
+        assert!(markdown.contains("**[00:00:03.000 --> 00:00:04.000] Speaker 2**"));
     }
 
     #[test]
@@ -318,12 +322,12 @@ mod tests {
     #[test]
     fn json_carries_synthetic_speaker_labels() {
         let segments = [segment(100, 250, "привет"), segment(300, 400, "пока")];
-        let turns = [turn(1.0, 2.5, 1), turn(3.0, 4.0, 0)];
+        let turns = [turn(1.0, 2.5, 1), turn(3.0, 4.0, 2)];
         let json = format_json(&result(segments.to_vec()), &turns, None);
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         let segments = value["segments"].as_array().unwrap();
         assert_eq!(segments[0]["speaker"], 1);
-        assert_eq!(segments[1]["speaker"], 0);
+        assert_eq!(segments[1]["speaker"], 2);
     }
 
     #[test]
@@ -336,21 +340,21 @@ mod tests {
 
     #[test]
     fn overlap_wins_over_proximity() {
-        let turns = [turn(0.0, 10.0, 0), turn(10.0, 20.0, 1)];
-        assert_eq!(match_speaker(9.0, 12.5, &turns), Some(1));
-        assert_eq!(match_speaker(2.0, 4.0, &turns), Some(0));
+        let turns = [turn(0.0, 10.0, 1), turn(10.0, 20.0, 2)];
+        assert_eq!(match_speaker(9.0, 12.5, &turns), Some(2));
+        assert_eq!(match_speaker(2.0, 4.0, &turns), Some(1));
     }
 
     #[test]
     fn a_line_in_a_gap_takes_the_nearest_turn() {
-        let turns = [turn(0.0, 10.0, 0), turn(12.0, 20.0, 1)];
-        assert_eq!(match_speaker(10.2, 10.8, &turns), Some(0));
-        assert_eq!(match_speaker(11.4, 11.9, &turns), Some(1));
+        let turns = [turn(0.0, 10.0, 1), turn(12.0, 20.0, 2)];
+        assert_eq!(match_speaker(10.2, 10.8, &turns), Some(1));
+        assert_eq!(match_speaker(11.4, 11.9, &turns), Some(2));
     }
 
     #[test]
     fn a_line_far_from_any_turn_stays_unassigned() {
-        let turns = [turn(0.0, 10.0, 0)];
+        let turns = [turn(0.0, 10.0, 1)];
         assert_eq!(match_speaker(12.0, 13.0, &turns), None);
         assert_eq!(match_speaker(1.0, 2.0, &[]), None);
     }
@@ -372,7 +376,7 @@ mod tests {
             no_speech_prob: 0.0,
             words: vec![word(0, 100, "привет "), word(100, 300, "пока ")],
         }];
-        let turns = [turn(0.0, 1.0, 0), turn(1.0, 3.0, 1)];
+        let turns = [turn(0.0, 1.0, 1), turn(1.0, 3.0, 2)];
         let markdown = format_markdown(&segments, &turns);
         assert!(markdown.contains("**[00:00:00.000 --> 00:00:01.000] Speaker 1**\n\nпривет"));
         assert!(markdown.contains("**[00:00:01.000 --> 00:00:03.000] Speaker 2**\n\nпока"));
@@ -387,7 +391,7 @@ mod tests {
             no_speech_prob: 0.1,
             words: vec![word(0, 100, "привет "), word(100, 300, "пока ")],
         }];
-        let turns = [turn(0.0, 1.0, 0), turn(1.0, 3.0, 1)];
+        let turns = [turn(0.0, 1.0, 1), turn(1.0, 3.0, 2)];
         let json = build_verbose_json(
             &TranscribeResult {
                 segments: segments.to_vec(),
@@ -398,9 +402,9 @@ mod tests {
         );
         assert_eq!(json.segments.len(), 2);
         assert_eq!(json.segments[0].text, "привет");
-        assert_eq!(json.segments[0].speaker, Some(0));
+        assert_eq!(json.segments[0].speaker, Some(1));
         assert_eq!(json.segments[1].text, "пока");
-        assert_eq!(json.segments[1].speaker, Some(1));
+        assert_eq!(json.segments[1].speaker, Some(2));
     }
 
     #[test]

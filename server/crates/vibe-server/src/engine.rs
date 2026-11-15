@@ -1,4 +1,5 @@
-use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 use anyhow::{bail, Context as _};
 use serde::{Deserialize, Serialize};
@@ -53,8 +54,9 @@ impl TranscribeResult {
     }
 }
 
-/// Progress callbacks for a chunked or streaming run. `on_segment` fires as
-/// soon as a segment is final; `should_abort` is polled between chunks.
+/// Progress callbacks for a chunked or streaming run. `on_progress` receives
+/// the completed fraction as a percentage (0–100); `on_segment` fires as soon
+/// as a segment is final; `should_abort` is polled between chunks.
 pub type OnProgress<'a> = Box<dyn FnMut(usize) + 'a>;
 pub type OnSegment<'a> = Box<dyn FnMut(&Segment) + 'a>;
 pub type ShouldAbort<'a> = Box<dyn FnMut() -> bool + 'a>;
@@ -70,7 +72,7 @@ pub struct StreamCallbacks<'a> {
 /// the unified engine where an equivalent exists. The retired whisper
 /// beam-search knobs and max segment length stay on the struct so an older
 /// desktop's request still parses; the engine warns and ignores them.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct TranscribeOptions {
     pub language: Option<String>,
     pub detect_language: bool,
@@ -78,8 +80,10 @@ pub struct TranscribeOptions {
     pub threads: i32,
     pub prompt: Option<String>,
     /// Kept for the CLI/HTTP surface; the unified engine's own logging rides
-    /// on `set_verbose` instead of a per-request flag.
+    /// on `set_verbose` instead of a per-request flag. Never part of a
+    /// request's identity: it is a process setting, not an output input.
     #[allow(dead_code)]
+    #[serde(skip)]
     pub verbose: bool,
     pub temperature: f32,
     pub max_text_ctx: i32,
@@ -90,6 +94,66 @@ pub struct TranscribeOptions {
     pub beam_size: i32,
     pub stable_timestamps: bool,
     pub vad_model_path: Option<String>,
+}
+
+/// A request the loaded engine refuses by contract. Each variant carries its
+/// own stable code, so the CLI and the HTTP layer classify a rejection by type
+/// instead of matching the engine's prose.
+#[derive(Debug, thiserror::Error)]
+pub enum RequestError {
+    #[error("{engine} supports only {only}")]
+    Language { engine: String, only: String },
+    #[error("{engine} does not support translation")]
+    Translation { engine: String },
+    #[error("{engine} does not support text prompts")]
+    TextPrompt { engine: String },
+}
+
+impl RequestError {
+    /// The code a client reads. A language rejection keeps its documented
+    /// code; every other option rejection gets the option-level one.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Language { .. } => "unsupported_language",
+            Self::Translation { .. } | Self::TextPrompt { .. } => "unsupported_option",
+        }
+    }
+}
+
+/// The memory an inference ran out of, when that is why it failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AllocationFailure {
+    /// Device memory. Reloading on the CPU is the recovery a client can offer.
+    Gpu,
+    /// System memory, which the CPU would run out of the same way.
+    System,
+}
+
+/// Classify an engine error as an allocation failure, naming the backend where
+/// the message does. The markers are the backends' own wording: CUDA's "out of
+/// memory" (the canonical message is
+/// `ggml_backend_cuda_buffer_type_alloc_buffer: CUDA error: out of memory`),
+/// whisper.cpp's "failed to allocate", and Vulkan's `OutOfDeviceMemoryError`.
+/// This one list decides both the HTTP error code and whether a chunk is split.
+pub fn allocation_failure(error: &anyhow::Error) -> Option<AllocationFailure> {
+    const MARKERS: [&str; 5] = [
+        "out of memory",
+        "out of device memory",
+        "failed to allocate",
+        "outofmemory",       // std::bad_alloc / OutOfMemoryError spellings
+        "outofdevicememory", // vk::OutOfDeviceMemoryError
+    ];
+    const GPU_MARKERS: [&str; 6] = ["cuda", "gpu", "metal", "vulkan", "vk::", "device memory"];
+
+    let message = format!("{error:#}").to_ascii_lowercase();
+    if !MARKERS.iter().any(|marker| message.contains(marker)) {
+        return None;
+    }
+    if GPU_MARKERS.iter().any(|marker| message.contains(marker)) {
+        Some(AllocationFailure::Gpu)
+    } else {
+        Some(AllocationFailure::System)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -325,6 +389,7 @@ impl Engine {
             .context("session init failed")?;
         let run = self.run_options(&options);
         let mut segments = Vec::new();
+        let total = ranges.len();
         for (index, (start, end)) in ranges.iter().enumerate() {
             if should_abort.as_mut().is_some_and(|callback| callback()) {
                 bail!("transcription aborted");
@@ -332,7 +397,9 @@ impl Engine {
             let chunk = &samples[*start..*end];
             let transcript = session.run(chunk, &run).context("inference failed")?;
             if let Some(callback) = on_progress.as_mut() {
-                callback(index + 1);
+                // The callback contract is a percentage, not a chunk number:
+                // clients scale it straight into a progress bar.
+                callback((index + 1) * 100 / total);
             }
             for segment in segments_for(&transcript, *start, *end) {
                 if let Some(callback) = on_segment.as_mut() {
@@ -398,27 +465,38 @@ impl Engine {
                     return;
                 }
                 let committed = stream.text().committed;
-                if committed.len() > emitted_text.len() && committed.starts_with(&*emitted_text) {
-                    let delta = &committed[emitted_text.len()..];
-                    let text = delta.trim().to_owned();
-                    if !text.is_empty() {
-                        let segment = Segment {
-                            start: *emitted_ms / 10,
-                            end: end_ms / 10,
-                            text,
-                            no_speech_prob: 0.0,
-                            // Streaming deltas carry no word rows; the batch
-                            // path is where word timings exist.
-                            words: Vec::new(),
-                        };
-                        if let Some(callback) = on_segment.as_mut() {
-                            callback(&segment);
-                        }
-                        live.push(segment);
-                    }
-                    *emitted_ms = end_ms;
-                    *emitted_text = committed;
+                if committed == *emitted_text {
+                    return;
                 }
+                if !committed.starts_with(&*emitted_text) {
+                    // The engine revised text it had already committed.
+                    // Re-basing is the only way the remaining windows can
+                    // emit: without it every later prefix check fails and the
+                    // rest of the stream is lost without a trace.
+                    tracing::warn!("streaming text was revised; resynchronizing the emitted prefix");
+                    *emitted_text = committed;
+                    *emitted_ms = end_ms;
+                    return;
+                }
+                let delta = &committed[emitted_text.len()..];
+                let text = delta.trim().to_owned();
+                if !text.is_empty() {
+                    let segment = Segment {
+                        start: *emitted_ms / 10,
+                        end: end_ms / 10,
+                        text,
+                        no_speech_prob: 0.0,
+                        // Streaming deltas carry no word rows; the batch
+                        // path is where word timings exist.
+                        words: Vec::new(),
+                    };
+                    if let Some(callback) = on_segment.as_mut() {
+                        callback(&segment);
+                    }
+                    live.push(segment);
+                }
+                *emitted_ms = end_ms;
+                *emitted_text = committed;
             };
             for chunk_start in (0..samples.len()).step_by(window) {
                 if should_abort.as_mut().is_some_and(|callback| callback()) {
@@ -437,7 +515,7 @@ impl Engine {
                     &mut emitted_ms,
                 );
                 if let Some(callback) = on_progress.as_mut() {
-                    callback((end / window).max(1));
+                    callback((end * 100 / samples.len()).min(100));
                 }
             }
             let final_update = stream.finalize().context("stream finalize failed")?;
@@ -462,6 +540,16 @@ impl Engine {
                 })
             }
         } else {
+            // A bounded family streamed without a plan would hand the model
+            // the whole recording, silently breaking the window the engine
+            // documented. The callers reach this branch only when planning
+            // degraded (a failed VAD load), so the bound still applies.
+            if self.caps.max_input_seconds.is_some() {
+                bail!(
+                    "{} requires externally chunked input; refusing an unbounded stream run",
+                    self.caps.engine
+                );
+            }
             let transcript = session.run(samples, &run).context("inference failed")?;
             emit_new(&mut seen, &transcript, &mut on_segment);
             let segments = segments_for(&transcript, 0, samples.len());
@@ -481,10 +569,16 @@ impl Engine {
     pub fn validate_request(&self, options: &mut TranscribeOptions) -> anyhow::Result<()> {
         let engine = self.caps.engine.as_str();
         if options.translate && !self.caps.translation {
-            bail!("{engine} does not support translation");
+            return Err(RequestError::Translation {
+                engine: engine.to_owned(),
+            }
+            .into());
         }
         if options.prompt.is_some() && !self.caps.text_prompts {
-            bail!("{engine} does not support text prompts");
+            return Err(RequestError::TextPrompt {
+                engine: engine.to_owned(),
+            }
+            .into());
         }
         if options.stable_timestamps && !self.caps.stable_timestamps {
             tracing::warn!("{engine} does not support stable timestamps; ignoring the flag");
@@ -494,7 +588,11 @@ impl Engine {
             let only = &self.caps.languages[0];
             let requested = options.language.as_deref().unwrap_or("");
             if !requested.is_empty() && requested != "auto" && requested != only {
-                bail!("{engine} supports only {only}");
+                return Err(RequestError::Language {
+                    engine: engine.to_owned(),
+                    only: only.clone(),
+                }
+                .into());
             }
         }
         Ok(())
@@ -602,7 +700,10 @@ fn emit_new(seen: &mut usize, transcript: &Transcript, on_segment: &mut Option<O
             words: words_for(transcript, segment, 0),
         })
         .collect();
-    *seen += fresh.len();
+    // The counter addresses the snapshot's raw segments, not the filtered
+    // ones: whisper.cpp emits a leading empty segment for the silence before
+    // speech, and counting it out again would re-emit or stall.
+    *seen = transcript.segments.len();
     for segment in fresh {
         if let Some(callback) = on_segment.as_mut() {
             callback(&segment);
@@ -702,58 +803,165 @@ pub fn model_capabilities(model: &Model) -> anyhow::Result<EngineCapabilities> {
     })
 }
 
+/// How much of a GGUF the architecture walk may read. The KV section starts at
+/// byte 24 and every exporter writes `general.architecture` first, so a few
+/// tens of kilobytes are generous; a key past this window is reported absent
+/// rather than pulling hundreds of megabytes of weights into memory.
+const GGUF_HEADER_PREFIX: u64 = 64 * 1024;
+
+/// A parsed `general.architecture`, cached with the file's identity: the
+/// answer changes only when the file does, and diarization asks on every
+/// request.
+struct CachedArchitecture {
+    len: u64,
+    modified: Option<std::time::SystemTime>,
+    architecture: Option<String>,
+}
+
+static GGUF_ARCHITECTURES: OnceLock<Mutex<HashMap<String, CachedArchitecture>>> = OnceLock::new();
+
+fn architecture_cache() -> &'static Mutex<HashMap<String, CachedArchitecture>> {
+    GGUF_ARCHITECTURES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 /// Reads `general.architecture` straight from the GGUF container, so an
 /// unsupported family is rejected by name even when the engine's own error
-/// only carries a status code.
+/// only carries a status code. The read is bounded to the metadata prefix and
+/// the answer is cached per path, since the path is asked on every
+/// diarization request.
 pub(crate) fn gguf_architecture(path: &str) -> Option<String> {
+    let metadata = std::fs::metadata(path).ok()?;
+    let len = metadata.len();
+    let modified = metadata.modified().ok();
+
+    let cached = architecture_cache().lock().ok().and_then(|cache| {
+        cache
+            .get(path)
+            .filter(|entry| entry.len == len && entry.modified == modified)
+            .map(|entry| entry.architecture.clone())
+    });
+    if cached.is_some() {
+        return cached.flatten();
+    }
+
+    let architecture = read_gguf_architecture(path);
+    if let Ok(mut cache) = architecture_cache().lock() {
+        // Paths are few (the loaded model and its VAD); the cap only keeps a
+        // long-lived process from accumulating probe paths.
+        if cache.len() >= 32 {
+            cache.clear();
+        }
+        cache.insert(
+            path.to_owned(),
+            CachedArchitecture {
+                len,
+                modified,
+                architecture: architecture.clone(),
+            },
+        );
+    }
+    architecture
+}
+
+/// Parse the architecture from a bounded prefix of the file.
+fn read_gguf_architecture(path: &str) -> Option<String> {
     use std::io::Read;
 
     let mut bytes = Vec::new();
-    std::fs::File::open(path).ok()?.read_to_end(&mut bytes).ok()?;
-    if bytes.len() < 12 || &bytes[..4] != b"GGUF" {
+    std::fs::File::open(path)
+        .ok()?
+        .take(GGUF_HEADER_PREFIX)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    architecture_from_header(&bytes)
+}
+
+fn u32_at(bytes: &[u8], at: usize) -> Option<u32> {
+    let end = at.checked_add(4)?;
+    <[u8; 4]>::try_from(bytes.get(at..end)?).ok().map(u32::from_le_bytes)
+}
+
+fn u64_at(bytes: &[u8], at: usize) -> Option<u64> {
+    let end = at.checked_add(8)?;
+    <[u8; 8]>::try_from(bytes.get(at..end)?).ok().map(u64::from_le_bytes)
+}
+
+/// Walk a GGUF v3 metadata header to `general.architecture`. Every bound is
+/// checked: the header comes from a file on disk and a damaged one must be
+/// reported as unsupported, never panic.
+fn architecture_from_header(bytes: &[u8]) -> Option<String> {
+    if bytes.get(..4)? != b"GGUF" {
         return None;
     }
     // Header: magic (4) + version u32 (4), then tensor count and kv count, u64 each.
-    let u64_at = |bytes: &[u8], at: usize| {
-        at.checked_add(8)
-            .and_then(|end| bytes.get(at..end))
-            .and_then(|v| <[u8; 8]>::try_from(v).ok().map(u64::from_le_bytes))
-    };
     let mut cursor = 8usize;
-    let _tensors = u64_at(&bytes, cursor)?;
-    cursor += 8;
-    let kvs = u64_at(&bytes, cursor)? as usize;
-    cursor += 8;
+    let _tensors = u64_at(bytes, cursor)?;
+    cursor = cursor.checked_add(8)?;
+    let kvs = u64_at(bytes, cursor)?;
+    cursor = cursor.checked_add(8)?;
+
     for _ in 0..kvs {
-        let key_len = u64_at(&bytes, cursor)? as usize;
-        cursor += 8;
-        let key = bytes.get(cursor..cursor.checked_add(key_len)?)?;
-        cursor += key_len;
-        let value_type = bytes
-            .get(cursor..cursor.checked_add(4)?)?
-            .try_into()
-            .map(u32::from_le_bytes)
-            .ok()?;
-        cursor += 4;
-        // Walk the value; only the string shape is decoded, everything else
-        // is skipped by its documented GGUF width.
-        let width = match value_type {
-            0..=5 => 1, // u8..f32 except f64
-            6 => 2,     // f64
-            7 => 1,     // bool
-            8 => {
-                return (key == b"general.architecture").then(|| {
-                    let len = u64_at(&bytes, cursor).unwrap_or(0) as usize;
-                    String::from_utf8_lossy(bytes.get(cursor + 8..cursor + 8 + len).unwrap_or_default()).into_owned()
-                })
+        let key_len = u64_at(bytes, cursor)? as usize;
+        cursor = cursor.checked_add(8)?;
+        let key_end = cursor.checked_add(key_len)?;
+        let key = bytes.get(cursor..key_end)?;
+        cursor = key_end;
+        let value_type = u32_at(bytes, cursor)?;
+        cursor = cursor.checked_add(4)?;
+
+        if key == b"general.architecture" {
+            if value_type != 8 {
+                return None;
             }
-            9 | 10 => 4, // u32 pairs and i32 pairs
-            11 => 16,    // f32 quartet
-            _ => return None,
-        };
-        cursor += width;
+            let len = u64_at(bytes, cursor)? as usize;
+            let start = cursor.checked_add(8)?;
+            let end = start.checked_add(len)?;
+            return Some(String::from_utf8_lossy(bytes.get(start..end)?).into_owned());
+        }
+        skip_value(bytes, &mut cursor, value_type, 0)?;
     }
     None
+}
+
+/// Skip one GGUF metadata value, leaving `cursor` at its end. Widths follow
+/// the v3 spec: u8/i8/bool 1, u16/i16 2, u32/i32/f32 4, u64/i64/f64 8, strings
+/// a length prefix plus bytes, and arrays a repeated element type.
+fn skip_value(bytes: &[u8], cursor: &mut usize, value_type: u32, depth: usize) -> Option<()> {
+    const MAX_ARRAY_DEPTH: usize = 4;
+    if depth > MAX_ARRAY_DEPTH {
+        return None;
+    }
+    let advance = |cursor: &mut usize, width: usize| -> Option<()> {
+        *cursor = (*cursor).checked_add(width)?;
+        (bytes.len() >= *cursor).then_some(())
+    };
+    match value_type {
+        0 | 1 | 7 => advance(cursor, 1), // u8, i8, bool
+        2 | 3 => advance(cursor, 2),     // u16, i16
+        4..=6 => advance(cursor, 4),     // u32, i32, f32
+        10..=12 => advance(cursor, 8),   // u64, i64, f64
+        8 => {
+            let len = u64_at(bytes, *cursor)? as usize;
+            advance(cursor, 8)?;
+            advance(cursor, len)
+        }
+        9 => {
+            // An array is a u32 element type, a u64 count, then the elements.
+            let element = u32_at(bytes, *cursor)?;
+            let count = u64_at(bytes, (*cursor).checked_add(4)?)? as usize;
+            advance(cursor, 12)?;
+            // Every element occupies at least one byte, so a count past the
+            // remaining buffer is corrupt, not merely large.
+            if count > bytes.len() - *cursor {
+                return None;
+            }
+            for _ in 0..count {
+                skip_value(bytes, cursor, element, depth + 1)?;
+            }
+            Some(())
+        }
+        _ => None,
+    }
 }
 
 /// Load a GGUF model through the unified engine, naming the family when the
@@ -767,8 +975,17 @@ fn load_model(path: &str, model_options: &transcribe_cpp::ModelOptions) -> anyho
 
 /// Whisper models in the legacy ggml `.bin` container are retired: the error
 /// names the format and points at the catalog that publishes the GGUF files.
+/// A file that cannot be opened or read reports that I/O failure instead: a
+/// typo in the path or an unfinished download is not a container problem, and
+/// telling the user to download the model again would be the wrong advice.
 pub fn reject_legacy_container(path: &str) -> anyhow::Result<()> {
-    if is_gguf(path) {
+    use std::io::Read;
+
+    let mut magic = [0u8; 4];
+    let mut file = std::fs::File::open(path).with_context(|| format!("cannot open model file {path}"))?;
+    file.read_exact(&mut magic)
+        .with_context(|| format!("cannot read model file {path}"))?;
+    if &magic == b"GGUF" {
         return Ok(());
     }
     let filename = std::path::Path::new(path)
@@ -824,15 +1041,6 @@ pub fn chunk_ranges(plan: &crate::plan::Plan, sample_count: usize) -> Vec<(usize
             (end > start).then_some((start, end))
         })
         .collect()
-}
-
-/// Whether the file starts with the GGUF magic. Anything else is a legacy or
-/// foreign container and never reaches the unified loader.
-pub fn is_gguf(path: &str) -> bool {
-    use std::io::Read;
-
-    let mut magic = [0u8; 4];
-    std::fs::File::open(path).is_ok_and(|mut file| file.read_exact(&mut magic).is_ok()) && &magic == b"GGUF"
 }
 
 /// Loads the model metadata once and reports the engine the server would run.
