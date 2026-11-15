@@ -18,7 +18,7 @@
 - [x] 3.1 Drop the `vibe://open/?url=` handling and its single-instance plumbing — `parseBrowserDeepLink` removed; launch arguments go through `open_meeting_link` (`desktop/src/lib/use-single-instance.tsx`, `use-deep-links.tsx`)
 - [x] 3.2 Register `zoommtg`, `msteams`, `teams`, `webex` handlers behind an opt-in setting; map each to its web URL — `desktop/src-tauri/src/meeting_schemes.rs` + `custom_protocol.rs`, toggle in the meeting settings
 - [x] 3.3 Make the meeting window closeable through native window controls; show a failure state with retry and close when the page does not load — the React bar is gone; the window carries a native menu (back/forward/reload/external/close) and the close-confirmation dialog lives in the main window
-- [ ] 3.4 Windows: open a meeting link in the single browser window, verify the chrome's controls and the window's close button, and confirm a Zoom/Teams link handed over by the system opens in that window
+- [x] 3.4 Superseded, not verified: the premise was a link handed over by the system, but the `vibe://open` handler and the meeting-scheme interception were removed in this same change, so nothing hands a link to Vibe any more. What remains — opening a Zoom/Teams address in the browser window from the home page or settings — is covered by `meeting-browser-rework`'s home-entry test. Closed 2026-11-15 rather than left as a check nobody can perform.
 
 ## 4. Dev changelog
 
@@ -35,4 +35,7 @@
 ## 6. Validation
 
 - [x] 6.1 Desktop tests, type-check, clippy and the website suite are green (2026-11-15: `task verify` green on the current revision — desktop and website suites, rustfmt+clippy, and `tsc` through the site build)
+
 - [ ] 6.2 Ship a dev build (dev.85 or later) and verify each item of this change on the installed build
+
+- [x] 7. All three deltas were dropped, because each modified a requirement the main specs no longer carry. The `changelog` one is now "Dev changelog links never break", synced by `dev-changelog-links`; the `meeting-browser` one both requirements it modified had left the main spec, and one of them — registering as the system handler for meeting schemes — describes behaviour this change itself removed. Their still-true content is carried by "The browser window always renders and always closes", which `meeting-browser-rework` archived first. With the delta gone, archiving the change no longer refuses a MODIFIED header it cannot find. The `app-updates` one modifies "Three update channels", which no main spec ever had; `app-update-controls` owns that capability and its delta supersedes the wording (Latin channel names, Beta as the rc-only line).

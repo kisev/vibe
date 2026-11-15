@@ -11,4 +11,4 @@
 - [ ] 7. Tests: defaults, the moved note, the absence of the Discord entry, the info tooltip text, first-paint locale.
 - [x] 8. Audit every settings hint: each names the consequence and, where a choice exists, how to choose; weak restatements are rewritten in en-US.
 - [x] 9. The rewritten hints are translated into every desktop locale.
-- [ ] 10. Deferred, not accepted on 2026-11-14: some labels still repeat the very description shown under them (e.g. a switch named like its hint), which reads as duplication. The row needs either a different label or a hint that adds information instead of echoing the label; revisit after the next acceptance round.
+- [ ] 10. Deferred, not accepted on 2026-11-14: some labels still repeat the very description shown under them (e.g. a switch named like its hint), which reads as duplication. On 2026-11-15 the maintainer chose the structural fix: `SettingsRow` renders one `description` both as visible text and as the tooltip, so the row gains a separate `hint` — a short visible description plus a longer explanation in the info icon, with every section's texts split accordingly. Revisit after the next acceptance round.
