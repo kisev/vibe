@@ -6,8 +6,10 @@ The meeting browser is a single Vibe-hosted window: Vibe's chrome (address, back
 
 | Scheme | Effect |
 | --- | --- |
-| `vibe://open/?url=<https-url>` | Open the URL in the Vibe browser window. The URL must be https and well formed; anything else is refused with a dialog |
+| `zoommtg:` / `msteams:` / `teams:` / `webex:` | Open the equivalent web URL in the browser window when its host may load, otherwise in the system browser. Opt-in under **Settings → Recording → Open meeting links in Vibe**; Windows and Linux only |
 | `vibe://download/?url=<model-url>` | Import a model from a custom URL |
+
+An `https` URL passed as a launch argument follows the same route: the browser window when its host may load, the system browser otherwise. Vibe ships no `vibe://open/` link of its own — that entry point was removed because no meeting page emits it; other applications' meeting schemes are what those pages already call.
 
 ## Platform webviews
 
@@ -44,6 +46,6 @@ The recorder captures the configured microphone and, when enabled, the system-au
 
 ## Limits
 
-- Only `vibe://open/` links arrive automatically. `https` clicks stay in the browser because Vibe is not the default browser.
+- Only a registered meeting scheme or an `https` launch argument arrives automatically. `https` clicks stay in the browser because Vibe is not the default browser.
 - DRM-heavy or WebRTC-hostile sites may work better in the system browser; **Open in system browser** is the supported fallback.
 - Windows is the validated platform first. Windows and Linux get the full single-window layout; macOS falls back to a page-only window without the in-window chrome, so use the main window to record or the system browser for the call.

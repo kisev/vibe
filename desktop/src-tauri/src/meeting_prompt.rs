@@ -63,6 +63,12 @@ struct PromptLogic {
 
 impl PromptLogic {
     fn detection(&mut self, state: MeetingState) -> bool {
+        self.detection_with(state, IN_APP_SESSION.load(Ordering::SeqCst))
+    }
+
+    /// [`Self::detection`] with the in-app flag passed in, so the suppression rule is testable
+    /// without writing the process-wide state other tests in this module run against.
+    fn detection_with(&mut self, state: MeetingState, in_app: bool) -> bool {
         let before = self.current.clone();
         self.last_state = Some(state.clone());
         if !state.recording {
@@ -74,7 +80,6 @@ impl PromptLogic {
             if self.own_recordings > 0 {
                 self.dismissed = true;
             }
-            let in_app = IN_APP_SESSION.load(Ordering::SeqCst);
             self.current = self
                 .detected
                 .filter(|_| !self.dismissed && self.own_recordings == 0 && !in_app)
@@ -528,6 +533,17 @@ mod tests {
         assert!(state.current.is_none());
         state.detection(zoom(false));
         state.detection(zoom(true));
+        assert!(state.current.is_some());
+    }
+
+    #[test]
+    fn an_open_in_app_window_suppresses_the_external_prompt() {
+        let mut state = PromptLogic::default();
+        // The same external call stays silent while Vibe hosts a browser window.
+        assert!(!state.detection_with(zoom(true), true));
+        assert!(state.current.is_none());
+        // Once the last window closes, detection resumes unchanged.
+        assert!(state.detection_with(zoom(true), false));
         assert!(state.current.is_some());
     }
 }

@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from 'vitest'
-import { isMeetingLaunchArg, normalizeAllowedHost, normalizeMeetingUrl } from './meeting-browser'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { handOffMeetingLaunchArg, handOffMeetingLink, isMeetingLaunchArg, normalizeAllowedHost, normalizeMeetingUrl } from './meeting-browser'
+
+const mocks = vi.hoisted(() => ({
+	invoke: vi.fn(),
+	message: vi.fn(async () => true),
+}))
+
+vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }))
+vi.mock('@tauri-apps/plugin-dialog', () => ({ message: mocks.message }))
 
 describe('allowed host normalization', () => {
 	it('lowercases a bare host and drops the trailing dot', () => {
@@ -24,6 +34,11 @@ describe('allowed host normalization', () => {
 })
 
 describe('meeting launch arguments', () => {
+	beforeEach(() => {
+		mocks.invoke.mockReset()
+		mocks.message.mockClear()
+	})
+
 	it('accepts the schemes other applications register', () => {
 		for (const value of [
 			'zoommtg://zoom.us/join?confno=123',
@@ -43,6 +58,43 @@ describe('meeting launch arguments', () => {
 		for (const value of ['vibe://download/?url=https://example.com/model.gguf', 'vibe://open/?url=https://x', '/tmp/a.wav', 'mailto:a@b.c']) {
 			expect(isMeetingLaunchArg(value)).toBe(false)
 		}
+	})
+
+	it('hands a meeting scheme or an https launch argument to the Rust router', async () => {
+		mocks.invoke.mockResolvedValue(null)
+		expect(await handOffMeetingLaunchArg('zoommtg://zoom.us/join?confno=1')).toBe(true)
+		expect(mocks.invoke).toHaveBeenCalledWith('open_meeting_link', {
+			raw: 'zoommtg://zoom.us/join?confno=1',
+		})
+
+		expect(await handOffMeetingLaunchArg('https://meet.example.com/j/1')).toBe(true)
+		expect(mocks.invoke).toHaveBeenLastCalledWith('open_meeting_link', {
+			raw: 'https://meet.example.com/j/1',
+		})
+	})
+
+	it('leaves a launch argument it does not handle untouched', async () => {
+		expect(await handOffMeetingLaunchArg('mailto:a@b.c')).toBe(false)
+		expect(mocks.invoke).not.toHaveBeenCalled()
+	})
+
+	it('reports an invalid link in a dialog and opens nothing', async () => {
+		mocks.invoke.mockRejectedValue(new Error('Only https URLs can be opened'))
+		await handOffMeetingLink('https://meet.example.com/j/1')
+
+		expect(mocks.invoke).toHaveBeenCalledWith('open_meeting_link', {
+			raw: 'https://meet.example.com/j/1',
+		})
+		expect(mocks.message).toHaveBeenCalledTimes(1)
+		expect(String(mocks.message.mock.calls[0][0])).toContain('Only https URLs can be opened')
+	})
+})
+
+describe('app capability isolation', () => {
+	it('grants the app’s permissions to the chrome webview only, never the page', () => {
+		const capabilities = JSON.parse(readFileSync(join(__dirname, '../../src-tauri/capabilities/main.json'), 'utf8'))
+		expect(capabilities.webviews).toEqual(['browser-chrome-*'])
+		expect(capabilities.webviews.some((pattern: string) => pattern.startsWith('browser-page'))).toBe(false)
 	})
 })
 

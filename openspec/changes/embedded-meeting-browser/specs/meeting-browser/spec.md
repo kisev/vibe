@@ -2,79 +2,89 @@
 
 ## Purpose
 
-Open any link inside Vibe, treat configured meeting hosts as recordable sessions, and hand links into Vibe through the one OS mechanism an installed app actually owns — its own URL scheme.
+Open a link inside Vibe, keep the browser window's chrome and page in one window, and hand meeting links into Vibe through the OS mechanisms an installed app actually owns.
 
 ## ADDED Requirements
 
-### Requirement: Any link opens in an app browser
+### Requirement: Links open in an app browser window
 
-The application SHALL open links in a Vibe-hosted Chromium webview window with address, back, forward, and reload controls. Links to configured meeting hosts SHALL additionally show a meeting bar. The browser window SHALL use a data partition separate from the application's own storage and SHALL NOT inject scripts into pages.
+The application SHALL open a link it accepts in a Vibe-hosted window built on the platform webview. The app-owned chrome — address, back, forward, reload, open in system browser and close — SHALL sit in the same window above the page, and the page SHALL fill the rest of it. The page SHALL get no injected scripts and no app capabilities; camera and microphone prompts SHALL be the platform webview's own, and the page SHALL share the app's webview environment.
 
-#### Scenario: An arbitrary link
+#### Scenario: A page in one window
 
-- **WHEN** the user opens any URL from the app or the deep link
-- **THEN** it loads in the Vibe browser window with working navigation controls
+- **WHEN** the user opens an accepted link from the app or the handoff
+- **THEN** one window opens with the chrome at the top and the page below it, and the page resizes with the window
 
 #### Scenario: A meeting link
 
-- **WHEN** the URL is on a host marked as a meeting host
-- **THEN** the same window shows the meeting bar with a record action
+- **WHEN** the URL is a meeting room on a host the browser may load
+- **THEN** the same window shows it with the chrome's recording action available
 
 #### Scenario: The page's own permissions
 
 - **WHEN** the page asks for camera or microphone access
 - **THEN** the platform webview asks the user, and Vibe does not grant the permission on its own
 
-### Requirement: Meeting hosts are configurable
+#### Scenario: A platform without multi-webview embedding
 
-Settings SHALL list meeting hosts with a default set (`telemost.yandex.ru`, `stream.wb.ru`) and SHALL let the user add and remove hosts. Host matching SHALL be by host name over https. The list SHALL only decide when Vibe counts a link as a meeting and suppresses its external call prompt; the browser chrome SHALL show its recording controls on every page.
+- **WHEN** the browser opens on macOS
+- **THEN** the page opens in a page-only window, and recording stays reachable from the main window
+
+### Requirement: Browser hosts are configurable
+
+Settings SHALL list the hosts the embedded browser may load and SHALL let the user add and remove hosts. Matching SHALL be by host name over https, an entry covering its subdomains. The list SHALL start empty — no seeded defaults — with the previous `meeting.browserHosts` value migrated once. A removed host SHALL be refused on its next navigation and recorded as blocked. While any browser window is open, Vibe SHALL suppress its own external call prompt.
 
 #### Scenario: Adding a host
 
 - **WHEN** the user adds a host
-- **THEN** links on that host count as meetings and suppress Vibe's external call prompt
+- **THEN** links on that host, and on its subdomains over https, load in the browser
 
 #### Scenario: Removing a host
 
 - **WHEN** the user removes a host
-- **THEN** its links still open in the browser with the same recording controls, and only the meeting classification is gone
+- **THEN** its next navigation is refused and the host appears among the blocked hosts with an Allow action
 
-### Requirement: Recording is one click away in a meeting
+### Requirement: Recording is one click away in the browser window
 
-For a meeting host, the meeting bar SHALL offer a prominent record action that starts the existing recording (system audio and microphone as configured) and shows a visible recording indicator in the meeting window and the main window; a second action stops it. Recording SHALL remain manual — this change adds no automatic start.
+The browser chrome SHALL offer a record action on every page. It SHALL start the existing recording with the configured devices and show a visible indicator in the browser window and the main window; a second action stops it. If a recording already runs when a browser window opens, the chrome SHALL show that state instead of offering a second start. Closing the window while recording SHALL ask whether to stop or keep it. Recording SHALL remain manual.
 
 #### Scenario: Starting a call
 
-- **WHEN** the user opens a meeting on a configured host
-- **THEN** the meeting bar shows "Record this call" and pressing it starts recording with a visible indicator
+- **WHEN** the user opens a meeting in the browser and presses "Record this call"
+- **THEN** recording starts with the configured devices and both windows show a visible indicator
 
 #### Scenario: Already recording
 
-- **WHEN** a recording is already running and a meeting window opens
-- **THEN** the bar shows the active state instead of offering a second recording
+- **WHEN** a recording is already running and a browser window opens
+- **THEN** the chrome shows the active state instead of offering a second recording
 
 #### Scenario: Leaving the call
 
-- **WHEN** the browser window closes while the meeting recording is running
+- **WHEN** the browser window closes while the recording it shows is running
 - **THEN** the app warns and lets the user stop or keep recording
 
 ### Requirement: Deep links hand URLs to the app
 
-The application SHALL accept `vibe://open/?url=<https url>`, validate the scheme and URL, and route it to the browser window; a second invocation SHALL focus the existing window rather than fail. A URL that fails validation SHALL NOT be opened without explicit confirmation.
+The application SHALL accept a meeting link handed to it by the operating system — a registered meeting scheme or an `https` launch argument — validate the URL, and route a link on a host the browser may load to the browser window. A second invocation for the same URL SHALL focus the existing window. A link that fails validation SHALL NOT load silently: the failure SHALL be reported in a dialog and nothing SHALL open. A URL on a host the browser may not load SHALL open in the system browser.
 
 #### Scenario: Handoff from another app
 
-- **WHEN** `vibe://open/?url=` names an https URL
-- **THEN** the app opens or focuses its browser window on that URL
+- **WHEN** the app is registered for a meeting scheme and the system hands it a link
+- **THEN** the equivalent https URL opens in the browser window, or its existing window is focused
 
 #### Scenario: Invalid input
 
-- **WHEN** the deep link names a non-https scheme or malformed URL
-- **THEN** the app does not load it silently and asks before doing anything
+- **WHEN** the handed link is malformed or does not resolve to an https URL
+- **THEN** the app reports it in a dialog and loads nothing
+
+#### Scenario: An ordinary link
+
+- **WHEN** the handed https URL is on a host the browser may not load
+- **THEN** the app opens it in the system browser
 
 ### Requirement: In-app meetings do not double-prompt
 
-While a meeting runs in an app browser window, the existing external-meeting detection prompt SHALL NOT appear for that same meeting, and detection of external calls SHALL continue unchanged.
+While a browser window is open, the existing external-meeting detection prompt SHALL NOT appear, and detection SHALL resume unchanged when the last browser window closes.
 
 #### Scenario: An in-app call
 
@@ -83,5 +93,5 @@ While a meeting runs in an app browser window, the existing external-meeting det
 
 #### Scenario: An external call
 
-- **WHEN** a call runs in the system browser
+- **WHEN** no browser window is open and a call runs in the system browser
 - **THEN** the existing detection prompt appears as before

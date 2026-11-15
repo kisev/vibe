@@ -8,10 +8,11 @@ A browser never hands an `https://` link to an installed app unless that app is 
 
 Vibe does the same honest thing:
 
-- `vibe://open/?url=https://…` opens the target in Vibe's browser window. Any app, script, or shortcut can call it. The app validates the URL (https only, well formed) in Rust and refuses anything else with a dialog.
+- Turn on **Open meeting links in Vibe** and Vibe registers the meeting schemes Zoom, Teams and Webex already use (`zoommtg://`, `msteams://`, `webex://`), mapping each to the web URL it carries. The app validates the URL in Rust and opens it in the browser window when its host may load, the system browser otherwise.
+- An `https` URL handed over as a launch argument takes the same route.
 - Inside the app, **Settings → Recording → Open in Vibe** pastes a link into the same path.
 
-Clicking an `https` link in Chrome, Edge, or Firefox still opens that browser. Making Vibe the default browser is deliberately out of scope: it would take over every link on the machine to serve one feature, and it would still be a user decision.
+Vibe deliberately ships no `vibe://open/` link of its own: no meeting page emits one, which is why that first entry point was removed. Clicking an `https` link in Chrome, Edge, or Firefox still opens that browser. Making Vibe the default browser is deliberately out of scope: it would take over every link on the machine to serve one feature, and it would still be a user decision.
 
 ## Why the content view is isolated
 
@@ -35,7 +36,7 @@ Closing the window while recording asks whether to stop or keep recording in the
 
 ## Limits
 
-- Only `vibe://open/` links open automatically. An `https` click needs the default-browser decision Vibe does not take.
+- Only a registered meeting scheme or an `https` launch argument is handed to Vibe. An `https` click needs the default-browser decision Vibe does not take.
 - DRM-heavy or WebRTC-hostile sites may work better in the system browser; **Open in system browser** is the supported fallback.
 - Windows is validated first. The other platforms use their own webviews and fall back to the system browser if the window cannot host the call.
 
