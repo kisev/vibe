@@ -74,3 +74,17 @@ The deployed site SHALL serve the production build at `/vibe/` and a build of `d
 
 - **WHEN** the production site is opened at `/vibe/roadmap`
 - **THEN** its path routing, language switch and 404 fallback behave exactly as before
+
+### Requirement: The site carries no upstream support surfaces
+
+The website SHALL NOT show donation dialogs, supporter walls, funding links or other references to the original project's support channel. The privacy policy SHALL describe the local-only behaviour.
+
+#### Scenario: Browsing the site
+
+- **WHEN** the user visits any page
+- **THEN** no Ko-fi dialog, link or supporters section is reachable
+
+#### Scenario: Reading the privacy policy
+
+- **WHEN** the user opens the privacy page
+- **THEN** it states that no telemetry is collected and nothing is transmitted automatically
