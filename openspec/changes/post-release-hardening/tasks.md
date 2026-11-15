@@ -6,7 +6,7 @@
 
 - [x] 2. `scripts/release_notes.py` fails on malformed frontmatter and on a prerelease marker other than `-rc.<n>`; a Python test covers both, wired into `task test`.
 
-  `scripts/release_notes_test.py` covers the stable and rc bodies, missing and malformed frontmatter (naming the file), a version mismatch, a `-beta.1` refusal and the `$GITHUB_OUTPUT` path. `task scripts:test` runs it and both Python test scripts, and `task test` includes that target.
+  `scripts/release_notes_test.py` covers the stable and rc bodies, a missing entry (naming the expected path), missing and malformed frontmatter (naming the file), a version mismatch, a `-beta.1` refusal and the `$GITHUB_OUTPUT` path. `task scripts:test` runs it with the other Python script tests, and `task test` includes that target.
 
 - [x] 3. CI calls `task rust:fmt-check` and `task rust:clippy` instead of raw `cargo fmt`/`clippy` in `lint.yml` and `lint_rust.yml`.
 
@@ -18,9 +18,9 @@
 
 - [x] 5. `website.yml` triggers on `openspec/changes/**` and `scripts/roadmap.py`; the E2E workflow adds `i18n/desktop/**`, `scripts/ci/e2e.sh`, `taskfile.yml`.
 
-- [x] 6. `scripts/ggml_libs.sh` packages the archive at the repository root, where `upload` reads it (regression from a109a4bd).
+- [x] 6. `scripts/ggml_libs.sh` packages the archive under `target/`, where `upload` reads it (regression from a109a4bd).
 
-  Verified: `build_libs` writes `"$ROOT/ggml-libs-$platform.tar.gz"` from a `cd "$ROOT"`, and `upload_libs` reads `archive="$ROOT/ggml-libs-$platform.tar.gz"`. A simulated packaging run confirmed `lib/` and `include/` sit at the archive root and the file lands at the repository root.
+  Verified: `build_libs` writes `target/ggml-libs-$platform.tar.gz` from a `cd "$ROOT"`, and `upload_libs` reads `archive="$ROOT/target/ggml-libs-$platform.tar.gz"`. A simulated packaging run confirmed `lib/` and `include/` sit at the archive root and the file lands in `target/`.
 
 - [x] 7. Residual `chore` references in `plans/` and in open changes (`fork-update-sources`, `dependency-hygiene`) are corrected.
 
@@ -38,4 +38,4 @@
 
 - [x] 14. `docs/how-to/maintain-the-repository.md` documents the signing agent: the `agent refused operation?` failure, how to unlock it, the probe, and why committing unsigned is not the way out.
 
-- [x] 16. `task verify` green, `openspec validate --all --strict` passes (2026-11-15: verify exit 0, validate 50/50).
+- [x] 15. `task verify` green, `openspec validate --all --strict` passes (2026-11-15: verify exit 0, validate 50/50).

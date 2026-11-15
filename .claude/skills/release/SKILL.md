@@ -1,6 +1,7 @@
-______________________________________________________________________
-
-## name: release description: Ship a Vibe release end to end — decide whether server/ needs its own release first, bump the version, PR and squash-merge, run release.yml unsigned, promote the prerelease, deploy the website. Use when the user asks to cut, ship or publish a release, or invokes /release.
+---
+name: release
+description: Ship a Vibe release end to end — decide whether server/ needs its own release first, bump the version, PR and squash-merge, run release.yml unsigned, promote the prerelease, deploy the website. Use when the user asks to cut, ship or publish a release, or invokes /release.
+---
 
 # Release
 
@@ -39,8 +40,9 @@ git log --oneline "server-${pin#v}"..main -- server/ 2>/dev/null ||
 - **Code changed** → release the server first:
   - If anything under `server/libs/` changed (`ggml-version`, `patches/`,
     `include/`) or `scripts/ggml_libs.sh` changed, bump `server/libs/revision` in
-    the same commit and run `server-libs.yml` **first** (~9 min); `task libs:upload`
-    refuses a tag that exists for another tree.
+    the same commit and publish the new bundle with `task libs:upload` on each
+    platform it must serve (~9 min per host) **before** the release; the upload
+    refuses a release that exists for another tree.
   - `git tag server-vX.Y.Z && git push origin server-vX.Y.Z` on main.
   - **Gate:** `server-release.yml` green (~8 min) and all 5 assets uploaded — the
     Intel Mac asset lands last. It publishes as a *prerelease* on purpose; leave
@@ -126,8 +128,9 @@ automatically and link to `/changelog/dev` instead.
 gh workflow run website.yml --ref main
 ```
 
-The website also deploys on `release: published`, but trigger it explicitly so the
-changelog page carries the new entry without waiting.
+`website.yml` has no `release` trigger — the environment's branch policy leaves the
+deploy job of a tag run skipped — so trigger it explicitly: the changelog page then
+carries the new entry without waiting for the next push to `main`.
 
 **Gate:** `website.yml` green, and `https://kisev.github.io/vibe/changelog/<version>`
 serves the new entry.

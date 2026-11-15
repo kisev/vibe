@@ -98,6 +98,16 @@ class ReleaseNotesTest(unittest.TestCase):
         self.assertIn(str(path), err)
         self.assertIn("does not match", err)
 
+    def test_missing_entry_names_the_expected_path(self) -> None:
+        path = self.changelog / "1.1.0.md"
+
+        code, out, err = self.run_main("1.1.0")
+
+        self.assertEqual(code, 1)
+        self.assertEqual(out, "")
+        self.assertIn(str(path), err)
+        self.assertIn("is missing", err)
+
     def test_non_rc_prerelease_is_refused(self) -> None:
         code, _, err = self.run_main("1.1.0-beta.1")
 

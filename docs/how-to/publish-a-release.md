@@ -53,7 +53,7 @@ gh release edit v1.0.0 --prerelease=false --latest --notes-file /tmp/notes.md
 
 Run the `gh release edit` last. Apps built before the channel files (the upstream 3.x line) still read whichever GitHub release is marked "latest", so this is what ships the version to them.
 
-Marking the release latest also changes `/releases/latest`, which the site build reads through `scripts/website_links.py`. The deploy runs on a push to `main` or `dev`, or on a manual dispatch — a release event no longer triggers it — so refresh the site once the promotion is done:
+Marking the release latest also changes `/releases/latest`, which the site build reads through `scripts/website_links.py`. The deploy runs on a push to `main` that touches the site, or on a manual dispatch — a release event no longer triggers it, and a dev push builds nothing — so refresh the site once the promotion is done:
 
 ```console
 gh workflow run website.yml --ref main
