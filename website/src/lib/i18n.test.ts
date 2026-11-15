@@ -12,7 +12,8 @@ import Features from '../pages/Features'
 import Roadmap from '../pages/Roadmap'
 import { localeFromSearch, safeTranslate, supportedWebsiteLocales, urlWithLocale, writeLocaleToUrl } from './i18n'
 
-const pageSources = import.meta.glob('../pages/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+// Test files live beside the pages they exercise; their fixtures are not user-visible copy.
+const pageSources = import.meta.glob(['../pages/*.tsx', '!../pages/*.test.tsx'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const componentSources = import.meta.glob('../components/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const changelogTranslations = import.meta.glob('../../../i18n/changelog/*/*.md') as Record<string, unknown>
 const englishChangelog = import.meta.glob('../../../i18n/changelog/*.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>

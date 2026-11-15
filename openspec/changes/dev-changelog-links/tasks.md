@@ -15,5 +15,9 @@
 ## 3. Validation
 
 - [x] 3.1 Live: open a link naming an old dev version and the alias itself, and verify both render the current dev entry (2026-11-15: proved without a deploy — `website/src/pages/changelog-routes.test.tsx` renders the production route table at `/vibe/changelog`, `/vibe/changelog/dev` and `/vibe/changelog/1.0.0-dev.84`, and all three land on the unreleased entry; the versioned dev URL also asserts the dev badge, no unknown-version notice, and an address bar canonicalized to the alias).
+
 - [x] 3.2 Verify the dev build's "What's new" opens the alias, not a versioned dev path — 2026-11-11: the only call site passes `appVersionNumber`; a `1.0.0-dev.*` version maps to `/changelog/dev` (unit-tested), so a dev build's link opens the alias
+
 - [x] 3.3 Live acceptance: open an old dev-version link from a previous release note and confirm it lands on the current dev entry; report anything that reads confusingly (2026-11-15: the swept-version case in the same test renders `/vibe/changelog/1.0.0-dev.84` and reaches the current dev entry; the page labels it "Dev" rather than a missing version, shows no unknown-version notice, and rewrites the address bar to the alias).
+
+- [x] 10. The route test added for 3.1 lives beside the pages it exercises, and the site's "no hardcoded English copy" guard globbed `pages/*.tsx` — so it flagged the test's fixture as user-visible copy. The guard now excludes `pages/*.test.tsx`; `website/src/lib/i18n.test.ts` is green with 18 tests.
