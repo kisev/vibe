@@ -77,7 +77,8 @@ export function SpeakerSeparationModelGroup() {
 	const [downloading, setDownloading] = useState(false)
 
 	async function download() {
-		if (!modelPath) return
+		// The download resolves its own destination from the URL and the models folder, so a row
+		// whose check failed (no path) still offers a working action rather than a dead button.
 		setDownloading(true)
 		try {
 			const downloaded = await downloadModel(

@@ -18,7 +18,7 @@ vi.mock('~/lib/model', () => ({
 	deleteModelFile: deleteMock,
 }))
 
-import { runDiarizationMigration } from './diarization-migration'
+import { runDiarizationMigration, sweepLegacyDiarizationFiles } from './diarization-migration'
 import * as config from '~/lib/config'
 
 const disable = vi.fn()
@@ -26,6 +26,30 @@ const disable = vi.fn()
 beforeEach(() => {
 	vi.clearAllMocks()
 	invokeMock.mockResolvedValue('C:/models')
+})
+
+describe('sweepLegacyDiarizationFiles', () => {
+	it('sweeps the superseded artifacts when the current model is in place', async () => {
+		isUsableMock.mockResolvedValue(true)
+
+		await sweepLegacyDiarizationFiles()
+
+		expect(deleteMock).toHaveBeenCalledTimes(config.legacyDiarizationFilenames.length)
+		for (const filename of config.legacyDiarizationFilenames) {
+			expect(deleteMock).toHaveBeenCalledWith(`C:/models/${filename}`)
+		}
+		expect(deleteMock).not.toHaveBeenCalledWith(`C:/models/${config.diarizeModelFilename}`)
+	})
+
+	it('leaves the folder alone when the current model is not usable', async () => {
+		// Without the replacement in place the legacy files are still the only ones the engine
+		// could use, so the sweep must not touch them.
+		isUsableMock.mockResolvedValue(false)
+
+		await sweepLegacyDiarizationFiles()
+
+		expect(deleteMock).not.toHaveBeenCalled()
+	})
 })
 
 describe('runDiarizationMigration', () => {
@@ -40,6 +64,7 @@ describe('runDiarizationMigration', () => {
 		expect(askMock).not.toHaveBeenCalled()
 		expect(downloadMock).not.toHaveBeenCalled()
 		expect(deleteMock).toHaveBeenCalledTimes(config.legacyDiarizationFilenames.length)
+		expect(deleteMock).not.toHaveBeenCalledWith(`C:/models/${config.diarizeModelFilename}`)
 	})
 
 	it('disables the preference with a notice when the download is declined', async () => {

@@ -5,7 +5,7 @@ import { DEFAULT_AUTO_EXPORT, type AutoExportSettings } from '~/lib/auto-export'
 import { CONFIG_KEYS } from '~/lib/config-keys'
 import { KEEP_AWAKE, startKeepAwake, stopKeepAwake } from '~/lib/keep-awake'
 import { usePersisted } from '~/lib/config-store'
-import { runDiarizationMigration } from '~/lib/diarization-migration'
+import { runDiarizationMigration, sweepLegacyDiarizationFiles } from '~/lib/diarization-migration'
 import { TextFormat } from '~/components/format-select'
 import { ModifyState } from '~/lib/types'
 import { supportedLanguages } from '~/lib/i18n'
@@ -253,10 +253,22 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 	// engine, so a persisted toggle can point at a file that is no longer
 	// downloaded — revalidate it before the first transcription, not after.
 	const diarizationMigrationDone = useRef(false)
+	// Whether the superseded artifacts were already swept. Separate from the migration above:
+	// the sweep does not depend on the preference, so it must run even when there is no
+	// persisted toggle to revalidate.
+	const diarizationSweepDone = useRef(false)
 	// Only a preference the user actually persisted is revalidated: the default is on, and
 	// prompting every fresh install to migrate would be a dialog nobody asked for.
 	const persistedDiarize = readConfig<boolean | null>(CONFIG_KEYS.diarizeEnabled, null)
 	useEffect(() => {
+		if (!diarizationSweepDone.current) {
+			diarizationSweepDone.current = true
+			// With the current model in place no replacement download ever runs, so the leftovers
+			// would stay forever. Best effort: a failed sweep must not disturb startup.
+			void sweepLegacyDiarizationFiles().catch((error) => {
+				console.error('failed to sweep superseded diarization artifacts:', error)
+			})
+		}
 		if (diarizationMigrationDone.current || !diarizeEnabled || persistedDiarize !== true) return
 		diarizationMigrationDone.current = true
 		void runDiarizationMigration(diarizeEnabled, () => setDiarizeEnabled(false))

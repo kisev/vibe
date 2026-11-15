@@ -13,6 +13,18 @@ export type DiarizationMigration =
 	| 'declined' // offer declined or download failed: preference disabled
 
 /**
+ * Remove the superseded diarization artifacts once the current model is usable — the case where
+ * no replacement download will ever run to clean them up. Startup calls this whatever the
+ * speaker-separation preference says: the files are dead weight with the switch on or off, and
+ * only the current model being absent makes them the thing the app might still need.
+ */
+export async function sweepLegacyDiarizationFiles(): Promise<void> {
+	const modelsFolder = await invoke<string>('get_models_folder')
+	const modelPath = await join(modelsFolder, config.diarizeModelFilename)
+	if (await isModelFileUsable(modelPath)) await cleanupLegacyDiarizationFiles(modelsFolder)
+}
+
+/**
  * The diarization model changed format with the unified engine, but the download gate only runs
  * when the switch is toggled — a preference that predates the change points at a file that is no
  * longer downloaded, and the server logs the load error away, silently dropping speakers. This

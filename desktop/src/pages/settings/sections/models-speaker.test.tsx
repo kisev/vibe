@@ -34,6 +34,8 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 // The model name the component renders from the bundled filename.
 const speakerModelName = 'Nemotron-3-Diarization Q8_0'
+// The published size, labelled in whole MB as the catalog labels its files.
+const speakerModelSize = `${Math.round((config.diarizeModelIntegrity.size ?? 0) / 1_000_000)} MB`
 
 beforeEach(() => {
 	mocks.invoke.mockResolvedValue('C:/models')
@@ -56,14 +58,19 @@ function renderGroup() {
 }
 
 describe('speaker separation model group', () => {
-	it('names the bundled model and shows it installed', async () => {
+	it('names the bundled model, shows its size and reveals it installed', async () => {
+		const user = userEvent.setup()
 		renderGroup()
 
 		expect(await screen.findByText(m.catalogInstalled())).toBeTruthy()
 		expect(screen.getByText(speakerModelName)).toBeTruthy()
+		expect(screen.getByText(new RegExp(`· ${speakerModelSize}$`))).toBeTruthy()
 		expect(mocks.invoke).toHaveBeenCalledWith('get_models_folder')
 		expect(mocks.isUsable).toHaveBeenCalledWith(`C:/models/${config.diarizeModelFilename}`)
 		expect(screen.queryByRole('button', { name: m.downloadModel() })).toBeNull()
+
+		await user.click(screen.getByRole('button', { name: m.showInFolder() }))
+		expect(mocks.openPath).toHaveBeenCalledWith({ name: speakerModelName, path: `C:/models/${config.diarizeModelFilename}` })
 	})
 
 	it('offers the download when the model is missing and flips to installed', async () => {
@@ -92,5 +99,21 @@ describe('speaker separation model group', () => {
 
 		expect(await screen.findByRole('button', { name: m.downloadModel() })).toBeTruthy()
 		expect(screen.queryByText(m.catalogInstalled())).toBeNull()
+	})
+
+	it('keeps the download working when the folder check itself failed', async () => {
+		// A refused check has no path; the download resolves its own destination, so the offered
+		// action must still run instead of being a dead button.
+		mocks.isUsable.mockRejectedValue(new Error('refused'))
+		mocks.downloadModel.mockResolvedValue(`C:/models/${config.diarizeModelFilename}`)
+		const user = userEvent.setup()
+		renderGroup()
+
+		await user.click(await screen.findByRole('button', { name: m.downloadModel() }))
+
+		expect(mocks.downloadModel).toHaveBeenCalledWith(
+			{ url: config.diarizeModelUrl, ...config.diarizeModelIntegrity },
+			{ displayName: config.diarizeModelFilename },
+		)
 	})
 })
