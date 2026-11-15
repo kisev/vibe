@@ -35,22 +35,22 @@ remote.upstream.tagOpt = --no-tags
 
 - **Two verbs, deliberately separate.** `task upstream:fetch` is the routine sync (branches only, prunes upstream-tracking branches). `task upstream:tags` is the occasional history read (namespaced tags). Keeping them apart means the common path cannot accidentally negotiate tags again.
 
-- **`task setup:remotes` is the reproducible entry point.** It applies the refspec and `tagOpt` with `git config` on the `upstream` remote, creating or updating it as needed, and is idempotent. Existing checkouts that already have the setting are unchanged; a fresh clone runs it once.
+- **`task setup:remotes` is the reproducible entry point.** It replaces the fetch refspec with `+refs/heads/*:refs/remotes/upstream/*` and `^refs/tags/*` and sets `tagOpt=--no-tags` with `git config` on an existing `upstream` remote, and is idempotent. It adds the `upstream` remote when a fresh clone has none (`origin` is all a clone carries), so one command takes a checkout to a working state. Existing checkouts that already have the setting are unchanged apart from that guard.
 
-- **`docs/UPSTREAM.md` carries the why.** The failure mode is counter-intuitive and the fix is invisible in `git fetch` output, so the doc records the root cause, the exact config, the two tasks, and the rule that the fork's versioning is its own.
+- **The docs carry the why, split by purpose.** The failure mode is counter-intuitive and the fix is invisible in `git fetch` output, so `docs/explanation/upstream-isolation.md` records the root cause and the trade-off, `docs/how-to/sync-upstream.md` the exact config, the two tasks and the rule that the fork's versioning is its own, and `docs/README.md` indexes both.
 
 ## Risks / Trade-offs
 
 - [Someone fetches upstream manually with an explicit tag refspec] → The doc states the namespaced form; a direct `git fetch upstream 'refs/tags/*:refs/tags/*'` can still fail, which is the correct outcome — it is asking to overwrite the fork's history.
-- [Setup task silently overwrites an intentional upstream config] → It only sets the three lines it owns and prints what it changed; other refspecs are left alone.
+- [Setup task silently overwrites an intentional upstream config] → It clears the remote's whole fetch refspec and replaces it with the two lines it owns, then prints the resulting rule; any custom refspec on `upstream` (for example PR refs) is dropped deliberately, because upstream branches under this isolation are the only thing that remote fetches. Other remotes are untouched.
 - [Upstream tags go stale] → `task upstream:tags` is run on demand before a comparison; the branches, which drive syncs, stay current through `upstream:fetch`.
 - \[Global `fetch.prunetags=true` deletes tags in forks that did import them\] → The negative refspec also prevents pruning at this remote, so the fork's tags are safe.
 
 ## Migration Plan
 
-1. Land the tasks and the doc.
+1. Land the tasks and the docs.
 1. Run `task setup:remotes` on the existing checkout; confirm `git fetch upstream` succeeds and `git tag -l 'v*'` still shows only fork tags.
-1. Any other checkout (or a fresh clone) runs the same task once.
+1. Any other checkout runs the same procedure once: add the `upstream` remote if the checkout is a fresh clone, then `task setup:remotes`.
 
 ## Open Questions
 

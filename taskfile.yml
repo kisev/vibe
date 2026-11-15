@@ -175,6 +175,10 @@ tasks:
     desc: Isolate upstream tags so fetches never collide with the fork's own history
     cmds:
       - |
+        # A fresh clone tracks only origin; everything below adjusts an upstream remote.
+        if ! git remote get-url upstream >/dev/null 2>&1; then
+          git remote add upstream https://github.com/thewh1teagle/vibe.git
+        fi
         git config --unset-all remote.upstream.fetch 2>/dev/null || true
         git config --add remote.upstream.fetch '+refs/heads/*:refs/remotes/upstream/*'
         git config --add remote.upstream.fetch '^refs/tags/*'

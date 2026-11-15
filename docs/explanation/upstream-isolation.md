@@ -36,6 +36,6 @@ The fork's version line starts at 1.0.0 and is its own. Releases are `vX.Y.Z` on
 
 - The fork's versioning is its own. Never push upstream tags to `origin`.
 - Never fetch `refs/tags/*` from `upstream` into `refs/tags/*`. A command that needs that is asking to overwrite the fork's history; use the namespaced task.
-- The setup task is idempotent and belongs in every fresh checkout.
+- The setup task is idempotent, configures an existing `upstream` remote, and belongs in every fresh checkout after that remote is added.
 
 The procedure is in [Sync upstream](../how-to/sync-upstream.md). The normative sync spec is `openspec/specs/upstream-sync/spec.md`.

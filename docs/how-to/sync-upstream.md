@@ -4,6 +4,9 @@ The fork tracks `thewh1teagle/vibe` for feature work but keeps its own tag histo
 
 ## Configure the remote once per checkout
 
+A fresh clone of the fork tracks only `origin`. One task does the rest — it adds the
+`upstream` remote when it is missing and isolates its tags:
+
 ```console
 task setup:remotes
 ```
@@ -16,7 +19,7 @@ remote.upstream.fetch = ^refs/tags/*
 remote.upstream.tagOpt = --no-tags
 ```
 
-Repository configuration wins over a machine-wide `fetch.forcetags`, so no global setting changes. The task is idempotent; run it again after a fresh clone.
+Repository configuration wins over a machine-wide `fetch.forcetags`, so no global setting changes. The task replaces that remote's whole fetch refspec with the two lines above — a custom refspec on `upstream` is dropped — and leaves other remotes alone. It adds `upstream` when a fresh clone has none. It is idempotent; run it again after a fresh clone.
 
 ## Fetch branches
 
@@ -42,4 +45,4 @@ git diff upstream-tags/v3.3.0 main
 - Never push upstream tags to `origin`.
 - Never fetch `refs/tags/*` from `upstream` into `refs/tags/*`; a command that needs that is asking to overwrite the fork's history. Use the namespaced task instead.
 - The fork's versioning is its own: releases are `vX.Y.Z` on `main` starting at 1.0.0, and dev builds are `dev.<n>` on `dev`.
-- The sync procedure itself lives in `openspec/specs/upstream-sync/spec.md`; this page covers the git plumbing.
+- The requirements an upstream sync must satisfy live in `openspec/specs/upstream-sync/spec.md`; this page covers the git plumbing.

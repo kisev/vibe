@@ -8,7 +8,7 @@
 
 - The upstream remote gets a fetch refspec that never writes tags: `+refs/heads/*:refs/remotes/upstream/*` plus a negative `^refs/tags/*`, and `tagOpt=--no-tags`. Repository config beats the global `fetch.forcetags`, so this works without changing the user's machine-wide settings.
 - Two tasks make the intent executable: `task upstream:fetch` updates upstream branches only, and `task upstream:tags` fetches upstream tags into the separate namespace `refs/upstream-tags/*` for history comparison, so they never collide with the fork's tags.
-- A setup task applies the remote configuration in any checkout, and `docs/UPSTREAM.md` records the root cause, the rules, and how to compare fork and upstream tags.
+- A setup task applies the remote configuration in any checkout that has the `upstream` remote (a fresh clone adds it once), and the docs record the root cause, the rules, and how to compare fork and upstream tags: `docs/explanation/upstream-isolation.md` carries the why, `docs/how-to/sync-upstream.md` the procedure.
 - The fork keeps its own versioning: upstream tags are read-only inputs under their own namespace, never merged into `refs/tags`, never pushed.
 
 ## Capabilities
@@ -21,4 +21,4 @@
 
 ## Impact
 
-- `taskfile.yml` (three tasks), `docs/UPSTREAM.md` (new), `AGENTS.md` (one line pointing at the task), and the local `remote.upstream` configuration as the applied result. No application code.
+- `taskfile.yml` (three tasks), `docs/how-to/sync-upstream.md` and `docs/explanation/upstream-isolation.md` (new), `AGENTS.md` (one line pointing at the task), and the local `remote.upstream` configuration as the applied result. No application code.
