@@ -110,7 +110,7 @@ export default function Cta() {
 				) : null}
 
 				<Button variant="outline" size="lg" asChild>
-					<a href="https://github.com/thewh1teagle/vibe" target="_blank" rel="noreferrer">
+					<a href="https://github.com/kisev/vibe" target="_blank" rel="noreferrer">
 						<Github width="18" height="18" />
 						{m['star-on-github']()}
 					</a>

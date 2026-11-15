@@ -51,7 +51,6 @@ const BRAND_NAMES = new Set([
 	'Intel',
 	'NVIDIA',
 	'AMD',
-	'thewh1teagle',
 ])
 
 /** Attributes whose value a visitor can read or hear. */
