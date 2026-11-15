@@ -86,6 +86,11 @@ After a comparison, the section SHALL offer a results surface that covers the ap
 - **WHEN** a result column is shown
 - **THEN** the markdown file written for that model can be revealed from the column
 
+#### Scenario: Transcript too long to diff
+
+- **WHEN** a transcript exceeds the diff budget
+- **THEN** its column shows the plain text and says highlighting is unavailable, never a silently unhighlighted or equal-looking text
+
 ### Requirement: Readable results surface
 
 The results surface SHALL keep each column's transcript in its own scroll region so a long text never displaces the header or collapses another column, SHALL state each non-baseline column's added and removed word counts, and SHALL place the close control so it overlaps no other control.
@@ -98,7 +103,7 @@ The results surface SHALL keep each column's transcript in its own scroll region
 #### Scenario: Difference counts
 
 - **WHEN** a column differs from the baseline
-- **THEN** the column states how many words it added and how many it missed
+- **THEN** the column states how many words it added and how many it missed, or, when the transcript is too long to diff, says that highlighting is unavailable
 
 #### Scenario: Close control
 

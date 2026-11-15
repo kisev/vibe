@@ -163,6 +163,8 @@ describe('models comparison section', () => {
 			await mocks.listeners.get('record_finish')?.({ payload: { path: '/x/take.wav', name: 'take.wav' } })
 		})
 		expect(screen.getByText('take.wav')).toBeTruthy()
+		// The captured clip is shown with its duration before any run starts.
+		expect(screen.getByText(/· 12s/)).toBeTruthy()
 	})
 
 	it('runs the chosen models and renders done and error rows', async () => {
@@ -287,6 +289,8 @@ describe('models comparison section', () => {
 
 		expect(await screen.findByText(m.compareTooLongNote())).toBeTruthy()
 		expect(screen.queryByText('+0')).toBeNull()
+		// The plain transcript still reads in its column; only the highlighting is skipped.
+		expect(screen.getByRole('region', { name: 'Beta' }).textContent).toContain('w0 w1 w2')
 	})
 
 	it('states how many models finished and how many failed before the results button', async () => {

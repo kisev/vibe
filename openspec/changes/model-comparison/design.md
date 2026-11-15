@@ -25,7 +25,7 @@
 ## Risks / Trade-offs
 
 - [Long inputs make comparisons slow] → the section nudges toward a short clip by showing the input duration; nothing hard-limits it, a deliberate file is the user's call.
-- [First-run load time skews timing when models were already resident] → timing notes include whether a load happened; the number users compare is per-comparison anyway, same conditions for all runs in it.
+- [First-run load time skews timing when models were already resident] → the server skips a load when the same model is already resident, but `load_model` returns no residency signal and the desktop has no status query, so the lab cannot tell a loaded run from a skipped one. Every run still goes through the same `load_model` call, and a comparison of distinct models pays a real load for each; reporting residency would need a new server/desktop signal, not a UI change.
 - [Removing published scores loses the quick "which is big/slow" glance] → size in MB and the family name remain on the card; quality is exactly what the lab measures on real audio.
 
 ## Migration Plan

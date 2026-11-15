@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { m } from '~/paraglide/messages.js'
+import { openPath } from '~/lib/app'
 import type { ComparisonRun } from '~/lib/model-comparison'
 import { ModelsComparisonResults } from './models-comparison-results'
+
+const openPathMock = vi.mocked(openPath)
 
 vi.mock('~/lib/app', () => ({ openPath: vi.fn() }))
 
@@ -17,7 +20,10 @@ beforeAll(() => {
 	Element.prototype.scrollIntoView ??= () => {}
 })
 
-afterEach(cleanup)
+afterEach(() => {
+	cleanup()
+	openPathMock.mockClear()
+})
 
 function run(name: string, overrides: Partial<ComparisonRun> = {}): ComparisonRun {
 	return {
@@ -64,5 +70,81 @@ describe('comparison results', () => {
 		expect(screen.getAllByRole('region')).toHaveLength(2)
 		expect(screen.queryByText(m.compareBaseline())).toBeNull()
 		expect(screen.queryByRole('combobox')).toBeNull()
+	})
+
+	it('puts the speaker on every diarized transcript line', () => {
+		renderResults([
+			run('Alpha', {
+				segments: [
+					{ start: 0, stop: 1, text: 'hello', speaker: 0 },
+					{ start: 1, stop: 2, text: 'there', speaker: 1 },
+				],
+			}),
+		])
+
+		const [column] = screen.getAllByRole('region')
+		expect(within(column!).getByText(new RegExp(`\\[${m.speakerPrefix()} 1\\] hello`))).toBeTruthy()
+		expect(within(column!).getByText(new RegExp(`\\[${m.speakerPrefix()} 2\\] there`))).toBeTruthy()
+	})
+
+	it('states added and removed word counts, and recomputes them when the baseline changes', async () => {
+		const user = userEvent.setup()
+		renderResults([
+			run('Alpha', { segments: [{ start: 0, stop: 1, text: 'hello world' }] }),
+			run('Beta', { seconds: 4, segments: [{ start: 0, stop: 1, text: 'hello there' }] }),
+		])
+
+		const alpha = screen.getByRole('region', { name: 'Alpha' })
+		const beta = screen.getByRole('region', { name: 'Beta' })
+		// Alpha is the baseline: no counts of its own, Beta states what it changed.
+		expect(within(alpha).queryByText('+1')).toBeNull()
+		expect(within(beta).getByText('+1')).toBeTruthy()
+		expect(within(beta).getByText('−1')).toBeTruthy()
+
+		await user.click(screen.getByRole('combobox'))
+		await user.click(await screen.findByRole('option', { name: 'Beta' }))
+
+		expect(within(alpha).getByText('+1')).toBeTruthy()
+		expect(within(alpha).getByText('−1')).toBeTruthy()
+		expect(within(beta).queryByText('+1')).toBeNull()
+	})
+
+	it('marks the differences against the baseline and reads as plain text with highlighting off', async () => {
+		const user = userEvent.setup()
+		renderResults([
+			run('Alpha', { segments: [{ start: 0, stop: 1, text: 'hello world' }] }),
+			run('Beta', { seconds: 4, segments: [{ start: 0, stop: 1, text: 'hello there' }] }),
+		])
+
+		const beta = screen.getByRole('region', { name: 'Beta' })
+		expect(within(beta).getByText('world').className).toContain('line-through')
+		expect(within(beta).getByText('there').className).toContain('bg-emerald-500/25')
+
+		await user.click(screen.getByRole('switch', { name: m.compareHighlight() }))
+
+		expect(within(beta).queryByText('world')).toBeNull()
+		expect(within(beta).getByText('hello there')).toBeTruthy()
+	})
+
+	it('keeps every transcript in its own scroll region under a header that reserves the close control', () => {
+		renderResults([run('Alpha', { segments: [{ start: 0, stop: 1, text: 'hello world' }] })])
+
+		// The dialog portals out of the render container, so the header is read from the document.
+		const header = document.querySelector('header')
+		expect(header?.className).toContain('pe-16')
+		const scroller = screen.getByText('hello world')
+		expect(scroller.className).toContain('overflow-y-auto')
+		expect(scroller.className).toContain('min-h-0')
+		expect(scroller.contains(header)).toBe(false)
+	})
+
+	it('reveals the markdown file written for a column', async () => {
+		const user = userEvent.setup()
+		renderResults([run('Alpha', { outputPath: '/out/Alpha.md' }), run('Beta', { outputPath: '/out/Beta.md' })])
+
+		const beta = screen.getByRole('region', { name: 'Beta' })
+		await user.click(within(beta).getByRole('button', { name: m.showInFolder() }))
+
+		expect(openPathMock).toHaveBeenCalledWith({ name: 'Beta', path: '/out/Beta.md' })
 	})
 })
