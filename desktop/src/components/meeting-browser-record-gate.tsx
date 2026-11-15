@@ -22,7 +22,11 @@ export default function MeetingBrowserRecordGate() {
 		const active = latest.current.isRecording
 		if (active) startedAt.current ??= Date.now()
 		else startedAt.current = null
-		return { recording: active, startedAt: startedAt.current }
+		return { recording: active, startedAt: startedAt.current, sources: capturedSources(latest.current) }
+	}
+
+	function capturedSources(state: ReturnType<typeof useRecording>): ('microphone' | 'system')[] {
+		return [...(state.inputDevice ? (['microphone'] as const) : []), ...(state.outputDevice ? (['system'] as const) : [])]
 	}
 
 	/**
@@ -34,7 +38,7 @@ export default function MeetingBrowserRecordGate() {
 		const active = await isRecordingActive()
 		if (active) startedAt.current ??= Date.now()
 		else startedAt.current = null
-		return { recording: active, startedAt: startedAt.current }
+		return { recording: active, startedAt: startedAt.current, sources: capturedSources(latest.current) }
 	}
 
 	useEffect(() => {

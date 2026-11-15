@@ -215,4 +215,6 @@ export interface RecordingStatePayload {
 	recording: boolean
 	/** Epoch ms when the recording began, or null when idle. */
 	startedAt: number | null
+	/** Which sources this run captures, so the chrome draws only the meters that mean something. */
+	sources?: ('microphone' | 'system')[]
 }

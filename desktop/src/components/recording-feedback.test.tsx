@@ -85,6 +85,44 @@ describe('recording indicator', () => {
 		expect(screen.getByRole('meter', { name: `${m.systemAudio()} Speakers` })).toBeDefined()
 	})
 
+	it('marks a source that never sent a level as silent', async () => {
+		// The system loopback sends nothing until the first sound reaches it; leaving that source
+		// unlabelled is how a wrong output device stays invisible.
+		render(<RecordingIndicator startedAt={Date.now()} microphoneName="Camera Mic" systemName="Speakers" />)
+		await settle()
+
+		act(() => vi.advanceTimersByTime(1200))
+		expect(screen.getAllByText(m.recordingSilent())).toHaveLength(2)
+	})
+
+	it('gives a pause shorter than the delay no silence marker', async () => {
+		render(<RecordingIndicator startedAt={Date.now()} microphoneName="Camera Mic" systemName="Speakers" />)
+		await settle()
+
+		level('microphone', 0.5)
+		level('system', 0.5)
+		act(() => vi.advanceTimersByTime(100))
+
+		// 300 ms of quiet is a pause in speech, not a dead device.
+		level('microphone', 0)
+		level('system', 0)
+		act(() => vi.advanceTimersByTime(300))
+		expect(screen.queryAllByText(m.recordingSilent())).toHaveLength(0)
+
+		act(() => vi.advanceTimersByTime(900))
+		expect(screen.getAllByText(m.recordingSilent())).toHaveLength(2)
+	})
+
+	it('draws no meter for a source the recording does not capture', async () => {
+		render(<RecordingIndicator startedAt={Date.now()} microphoneName="Camera Mic" systemName="Speakers" sources={['microphone']} />)
+		await settle()
+
+		act(() => vi.advanceTimersByTime(1200))
+		// One meter, and the silence marker belongs to the captured source only.
+		expect(screen.getAllByRole('meter')).toHaveLength(1)
+		expect(screen.getAllByText(m.recordingSilent())).toHaveLength(1)
+	})
+
 	it('renders compact meters for the chrome', async () => {
 		render(<RecordingIndicator compact startedAt={Date.now()} microphoneName="Camera Mic" systemName="Speakers" />)
 		await settle()

@@ -846,5 +846,7 @@
   "meetingBrowserLoadFailedTitle": "Страницата не се отвори",
   "meetingBrowserLoadFailedBody": "Страницата не можа да бъде заредена. Да опитате отново или да затворите прозореца?",
   "meetingBrowserRetry": "Опитайте отново",
-  "recordingLongSilence": "Пет минути няма звук от {name}. Проверете дали това е устройството, което искате да записвате."
+  "recordingLongSilence": "Пет минути няма звук от {name}. Проверете дали това е устройството, което искате да записвате.",
+  "recordingSilenceMinutes": "Silence warning after (minutes)",
+  "recordingSilenceMinutesInfo": "While recording, a source that stays quiet this long makes Vibe bring its window forward and name the device that heard nothing. Once per source per recording. A shorter window catches a muted or wrong device sooner but interrupts on long pauses; the default of 5 minutes suits meetings with real discussion."
 }

@@ -846,5 +846,7 @@
   "meetingBrowserLoadFailedTitle": "La pagina non si è aperta",
   "meetingBrowserLoadFailedBody": "Impossibile caricare la pagina. Vuoi riprovare o chiudere la finestra?",
   "meetingBrowserRetry": "Riprova",
-  "recordingLongSilence": "Nessun audio da {name} da cinque minuti. Controlla che sia il dispositivo che vuoi registrare."
+  "recordingLongSilence": "Nessun audio da {name} da cinque minuti. Controlla che sia il dispositivo che vuoi registrare.",
+  "recordingSilenceMinutes": "Silence warning after (minutes)",
+  "recordingSilenceMinutesInfo": "While recording, a source that stays quiet this long makes Vibe bring its window forward and name the device that heard nothing. Once per source per recording. A shorter window catches a muted or wrong device sooner but interrupts on long pauses; the default of 5 minutes suits meetings with real discussion."
 }

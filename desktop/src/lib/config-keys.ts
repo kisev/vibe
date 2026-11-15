@@ -56,6 +56,8 @@ export const CONFIG_KEYS = {
 	recordingShortcutEnabled: 'recording.shortcutEnabled',
 	recordingShortcut: 'recording.shortcut',
 	meetingDetectionEnabled: 'recording.meetingDetectionEnabled',
+	/** Minutes of uninterrupted silence before Vibe brings itself forward; 5 by default. */
+	longSilenceMinutes: 'recording.longSilenceMinutes',
 	autoTranscribeAfterRecording: 'recording.autoTranscribeAfterRecording',
 
 	// Reading the transcript

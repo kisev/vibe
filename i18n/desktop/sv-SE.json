@@ -846,5 +846,7 @@
   "meetingBrowserLoadFailedTitle": "Sidan öppnades inte",
   "meetingBrowserLoadFailedBody": "Det gick inte att läsa in sidan. Försök igen eller stäng fönstret?",
   "meetingBrowserRetry": "Försök igen",
-  "recordingLongSilence": "Ingen ljud från {name} på fem minuter. Kontrollera att det här är enheten du vill spela in."
+  "recordingLongSilence": "Ingen ljud från {name} på fem minuter. Kontrollera att det här är enheten du vill spela in.",
+  "recordingSilenceMinutes": "Silence warning after (minutes)",
+  "recordingSilenceMinutesInfo": "While recording, a source that stays quiet this long makes Vibe bring its window forward and name the device that heard nothing. Once per source per recording. A shorter window catches a muted or wrong device sooner but interrupts on long pauses; the default of 5 minutes suits meetings with real discussion."
 }

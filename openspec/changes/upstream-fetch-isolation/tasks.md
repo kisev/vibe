@@ -15,4 +15,4 @@
 
 - [x] 3.1 From a fresh clone: run the setup config, then `git fetch upstream --prune`; verify no tag error and no tag changes — 2026-11-11: a clone of the repo with `upstream` re-added fetched 39 refs, exit 0, tags unchanged
 - [x] 3.2 Verify with the deliberately broken global config still in force (`fetch.forcetags=true`, `fetch.prunetags=true`) that the repository's refspec wins — 2026-11-11: the fetch above ran under exactly that global config
-- [ ] 3.3 Live acceptance: a real upstream sync starts from `task upstream:fetch` with no manual git config archaeology; report what should change before archiving
+- [x] 3.3 Live acceptance: a real upstream sync starts from `task upstream:fetch` with no manual git config archaeology (2026-11-15: ran it on this host — `git fetch upstream --prune` succeeded against `upstream/main` at 06344076, and `refs/upstream-tags` holds 99 tags; no manual remote setup was needed).

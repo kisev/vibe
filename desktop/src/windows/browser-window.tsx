@@ -156,6 +156,7 @@ export default function BrowserWindow({ session }: { session: number }) {
 	const [policy, setPolicy] = useState<BrowserPolicy>('strict')
 	const [recording, setRecording] = useState(false)
 	const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null)
+	const [recordingSources, setRecordingSources] = useState<('microphone' | 'system')[]>(['microphone', 'system'])
 	const [recordingDevices, setRecordingDevices] = useState<RecordingDeviceState | null>(null)
 
 	/** Hidden with no hosts to show, or when the policy leaves resources unfiltered. */
@@ -238,6 +239,7 @@ export default function BrowserWindow({ session }: { session: number }) {
 		listen<RecordingStatePayload>(RECORDING_STATE_EVENT, (event) => {
 			setRecording(event.payload.recording)
 			setRecordingStartedAt(event.payload.recording ? (event.payload.startedAt ?? Date.now()) : null)
+			if (event.payload.sources?.length) setRecordingSources(event.payload.sources)
 		}).then((fn) => {
 			if (active) unlisteners.push(fn)
 			else fn()
@@ -414,7 +416,15 @@ export default function BrowserWindow({ session }: { session: number }) {
 							{m.meetingBrowserRecord()}
 						</Button>
 					)}
-					{recording && <RecordingIndicator compact startedAt={recordingStartedAt} microphoneName={microphoneName} systemName={systemName} />}
+					{recording && (
+						<RecordingIndicator
+							compact
+							startedAt={recordingStartedAt}
+							microphoneName={microphoneName}
+							systemName={systemName}
+							sources={recordingSources}
+						/>
+					)}
 					{blockedHost ? (
 						<div className="flex min-w-0 items-center gap-2">
 							<span className="min-w-0 truncate text-xs text-destructive">{error ?? m.browserNavigationBlocked({ host: blockedHost })}</span>
