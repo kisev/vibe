@@ -7,7 +7,7 @@
 - [ ] 5. macOS: `WKContentRuleList` from the same JSON; fallback to navigation-only blocking where unavailable. — not in this pass; top-level navigation is already blocked by the shared `on_navigation` gate.
 - [x] 6. Settings: allowed domains list and blocked hosts list with Allow; allow adds to the list and reloads the page. — 2026-11-13.
 - [x] 7. Remove the meeting classification and special protocol handling; suppress the external prompt while a browser window is open. — 2026-11-13: `is_meeting` and the telemost/stream defaults are gone; session count suppresses the prompt. Zoom/Teams/Webex scheme mapping is unchanged.
-- [x] 8. Tests: decision function, migration, blocked-host dedupe, allow-then-reload, and a Windows integration check on a page with a cross-origin asset. — 2026-11-13: Rust unit tests in `browser_policy`, TS tests for settings and the chrome notice; the Windows cross-origin integration check still needs a Windows run.
+- [x] 8. Tests: decision function, migration, blocked-host dedupe, allow-then-reload. — 2026-11-13: Rust unit tests in `browser_policy`, TS tests for the settings list and the chrome's blocked notice.
 - [x] 9. Docs: settings reference, how-to and the explanation of the trade-off. — 2026-11-13: brief updates in `docs/` and `i18n/docs/en-US/`.
 
 ## Notes
@@ -16,3 +16,4 @@
 - The Windows COM path (`desktop/src-tauri/src/meeting_browser.rs`, `install_resource_interceptor`) is `cfg(windows)` and was not compiled on the Linux host that implemented this change.
 - [x] 10. Strictness setting `browser.policy` (`strict` default, `trusted-site` skips the per-origin resource filter, never the navigation gate) with a Settings selector.
 - [x] 11. The chrome lists blocked hosts with Allow in a popover of its own, hidden when empty or off-policy.
+- [ ] 12. Windows: open a page whose assets come from another origin and verify the blocked-host registry fills from real `WebResourceRequested` traffic and that Allow reloads it in place.

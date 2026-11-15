@@ -34,15 +34,15 @@
 
 ## 7. Validation
 
-- [ ] 7.1 Windows: open a Telemost link through `vibe://open/`, join a call, press record in the bar, verify the recording indicator, stop, and check the transcript covers both sides
-- [ ] 7.2 Windows: add stream.wb.ru as a host, open a call there, verify the bar appears; remove the host and verify the bar disappears while the link still opens
-- [ ] 7.3 Fallback checks: a host that cannot be hosted opens externally with a notice, and an external call still triggers the existing prompt
+- [ ] 7.1 Windows: open a Telemost link, join a call, press record in the chrome, verify the timer and per-source levels, stop, and check the transcript covers both sides
+- [ ] 7.2 Windows: allow stream.wb.ru in the settings, open a call there, verify the chrome sits above the page; remove the domain and verify navigation to it is refused with the blocked notice and its Allow action
+- [ ] 7.3 Fallback checks: a host outside the allowlist is refused with the blocked-navigation notice, and the app's external-call prompt still appears for a call it does not host
 
 ## 8. Live acceptance (user checkpoints)
 
-- [ ] 8.1 The user opens a meeting link in Vibe, confirms the call itself works (audio/video), presses record without switching windows, and reports whether the flow removes the "forgot to record" problem
-- [ ] 8.2 The user checks the bar's controls and placement in a real call and reports what should change
-- [ ] 8.3 The user verifies the recording contains both sides of the conversation and that closing the window behaves as expected; report findings before archiving
+- [ ] 8.1 The user opens a meeting link in Vibe, confirms the call itself works (audio/video), presses record in the chrome without switching windows, and reports whether the flow removes the "forgot to record" problem
+- [ ] 8.2 The user checks the chrome's controls and placement in a real call — device pickers, record, timer — and reports what should change
+- [ ] 8.3 The user verifies the recording contains both sides of the conversation and that closing the browser window ends the session cleanly; report findings before archiving
 
 ## Workflow follow-up
 
