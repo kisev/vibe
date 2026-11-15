@@ -77,3 +77,5 @@
 - [ ] 4.4 Live acceptance: the check/update output is actionable without reading the scripts, and the Renovate PRs are understandable; report what should change before archiving
 
   Pending the network restore and the first Renovate run. The local dry run and `deps:check` show the intended output shape.
+
+- [ ] 5. `desktop/src-tauri/Cargo.toml` carries a Linux-only `openssl` dependency with `vendored`, which `cargo machete` reports as unused — the `vibe` manifest warning on every clippy run. On this host a system OpenSSL hides whether a transitive crate needs that vendored feature, so decide it on a clean Linux runner (or by removing it and reading the container build's configure output), then drop the line and its lockfile entries if nothing depends on it.
