@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -14,7 +15,7 @@ import {
 	getMeetingSchemesEnabled,
 	meetingSchemesSupported,
 	normalizeAllowedHost,
-	normalizeMeetingUrl,
+	resolveMeetingAddress,
 	openMeetingBrowser,
 	openMeetingLink,
 	removeBrowserAllowedHost,
@@ -43,6 +44,21 @@ export function MeetingBrowserSettings() {
 	const [link, setLink] = useState('')
 	const [opening, setOpening] = useState(false)
 	const [handlers, setHandlers] = useState<{ enabled: boolean; supported: boolean } | null>(null)
+	// Strict blocks every unlisted origin through the page webview's resource filter, which only
+	// one platform implements; offering it elsewhere would be a switch that changes nothing.
+	const [resourceFilterSupported, setResourceFilterSupported] = useState(true)
+
+	useEffect(() => {
+		let cancelled = false
+		invoke<boolean>('browser_resource_filter_supported')
+			.then((supported) => {
+				if (!cancelled) setResourceFilterSupported(supported)
+			})
+			.catch((reason) => console.error('Failed to read the browser resource filter support:', reason))
+		return () => {
+			cancelled = true
+		}
+	}, [])
 
 	useEffect(() => {
 		let cancelled = false
@@ -136,14 +152,14 @@ export function MeetingBrowserSettings() {
 	}
 
 	async function openLink() {
-		// The embedded page loads https only: a pasted http link is upgraded, and a Zoom/Teams/Webex
-		// scheme link is mapped by Rust the same way it maps one arriving from the system.
-		const url = normalizeMeetingUrl(link).replace(/^http:\/\//i, 'https://')
-		if (!url || opening) return
+		// A web link opens in the embedded window; a scheme is mapped by Rust. The shared resolver
+		// upgrades an `http` or uppercase `HTTPS` link, the only web scheme the page loads.
+		const target = resolveMeetingAddress(link)
+		if (!target || opening) return
 		setOpening(true)
 		try {
-			if (url.startsWith('https://')) await openMeetingBrowser(url)
-			else await openMeetingLink(url)
+			if (target.kind === 'web') await openMeetingBrowser(target.url)
+			else await openMeetingLink(target.url)
 			setLink('')
 		} catch (reason) {
 			console.error('Failed to open the link in Vibe:', reason)
@@ -175,10 +191,13 @@ export function MeetingBrowserSettings() {
 						value={policy}
 						onChange={(event) => void changePolicy(event.target.value as BrowserPolicy)}
 						className="h-9 w-40 cursor-pointer rounded-lg border border-input/60 bg-muted/40 px-2 text-sm text-foreground">
-						<option value="strict">{m.browserPolicyStrict()}</option>
+						<option value="strict" disabled={!resourceFilterSupported}>
+							{m.browserPolicyStrict()}
+						</option>
 						<option value="trusted-site">{m.browserPolicyTrustedSite()}</option>
 					</select>
 				</SettingsRow>
+				{!resourceFilterSupported && <SettingsNote>{`${m.browserPolicyStrict()} — ${m.permissionNotApplicable()}`}</SettingsNote>}
 			</SettingsGroup>
 
 			<SettingsGroup title={m.browserAllowedHosts()} description={m.browserAllowedHostsInfo()}>

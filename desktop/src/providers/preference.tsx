@@ -271,8 +271,13 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 		}
 		if (diarizationMigrationDone.current || !diarizeEnabled || persistedDiarize !== true) return
 		diarizationMigrationDone.current = true
-		void runDiarizationMigration(diarizeEnabled, () => setDiarizeEnabled(false))
-	}, [diarizeEnabled, setDiarizeEnabled])
+		void runDiarizationMigration(diarizeEnabled, () => setDiarizeEnabled(false)).catch((error) => {
+			// A revalidation that throws would otherwise leave the switch on with no model behind
+			// it; turn it off the same way a declined download does.
+			console.error('failed to migrate the diarization preference:', error)
+			setDiarizeEnabled(false)
+		})
+	}, [diarizeEnabled, setDiarizeEnabled, persistedDiarize])
 	const [chunkSeconds, setChunkSeconds] = usePersisted<number | null>(CONFIG_KEYS.chunkSeconds, null)
 	const [storedExportOptions, setStoredExportOptions] = usePersisted<Partial<ExportOptions>>(CONFIG_KEYS.exportOptions, DEFAULT_EXPORT_OPTIONS)
 	// One key holding several settings can be half-written by an older build or a hand-edited

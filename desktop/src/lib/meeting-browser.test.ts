@@ -86,7 +86,7 @@ describe('meeting launch arguments', () => {
 			raw: 'https://meet.example.com/j/1',
 		})
 		expect(mocks.message).toHaveBeenCalledTimes(1)
-		expect(String(mocks.message.mock.calls[0][0])).toContain('Only https URLs can be opened')
+		expect(mocks.message).toHaveBeenCalledWith(expect.stringContaining('Only https URLs can be opened'), expect.anything())
 	})
 })
 

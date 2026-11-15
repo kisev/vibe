@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { m } from '~/paraglide/messages.js'
 import type { AudioDevice } from '~/lib/audio'
 import { CONFIG_KEYS } from '~/lib/config-keys'
+import { RECORDING_START_FAILED_EVENT } from '~/components/meeting-browser-record-gate'
 import BrowserWindow from './browser-window'
 
 const mocks = vi.hoisted(() => ({
@@ -205,6 +206,48 @@ describe('browser chrome', () => {
 		await screen.findByLabelText(m.meetingBarAddress())
 		await userEvent.click(screen.getByRole('button', { name: m.meetingBarClose() }))
 		await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('meeting_browser_close', { session: 7 }))
+	})
+
+	it('asks the close gate instead of force-closing during a recording', async () => {
+		mocks.invoke.mockImplementation(async (command: string) => {
+			if (command === 'meeting_browser_session') return session
+			if (command === 'get_audio_devices') return devices
+			if (command === 'get_browser_policy') return 'strict'
+			if (command === 'browser_blocked_hosts') return []
+			if (command === 'recording_active') return true
+			return undefined
+		})
+		render(<BrowserWindow session={7} />)
+		await screen.findByLabelText(m.meetingBarAddress())
+
+		await userEvent.click(screen.getByRole('button', { name: m.meetingBarClose() }))
+
+		// The same question the native title-bar close asks; Rust's own close would leave the
+		// recording running with no confirmation.
+		await waitFor(() => expect(mocks.emit).toHaveBeenCalledWith('meeting-browser-close-requested', { session: 7 }))
+		expect(mocks.invoke).not.toHaveBeenCalledWith('meeting_browser_close', expect.anything())
+	})
+
+	it('routes a meeting scheme link through the settings field handler', async () => {
+		render(<BrowserWindow session={7} />)
+		const address = await screen.findByLabelText(m.meetingBarAddress())
+
+		await userEvent.clear(address)
+		await userEvent.type(address, 'webex://meet.example.com/rooms/1{Enter}')
+
+		// Not loadable by the page webview, so it takes the same mapped route as Settings.
+		await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith('open_meeting_link', { raw: 'webex://meet.example.com/rooms/1' }))
+		expect(mocks.invoke).not.toHaveBeenCalledWith('meeting_browser_load', expect.anything())
+	})
+
+	it('shows a refused recording start in its own error line', async () => {
+		render(<BrowserWindow session={7} />)
+		await screen.findByLabelText(m.meetingBarAddress())
+
+		act(() => mocks.listeners.get(RECORDING_START_FAILED_EVENT)?.({ payload: undefined }))
+
+		// The error modal opened in the main window, which the person in the meeting cannot see.
+		expect(await screen.findByText(m.meetingBrowserStartFailed())).toBeTruthy()
 	})
 })
 

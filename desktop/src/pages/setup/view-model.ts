@@ -2,16 +2,14 @@ import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { m } from '~/paraglide/messages.js'
 import { ErrorModalContext } from '~/providers/error-modal'
 import { usePreferenceProvider } from '~/providers/preference'
 import * as utils from '~/lib/model'
 import * as osExt from '@tauri-apps/plugin-os'
 import * as config from '~/lib/config'
-import { ask } from '@tauri-apps/plugin-dialog'
-import { join } from '@tauri-apps/api/path'
-import { ensureVadModel } from '~/lib/vad'
 import { downloadSnapshot, subscribeDownloads } from '~/lib/downloads'
+import { errorMessage } from '~/lib/errors'
+import { ensureRequiredVadModel } from '~/pages/model-selection'
 
 export function viewModel() {
 	const location = useLocation()
@@ -22,17 +20,21 @@ export function viewModel() {
 	const navigate = useNavigate()
 	const preference = usePreferenceProvider()
 
-	// The setup progress bar follows the download registry: the latest-touched
-	// download, resetting when the source switches to a fallback URL.
+	// The setup progress bar follows the download registry: the latest-touched download,
+	// restarting when the file changes or the same file goes back to zero (a retry). The shell's
+	// global bridge feeds the registry on every route, this one included.
 	const latestNameRef = useRef<string | null>(null)
 	useEffect(
 		() =>
 			subscribeDownloads(() => {
 				const { latest } = downloadSnapshot()
 				if (!latest) return
-				if (latest.name !== latestNameRef.current) {
+				// Within one attempt the record is monotonic; a drop means the same file restarted
+				// from zero (an in-place re-download, or "Try again" after a failure).
+				if (latest.name !== latestNameRef.current || latest.progress < downloadProgressRef.current) {
 					latestNameRef.current = latest.name
 					downloadProgressRef.current = 0
+					setDownloadProgress(0)
 				}
 				if (latest.progress > downloadProgressRef.current) {
 					setDownloadProgress(latest.progress)
@@ -49,31 +51,12 @@ export function viewModel() {
 		})
 	}
 
-	async function ensureRequiredVad(metadata: utils.ModelMetadata | null) {
-		const modelsFolder = await invoke<string>('get_models_folder')
-		const vadPath = await join(modelsFolder, config.vadModelFilename)
-		return ensureVadModel({
-			metadata,
-			vadPath,
-			isUsable: utils.isModelFileUsable,
-			confirm: () => ask(m.downloadRequiredVadModelQuestion(), { title: m.downloadRequiredVadModel(), kind: 'info' }),
-			download: async (url, path) => {
-				await invoke('download_model', { url, path })
-			},
-		})
-	}
-
 	async function selectDownloadedModel(modelPath: string) {
 		const metadata = await readModelMetadata(modelPath)
-		if (!(await ensureRequiredVad(metadata))) return false
+		if (!(await ensureRequiredVadModel(metadata))) return false
+		// The provider reconciles the language when the metadata changes; writing it here too would
+		// spread a stale snapshot of the options taken before the awaits over the current one.
 		preference.setModelMetadata(metadata)
-		if (metadata) {
-			// A freshly downloaded model may not support the language left over from before.
-			preference.setModelOptions({
-				...preference.modelOptions,
-				lang: utils.resolveModelLanguage(metadata.capabilities, preference.modelOptions.lang),
-			})
-		}
 		preference.setModelPath(modelPath)
 		return true
 	}
@@ -125,10 +108,10 @@ export function viewModel() {
 				}
 			}
 
-			throw new Error(`All model downloads failed. Last error: ${lastError}`)
+			throw new Error(`All model downloads failed. Last error: ${errorMessage(lastError)}`)
 		} catch (err) {
 			console.error(`[model] Unhandled error:`, err)
-			setErrorModal?.({ open: true, log: String(err) })
+			setErrorModal?.({ open: true, log: errorMessage(err) })
 		}
 	}
 

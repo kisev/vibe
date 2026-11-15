@@ -8,8 +8,8 @@ import { AlertTriangle, Mic, Volume2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { m } from '~/paraglide/messages.js'
 import { CONFIG_KEYS } from '~/lib/config-keys'
-import { readConfig } from '~/lib/config-store'
-import { DEFAULT_LONG_SILENCE_MINUTES } from '~/lib/recording-limits'
+import { usePersisted } from '~/lib/config-store'
+import { clampLongSilenceMinutes, DEFAULT_LONG_SILENCE_MINUTES } from '~/lib/recording-limits'
 import { cn } from '~/lib/style'
 
 /** Which captured source a level belongs to. Mirrors `RecordLevelDevice` on the Rust side. */
@@ -65,18 +65,16 @@ export function formatElapsed(seconds: number): string {
  * a source that never produces a level at all is labelled instead of looking absent. Only sources
  * the recording actually captures take part.
  */
-export function useSourceFeedback(
-	active: boolean,
-	startedAt: number | null,
-	sources: RecordLevelDevice[] = DEVICES,
-): Record<RecordLevelDevice, SourceFeedback> {
+export function useSourceFeedback(active: boolean, sources: RecordLevelDevice[] = DEVICES): Record<RecordLevelDevice, SourceFeedback> {
 	// Callers pass a fresh array each render, so the effect keys on the list's content instead.
-	const sourceKey = sources.join(',')
+	// Unknown values are dropped: an empty or bogus list must not create a key for a source that
+	// emits nothing, which would make `setLevels` write NaN and re-render on every tick.
+	const sourceKey = sources.filter((source) => DEVICES.includes(source)).join(',')
 	const [levels, setLevels] = useState<Record<RecordLevelDevice, number>>({ microphone: 0, system: 0 })
 	const [silent, setSilent] = useState<Record<RecordLevelDevice, boolean>>({ microphone: false, system: false })
 
 	useEffect(() => {
-		if (!active) {
+		if (!active || !sourceKey) {
 			setLevels({ microphone: 0, system: 0 })
 			setSilent({ microphone: false, system: false })
 			return
@@ -134,7 +132,7 @@ export function useSourceFeedback(
 			window.clearInterval(timer)
 			unlisten.then((fn) => fn())
 		}
-	}, [active, startedAt, sourceKey])
+	}, [active, sourceKey])
 
 	return {
 		microphone: { level: levels.microphone, silent: silent.microphone },
@@ -225,7 +223,8 @@ function useLongSilenceAlert(
 	minutes: number,
 	sources: RecordLevelDevice[] = DEVICES,
 ) {
-	const sourceKey = sources.join(',')
+	// Same filtering as the meters: an unknown or empty source list has nothing to escalate.
+	const sourceKey = sources.filter((source) => DEVICES.includes(source)).join(',')
 	const thresholdMs = Math.max(1, Number.isFinite(minutes) ? minutes : DEFAULT_LONG_SILENCE_MINUTES) * 60_000
 	const silentSince = useRef<Record<RecordLevelDevice, number | null>>({ microphone: null, system: null })
 	const alerted = useRef<Record<RecordLevelDevice, boolean>>({ microphone: false, system: false })
@@ -244,6 +243,7 @@ function useLongSilenceAlert(
 			alerted.current = { microphone: false, system: false }
 			return
 		}
+		if (!sourceKey) return
 		const timer = window.setInterval(() => {
 			const now = Date.now()
 			const feedback = feedbackRef.current
@@ -275,8 +275,10 @@ export default function RecordingIndicator({
 	sources = DEVICES,
 }: RecordingIndicatorProps) {
 	const elapsed = useElapsedSeconds(startedAt)
-	const feedback = useSourceFeedback(startedAt !== null, startedAt, sources)
-	const minutes = readConfig<number>(CONFIG_KEYS.longSilenceMinutes, DEFAULT_LONG_SILENCE_MINUTES)
+	const feedback = useSourceFeedback(startedAt !== null, sources)
+	const [configuredMinutes] = usePersisted<number>(CONFIG_KEYS.longSilenceMinutes, DEFAULT_LONG_SILENCE_MINUTES)
+	// A hand-edited value must not reach either the threshold or the message as typed.
+	const minutes = clampLongSilenceMinutes(configuredMinutes)
 	const time = formatElapsed(elapsed)
 	const names = { microphone: microphoneName, system: systemName }
 	useLongSilenceAlert(startedAt !== null, feedback, names, !compact, minutes, sources)

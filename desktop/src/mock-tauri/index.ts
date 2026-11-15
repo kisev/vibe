@@ -12,6 +12,11 @@ const extraHandlers = {
 	keepawake_stop: () => undefined,
 	// Nothing is published on any line by default; specs override it per channel.
 	update_check: () => null,
+	// The install half of the update flow, so a spec stubbing `update_check` can walk "Update now"
+	// past `update_download`/`update_install` instead of dying on an unhandled command before it
+	// ever reaches `stop_api_server_process`.
+	update_download: () => undefined,
+	update_install: () => undefined,
 }
 
 // Entry point for browser mock mode. Must run before any app module is imported

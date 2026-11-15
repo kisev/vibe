@@ -108,6 +108,26 @@ describe('runComparison', () => {
 		])
 	})
 
+	it('keeps two models with the same display name in separate files', async () => {
+		const { io, writes } = fakeIo()
+		const twins: ComparisonModel[] = [
+			{ name: 'Alpha', path: '/models/one.gguf' },
+			{ name: 'Alpha', path: '/models/two.gguf' },
+		]
+
+		const runs = await runComparison(input, twins, 'en', io)
+
+		expect(writes.map((write) => write.path)).toEqual([`${folder}/Alpha.md`, `${folder}/Alpha (2).md`])
+		expect(runs.map((run) => run.outputPath)).toEqual([`${folder}/Alpha.md`, `${folder}/Alpha (2).md`])
+	})
+
+	it('creates the comparison folder once, before the first run', async () => {
+		const { io, calls } = fakeIo()
+		await runComparison(input, models, 'en', io)
+
+		expect(calls.filter((call) => call.startsWith('mkdir'))).toEqual([`mkdir ${folder}`])
+	})
+
 	it('isolates a load failure: the failed model errors, the rest still run', async () => {
 		const { io, writes } = fakeIo({ load: '/models/beta.gguf' })
 		const runs = await runComparison(input, models, 'en', io)
@@ -168,7 +188,7 @@ describe('tauriComparisonIo transcribe options', () => {
 
 	it('supplies the bundled VAD model to an engine that requires one', async () => {
 		invokeMock.mockImplementation(async (command: string) => {
-			if (command === 'get_model_metadata') return { capabilities: { requires_vad: true } }
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: true, languages: ['ru'], language_detection: false } }
 			if (command === 'get_models_folder') return 'C:/models'
 			return { segments: [] }
 		})
@@ -182,7 +202,7 @@ describe('tauriComparisonIo transcribe options', () => {
 
 	it('leaves an engine without the requirement on the plain options', async () => {
 		invokeMock.mockImplementation(async (command: string) => {
-			if (command === 'get_model_metadata') return { capabilities: { requires_vad: false } }
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: false, languages: ['ru'], language_detection: false } }
 			return { segments: [] }
 		})
 
@@ -191,9 +211,22 @@ describe('tauriComparisonIo transcribe options', () => {
 		expect(invokeMock).toHaveBeenCalledWith('transcribe', { options: { path: '/rec/clip.wav', lang: 'ru' } })
 	})
 
+	it('runs a single-language model in its own language instead of the global one', async () => {
+		// The server rejects a language the model does not support; the main flow coerces it, and
+		// a comparison must too, or a working model fails its run.
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: false, languages: ['ru'], language_detection: false } }
+			return { segments: [] }
+		})
+
+		await io().transcribe('/models/gigaam.gguf', '/rec/clip.wav', 'en')
+
+		expect(invokeMock).toHaveBeenCalledWith('transcribe', { options: { path: '/rec/clip.wav', lang: 'ru' } })
+	})
+
 	it('adds the separation model to the options when the comparison asks for speakers', async () => {
 		invokeMock.mockImplementation(async (command: string) => {
-			if (command === 'get_model_metadata') return { capabilities: { requires_vad: false } }
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: false, languages: ['ru'], language_detection: false } }
 			return { segments: [] }
 		})
 		const withDiarize = tauriComparisonIo({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null, 'C:/models/speakers.gguf')

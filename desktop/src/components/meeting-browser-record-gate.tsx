@@ -11,12 +11,25 @@ import {
 } from '~/lib/meeting-browser'
 import { useRecording } from '~/pages/home/hooks/use-recording'
 
+/**
+ * A start the recorder refused. Its error modal opens in the main window, which the person in the
+ * meeting window never sees, so the chrome shows the failure in its own error line instead.
+ */
+export const RECORDING_START_FAILED_EVENT = 'meeting-browser-recording-start-failed'
+
 export default function MeetingBrowserRecordGate() {
 	const recording = useRecording(() => {})
 	const latest = useRef(recording)
 	latest.current = recording
 	// The chrome shows a timer, so the state event carries when this recording actually began.
 	const startedAt = useRef<number | null>(null)
+	/** Whether the run in progress was started by this gate: its device set is the one this hook resolved. */
+	const ownRun = useRef(false)
+	/**
+	 * Rust reserves the recorder's slot on the first start. A double click in the chrome must not
+	 * deliver a second one: its failed start would drop the keep-awake hold of the live recording.
+	 */
+	const startPending = useRef(false)
 
 	function localState(): RecordingStatePayload {
 		const active = latest.current.isRecording
@@ -48,7 +61,14 @@ export default function MeetingBrowserRecordGate() {
 		const active = await isRecordingActive()
 		if (active) startedAt.current ??= Date.now()
 		else startedAt.current = null
-		return { recording: active, startedAt: startedAt.current, sources: capturedSources(latest.current), ...recordedDevices(latest.current) }
+		return {
+			recording: active,
+			startedAt: startedAt.current,
+			// Which sources a run captures is known only to the surface that resolved them; a
+			// foreign run omits them, like the device names, so the chrome keeps its own default.
+			...(active && ownRun.current ? { sources: capturedSources(latest.current) } : {}),
+			...recordedDevices(latest.current),
+		}
 	}
 
 	useEffect(() => {
@@ -59,7 +79,19 @@ export default function MeetingBrowserRecordGate() {
 	// and without listening for it this gate kept reporting "recording" forever.
 	useEffect(() => {
 		const unlisten = listen('record_finish', () => {
+			ownRun.current = false
 			latest.current.setIsRecording(false)
+		})
+		return () => {
+			unlisten.then((fn) => fn())
+		}
+	}, [])
+
+	// A run this hook did not start (the main window's record tab, the shortcut) reports its real
+	// start time. Keeping it stops the next report from resetting every surface's clock to now.
+	useEffect(() => {
+		const unlisten = listen<RecordingStatePayload>(RECORDING_STATE_EVENT, ({ payload }) => {
+			startedAt.current = payload.recording ? (payload.startedAt ?? startedAt.current) : null
 		})
 		return () => {
 			unlisten.then((fn) => fn())
@@ -70,8 +102,14 @@ export default function MeetingBrowserRecordGate() {
 		const unlisten = listen<{ stop: boolean }>(RECORDING_TOGGLE_EVENT, async (event) => {
 			const current = latest.current
 			try {
-				if (event.payload.stop) await current.stopRecord()
-				else {
+				if (event.payload.stop) {
+					ownRun.current = false
+					await current.stopRecord()
+					return
+				}
+				if (startPending.current) return
+				startPending.current = true
+				try {
 					if (await isRecordingActive()) {
 						// Already running elsewhere: report it rather than opening a second stream set.
 						void emit(RECORDING_STATE_EVENT, await reportedState())
@@ -80,13 +118,22 @@ export default function MeetingBrowserRecordGate() {
 					await current.refreshDevices()
 					// Read the hook from the latest render: `current` still carries the device set
 					// from before the refresh, so a just-plugged device would miss this run.
-					await latest.current.startRecord()
+					ownRun.current = true
+					const started = await latest.current.startRecord()
+					ownRun.current = started
+					if (started) void emit(RECORDING_STATE_EVENT, await reportedState())
 					// A refused start (a missing pinned device, a permission) leaves the chrome on
-					// "Record" instead of a stop button for a recording that never began.
-					void emit(RECORDING_STATE_EVENT, await reportedState())
+					// "Record" with no explanation: the error modal is in the other window.
+					else void emit(RECORDING_START_FAILED_EVENT)
+				} finally {
+					startPending.current = false
 				}
 			} catch (error) {
 				console.error('meeting bar recording toggle failed:', error)
+				if (!event.payload.stop) {
+					ownRun.current = false
+					void emit(RECORDING_START_FAILED_EVENT)
+				}
 			}
 		})
 		return () => {
@@ -94,7 +141,17 @@ export default function MeetingBrowserRecordGate() {
 		}
 	}, [])
 
+	const mounted = useRef(false)
 	useEffect(() => {
+		// On mount the truth is Rust's: a main-window webview reload must not tell an open chrome
+		// "not recording" over a run the recorder is still capturing.
+		if (!mounted.current) {
+			mounted.current = true
+			void reportedState()
+				.then((state) => emit(RECORDING_STATE_EVENT, state))
+				.catch((error) => console.error('could not report the recording state:', error))
+			return
+		}
 		void emit(RECORDING_STATE_EVENT, localState())
 	}, [recording.isRecording])
 
@@ -102,7 +159,9 @@ export default function MeetingBrowserRecordGate() {
 	// on a stale "Record" button until the next state flip.
 	useEffect(() => {
 		const unlisten = listen(RECORDING_STATE_REQUEST_EVENT, () => {
-			void reportedState().then((state) => emit(RECORDING_STATE_EVENT, state))
+			reportedState()
+				.then((state) => emit(RECORDING_STATE_EVENT, state))
+				.catch((error) => console.error('could not report the recording state:', error))
 		})
 		return () => {
 			unlisten.then((fn) => fn())

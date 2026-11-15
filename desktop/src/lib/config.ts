@@ -1,6 +1,5 @@
 export const aboutURL = 'https://kisev.github.io/vibe/'
 export const repoURL = 'https://github.com/kisev/vibe'
-export const updateVersionURL = 'https://github.com/kisev/vibe/releases/latest'
 export const modelsDocURL = 'https://kisev.github.io/vibe/docs#models'
 /**
  * Release notes. A stable version opens its own entry; the dev alias, `unreleased`,
@@ -63,13 +62,9 @@ export const modelUrls: Record<'default' | 'hebrew', ModelDownload[]> = {
 export const gigaamModelFilename = 'gigaam-v3-e2e-rnnt-Q8_0.gguf'
 export const gigaamModelUrl =
 	'https://huggingface.co/handy-computer/gigaam-v3-e2e-rnnt-gguf/resolve/f719d70812344f4d0fb8c11c0887b190501a7465/gigaam-v3-e2e-rnnt-Q8_0.gguf'
-export const gigaamModelSha256 = '78d63b47723b7f8d78c6113a6ef983b5a86e2a86f6c273e1f5cb6967b1c4467a'
-export const gigaamModelSize = 273724832
 
 export const embeddingModelFilename = 'wespeaker_en_voxceleb_CAM++.onnx'
 export const segmentModelFilename = 'segmentation-3.0.onnx'
-export const embeddingModelUrl = 'https://github.com/thewh1teagle/vibe/releases/download/v0.0.1/wespeaker_en_voxceleb_CAM++.onnx'
-export const segmentModelUrl = 'https://github.com/thewh1teagle/vibe/releases/download/v0.0.1/segmentation-3.0.onnx'
 
 /**
  * Diarization runs NVIDIA Nemotron-3-Diarization (up to 8 speakers) on ggml, a GGUF exported from

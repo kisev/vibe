@@ -46,9 +46,18 @@ const STATE_KEY = '__vibeMockTauriRuntime__'
 /** The log is an inspection aid for a dev session, not a transcript: keep only the newest. */
 const MAX_LOGGED_CALLS = 5_000
 
+/** Clone IPC args for the log; non-cloneable values (functions, DOM nodes) fall back to a shallow copy. */
+function snapshotArgs(args: Record<string, unknown>): Record<string, unknown> {
+	try {
+		return structuredClone(args)
+	} catch {
+		return { ...args }
+	}
+}
+
 /** A log entry a spec may mutate without corrupting what the app actually sent. */
 function copyInvocation(call: MockInvocation): MockInvocation {
-	return { cmd: call.cmd, args: structuredClone(call.args) }
+	return { cmd: call.cmd, args: snapshotArgs(call.args) }
 }
 
 function getState(): RuntimeState {
@@ -107,7 +116,9 @@ function isWindowSurfaceCommand(cmd: string): boolean {
 
 async function route(cmd: string, args: Record<string, unknown>): Promise<unknown> {
 	const state = getState()
-	state.calls.push({ cmd, args })
+	// Snapshot at entry: a handler or a spec override mutating `args` in place would otherwise
+	// rewrite the log's history.
+	state.calls.push({ cmd, args: snapshotArgs(args) })
 	// A dev session runs for hours and nothing clears the log mid-session, so it is bounded.
 	if (state.calls.length > MAX_LOGGED_CALLS) state.calls.splice(0, state.calls.length - MAX_LOGGED_CALLS)
 

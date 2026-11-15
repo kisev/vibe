@@ -56,6 +56,7 @@ vi.mock('~/lib/fs', () => ({
 	pathToNamedPath: async (path: string) => ({ name: path.split('/').pop() ?? path, path }),
 }))
 vi.mock('~/lib/app', () => ({ openPath: mocks.openPath }))
+vi.mock('~/providers/preference', () => ({ usePreferenceProvider: () => ({ diarizeEnabled: false }) }))
 
 // jsdom has no pointer-capture API; Radix's tooltip trigger calls it.
 beforeAll(() => {
@@ -71,6 +72,8 @@ beforeEach(() => {
 	mocks.tauriComparisonIo.mockReturnValue({})
 	mocks.getMediaDurationSeconds.mockResolvedValue(12)
 	mocks.isModelFileUsable.mockResolvedValue(false)
+	mocks.startRecord.mockResolvedValue(true)
+	mocks.stopRecord.mockResolvedValue(true)
 })
 
 afterEach(() => {

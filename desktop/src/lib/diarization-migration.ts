@@ -49,13 +49,22 @@ export async function runDiarizationMigration(diarizeEnabled: boolean, disable: 
 		return 'declined'
 	}
 
-	const downloaded = await downloadModel(
-		{ url: config.diarizeModelUrl, ...config.diarizeModelIntegrity },
-		{ displayName: config.diarizeModelFilename },
-	)
+	let downloaded: string | null = null
+	let failure: string | null = null
+	try {
+		downloaded = await downloadModel(
+			{ url: config.diarizeModelUrl, ...config.diarizeModelIntegrity },
+			{ displayName: config.diarizeModelFilename },
+		)
+	} catch (error) {
+		// A thrown download (network, disk) must land in the same branch as a refusal: otherwise
+		// the preference stays on pointing at a file that is not there.
+		console.error('diarization model download failed:', error)
+		failure = String(error)
+	}
 	if (!downloaded) {
 		disable()
-		toast.error(m.diarizationMigratedOff())
+		toast.error(failure ?? m.diarizationMigratedOff())
 		return 'declined'
 	}
 	await cleanupLegacyDiarizationFiles(modelsFolder)

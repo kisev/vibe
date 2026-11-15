@@ -11,7 +11,10 @@ import { m } from '~/paraglide/messages.js'
 import { openPath } from '~/lib/app'
 import { sizeMb } from '~/lib/catalog'
 import * as config from '~/lib/config'
+import { downloadSnapshot, subscribeDownloads } from '~/lib/downloads'
 import { downloadModel, getModelDisplayName, isModelFileUsable } from '~/lib/model'
+import { errorMessage } from '~/lib/errors'
+import { usePreferenceProvider } from '~/providers/preference'
 import { IconAction, SettingsGroup, SettingsRow } from './shared'
 
 type SpeakerModelState = 'checking' | 'installed' | 'missing' | 'downloading'
@@ -44,6 +47,7 @@ export interface DiarizationModel {
  */
 export function useDiarizationModel(): DiarizationModel {
 	const [state, setState] = useState<Omit<DiarizationModel, 'refresh'>>({ path: null, installed: false, checked: false })
+	const preference = usePreferenceProvider()
 
 	const refresh = useCallback(async () => {
 		try {
@@ -69,6 +73,21 @@ export function useDiarizationModel(): DiarizationModel {
 		}
 	}, [refresh])
 
+	// The diarization gate in Tuning downloads the model without leaving Settings (so no focus
+	// event) and flips the preference only after the download landed; the startup migration
+	// downloads it through the shared registry instead. Either is a signal to look again.
+	useEffect(() => {
+		if (preference.diarizeEnabled) void refresh()
+	}, [preference.diarizeEnabled, refresh])
+	useEffect(
+		() =>
+			subscribeDownloads(() => {
+				// Only the last in-flight download finishing can mean the model has landed.
+				if (downloadSnapshot().count === 0) void refresh()
+			}),
+		[refresh],
+	)
+
 	return { ...state, refresh }
 }
 
@@ -90,7 +109,7 @@ export function SpeakerSeparationModelGroup() {
 				announceDiarizeModelChanged()
 			}
 		} catch (error) {
-			toast.error(String(error))
+			toast.error(errorMessage(error))
 		} finally {
 			setDownloading(false)
 		}

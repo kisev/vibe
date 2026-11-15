@@ -48,7 +48,7 @@ export default function HTMLView({ segments, file, preference }: HTMLViewProps) 
 							{formatDuration(segment.start, segment.stop)}
 							{segment.speaker != null && (
 								<span style={{ marginLeft: '8px', fontWeight: 600 }}>
-									{m.speakerPrefix()} {segment.speaker + 1}
+									{m.speakerPrefix()} {segment.speaker}
 								</span>
 							)}
 						</div>

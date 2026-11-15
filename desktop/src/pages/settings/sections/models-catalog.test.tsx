@@ -335,19 +335,24 @@ describe('quant selector affordances', () => {
 		expect(mocks.deleteModelFile).toHaveBeenCalledWith('/models/fixture-Q8_0.gguf')
 	})
 
-	it('allows deleting the active model too — the stale selection clears on refresh', async () => {
-		mocks.deleteModelFile.mockResolvedValue(undefined)
-		mocks.loadModels.mockResolvedValue(undefined)
-		const user = userEvent.setup()
+	it('never deletes the active model from the card', async () => {
 		const path = '/models/fixture-Q8_0.gguf'
 		renderCatalog([fixture()], [{ name: 'fixture-Q8_0.gguf', path }], path)
 
-		expect((screen.getByRole('button', { name: m.catalogDeleteModel() }) as HTMLButtonElement).disabled).toBe(false)
-		await user.click(screen.getByRole('button', { name: m.catalogDeleteModel() }))
-		await user.click(await screen.findByRole('button', { name: m.catalogConfirmDelete() }))
+		// The active model's file stays on disk: the delete is disabled and says why.
+		const remove = screen.getByRole('button', { name: m.catalogActive() }) as HTMLButtonElement
+		expect(remove.disabled).toBe(true)
+		expect(remove.title).toBe(m.catalogActive())
+		expect(mocks.deleteModelFile).not.toHaveBeenCalled()
+	})
 
-		expect(mocks.deleteModelFile).toHaveBeenCalledWith(path)
-		expect(mocks.loadModels).toHaveBeenCalled()
+	it('never deletes the active manual download the catalog does not know', () => {
+		const path = '/models/manual-download-Q4.gguf'
+		renderCatalog([fixture()], [{ name: 'manual-download-Q4.gguf', path }], path)
+
+		const remove = screen.getByRole('button', { name: m.catalogActive() }) as HTMLButtonElement
+		expect(remove.disabled).toBe(true)
+		expect(remove.title).toBe(m.catalogActive())
 	})
 })
 

@@ -62,6 +62,18 @@ describe('closing the browser while recording', () => {
 
 		expect(mocks.confirmClose).toHaveBeenCalledWith(7, false)
 	})
+
+	it('closes the window anyway when the dialog itself fails', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+		mocks.ask.mockRejectedValue(new Error('the dialog could not open'))
+		render(<MeetingBrowserCloseGate />)
+
+		await fire('meeting-browser-close-requested')
+
+		// Rust holds the window until this gate answers; an unanswered request would leave it stuck.
+		expect(mocks.confirmClose).toHaveBeenCalledWith(7, false)
+		consoleError.mockRestore()
+	})
 })
 
 describe('a page that never loaded', () => {
@@ -83,5 +95,24 @@ describe('a page that never loaded', () => {
 
 		expect(mocks.close).toHaveBeenCalledWith(7)
 		expect(mocks.retry).not.toHaveBeenCalled()
+	})
+
+	it('opens one dialog for two failures at once', async () => {
+		let answer: (retry: boolean) => void = () => {}
+		mocks.ask.mockImplementation(() => new Promise<boolean>((resolve) => (answer = resolve)))
+		render(<MeetingBrowserCloseGate />)
+
+		await waitFor(() => expect(mocks.listeners.has('meeting-browser-load-failed')).toBe(true))
+		await act(async () => {
+			const handler = mocks.listeners.get('meeting-browser-load-failed')!
+			const first = handler({ payload: { session: 7 } })
+			const second = handler({ payload: { session: 8 } })
+			answer(false)
+			await Promise.all([first, second])
+		})
+
+		// The second failure must not stack a dialog whose answer contradicts the first one.
+		expect(mocks.ask).toHaveBeenCalledTimes(1)
+		expect(mocks.close).toHaveBeenCalledTimes(1)
 	})
 })

@@ -41,16 +41,23 @@ export interface CatalogModel {
 /** One model's benchmark row: word error rate per language, speed as realtime factor (higher is faster). */
 export interface CatalogBenchmark {
 	accuracy: Record<string, { error: number; ciLower?: number }>
-	performance: { accelerated: number; cpu: number }
+	/** Empty for models not benchmarked for speed (e.g. Voxtral-Small-24B-2507). */
+	performance: { accelerated?: number; cpu?: number }
 }
 
 export interface CatalogData {
 	schema: number
+	/** transcribe.cpp version the upstream catalog was built against (informational). */
+	transcribeCpp?: string
 	models: CatalogModel[]
 	results: Record<string, CatalogBenchmark>
 }
 
-/** The transcribe.cpp build the bundled engine runs; catalog entries gate on it via `minEngine`. */
+/**
+ * The transcribe.cpp build the bundled engine runs; catalog entries gate on it via `minEngine`.
+ * Keep in sync with the `transcribe-cpp` pin in server/crates/vibe-server/Cargo.toml and the
+ * mirror in scripts/generate-models-docs.mjs.
+ */
 export const ENGINE_VERSION = '0.4.1'
 
 /** Download URL for one file of an entry. */
@@ -129,8 +136,13 @@ export function mergeCatalogs(handy: CatalogData, vibe: { schema: number; models
 			if (!seenFiles.has(`${model.repository}@${model.revision}/${file.filename}`)) novel[quant] = file
 		}
 		if (Object.keys(novel).length === 0) continue
-		if (Object.keys(novel).length !== Object.keys(model.files).length) continue // partial overlap: data bug, skip loudly
-		seenFiles.add(identityKey(model, model.quant))
+		if (Object.keys(novel).length !== Object.keys(model.files).length) {
+			console.warn(`catalog: vibe model ${model.id} partially overlaps the handy layer; skipping`)
+			continue
+		}
+		// Register every file, not just the default quant: a later entry reusing another file of
+		// this model must count as a duplicate too.
+		for (const quant of Object.keys(model.files)) seenFiles.add(identityKey(model, quant))
 		models.push(model)
 	}
 	return { schema: handy.schema, models, results: handy.results ?? {} }

@@ -6,6 +6,8 @@ import type { CommandHandlerMap } from '../types'
 
 /** Mirrors the Rust event: the full blocked list, emitted whenever a new host is refused. */
 const BROWSER_BLOCKED_HOSTS_EVENT = 'browser-blocked-hosts'
+/** Mirrors the Rust event: an open chrome follows a policy saved in Settings. */
+const BROWSER_POLICY_EVENT = 'browser-policy'
 /** Same shape the Rust `normalize_host` accepts: a bare host, or a URL it can parse. */
 const HOSTNAME_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 
@@ -69,9 +71,18 @@ function allowed(url: string): boolean {
 	}
 }
 
+/** Like every other refusal in this mock, a bad URL must carry the group's prefix. */
+function parseUrl(url: string): URL {
+	try {
+		return new URL(url)
+	} catch {
+		throw `[mock-meeting] Invalid URL: ${url}`
+	}
+}
+
 /** Like `open_meeting_browser`: only an allowed https link opens, and a refusal is recorded. */
 function openBrowser(url: string): MockSession {
-	const parsed = new URL(url)
+	const parsed = parseUrl(url)
 	if (parsed.protocol !== 'https:') {
 		throw `[mock-meeting] Only https URLs can be opened; ${url} uses the ${parsed.protocol.replace(':', '')} scheme`
 	}
@@ -91,6 +102,34 @@ function openBrowser(url: string): MockSession {
 /** What a command returns: the session record without the mock-only browsing history. */
 function sessionInfo(state: MockSession) {
 	return { session: state.session, url: state.url, host: state.host, canBack: state.canBack, canForward: state.canForward }
+}
+
+/**
+ * Mirror `meeting_schemes::meeting_url`: the web address a meeting scheme stands for, or null for
+ * a shape the Rust side declines. Kept small on purpose — the mock exists to exercise the flow,
+ * not to re-implement every validation rule Zoom links are held to.
+ */
+function meetingUrl(raw: string): string | null {
+	const split = raw.indexOf('://')
+	if (split < 0) return null
+	const scheme = raw.slice(0, split).toLowerCase()
+	const rest = raw.slice(split + 3)
+	if (scheme === 'webex' || scheme === 'wbx') return `https://${rest}`
+	const hostEnd = rest.search(/[/?#]/)
+	const host = hostEnd < 0 ? rest : rest.slice(0, hostEnd)
+	const tail = hostEnd < 0 ? '' : rest.slice(hostEnd)
+	if (!host.includes('.')) return null
+	if (scheme === 'msteams' || scheme === 'teams') return tail.startsWith('/') ? `https://${host}${tail}` : null
+	if (scheme === 'zoommtg' || scheme === 'zoomus') {
+		const query = tail.includes('?') ? tail.slice(tail.indexOf('?') + 1) : ''
+		const value = (key: string) => query.split('&').find((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1)
+		const confno = value('confno')
+		// The meeting number is untrusted input: digits only, or it could rewrite the path.
+		if (!confno || !/^\d+$/.test(confno)) return null
+		const pwd = value('pwd')
+		return `https://${host}/j/${confno}${pwd ? `?pwd=${encodeURIComponent(pwd)}` : ''}`
+	}
+	return null
 }
 
 export const meetingHandlers: CommandHandlerMap = {
@@ -128,6 +167,8 @@ export const meetingHandlers: CommandHandlerMap = {
 			throw `[mock-meeting] unknown browser policy: ${next}`
 		}
 		policy = next
+		// Rust publishes the saved mode so an open chrome can grow or fold its blocked list.
+		emitMockEvent(BROWSER_POLICY_EVENT, policy)
 		return policy
 	},
 
@@ -151,7 +192,7 @@ export const meetingHandlers: CommandHandlerMap = {
 		const current = sessions.get(session)
 		if (!current) throw `[mock-meeting] unknown session ${String(args.session)}`
 		const url = String(args.url ?? '')
-		const parsed = new URL(url)
+		const parsed = parseUrl(url)
 		if (parsed.protocol !== 'https:') {
 			throw `[mock-meeting] Only https URLs can be opened; ${url} uses the ${parsed.protocol.replace(':', '')} scheme`
 		}
@@ -204,16 +245,14 @@ export const meetingHandlers: CommandHandlerMap = {
 		if (!sessions.has(Number(args.session))) throw `[mock-meeting] unknown session ${String(args.session)}`
 	},
 
-	// A scheme or web link from the system: an allowed link opens the mock session, anything
-	// else goes to the (mock) system browser as `null`, exactly like the Rust handler.
+	// A scheme or web link from the system: map it like `meeting_schemes::meeting_url`, open an
+	// allowed link in the mock session and send anything else to the (mock) system browser.
 	open_meeting_link: async (args) => {
 		const raw = String(args.raw ?? '')
-		if (!raw.startsWith('https://')) {
-			if (/^(zoommtg|zoomus|msteams|teams|webex|wbx):/i.test(raw)) return null
-			throw `[mock-meeting] This link is not a meeting link Vibe can open: ${raw}`
-		}
-		if (!allowed(raw)) return null
-		return sessionInfo(openBrowser(raw))
+		const url = raw.startsWith('https://') ? raw : meetingUrl(raw)
+		if (!url) throw `[mock-meeting] This link is not a meeting link Vibe can open: ${raw}`
+		if (!allowed(url)) return null
+		return sessionInfo(openBrowser(url))
 	},
 
 	meeting_browser_retry: (args) => {

@@ -22,10 +22,12 @@ describe('resolveSelection', () => {
 		expect(resolveSelection(devices, null, []).device?.name).toBe('Bluetooth')
 	})
 
-	it('treats an empty saved name as nothing saved', () => {
-		// The legacy id-based values never match a device name and land here once.
+	it('treats an empty saved name as an explicit "None"', () => {
+		// Both pickers persist "None" as an empty name; it must not fall back to the default.
 		const devices = [mic('Camera Mic', '0', true)]
-		expect(resolveSelection(devices, '', []).device?.name).toBe('Camera Mic')
+		const resolved = resolveSelection(devices, '', [])
+		expect(resolved.device).toBeNull()
+		expect(resolved.unavailableName).toBeNull()
 	})
 
 	it('keeps a missing pinned device as unavailable instead of silently dropping it', () => {

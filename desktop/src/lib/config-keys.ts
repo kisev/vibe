@@ -41,6 +41,8 @@ export const CONFIG_KEYS = {
 	projectsPath: 'transcription.projectsPath',
 	/** Export every finished transcript automatically: formats, destination, replace rule. */
 	autoExport: 'transcription.autoExport',
+	/** Upper bound per model input for long recordings; null = the engine maximum. */
+	chunkSeconds: 'transcription.chunkSeconds',
 
 	// Recording
 	/** Legacy enumeration-index ids; kept only so old stored values can be ignored. */
@@ -51,8 +53,6 @@ export const CONFIG_KEYS = {
 	outputDeviceName: 'recording.outputDeviceName',
 	hiddenInputDevices: 'recording.hiddenInputDevices',
 	hiddenOutputDevices: 'recording.hiddenOutputDevices',
-	/** Upper bound per model input for long recordings; null = the engine maximum. */
-	chunkSeconds: 'transcription.chunkSeconds',
 	recordingShortcutEnabled: 'recording.shortcutEnabled',
 	recordingShortcut: 'recording.shortcut',
 	meetingDetectionEnabled: 'recording.meetingDetectionEnabled',
@@ -88,7 +88,8 @@ export const CONFIG_KEYS = {
 
 	// Local API. The intent is the user setting the Agents switch reads; the base URL is written
 	// by the app while a shared process runs so agents can find the per-run port, and removed on
-	// stop and on exit.
+	// stop and on exit. `api.enabled` is read and written only from Rust (`cmd/config.rs`); the
+	// frontend reads it back through the `api_server_enabled` command.
 	apiEnabled: 'api.enabled',
 	apiBaseUrl: 'api.baseUrl',
 

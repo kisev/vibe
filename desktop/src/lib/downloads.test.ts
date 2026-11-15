@@ -36,6 +36,27 @@ describe('download registry', () => {
 		unsubscribe()
 	})
 
+	it('keeps the entry until the last concurrent download of the same URL ends', () => {
+		beginDownload('a', 'model-a.gguf')
+		beginDownload('a', 'model-a.gguf')
+		endDownload('a')
+		expect(downloadSnapshot().count).toBe(1)
+		endDownload('a')
+		expect(downloadSnapshot().count).toBe(0)
+	})
+
+	it('falls back to the most recently touched download, not the last started', () => {
+		beginDownload('a', 'model-a.gguf')
+		beginDownload('b', 'model-b.gguf')
+		beginDownload('c', 'model-c.gguf')
+		updateDownload('b', 10)
+		updateDownload('a', 20)
+
+		endDownload('a')
+
+		expect(downloadSnapshot().latest?.name).toBe('model-b.gguf')
+	})
+
 	it('derives a short file label from the URL', () => {
 		expect(downloadName('https://huggingface.co/x/y/resolve/abc/model-Q4.gguf?download=true')).toBe('model-Q4.gguf')
 	})

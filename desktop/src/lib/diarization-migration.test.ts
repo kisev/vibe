@@ -83,6 +83,15 @@ describe('runDiarizationMigration', () => {
 		expect(disable).toHaveBeenCalledOnce()
 	})
 
+	it('disables the preference when the download rejects instead of returning', async () => {
+		// A network failure throws out of `downloadModel`; it must not become an unhandled rejection.
+		isUsableMock.mockResolvedValue(false)
+		askMock.mockResolvedValue(true)
+		downloadMock.mockRejectedValue(new Error('offline'))
+		expect(await runDiarizationMigration(true, disable)).toBe('declined')
+		expect(disable).toHaveBeenCalledOnce()
+	})
+
 	it('downloads the replacement and removes every legacy artifact', async () => {
 		isUsableMock.mockResolvedValue(false)
 		askMock.mockResolvedValue(true)

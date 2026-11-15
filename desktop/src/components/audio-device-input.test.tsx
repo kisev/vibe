@@ -69,4 +69,48 @@ describe('AudioDeviceInput hide interaction', () => {
 		expect(onHide).toHaveBeenCalledWith(devices[1])
 		expect(setDevice).not.toHaveBeenCalledWith(devices[1])
 	})
+
+	it('hides the device from the hide button by keyboard without selecting it', async () => {
+		const onHide = vi.fn()
+		const setDevice = vi.fn()
+		const user = userEvent.setup()
+		render(
+			<AudioDeviceInput
+				type="input"
+				devices={devices}
+				device={devices[0]}
+				setDevice={setDevice}
+				onHide={onHide}
+				hiddenNames={[]}
+			/>,
+		)
+		await user.click(screen.getByRole('combobox'))
+		const eye = await screen.findByLabelText('Hide Bluetooth')
+		eye.focus()
+		await user.keyboard('{Enter}')
+		expect(onHide).toHaveBeenCalledWith(devices[1])
+		expect(setDevice).not.toHaveBeenCalledWith(devices[1])
+	})
+
+	it('hides the focused device with Delete, without reaching the nested button', async () => {
+		const onHide = vi.fn()
+		const setDevice = vi.fn()
+		const user = userEvent.setup()
+		render(
+			<AudioDeviceInput
+				type="input"
+				devices={devices}
+				device={devices[0]}
+				setDevice={setDevice}
+				onHide={onHide}
+				hiddenNames={[]}
+			/>,
+		)
+		await user.click(screen.getByRole('combobox'))
+		const option = await screen.findByRole('option', { name: /Bluetooth/ })
+		option.focus()
+		await user.keyboard('{Delete}')
+		expect(onHide).toHaveBeenCalledWith(devices[1])
+		expect(setDevice).not.toHaveBeenCalledWith(devices[1])
+	})
 })

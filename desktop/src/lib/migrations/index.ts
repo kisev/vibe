@@ -1,5 +1,6 @@
 import { migrateLegacyLocale } from './migrate-legacy-locale'
 import { migratePrefsToConfig } from './migrate-prefs-to-config'
+import { removeAnalyticsEnabled } from './remove-analytics-enabled'
 import { removeRecordingPathSettings } from './remove-recording-path-settings'
 
 /**
@@ -17,6 +18,7 @@ const migrations = [
 	{ version: 1, run: migrateLegacyLocale },
 	{ version: 2, run: migratePrefsToConfig },
 	{ version: 3, run: removeRecordingPathSettings },
+	{ version: 4, run: removeAnalyticsEnabled },
 ]
 const MIGRATION_VERSION_KEY = 'vibe:migration-version'
 

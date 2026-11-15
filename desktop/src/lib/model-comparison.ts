@@ -8,7 +8,7 @@ import * as fs from '@tauri-apps/plugin-fs'
 import { m } from '~/paraglide/messages.js'
 import { renderExport } from '~/lib/auto-export'
 import * as config from '~/lib/config'
-import { requiresVad, type ModelMetadata } from '~/lib/model'
+import { requiresVad, resolveModelLanguage, type ModelMetadata } from '~/lib/model'
 import { projectExportFilename } from '~/lib/project-name'
 import { transcriptsFolder } from '~/lib/transcripts-store'
 import type { Segment } from '~/lib/transcript'
@@ -89,6 +89,11 @@ export async function runComparison(
 		onEvent?.({ ...run, model: { ...run.model } }, index)
 	}
 	const folder = await io.join(await io.comparisonsFolder(), comparisonFolderName(input.name))
+	// One folder per comparison, created once: a failure here is a setup failure the caller
+	// reports for the whole run, not a per-model one.
+	await io.mkdir(folder)
+	// Renaming does not require unique display names, so two chosen models can share a stem.
+	const usedFiles = new Set<string>()
 
 	for (const [index, run] of runs.entries()) {
 		run.status = 'running'
@@ -101,8 +106,11 @@ export async function runComparison(
 			// processing time, and timing covers load-if-needed plus transcription only.
 			const seconds = Math.round((performance.now() - startedAt) / 1000)
 			const markdown = await io.renderMarkdown(run.model.name, segments)
-			const outputPath = await io.join(folder, projectExportFilename(run.model.name, 'md'))
-			await io.mkdir(folder)
+			const stem = projectExportFilename(run.model.name, 'md').replace(/\.md$/i, '')
+			let filename = `${stem}.md`
+			for (let suffix = 2; usedFiles.has(filename.toLowerCase()); suffix++) filename = `${stem} (${suffix}).md`
+			usedFiles.add(filename.toLowerCase())
+			const outputPath = await io.join(folder, filename)
 			await io.writeText(outputPath, markdown)
 			run.status = 'done'
 			run.seconds = seconds
@@ -118,16 +126,25 @@ export async function runComparison(
 }
 
 /**
- * The bundled VAD model for an engine that cannot plan its speech ranges without
- * one. It is not a comparison option: every model that requires it gets the same
- * file, so outputs still differ only by the model. An engine that does not
- * advertise the requirement gets no `vad_model`, and a metadata read failure
- * falls through to the transcribe call's own error.
+ * The model's metadata, or null when it cannot be read. A read failure falls through to the
+ * transcribe call's own error rather than failing the run here.
  */
-async function comparisonVadModel(modelPath: string): Promise<string | null> {
+async function comparisonModelMetadata(modelPath: string): Promise<ModelMetadata | null> {
 	try {
-		const metadata = await invoke<ModelMetadata>('get_model_metadata', { modelPath })
-		if (!requiresVad(metadata?.capabilities)) return null
+		return await invoke<ModelMetadata>('get_model_metadata', { modelPath })
+	} catch {
+		return null
+	}
+}
+
+/**
+ * The bundled VAD model for an engine that cannot plan its speech ranges without one. It is
+ * not a comparison option: every model that requires it gets the same file, so outputs still
+ * differ only by the model. An engine that does not advertise the requirement gets no
+ * `vad_model`.
+ */
+async function bundledVadModel(): Promise<string | null> {
+	try {
 		const modelsFolder = await invoke<string>('get_models_folder')
 		return `${modelsFolder}/${config.vadModelFilename}`
 	} catch {
@@ -162,13 +179,17 @@ export function tauriComparisonIo(load: ComparisonLoadOptions, projectsPath?: st
 		// stable timestamps, no decoding knobs — differences between the outputs are
 		// model differences. Every run of one comparison gets the same set.
 		transcribe: async (modelPath, path, language) => {
-			const vadModel = await comparisonVadModel(modelPath)
+			const metadata = await comparisonModelMetadata(modelPath)
+			// Each model can run only its own languages, and the server rejects the rest: comparing
+			// a single-language model under the global language would fail it for no good reason.
+			const lang = resolveModelLanguage(metadata?.capabilities, language)
+			const vadModel = requiresVad(metadata?.capabilities) ? await bundledVadModel() : null
 			const ffmpeg = load.ffmpegOptions
 			const wantsProcessing = ffmpeg ? ffmpeg.normalize_loudness || (ffmpeg.custom_command ?? '').trim().length > 0 : false
 			const result = await invoke<{ segments: Segment[] }>('transcribe', {
 				options: {
 					path,
-					lang: language,
+					lang,
 					...(wantsProcessing && ffmpeg ? { ffmpeg_options: ffmpeg } : {}),
 					...(vadModel ? { vad_model: vadModel } : {}),
 					...(diarizeModelPath ? { diarize_model: diarizeModelPath } : {}),

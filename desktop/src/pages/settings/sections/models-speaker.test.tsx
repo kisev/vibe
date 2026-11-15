@@ -30,6 +30,7 @@ vi.mock('~/lib/model', () => ({
 }))
 vi.mock('~/lib/catalog', () => ({ sizeMb: (bytes: number) => Math.round(bytes / 1_000_000) }))
 vi.mock('~/lib/app', () => ({ openPath: mocks.openPath }))
+vi.mock('~/providers/preference', () => ({ usePreferenceProvider: () => ({ diarizeEnabled: false }) }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 // The model name the component renders from the bundled filename.

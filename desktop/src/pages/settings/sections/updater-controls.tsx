@@ -17,7 +17,12 @@ const channels: { value: UpdateChannel; label: string }[] = [
 ]
 
 /** One sentence for the last check, whatever the phase. */
-function statusText(state: CheckState, version: string | undefined, lastCheckedAt: number | null, errorStage: 'check' | 'install' | null): string {
+function statusText(
+	state: CheckState,
+	version: string | undefined,
+	lastCheckedAt: number | null,
+	errorStage: 'check' | 'install' | 'download' | null,
+): string {
 	switch (state) {
 		case 'checking':
 			return m.updateChecking()
@@ -30,7 +35,9 @@ function statusText(state: CheckState, version: string | undefined, lastCheckedA
 		case 'installing':
 			return m.updateInstalling()
 		case 'error':
-			return errorStage === 'install' ? m.updateInstallFailed() : m.updateFailed()
+			if (errorStage === 'install') return m.updateInstallFailed()
+			if (errorStage === 'download') return m.updateDownloadFailed()
+			return m.updateFailed()
 		default:
 			return lastCheckedAt ? m.updateLastChecked({ time: new Date(lastCheckedAt).toLocaleTimeString() }) : m.updateNotChecked()
 	}
@@ -56,6 +63,10 @@ export function UpdateControls() {
 	// below what is installed. The copy says so instead of pretending a check failed —
 	// but only when the line offered nothing, not next to an "update now" button.
 	const devLineBelow = channel === 'dev' && checkState === 'current' && version !== '' && !version.includes('-dev.')
+	// "current" also covers an up-to-date build of the line itself (a beta tester on the latest
+	// rc). Only a version that sorts above the line has no candidate above it.
+	const onLineBuild = channel === 'stable' || (channel === 'dev' ? version.includes('-dev.') : version.includes('-rc.'))
+	const noCandidateAbove = checkState === 'current' && version !== '' && !onLineBuild
 	const busy = checkState === 'checking' || updating
 
 	return (
@@ -89,7 +100,7 @@ export function UpdateControls() {
 			</SettingsField>
 
 			<SettingsRow
-				label={checkState === 'current' && channel !== 'stable' ? m.updateNoCandidate() : statusText(checkState, manifest?.version, lastCheckedAt, errorStage)}
+				label={noCandidateAbove ? m.updateNoCandidate() : statusText(checkState, manifest?.version, lastCheckedAt, errorStage)}
 				description={checkState === 'error' ? checkError : m.infoCheckForUpdates()}
 				clampDescription={false}>
 				{busy && checkState !== 'available' && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}

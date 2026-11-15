@@ -6,9 +6,9 @@ import { register, unregister, isRegistered } from '@tauri-apps/plugin-global-sh
 import * as clipboard from '@tauri-apps/plugin-clipboard-manager'
 import { AudioDevice } from '~/lib/audio'
 import { CONFIG_KEYS } from '~/lib/config-keys'
-import { resolveSelection } from '~/lib/device-selection'
+import { resolveConfiguredSelection } from '~/lib/device-selection'
 import { gpuOutOfMemoryBefore } from '~/lib/gpu-memory'
-import { readConfig, usePersisted } from '~/lib/config-store'
+import { usePersisted } from '~/lib/config-store'
 import { createClient, fillPrompt } from '~/lib/ai'
 import { withoutUnsupportedOptions } from '~/lib/model'
 import * as transcript from '~/lib/transcript'
@@ -118,15 +118,12 @@ export function HotkeyProvider({ children }: { children: ReactNode }) {
 		isStartingRef.current = true
 		try {
 			const devices = await invoke<AudioDevice[]>('get_audio_devices')
-			const savedName = readConfig<string | null>(CONFIG_KEYS.inputDeviceName, null)
-			const hiddenNames = readConfig<string[]>(CONFIG_KEYS.hiddenInputDevices, [])
-			const input = resolveSelection(
-				devices.filter((device) => device.isInput),
-				savedName,
-				hiddenNames,
-			).device
+			const { device: input, savedName } = resolveConfiguredSelection(devices, 'input')
 			if (!input) {
 				console.error('No input device found')
+				// A pinned microphone that is unplugged or hidden would otherwise fail with nothing
+				// but a log line: no recording, no indicator, no explanation for the user.
+				void notify('Vibe', savedName ? m.pinnedDeviceMissing({ name: savedName }) : m.noDefaultMicrophone())
 				return
 			}
 

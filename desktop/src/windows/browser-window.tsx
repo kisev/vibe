@@ -10,6 +10,7 @@ import { emit, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { ArrowLeft, ArrowRight, ExternalLink, Mic, RotateCw, ShieldAlert, Square, X } from 'lucide-react'
 import RecordingIndicator from '~/components/recording-feedback'
+import { RECORDING_START_FAILED_EVENT } from '~/components/meeting-browser-record-gate'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import type { AudioDevice } from '~/lib/audio'
@@ -23,10 +24,12 @@ import {
 	getBrowserBlockedHosts,
 	getBrowserPolicy,
 	getMeetingBrowserSession,
+	isRecordingActive,
 	navigateMeetingBrowser,
 	openMeetingBrowserExternal,
+	openMeetingLink,
 	loadMeetingBrowserUrl,
-	normalizeMeetingUrl,
+	resolveMeetingAddress,
 	readRecordingDeviceState,
 	setBrowserChromeExpanded,
 	writeRecordingDeviceSelection,
@@ -100,14 +103,13 @@ function DevicePicker({
 		recordedName === undefined
 			? device
 			: (devices.find((candidate) => candidate.name === recordedName && candidate.isInput === (type === 'input')) ?? null)
-	const value =
-		recordedName === undefined
-			? (device?.id ?? (unavailableName ? 'unavailable' : 'none'))
-			: shownDevice
-				? shownDevice.id
-				: recordedName
-					? 'recorded'
-					: 'none'
+	/** Recorded run: its own device, the last-resort "recorded" id, or "none" when it captured nothing. */
+	function pickerValue(): string {
+		if (recordedName === undefined) return device?.id ?? (unavailableName ? 'unavailable' : 'none')
+		if (shownDevice) return shownDevice.id
+		return recordedName ? 'recorded' : 'none'
+	}
+	const value = pickerValue()
 	const triggerLabel =
 		recordedName === undefined
 			? (device?.name ?? (unavailableName ? m.deviceUnavailable({ name: unavailableName }) : m.noRecord()))
@@ -234,6 +236,8 @@ export default function BrowserWindow({ session }: { session: number }) {
 
 		track(listen<string[]>(BROWSER_BLOCKED_HOSTS_EVENT, (event) => setBlockedHosts(event.payload)))
 		track(listen<BrowserPolicy>(BROWSER_POLICY_EVENT, (event) => setPolicy(event.payload)))
+		// The recorder refused a chrome start; its own error modal is in the main window.
+		track(listen(RECORDING_START_FAILED_EVENT, () => setError(m.meetingBrowserStartFailed())))
 		track(
 			listen<BrowserSessionInfo>('meeting-browser-session', (event) => {
 				if (event.payload.session !== session) return
@@ -309,11 +313,25 @@ export default function BrowserWindow({ session }: { session: number }) {
 	}
 
 	function go() {
-		// The address bar takes the same input as the settings field: a bare domain becomes https
-		// (and an http link is upgraded), which is the only scheme the page webview loads.
-		const url = normalizeMeetingUrl(address.trim()).replace(/^http:\/\//i, 'https://')
-		if (!url) return
-		void run(() => loadMeetingBrowserUrl(session, url))
+		// A bare domain becomes https and an http link is upgraded; a scheme link (zoommtg:,
+		// msteams:, webex:) is not loadable by the page webview, so it takes the same route as the
+		// settings field, where Rust maps it into an https address.
+		const target = resolveMeetingAddress(address)
+		if (!target) return
+		void run(() => (target.kind === 'web' ? loadMeetingBrowserUrl(session, target.url) : openMeetingLink(target.url)))
+	}
+
+	/**
+	 * The chrome's own X asks the same question the native window close does: Rust's
+	 * `meeting_browser_close` force-closes past the recording guard, so an active recording goes
+	 * through the close gate instead of silently outliving the window.
+	 */
+	async function close() {
+		if (await isRecordingActive()) {
+			await emit('meeting-browser-close-requested', { session })
+			return
+		}
+		await closeMeetingBrowser(session)
 	}
 
 	/** Allow a refused host; the Rust side persists it and reloads the page webviews. */
@@ -409,7 +427,7 @@ export default function BrowserWindow({ session }: { session: number }) {
 						onClick={() => void run(() => openMeetingBrowserExternal(session))}>
 						<ExternalLink className="h-4 w-4" />
 					</Button>
-					<Button variant="ghost" size="icon" aria-label={m.meetingBarClose()} onClick={() => void run(() => closeMeetingBrowser(session))}>
+					<Button variant="ghost" size="icon" aria-label={m.meetingBarClose()} onClick={() => void run(close)}>
 						<X className="h-4 w-4" />
 					</Button>
 				</div>

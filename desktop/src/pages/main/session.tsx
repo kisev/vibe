@@ -20,6 +20,7 @@ import { ErrorModalContext } from '~/providers/error-modal'
 import { usePreferenceProvider, type Preference } from '~/providers/preference'
 import { useAudioDownload } from '~/pages/home/hooks/use-audio-download'
 import { useRecording } from '~/pages/home/hooks/use-recording'
+import { isComparisonClipPending, OWN_RECORDING_REPORT } from '~/pages/recording-ownership'
 import { useDropTarget } from './hooks/use-drop-target'
 import { useSummaries, type Summaries } from './hooks/use-summaries'
 import { useTranscribeQueue, type TranscribeQueue } from './hooks/use-transcribe-queue'
@@ -143,7 +144,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 	// reports gives the whole app one recording state, so the main window shows a chrome-started
 	// run and a second start is impossible from either side.
 	useEffect(() => {
-		const unlisten = listen<RecordingStatePayload>(RECORDING_STATE_EVENT, ({ payload }) => {
+		const unlisten = listen<RecordingStatePayload & { origin?: string }>(RECORDING_STATE_EVENT, ({ payload }) => {
+			// emit() delivers to the emitting window too: adopting our own broadcast would take
+			// ownership of a run this window started and re-publish it without its device names.
+			if (payload.origin === OWN_RECORDING_REPORT) return
 			manualRecording.adoptRecording(payload.recording, payload.startedAt)
 		})
 		return () => {
@@ -159,18 +163,37 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 	const shortcutInputName = recordingShortcut.shortcutDevices?.input
 	const shortcutOutputName = recordingShortcut.shortcutDevices?.output
 	useEffect(() => {
-		const devices = recording.ownsRecording
-			? { inputName: ownInputName, outputName: ownOutputName }
-			: recordingShortcut.isShortcutRecording && recordingShortcut.shortcutDevices
-				? { inputName: shortcutInputName, outputName: shortcutOutputName }
-				: {}
-		void emit(RECORDING_STATE_EVENT, { recording: recording.isRecording, startedAt: recording.startedAt, ...devices })
+		// A run this window did not start carries its own names and channels from the gate.
+		let devices: { inputName?: string | null; outputName?: string | null } = {}
+		let sources: RecordingStatePayload['sources']
+		if (recording.ownsRecording) {
+			devices = { inputName: ownInputName, outputName: ownOutputName }
+			sources = [
+				...(manualRecording.inputDevice ? (['microphone'] as const) : []),
+				...(manualRecording.outputDevice ? (['system'] as const) : []),
+			]
+		} else if (recordingShortcut.isShortcutRecording && recordingShortcut.shortcutDevices) {
+			devices = { inputName: shortcutInputName, outputName: shortcutOutputName }
+			sources = [
+				...(shortcutInputName != null ? (['microphone'] as const) : []),
+				...(shortcutOutputName != null ? (['system'] as const) : []),
+			]
+		}
+		void emit(RECORDING_STATE_EVENT, {
+			recording: recording.isRecording,
+			startedAt: recording.startedAt,
+			...(sources ? { sources } : {}),
+			...devices,
+			origin: OWN_RECORDING_REPORT,
+		})
 	}, [
 		recording.isRecording,
 		recording.startedAt,
 		recording.ownsRecording,
 		ownInputName,
 		ownOutputName,
+		manualRecording.inputDevice,
+		manualRecording.outputDevice,
 		recordingShortcut.isShortcutRecording,
 		recordingShortcut.shortcutDevices,
 		shortcutInputName,
@@ -190,7 +213,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 	// updates that same project, so a failed/disabled transcription never costs the user the audio.
 	useEffect(() => {
 		const unlisten: Promise<UnlistenFn> = listen<{ path: string; name: string; warning?: string }>('record_finish', async ({ payload }) => {
-			if (hotkeyRecordingActive) return
+			// A hotkey run and a comparison-lab clip have their own handlers; saving this clip as a
+			// project would move its temp file out from under them.
+			if (hotkeyRecordingActive || isComparisonClipPending()) return
 			recording.setIsRecording(false)
 			setPanel('none')
 			if (payload.warning) toast.warning(m.recordingRecoveredWarning(), { description: payload.warning, position: 'bottom-center' })

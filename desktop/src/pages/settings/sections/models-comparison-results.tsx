@@ -30,7 +30,7 @@ function transcriptText(segments: ComparisonRun['segments']): string {
 		.map((segment) => {
 			const text = segment.text.trim()
 			if (!text) return ''
-			return segment.speaker != null ? `[${label} ${segment.speaker + 1}] ${text}` : text
+			return segment.speaker != null ? `[${label} ${segment.speaker}] ${text}` : text
 		})
 		.filter(Boolean)
 		.join('\n')

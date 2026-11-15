@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from 'react'
 import { m } from '~/paraglide/messages.js'
 import { toast } from 'sonner'
 import * as clipboard from '@tauri-apps/plugin-clipboard-manager'
-import { join } from '@tauri-apps/api/path'
 import * as config from '~/lib/config'
 import { NamedPath } from '~/lib/types'
 import { getIssueUrl, resetApp } from '~/lib/app'
@@ -21,16 +20,14 @@ import { useStoreValue } from '~/lib/use-store-value'
 import { collectLogs, getPrettyVersion, getVersionNumber } from '~/lib/logs'
 import {
 	cleanupPartialDownloads,
-	isModelFileUsable,
 	listInstalledModels,
 	resolveModelLanguage,
 	type InstalledModel,
 	type ModelMetadata,
 } from '~/lib/model'
 import { buildSkill, installSkill, type SkillTarget } from '~/lib/skill'
-import { downloadSnapshot, subscribeDownloads, updateDownload } from '~/lib/downloads'
-import { downloadModel as downloadModelFromLib } from '~/lib/model'
-import { ensureVadModel } from '~/lib/vad'
+import { downloadSnapshot, subscribeDownloads } from '~/lib/downloads'
+import { ensureRequiredVadModel } from '~/pages/model-selection'
 
 export interface GpuDevice {
 	index: number
@@ -220,25 +217,6 @@ export function viewModel() {
 		}
 	}
 
-	async function ensureRequiredVad(metadata: ModelMetadata | null) {
-		const modelsFolder = await invoke<string>('get_models_folder')
-		const vadPath = await join(modelsFolder, config.vadModelFilename)
-		return ensureVadModel({
-			metadata,
-			vadPath,
-			isUsable: isModelFileUsable,
-			confirm: () => ask(m.downloadRequiredVadModelQuestion(), { title: m.downloadRequiredVadModel(), kind: 'info' }),
-			download: async (url, path) => {
-				try {
-					await downloadModelFromLib(url, { replacePath: path, displayName: 'Silero VAD' })
-					toast.success(m.downloadComplete())
-				} catch (error) {
-					toast.error(String(error))
-				}
-			},
-		})
-	}
-
 	function applyModelLanguage(metadata: ModelMetadata | null) {
 		if (!metadata) return
 		const lang = resolveModelLanguage(metadata.capabilities, preference.modelOptions.lang)
@@ -248,7 +226,7 @@ export function viewModel() {
 
 	async function selectModel(modelPath: string) {
 		const metadata = await readModelMetadata(modelPath)
-		if (!(await ensureRequiredVad(metadata))) return
+		if (!(await ensureRequiredVadModel(metadata))) return
 		preference.setModelMetadata(metadata)
 		applyModelLanguage(metadata)
 		preference.setModelPath(modelPath)
@@ -386,15 +364,6 @@ export function viewModel() {
 	useEffect(() => {
 		return () => {
 			if (aiErrorCopyTimer.current) window.clearTimeout(aiErrorCopyTimer.current)
-		}
-	}, [])
-
-	useEffect(() => {
-		const unlisten = listen<{ url: string; current: number; total: number }>('download_progress', (event) => {
-			updateDownload(event.payload.url, (event.payload.current / event.payload.total) * 100)
-		})
-		return () => {
-			unlisten.then((fn) => fn())
 		}
 	}, [])
 

@@ -10,6 +10,9 @@ export default function MeetingBrowserCloseGate() {
 	// Rust holds the window in `prevent_close` until this gate answers. A second click while the
 	// dialog is open must not open a second one or send the confirmation twice.
 	const closePending = useRef(false)
+	// The same guard for the load failure: two sessions failing (or the next one failing while the
+	// dialog is still up) must not stack dialogs whose answers contradict each other.
+	const loadPending = useRef(false)
 
 	useEffect(() => {
 		let disposed = false
@@ -32,6 +35,9 @@ export default function MeetingBrowserCloseGate() {
 					await confirmMeetingBrowserClose(event.payload.session, stopAndClose)
 				} catch (error) {
 					console.error('could not close the meeting browser:', error)
+					// Rust holds the window in `prevent_close`: an unanswered request leaves it stuck
+					// with no way out, so keep the recording running and close it best-effort instead.
+					await confirmMeetingBrowserClose(event.payload.session, false).catch(() => undefined)
 				} finally {
 					closePending.current = false
 				}
@@ -40,17 +46,21 @@ export default function MeetingBrowserCloseGate() {
 
 		track(
 			listen<{ session: number }>('meeting-browser-load-failed', async (event) => {
-				// OK retries the page, cancel closes the window instead of leaving a blank surface.
-				const retry = await ask(m.meetingBrowserLoadFailedBody(), {
-					title: m.meetingBrowserLoadFailedTitle(),
-					kind: 'error',
-					okLabel: m.meetingBrowserRetry(),
-					cancelLabel: m.meetingBarClose(),
-				})
+				if (loadPending.current) return
+				loadPending.current = true
 				try {
+					// OK retries the page, cancel closes the window instead of leaving a blank surface.
+					const retry = await ask(m.meetingBrowserLoadFailedBody(), {
+						title: m.meetingBrowserLoadFailedTitle(),
+						kind: 'error',
+						okLabel: m.meetingBrowserRetry(),
+						cancelLabel: m.meetingBarClose(),
+					})
 					await (retry ? retryMeetingBrowser(event.payload.session) : closeMeetingBrowser(event.payload.session))
 				} catch (error) {
 					console.error('could not recover the meeting browser:', error)
+				} finally {
+					loadPending.current = false
 				}
 			}),
 		)

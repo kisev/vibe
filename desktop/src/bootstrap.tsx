@@ -4,6 +4,7 @@ import { unregisterAll } from '@tauri-apps/plugin-global-shortcut'
 import './globals.css'
 import { CONFIG_KEYS } from './lib/config-keys'
 import { loadConfigStore, readConfig } from './lib/config-store'
+import { initDownloadEvents } from './lib/downloads'
 import { getLocale, getTextDirection, isLocale, setLocale } from './paraglide/runtime.js'
 import { runMigrations } from './lib/migrations'
 import Root from './root'
@@ -56,12 +57,19 @@ async function start() {
 		const session = Number(rawSession)
 		if (rawSession === null || rawSession === '' || !Number.isSafeInteger(session) || session < 0) {
 			console.error('browser window opened without a valid session id:', window.location.search)
+			// Nothing would ever render here; close the orphan window instead of leaving a blank surface.
+			void getCurrentWindow()
+				.close()
+				.catch((error) => console.error('failed to close the orphan browser window:', error))
 			return
 		}
 		ReactDOM.createRoot(root).render(<BrowserWindow session={session} />)
 		return
 	}
 	await loadConfigStore()
+	// One bridge from the Rust download event into the registry, owned by the shell: `/setup`
+	// also downloads models, and the settings view that used to listen is not mounted there.
+	initDownloadEvents()
 	// Migrations write through the same store and can change the saved locale, so the
 	// appearance is applied after them — both still run before the first paint.
 	runMigrations()

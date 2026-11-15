@@ -10,6 +10,7 @@ import { MeetingBrowserSettings } from './meeting-browser'
 const mocks = vi.hoisted(() => ({
 	invoke: vi.fn(),
 	listeners: new Map<string, (event: { payload: unknown }) => void>(),
+	resourceFilterSupported: true,
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }))
@@ -27,7 +28,9 @@ const blocked = ['cdn.other.test']
 beforeEach(() => {
 	mocks.invoke.mockReset()
 	mocks.listeners.clear()
+	mocks.resourceFilterSupported = true
 	mocks.invoke.mockImplementation(async (command: string, args?: { host?: string }) => {
+		if (command === 'browser_resource_filter_supported') return mocks.resourceFilterSupported
 		if (command === 'browser_allowed_hosts') return [...stored]
 		if (command === 'browser_blocked_hosts') return [...blocked]
 		if (command === 'browser_allow_host') return [...new Set([...stored, String(args?.host ?? '')])]
@@ -128,5 +131,17 @@ describe('blocking policy', () => {
 		const select = (await screen.findByLabelText(m.browserPolicy())) as HTMLSelectElement
 		await userEvent.selectOptions(select, 'trusted-site')
 		await waitFor(() => expect(screen.queryByText(m.browserBlockedHosts())).toBeNull())
+	})
+
+	it('disables strict where the platform has no resource filter', async () => {
+		mocks.resourceFilterSupported = false
+		renderSettings()
+		const select = (await screen.findByLabelText(m.browserPolicy())) as HTMLSelectElement
+		const strict = select.querySelector('option[value="strict"]') as HTMLOptionElement
+		const trustedSite = select.querySelector('option[value="trusted-site"]') as HTMLOptionElement
+
+		await waitFor(() => expect(strict.disabled).toBe(true))
+		expect(trustedSite.disabled).toBe(false)
+		expect(screen.getByText(`${m.browserPolicyStrict()} — ${m.permissionNotApplicable()}`)).toBeTruthy()
 	})
 })

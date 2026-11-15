@@ -22,8 +22,10 @@ export function useSingleInstance({ setFiles }: UseSingleInstanceProps) {
 			const argv = event.payload
 			const action = argv?.[1]
 
-			// A meeting scheme or https link handed over by the system's handler.
-			if (action) await handOffMeetingLaunchArg(action)
+			// A meeting scheme or https link handed over by the system's handler. It is not a file
+			// to transcribe, so stop here — a URL ending in a media extension would otherwise be
+			// added below as a broken local path, exactly as the deep-link handler avoids.
+			if (action && (await handOffMeetingLaunchArg(action))) return
 
 			// vibe://download/?url=google.com
 			// already handled in deep links in macos

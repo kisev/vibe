@@ -46,8 +46,13 @@ function mergeCatalogs(handy, vibe) {
 			if (!seenFiles.has(`${model.repository}@${model.revision}/${file.filename}`)) novel[quant] = file
 		}
 		if (Object.keys(novel).length === 0) continue
-		if (Object.keys(novel).length !== Object.keys(model.files).length) continue // partial overlap: data bug, skip loudly
-		seenFiles.add(identityKey(model, model.quant))
+		if (Object.keys(novel).length !== Object.keys(model.files).length) {
+			console.warn(`models docs: vibe model ${model.id} partially overlaps the handy layer; skipping`)
+			continue
+		}
+		// Register every file, not just the default quant: a later entry reusing another file of
+		// this model must count as a duplicate too.
+		for (const quant of Object.keys(model.files)) seenFiles.add(identityKey(model, quant))
 		models.push(model)
 	}
 	return { schema: handy.schema, models, results: handy.results ?? {} }
@@ -126,7 +131,6 @@ function entryBlock(model, curated) {
 		.join(' · ')
 	const notes = []
 	if (model.capabilities?.streaming) notes.push('Supports streaming.')
-	if (!engineAtLeast(model.minEngine)) notes.push(`Requires transcribe.cpp ${model.minEngine}; the bundled engine is ${ENGINE_VERSION}, so it cannot load yet.`)
 	const heading = curated ? `### ${FAMILY_EMOJI[model.family] ?? '⭐'} ${model.name}` : `### ${model.name}`
 	const links = [`[👉 View Model](https://huggingface.co/${model.repository}/tree/${model.revision})`]
 	const quants = [
@@ -166,7 +170,7 @@ function render(markdown) {
 	const page = `${head}${AVAILABLE_HEADING}\n\n${blocks.join('\n\n')}\n\n${tail}`
 	return {
 		page,
-		counts: { documented: asr.length, curated: curated.length, legacy: 0, handy: handy.models.length, vibeKept: merged.models.length - handy.models.length },
+		counts: { documented: asr.length, curated: curated.length, handy: handy.models.length, vibeKept: merged.models.length - handy.models.length },
 	}
 }
 
@@ -182,7 +186,7 @@ if (process.argv[2] === 'check') {
 } else if (process.argv[2] === undefined) {
 	writeFileSync(docsPath, page)
 	console.log(
-		`rendered ${docsPath}: ${counts.documented} ASR entries (${counts.curated} curated, ${counts.legacy} legacy) from ${counts.handy} handy + ${counts.vibeKept} vibe models`,
+		`rendered ${docsPath}: ${counts.documented} ASR entries (${counts.curated} curated) from ${counts.handy} handy + ${counts.vibeKept} vibe models`,
 	)
 } else {
 	console.error('usage: generate-models-docs.mjs [check]')

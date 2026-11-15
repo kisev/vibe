@@ -14,15 +14,18 @@ export function WhisperOptionsSection({ vm }: { vm: SettingsViewModel }) {
 	const maxThreads = Math.max(1, navigator.hardwareConcurrency || 8)
 	const promptLength = vm.preference.modelOptions?.init_prompt?.length ?? 0
 
-	// Models that report no decoding options reject or ignore these controls. Reaching this page
-	// with one selected (for example from a stale deep link) shows why, not dead controls.
-	const whisperOnlyHidden = hidesDecodingOptions(vm.preference.modelMetadata?.capabilities)
+	// Each option follows its own capability: translation and prompts stay available on models
+	// without Whisper-style decoding, exactly as `withoutUnsupportedOptions` sends them.
+	const capabilities = vm.preference.modelMetadata?.capabilities
+	const hidesDecoding = hidesDecodingOptions(capabilities)
+	const hidesTranslation = capabilities?.translation === false
+	const hidesPrompts = capabilities?.text_prompts === false
 
 	return (
 		<div className="space-y-6">
 			<SettingsGroup>
-				{whisperOnlyHidden && <SettingsNote>{m.whisperOnlyOptionsNote()}</SettingsNote>}
-				{!whisperOnlyHidden && (
+				{hidesDecoding && <SettingsNote>{m.whisperOnlyOptionsNote()}</SettingsNote>}
+				{!hidesTranslation && (
 					<>
 						<SettingsRow label={m.translateToEnglish()} description={m.infoTranslateToEnglish()}>
 							<Switch
@@ -31,34 +34,36 @@ export function WhisperOptionsSection({ vm }: { vm: SettingsViewModel }) {
 							/>
 						</SettingsRow>
 						{vm.preference.modelOptions.translate && <SettingsNote>{m.translateWhisperModelNote()}</SettingsNote>}
-
-						<SettingsRow label={m.useWordTimestamps()} description={m.infoUseWordTimestamps()}>
-							<Switch
-								checked={Boolean(vm.preference.modelOptions.word_timestamps)}
-								onCheckedChange={(checked) => vm.preference.setModelOptions({ ...vm.preference.modelOptions, word_timestamps: checked })}
-							/>
-						</SettingsRow>
-
-						<SettingsField
-							label={m.prompt()}
-							description={m.infoPrompt()}
-							footer={promptLength > 0 ? `${1024 - promptLength} ${m.characters()} ${m.leftover().toLowerCase()}` : undefined}>
-							<Textarea
-								value={vm.preference.modelOptions?.init_prompt}
-								onChange={(e) => vm.preference.setModelOptions({ ...vm.preference.modelOptions, init_prompt: e.target.value.slice(0, 1024) })}
-								placeholder={m.promptPlaceholder()}
-								className={textareaClass}
-							/>
-						</SettingsField>
-						{vm.preference.modelMetadata?.capabilities.text_prompts === false && promptLength > 0 && (
-							<SettingsNote>{m.promptIgnoredByModel()}</SettingsNote>
-						)}
 					</>
 				)}
+
+				{!hidesDecoding && (
+					<SettingsRow label={m.useWordTimestamps()} description={m.infoUseWordTimestamps()}>
+						<Switch
+							checked={Boolean(vm.preference.modelOptions.word_timestamps)}
+							onCheckedChange={(checked) => vm.preference.setModelOptions({ ...vm.preference.modelOptions, word_timestamps: checked })}
+						/>
+					</SettingsRow>
+				)}
+
+				{!hidesPrompts && (
+					<SettingsField
+						label={m.prompt()}
+						description={m.infoPrompt()}
+						footer={promptLength > 0 ? `${1024 - promptLength} ${m.characters()} ${m.leftover().toLowerCase()}` : undefined}>
+						<Textarea
+							value={vm.preference.modelOptions?.init_prompt}
+							onChange={(e) => vm.preference.setModelOptions({ ...vm.preference.modelOptions, init_prompt: e.target.value.slice(0, 1024) })}
+							placeholder={m.promptPlaceholder()}
+							className={textareaClass}
+						/>
+					</SettingsField>
+				)}
+				{capabilities?.text_prompts === false && promptLength > 0 && <SettingsNote>{m.promptIgnoredByModel()}</SettingsNote>}
 			</SettingsGroup>
 
 			<SettingsGroup title={m.advanced()}>
-				{!whisperOnlyHidden && (
+				{!hidesDecoding && (
 					<>
 						<SettingsRow label={m.temperature()} description={m.infoTemperature()}>
 							<NumberField
@@ -94,7 +99,7 @@ export function WhisperOptionsSection({ vm }: { vm: SettingsViewModel }) {
 					/>
 				</SettingsRow>
 			</SettingsGroup>
-			{!whisperOnlyHidden && (
+			{!hidesDecoding && (
 				<SettingsGroup>
 					<ActionRow
 						label={m.resetWhisperOptions()}

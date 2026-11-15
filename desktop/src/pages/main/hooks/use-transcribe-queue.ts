@@ -162,12 +162,11 @@ export async function buildSharedOptions(preference: Preference) {
 	// Null it out when the model is not usable, so the type itself carries the invariant and the
 	// spread below cannot send a path that failed the check.
 	let diarizeModel = preference.diarizeEnabled && modelsFolder ? `${modelsFolder}/${config.diarizeModelFilename}` : null
-	if (diarizeModel) {
-		try {
-			if (!(await isModelFileUsable(diarizeModel))) diarizeModel = null
-		} catch {
-			// The check is a guard, not a gate: if it cannot run, behave as before and send it.
-		}
+	// The check is a guard, not a gate: if it cannot run, behave as before and send the path.
+	if (diarizeModel && !(await isModelFileUsable(diarizeModel).catch(() => true))) {
+		// Running without speakers while the switch is on reads as a broken feature, so say why.
+		diarizeModel = null
+		toast.warning(m.diarizationMigratedOff(), { position: 'bottom-center' })
 	}
 	const ffmpeg = preference.ffmpegOptions
 	const wantsProcessing = Boolean(ffmpeg) && (ffmpeg.normalize_loudness || (ffmpeg.custom_command ?? '').trim().length > 0)

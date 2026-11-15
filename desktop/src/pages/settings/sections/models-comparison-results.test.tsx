@@ -76,8 +76,8 @@ describe('comparison results', () => {
 		renderResults([
 			run('Alpha', {
 				segments: [
-					{ start: 0, stop: 1, text: 'hello', speaker: 0 },
-					{ start: 1, stop: 2, text: 'there', speaker: 1 },
+					{ start: 0, stop: 1, text: 'hello', speaker: 1 },
+					{ start: 1, stop: 2, text: 'there', speaker: 2 },
 				],
 			}),
 		])

@@ -10,6 +10,7 @@ import { Spinner } from '~/components/ui/spinner'
 import { Switch } from '~/components/ui/switch'
 import { SettingsGroup, SettingsNote, SettingsRow } from './shared'
 import { Button } from '~/components/ui/button'
+import { errorMessage } from '~/lib/errors'
 import { PhoneIllustration, PhonePairingPanel } from './phone-pairing'
 
 /* -------------------------------------------------------------------------- */
@@ -65,12 +66,6 @@ function normalizeStatus(payload: HandoffStatusPayload): HandoffStatus {
 		pairingId: payload.pairingId ?? payload.pairing_id ?? null,
 		devices: payload.devices ?? [],
 	}
-}
-
-function errorMessage(error: unknown): string {
-	if (typeof error === 'string') return error
-	if (error && typeof error === 'object' && 'message' in error) return String((error as { message: unknown }).message)
-	return String(error)
 }
 
 /** The backend half of this feature may not be in the build yet — tell them so instead of crashing. */

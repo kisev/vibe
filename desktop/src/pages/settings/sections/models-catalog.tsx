@@ -17,6 +17,7 @@ import {
 import { deleteModelFile, downloadModel, getModelDisplayName } from '~/lib/model'
 import type { ModelDownload } from '~/lib/config'
 import { cn } from '~/lib/style'
+import { errorMessage } from '~/lib/errors'
 import { Badge } from '~/components/ui/badge'
 import { Input } from '~/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
@@ -104,7 +105,18 @@ interface Renaming {
 }
 
 /** A trash button that asks for a second click before deleting — one icon, no dialog. */
-function DeleteAction({ label, onConfirm, disabled }: { label: string; onConfirm: () => void; disabled?: boolean }) {
+function DeleteAction({
+	label,
+	onConfirm,
+	disabled,
+	disabledReason,
+}: {
+	label: string
+	onConfirm: () => void
+	disabled?: boolean
+	/** Why the action is unavailable, shown on the icon instead of the plain label. */
+	disabledReason?: string
+}) {
 	const [confirming, setConfirming] = useState(false)
 	useEffect(() => {
 		if (!confirming) return
@@ -122,7 +134,14 @@ function DeleteAction({ label, onConfirm, disabled }: { label: string; onConfirm
 			}}
 		/>
 	) : (
-		<IconAction variant="outline" label={label} icon={<Trash2 className="h-4 w-4" />} disabled={disabled} onClick={() => setConfirming(true)} />
+		<IconAction
+			variant="outline"
+			label={disabled ? (disabledReason ?? label) : label}
+			title={disabled ? disabledReason : undefined}
+			icon={<Trash2 className="h-4 w-4" />}
+			disabled={disabled}
+			onClick={() => setConfirming(true)}
+		/>
 	)
 }
 
@@ -148,6 +167,8 @@ function QuantItem({
 	file,
 	installed,
 	downloadDisabled,
+	deleteDisabled,
+	deleteReason,
 	onDownload,
 	onDelete,
 }: {
@@ -155,6 +176,9 @@ function QuantItem({
 	file: CatalogFileEntry
 	installed: boolean
 	downloadDisabled: boolean
+	/** The active model's file: deleting it would leave the persisted path dangling. */
+	deleteDisabled: boolean
+	deleteReason: string
 	onDownload: () => void
 	onDelete: () => void
 }) {
@@ -173,8 +197,10 @@ function QuantItem({
 			{installed ? (
 				<button
 					type="button"
-					aria-label={m.catalogDelete()}
-					className="ms-auto flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+					aria-label={deleteDisabled ? deleteReason : m.catalogDelete()}
+					title={deleteDisabled ? deleteReason : undefined}
+					disabled={deleteDisabled}
+					className="ms-auto flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
 					{...itemButtonProps(onDelete)}>
 					<Trash2 className="h-3.5 w-3.5" />
 				</button>
@@ -196,38 +222,46 @@ function CatalogCard({
 	model,
 	installedEntry,
 	installedNames,
-	pathOf,
+	entryOf,
 	active,
+	activePath,
 	onDownload,
 	onDelete,
 	onSelect,
 	onOpenFolder,
-	renaming,
+	renamingFor,
 }: {
 	model: CatalogModel
-	/** The installed file of this entry, when any quant is already on disk. */
+	/** The installed file of this entry, when any quant is already on disk; drives the card highlight. */
 	installedEntry?: NamedPath
 	/** Every installed file name; drives per-quant install state. */
 	installedNames: Set<string>
-	/** Path of an installed file name, for delete actions. */
-	pathOf: (filename: string) => string | undefined
+	/** The installed file for a catalog filename, so actions target the selected quant. */
+	entryOf: (filename: string) => NamedPath | undefined
+	/** Any file of this entry is the active model. */
 	active: boolean
+	/** The persisted active model path; it is never deletable from here. */
+	activePath: string | null
 	onDownload: (download: ModelDownload) => void
 	onDelete: (paths: string[]) => void
 	onSelect: (path: string) => void
 	onOpenFolder: (path: string) => void
-	renaming: Renaming | undefined
+	renamingFor: (entry: NamedPath) => Renaming
 }) {
 	const [quant, setQuant] = useState(defaultQuant(model))
 	const file = model.files[quant] ?? Object.values(model.files)[0]
+	// The selected quant owns the install state and is the target of every card action.
+	const selectedEntry = file ? entryOf(file.filename) : undefined
+	const selectedIsActive = Boolean(selectedEntry && selectedEntry.path === activePath)
 	const status = availability(model, quant)
 	const limitations = catalogLimitations(model)
-	const thisQuantInstalled = Boolean(file && installedNames.has(file.filename))
-	// Every copy of this entry on disk — the model-level delete removes them all.
+	const thisQuantInstalled = Boolean(selectedEntry)
+	// Every copy of this entry on disk the delete may remove — the active model's file stays.
 	const installedPaths = Object.values(model.files)
 		.filter((candidate) => installedNames.has(candidate.filename))
-		.map((candidate) => pathOf(candidate.filename))
-		.filter((path): path is string => path !== undefined)
+		.map((candidate) => entryOf(candidate.filename)?.path)
+		.filter((path): path is string => path !== undefined && path !== activePath)
+	const renaming = selectedEntry ? renamingFor(selectedEntry) : undefined
 
 	return (
 		<div
@@ -264,38 +298,43 @@ function CatalogCard({
 									quant={candidate}
 									file={candidateFile}
 									installed={installedNames.has(candidateFile.filename)}
-									downloadDisabled={!status.ok}
+									// Availability is per file: a mixed-format catalog entry can have one
+									// candidate the engine cannot load and another it can.
+									downloadDisabled={!availability(model, candidate).ok}
+									deleteDisabled={entryOf(candidateFile.filename)?.path === activePath}
+									deleteReason={m.catalogActive()}
 									onDownload={() =>
 										onDownload({ url: fileUrl(model, candidateFile), size: candidateFile.size, sha256: candidateFile.sha256 })
 									}
 									onDelete={() => {
-										const path = pathOf(candidateFile.filename)
-										if (path) onDelete([path])
+										const installed = entryOf(candidateFile.filename)
+										if (installed && installed.path !== activePath) onDelete([installed.path])
 									}}
 								/>
 							))}
 						</SelectContent>
 					</Select>
-					{thisQuantInstalled ? (
+					{thisQuantInstalled && selectedEntry ? (
 						renaming?.editing ? (
 							<RenameControls value={renaming.name} onChange={renaming.setName} onCommit={renaming.commit} onCancel={renaming.cancel} />
 						) : (
 							<>
-								{!active && (
-									<IconAction
-										label={m.catalogUse()}
-										icon={<Check className="h-4 w-4" />}
-										onClick={() => installedEntry && onSelect(installedEntry.path)}
-									/>
+								{!selectedIsActive && (
+									<IconAction label={m.catalogUse()} icon={<Check className="h-4 w-4" />} onClick={() => onSelect(selectedEntry.path)} />
 								)}
 								<IconAction variant="outline" label={m.rename()} icon={<Pencil className="h-4 w-4" />} onClick={renaming?.start} />
 								<IconAction
 									variant="outline"
 									label={m.showInFolder()}
 									icon={<FolderOpen className="h-4 w-4" />}
-									onClick={() => installedEntry && onOpenFolder(installedEntry.path)}
+									onClick={() => onOpenFolder(selectedEntry.path)}
 								/>
-								<DeleteAction label={m.catalogDeleteModel()} onConfirm={() => onDelete(installedPaths)} />
+								<DeleteAction
+									label={m.catalogDeleteModel()}
+									disabled={installedPaths.length === 0}
+									disabledReason={m.catalogActive()}
+									onConfirm={() => onDelete(installedPaths)}
+								/>
 							</>
 						)
 					) : (
@@ -363,7 +402,12 @@ function ExtraCard({
 								icon={<FolderOpen className="h-4 w-4" />}
 								onClick={() => onOpenFolder(entry.path)}
 							/>
-							<DeleteAction label={m.catalogDeleteModel()} onConfirm={() => onDelete([entry.path])} />
+							<DeleteAction
+								label={m.catalogDeleteModel()}
+								disabled={active}
+								disabledReason={m.catalogActive()}
+								onConfirm={() => onDelete([entry.path])}
+							/>
 						</>
 					)}
 				</div>
@@ -406,7 +450,8 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 
 	const installedByName = useMemo(() => new Map(vm.models.map((entry) => [entry.name, entry])), [vm.models])
 	const installedNames = useMemo(() => new Set(installedByName.keys()), [installedByName])
-	const onDiskPathOf = (filename: string): string | undefined => installedByName.get(filename)?.path
+	const entryOf = (filename: string): NamedPath | undefined => installedByName.get(filename)
+	const activePath = vm.preference.modelPath
 	/** The installed file of a catalog entry, when any quant is already on disk. */
 	const installedFileOf = (model: CatalogModel): NamedPath | undefined => {
 		for (const file of Object.values(model.files)) {
@@ -451,19 +496,21 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 			}
 		} catch (error) {
 			console.error('failed to download the catalog model:', error)
-			toast.error(String(error))
+			toast.error(errorMessage(error))
 		}
 	}
 
-	/** Remove the file(s) from disk and refresh the list; the active model is never deletable from here. */
+	/** Remove the file(s) from disk and refresh the list; the active model is filtered out so it is never deletable from here. */
 	async function removeFiles(paths: string[]) {
+		const deletable = paths.filter((path) => path !== activePath)
+		if (deletable.length === 0) return
 		try {
-			await Promise.all(paths.map((path) => deleteModelFile(path)))
+			await Promise.all(deletable.map((path) => deleteModelFile(path)))
 			toast.success(m.catalogDeleted())
 			await vm.loadModels()
 		} catch (error) {
 			console.error('failed to delete the model file:', error)
-			toast.error(String(error))
+			toast.error(errorMessage(error))
 		}
 	}
 
@@ -528,7 +575,7 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 				<ExtraCard
 					key={entry.path}
 					entry={entry}
-					active={entry.path === vm.preference.modelPath}
+					active={entry.path === activePath}
 					displayName={vm.preference.modelDisplayNames[entry.path] ?? getModelDisplayName(entry.name)}
 					onDelete={removeFiles}
 					onSelect={vm.selectModel}
@@ -546,19 +593,15 @@ export function ModelsCatalogSection({ vm, models = asrCatalog() }: { vm: Settin
 								model={model}
 								installedEntry={installedEntry}
 								installedNames={installedNames}
-								pathOf={onDiskPathOf}
-								active={Boolean(installedEntry && installedEntry.path === vm.preference.modelPath)}
+								entryOf={entryOf}
+								active={Object.values(model.files).some((candidate) => entryOf(candidate.filename)?.path === activePath)}
+								activePath={activePath}
 								onDownload={startDownload}
 								onDelete={removeFiles}
 								onSelect={vm.selectModel}
 								onOpenFolder={vm.openSelectedModel}
-								renaming={
-									installedEntry
-										? renamingFor(
-												installedEntry.path,
-												vm.preference.modelDisplayNames[installedEntry.path] ?? getModelDisplayName(installedEntry.name),
-											)
-										: undefined
+								renamingFor={(entry) =>
+									renamingFor(entry.path, vm.preference.modelDisplayNames[entry.path] ?? getModelDisplayName(entry.name))
 								}
 							/>
 						)

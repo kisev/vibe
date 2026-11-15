@@ -11,7 +11,7 @@ import { Spinner } from '~/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/style'
 import { parseMediaLinks } from '~/lib/ytdlp'
-import { normalizeMeetingUrl, openMeetingBrowser, openMeetingLink } from '~/lib/meeting-browser'
+import { openMeetingBrowser, openMeetingLink, resolveMeetingAddress } from '~/lib/meeting-browser'
 import { useSession, type IdlePanel } from '../session'
 import QuietRow from './quiet-row'
 
@@ -127,17 +127,14 @@ function BrowserPanel() {
 	const [error, setError] = useState<string | null>(null)
 
 	async function open() {
-		// The embedded page loads https only: a pasted http link is upgraded, and a Zoom/Teams/Webex
-		// scheme link is mapped by Rust the same way it maps one arriving from the system.
-		const normalized = normalizeMeetingUrl(url).replace(/^http:\/\//i, 'https://')
-		if (!normalized) {
-			setError(m.meetingBrowserInvalidLink({ reason: url.trim() }))
-			return
-		}
+		// A web link opens in the embedded window; a Zoom/Teams/Webex scheme is mapped by Rust the
+		// same way it maps one arriving from the system. Both forms come from the shared resolver.
+		const target = resolveMeetingAddress(url)
 		setError(null)
+		if (!target) return
 		try {
-			if (normalized.startsWith('https://')) await openMeetingBrowser(normalized)
-			else await openMeetingLink(normalized)
+			if (target.kind === 'web') await openMeetingBrowser(target.url)
+			else await openMeetingLink(target.url)
 			setUrl('')
 		} catch (reason) {
 			setError(reason instanceof Error ? reason.message : String(reason))

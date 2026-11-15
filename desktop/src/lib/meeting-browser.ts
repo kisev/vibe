@@ -3,8 +3,8 @@ import { message } from '@tauri-apps/plugin-dialog'
 import { m } from '~/paraglide/messages.js'
 import type { AudioDevice } from './audio'
 import { CONFIG_KEYS } from './config-keys'
-import { readConfig, writeConfig } from './config-store'
-import { resolveSelection } from './device-selection'
+import { writeConfig } from './config-store'
+import { resolveConfiguredSelection } from './device-selection'
 
 /** The Rust-side session record, mirrored for the frontend. */
 export interface BrowserSessionInfo {
@@ -115,6 +115,18 @@ export function normalizeMeetingUrl(raw: string): string {
 	return hasScheme ? trimmed : `https://${trimmed}`
 }
 
+/**
+ * What a pasted address should open as: a web page the meeting window can load, or a scheme
+ * Rust maps. `https://` is the only web scheme the page webview loads, so an `http` (or an
+ * uppercase `HTTPS`) link is upgraded here and nowhere else. Empty input resolves to `null`.
+ */
+export function resolveMeetingAddress(raw: string): { kind: 'web' | 'scheme'; url: string } | null {
+	const normalized = normalizeMeetingUrl(raw)
+	if (!normalized) return null
+	if (/^https?:\/\//i.test(normalized)) return { kind: 'web', url: normalized.replace(/^https?:\/\//i, 'https://') }
+	return { kind: 'scheme', url: normalized }
+}
+
 /** Hand a scheme or web link to the Rust side, which maps it and picks the window. */
 export const openMeetingLink = (raw: string) => invoke<BrowserSessionInfo | null>('open_meeting_link', { raw })
 
@@ -163,45 +175,26 @@ export interface RecordingDeviceState {
  */
 export async function readRecordingDeviceState(): Promise<RecordingDeviceState> {
 	const devices = await invoke<AudioDevice[]>('get_audio_devices')
-	const hiddenInputDevices = readConfig<string[]>(CONFIG_KEYS.hiddenInputDevices, [])
-	const hiddenOutputDevices = readConfig<string[]>(CONFIG_KEYS.hiddenOutputDevices, [])
-	const input = resolveSelection(
-		devices.filter((device) => device.isInput),
-		readConfig<string | null>(CONFIG_KEYS.inputDeviceName, null),
-		hiddenInputDevices,
-	)
-	const output = resolveSelection(
-		devices.filter((device) => !device.isInput),
-		readConfig<string | null>(CONFIG_KEYS.outputDeviceName, null),
-		hiddenOutputDevices,
-	)
+	const input = resolveConfiguredSelection(devices, 'input')
+	const output = resolveConfiguredSelection(devices, 'output')
 	return {
 		devices,
 		input: input.device,
 		output: output.device,
 		inputUnavailableName: input.unavailableName,
 		outputUnavailableName: output.unavailableName,
-		hiddenInputDevices,
-		hiddenOutputDevices,
+		hiddenInputDevices: input.hiddenNames,
+		hiddenOutputDevices: output.hiddenNames,
 	}
 }
 
 /**
  * Persist a picker choice under the same keys and convention the main window uses: an empty name
- * means "no device" and the system default is never written.
+ * is an explicit "no device", `null` (nothing chosen) writes the same explicit "none". The system
+ * default is never written, so `resolveSelection` keeps reading the saved name as a pin.
  */
 export function writeRecordingDeviceSelection(type: 'input' | 'output', name: string | null): void {
 	writeConfig(type === 'input' ? CONFIG_KEYS.inputDeviceName : CONFIG_KEYS.outputDeviceName, name ?? '')
-}
-
-/** Select a device the user had hidden, removing it from that direction's hidden list. */
-export function restoreRecordingDevice(type: 'input' | 'output', name: string): void {
-	const hiddenKey = type === 'input' ? CONFIG_KEYS.hiddenInputDevices : CONFIG_KEYS.hiddenOutputDevices
-	writeConfig(
-		hiddenKey,
-		readConfig<string[]>(hiddenKey, []).filter((hidden) => hidden !== name),
-	)
-	writeRecordingDeviceSelection(type, name)
 }
 
 /** What the main window reports about the recording it owns, for the chrome to mirror. */

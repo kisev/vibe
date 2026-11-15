@@ -15,7 +15,9 @@ import { getMediaDurationSeconds } from '~/lib/media'
 import { getModelDisplayName } from '~/lib/model'
 import { runComparison, tauriComparisonIo, type ComparisonModel, type ComparisonRun } from '~/lib/model-comparison'
 import { cn } from '~/lib/style'
+import { errorMessage } from '~/lib/errors'
 import { useRecording } from '~/pages/home/hooks/use-recording'
+import { setComparisonClipPending } from '~/pages/recording-ownership'
 import { Button } from '~/components/ui/button'
 import { Switch } from '~/components/ui/switch'
 import { IconAction, SettingsField, SettingsGroup, SettingsRow, type SettingsViewModel } from './shared'
@@ -99,13 +101,20 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 			// must not hijack the lab with a clip the user never chose here.
 			if (!awaitingRef.current) return
 			awaitingRef.current = false
-			setPhase('idle')
-			const named = await pathToNamedPath(payload.path)
-			setInput({ name: named.name, path: named.path, duration: await getMediaDurationSeconds(payload.path) })
-			setRuns([])
+			try {
+				setPhase('idle')
+				const named = await pathToNamedPath(payload.path)
+				setInput({ name: named.name, path: named.path, duration: await getMediaDurationSeconds(payload.path) })
+				setRuns([])
+			} finally {
+				// The main window's listener reads this flag; it must cover the whole delivery.
+				setComparisonClipPending(false)
+			}
 		})
 		return () => {
 			unlisten.then((fn) => fn())
+			// A lab closed while awaiting its clip must not keep the next recording from being saved.
+			setComparisonClipPending(false)
 		}
 	}, [])
 
@@ -128,17 +137,27 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 		setRuns([])
 	}
 
-	function startRecording() {
+	async function startRecording() {
 		setPhase('recording')
-		void recording.startRecord()
+		// startRecord reports a blocked start (a missing pinned device, a refused permission)
+		// instead of throwing, so the button never sticks on Stop without a recording behind it.
+		if (!(await recording.startRecord())) setPhase('idle')
 	}
 
 	async function stopRecording() {
 		// Arm the listener before asking the recorder to stop: record_finish can arrive
 		// before stopRecord resolves, and an arrived clip must not be dropped.
 		awaitingRef.current = true
+		// Claim the clip: the main window's listener would otherwise save it as a project and
+		// move the temp file out from under this section.
+		setComparisonClipPending(true)
 		setPhase('awaiting')
-		await recording.stopRecord()
+		if (!(await recording.stopRecord())) {
+			// The stop failed and no clip will arrive; drop the armed listener instead of spinning forever.
+			awaitingRef.current = false
+			setComparisonClipPending(false)
+			setPhase('idle')
+		}
 	}
 
 	function resetInput() {
@@ -196,7 +215,7 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 			// A setup failure (the comparisons folder) never reaches the per-run catch, so
 			// end the spinner here instead of leaving every row running forever.
 			setRuns((previous) =>
-				previous.map((candidate) => (candidate.status === 'done' ? candidate : { ...candidate, status: 'error', error: String(error) })),
+				previous.map((candidate) => (candidate.status === 'done' ? candidate : { ...candidate, status: 'error', error: errorMessage(error) })),
 			)
 		} finally {
 			setRunning(false)

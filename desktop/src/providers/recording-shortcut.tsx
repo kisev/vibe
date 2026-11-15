@@ -5,8 +5,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { toast } from 'sonner'
 import { type AudioDevice } from '~/lib/audio'
 import { CONFIG_KEYS } from '~/lib/config-keys'
-import { resolveSelection } from '~/lib/device-selection'
-import { readConfig, usePersisted } from '~/lib/config-store'
+import { resolveConfiguredSelection } from '~/lib/device-selection'
+import { usePersisted } from '~/lib/config-store'
 import { getDefaultRecordingShortcut } from '~/lib/config'
 import type { MeetingRecordingOptions } from '~/lib/meeting-prompt'
 import { ensureSystemAudioPermission } from '~/lib/permissions'
@@ -71,15 +71,14 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 		startingRef.current = true
 		try {
 			const devices = await invoke<AudioDevice[]>('get_audio_devices')
-			const savedName = readConfig<string | null>(CONFIG_KEYS.inputDeviceName, null)
-			const hiddenNames = readConfig<string[]>(CONFIG_KEYS.hiddenInputDevices, [])
-			const microphone = resolveSelection(
-				devices.filter((device) => device.isInput),
-				savedName,
-				hiddenNames,
-			).device
-			const systemAudio = devices.find((device) => device.isDefault && !device.isInput)
-			if (options.microphone && !microphone) throw new Error(m.noDefaultMicrophone())
+			const input = resolveConfiguredSelection(devices, 'input')
+			const microphone = input.device
+			// The output follows the same pin policy as the main window: a user who picked "None"
+			// does not want a shortcut capturing their system audio either.
+			const systemAudio = resolveConfiguredSelection(devices, 'output').device
+			if (options.microphone && !microphone) {
+				throw new Error(input.savedName ? m.pinnedDeviceMissing({ name: input.savedName }) : m.noDefaultMicrophone())
+			}
 			if (options.systemAudio && !systemAudio) throw new Error(m.systemAudioPermissionInfo())
 			if (options.systemAudio && !(await ensureSystemAudioPermission())) return false
 			const selectedDevices = [options.microphone ? microphone : null, options.systemAudio ? systemAudio : null].filter(

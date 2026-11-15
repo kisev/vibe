@@ -168,7 +168,14 @@ class OpenAICompatible implements AiClient {
 	private body(prompt: string, stream: boolean) {
 		// OpenAI's newer models reject `max_tokens` and require `max_completion_tokens` (#1667), but
 		// many OpenAI-compatible servers only know `max_tokens`, so the new name goes to OpenAI alone.
-		const limitKey = new URL(this.url()).hostname === 'api.openai.com' ? 'max_completion_tokens' : 'max_tokens'
+		let limitKey = 'max_tokens'
+		try {
+			// Trailing-dot and case variants are the same host; a base URL without a scheme is left
+			// to fetch, which reports it with the request context instead of a local TypeError here.
+			if (new URL(this.url()).hostname.replace(/\.$/, '') === 'api.openai.com') limitKey = 'max_completion_tokens'
+		} catch {
+			// keep `max_tokens` for a URL this code cannot parse
+		}
 		return JSON.stringify({
 			model: this.connection.model,
 			[limitKey]: outputTokens(this.connection.contextTokens),

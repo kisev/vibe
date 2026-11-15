@@ -146,6 +146,51 @@ describe('useRecording device enforcement', () => {
 		await waitFor(() => expect(result.current.inputDevice?.name).toBe('USB Mic'))
 	})
 
+	it('keeps an explicit "None" instead of falling back to the default device', async () => {
+		mocks.invoke.mockImplementation(async (command: string) => {
+			if (command === 'get_audio_devices') return [device('Camera Mic', true, '0', true)]
+			throw new Error(`unexpected invoke: ${command}`)
+		})
+
+		const { result } = renderRecording()
+		// Nothing stored yet: the system default stands in.
+		await waitFor(() => expect(result.current.inputDevice?.name).toBe('Camera Mic'))
+
+		act(() => result.current.setInputDevice(null))
+		// '' is the stored "None"; null would mean "nothing stored" and bring the default back.
+		expect(mocks.persisted.get('recording.inputDeviceName')).toBe('')
+
+		// The write re-enumerates the devices; None must survive that refresh.
+		await act(async () => {
+			await result.current.refreshDevices()
+		})
+		expect(result.current.inputDevice).toBeNull()
+		expect(result.current.inputUnavailableName).toBeNull()
+	})
+
+	it('starts with the devices enumerated at start, not the ones from the rendering closure', async () => {
+		let snapshot = [device('Camera Mic', true, '0', true)]
+		mocks.invoke.mockImplementation(async (command: string) => {
+			if (command === 'get_audio_devices') return snapshot
+			if (command === 'start_record') return null
+			throw new Error(`unexpected invoke: ${command}`)
+		})
+
+		const { result } = renderRecording()
+		await waitFor(() => expect(result.current.inputDevice?.name).toBe('Camera Mic'))
+
+		// The device set changed since the last render; a stale closure would still name the old mic.
+		snapshot = [device('Bluetooth', true, '0', true)]
+		await act(async () => {
+			await result.current.startRecord()
+		})
+
+		expect(mocks.invoke).toHaveBeenCalledWith(
+			'start_record',
+			expect.objectContaining({ devices: [expect.objectContaining({ name: 'Bluetooth' })] }),
+		)
+	})
+
 	it('starts normally when every pinned device is present', async () => {
 		mocks.persisted.set('recording.inputDeviceName', 'Camera Mic')
 		mocks.invoke.mockImplementation(async (command: string) => {

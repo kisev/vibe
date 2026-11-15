@@ -80,6 +80,9 @@ export const mediaMiscHandlers: CommandHandlerMap = {
 	recording_active: () => recordingActive,
 
 	start_record: (args) => {
+		// Mirror the Rust guard: a second recording is rejected atomically there, and the record and
+		// browser gates read `recording_active`, so the mock must not run two capture loops instead.
+		if (recordingActive) throw new Error('A recording is already in progress')
 		console.info('[mock] start_record', args)
 		recordingActive = true
 		const path = `${APP_LOCAL_DATA}/recording.wav`

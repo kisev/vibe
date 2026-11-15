@@ -21,7 +21,9 @@ const escalation = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen }))
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ setFocus: escalation.setFocus }) }))
 vi.mock('@tauri-apps/plugin-dialog', () => ({ message: escalation.message }))
-vi.mock('~/lib/config-store', () => ({ readConfig: (_key: string, fallback: number) => escalation.silenceMinutes.value ?? fallback }))
+vi.mock('~/lib/config-store', () => ({
+	usePersisted: (_key: string, fallback: number) => [escalation.silenceMinutes.value ?? fallback, () => {}],
+}))
 
 const level = (device: 'microphone' | 'system', value: number) => {
 	act(() => {
@@ -162,6 +164,32 @@ describe('recording indicator', () => {
 
 		expect(screen.getAllByRole('meter')).toHaveLength(2)
 		expect(screen.getByRole('timer')).toBeDefined()
+	})
+
+	it('keeps the silence window when another surface revises the start time', async () => {
+		const { rerender } = render(<RecordingIndicator startedAt={Date.now()} microphoneName="Camera Mic" systemName="Speakers" />)
+		await settle()
+
+		act(() => vi.advanceTimersByTime(1600))
+		expect(screen.getAllByText(m.recordingSilent())).toHaveLength(2)
+
+		// The recorder reports a fresh estimate of the same run's start; rebuilding the meters for
+		// it would restart the silence window and postpone the escalation.
+		rerender(<RecordingIndicator startedAt={Date.now() - 60_000} microphoneName="Camera Mic" systemName="Speakers" />)
+		act(() => vi.advanceTimersByTime(0))
+
+		expect(screen.getAllByText(m.recordingSilent())).toHaveLength(2)
+	})
+
+	it('shows no meter and no silence marker for an empty source list', async () => {
+		render(<RecordingIndicator startedAt={Date.now()} microphoneName="Camera Mic" systemName="Speakers" sources={[]} />)
+		await settle()
+
+		// An adopted run whose reporter did not resolve devices passes no sources at all.
+		act(() => vi.advanceTimersByTime(1200))
+
+		expect(screen.queryAllByRole('meter')).toHaveLength(0)
+		expect(screen.queryAllByText(m.recordingSilent())).toHaveLength(0)
 	})
 
 	it('brings the window forward and names the silent source after the configured window', async () => {
