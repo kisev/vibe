@@ -846,7 +846,7 @@
   "meetingBrowserLoadFailedTitle": "页面未能打开",
   "meetingBrowserLoadFailedBody": "无法加载页面。要重试，还是关闭窗口？",
   "meetingBrowserRetry": "重试",
-  "recordingLongSilence": "五分钟没有听到 {name} 的声音。请确认这是你要录制的设备。",
+  "recordingLongSilence": "{minutes} 分钟没有听到 {name} 的声音。请确认这是你要录制的设备。",
   "recordingSilenceMinutes": "Silence warning after (minutes)",
   "recordingSilenceMinutesInfo": "While recording, a source that stays quiet this long makes Vibe bring its window forward and name the device that heard nothing. Once per source per recording. A shorter window catches a muted or wrong device sooner but interrupts on long pauses; the default of 5 minutes suits meetings with real discussion."
 }

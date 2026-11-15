@@ -2,6 +2,7 @@
 
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_LONG_SILENCE_MINUTES } from '~/lib/recording-limits'
 import { m } from '~/paraglide/messages.js'
 import RecordingIndicator from './recording-feedback'
 
@@ -10,7 +11,17 @@ const mocks = vi.hoisted(() => ({
 	listeners: new Map<string, (event: { payload: unknown }) => void>(),
 }))
 
+/** The escalation's side effects: bringing the window forward and showing the alert. */
+const escalation = vi.hoisted(() => ({
+	setFocus: vi.fn(),
+	message: vi.fn(),
+	silenceMinutes: { value: 5 },
+}))
+
 vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen }))
+vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ setFocus: escalation.setFocus }) }))
+vi.mock('@tauri-apps/plugin-dialog', () => ({ message: escalation.message }))
+vi.mock('~/lib/config-store', () => ({ readConfig: (_key: string, fallback: number) => escalation.silenceMinutes.value ?? fallback }))
 
 const level = (device: 'microphone' | 'system', value: number) => {
 	act(() => {
@@ -23,10 +34,28 @@ const settle = async () => {
 	await act(async () => {})
 }
 
+/**
+ * Advance fake time in short steps so effects flush between timer callbacks — the escalation
+ * reads the silence flags out of a ref refreshed on render. `keepMicrophoneAlive` feeds a level
+ * every step, so only the source that makes no sound is ever marked silent.
+ */
+const advance = async (ms: number, keepMicrophoneAlive = false) => {
+	const step = 500
+	for (let left = ms; left > 0; left -= step) {
+		if (keepMicrophoneAlive) level('microphone', 0.5)
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(Math.min(step, left))
+		})
+	}
+}
+
 beforeEach(() => {
 	vi.useFakeTimers()
 	vi.setSystemTime(new Date('2026-01-01T12:00:00Z'))
 	vi.resetAllMocks()
+	escalation.setFocus.mockResolvedValue(undefined)
+	escalation.message.mockResolvedValue(undefined)
+	escalation.silenceMinutes.value = DEFAULT_LONG_SILENCE_MINUTES
 	mocks.listeners.clear()
 	mocks.listen.mockImplementation(async (event: string, callback: (event: { payload: unknown }) => void) => {
 		mocks.listeners.set(event, callback)
@@ -44,6 +73,10 @@ describe('recording indicator', () => {
 		render(<RecordingIndicator startedAt={Date.now() - 65_000} microphoneName="Camera Mic" systemName="Speakers" />)
 
 		expect(screen.getByRole('timer').textContent).toBe('01:05')
+
+		// The clock follows the recording, not the moment the surface mounted.
+		act(() => vi.advanceTimersByTime(1000))
+		expect(screen.getByRole('timer').textContent).toBe('01:06')
 	})
 
 	it('drives one independent meter per source', async () => {
@@ -129,5 +162,40 @@ describe('recording indicator', () => {
 
 		expect(screen.getAllByRole('meter')).toHaveLength(2)
 		expect(screen.getByRole('timer')).toBeDefined()
+	})
+
+	it('brings the window forward and names the silent source after the configured window', async () => {
+		render(<RecordingIndicator startedAt={Date.now()} microphoneName="Camera Mic" systemName="Speakers" />)
+		await settle()
+
+		// The microphone keeps sounding; the system loopback never does.
+		await advance(60_000, true)
+		expect(escalation.message).not.toHaveBeenCalled()
+
+		// Five minutes of silence for the system source, plus the alert's own 15 s tick.
+		await advance(4 * 60_000 + 15_000, true)
+		expect(escalation.setFocus).toHaveBeenCalledTimes(1)
+		expect(escalation.message).toHaveBeenCalledTimes(1)
+		expect(escalation.message).toHaveBeenCalledWith(
+			m.recordingLongSilence({ name: 'Speakers', minutes: DEFAULT_LONG_SILENCE_MINUTES }),
+			expect.objectContaining({ kind: 'warning' }),
+		)
+
+		// Once per source per recording: continued silence must not nag.
+		await advance(60_000, true)
+		expect(escalation.message).toHaveBeenCalledTimes(1)
+	})
+
+	it('fires after the configured one-minute window, not after five', async () => {
+		escalation.silenceMinutes.value = 1
+		render(<RecordingIndicator startedAt={Date.now()} microphoneName="Camera Mic" systemName="Speakers" sources={['system']} />)
+		await settle()
+
+		// The silent marker's second, the configured minute, and the alert's 15 s tick.
+		await advance(90_000)
+
+		expect(escalation.setFocus).toHaveBeenCalledTimes(1)
+		expect(escalation.message).toHaveBeenCalledTimes(1)
+		expect(escalation.message).toHaveBeenCalledWith(m.recordingLongSilence({ name: 'Speakers', minutes: 1 }), expect.anything())
 	})
 })

@@ -846,7 +846,7 @@
   "meetingBrowserLoadFailedTitle": "페이지를 열지 못했습니다",
   "meetingBrowserLoadFailedBody": "페이지를 불러올 수 없습니다. 다시 시도할까요, 아니면 창을 닫을까요?",
   "meetingBrowserRetry": "다시 시도",
-  "recordingLongSilence": "5분 동안 {name}에서 소리가 없습니다. 녹음하려는 장치가 맞는지 확인하세요.",
+  "recordingLongSilence": "{minutes}분 동안 {name}에서 소리가 없습니다. 녹음하려는 장치가 맞는지 확인하세요.",
   "recordingSilenceMinutes": "Silence warning after (minutes)",
   "recordingSilenceMinutesInfo": "While recording, a source that stays quiet this long makes Vibe bring its window forward and name the device that heard nothing. Once per source per recording. A shorter window catches a muted or wrong device sooner but interrupts on long pauses; the default of 5 minutes suits meetings with real discussion."
 }
