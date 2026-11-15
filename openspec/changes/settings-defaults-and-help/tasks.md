@@ -1,13 +1,13 @@
 # Tasks
 
-- [ ] 1. Loudness normalization and speaker separation default to on; the audio-processing reset restores normalization on.
-- [ ] 2. The Whisper-only note moves into the Whisper options group.
+- [x] 1. Loudness normalization and speaker separation default to on; the audio-processing reset restores normalization on. (defaults at `desktop/src/providers/preference.tsx:186` and `:250`; reset at `desktop/src/pages/settings/sections/audio-processing.tsx:34`; migration only revalidates a persisted preference)
+- [x] 2. The Whisper-only note moves into the Whisper options group. (rendered inside the Whisper options group at `desktop/src/pages/settings/sections/whisper-options.tsx:24` and beside the Whisper-options action row at `desktop/src/pages/settings/sections/tuning.tsx:70`, no longer under the speaker toggle; `tuning.test.tsx` and `whisper-options.test.tsx` green)
 - [ ] 3. Discord link, URL and catalog strings removed everywhere.
 - [x] 4. SettingsRow renders an info icon with the row's explanation; rows without a description get one.
   - Verified: all 27 parameter rows in `sections/**` now pass a `description`; 23 new `info*` keys were added and `infoGpuDevice`/`autoExportInfo` reused where the text already existed. `shared.test.tsx` proves the tooltip text and that a row without a description renders no icon. Dynamic list/status rows (comparison runs, non-default meeting hosts) are not parameters and were left alone.
 - [x] 5. New help strings translated into all desktop locales; `task i18n:audit` clean.
   - Verified: `parameterHelp` plus the 23 new keys exist in all 21 non-English catalogs (837 keys each); `pnpm --dir desktop i18n:generate`, `pnpm --dir desktop exec tsc --noEmit` and `mise exec -- oxfmt --check i18n/desktop` pass. `task i18n:audit` passes with one fallback warning for `recordingLongSilence`, a key added to `en-US` concurrently by another change, outside this task's strings.
-- [ ] 6. The main window applies locale and theme before its first paint.
+- [x] 6. The main window applies locale and theme before its first paint. (`desktop/src/bootstrap.tsx:69` calls `applyAppearance()` before `ReactDOM.createRoot(...).render(...)` at `:80`; `bootstrap.test.tsx` mocks both and is green)
 - [ ] 7. Tests: defaults, the moved note, the absence of the Discord entry, the info tooltip text, first-paint locale.
 - [x] 8. Audit every settings hint: each names the consequence and, where a choice exists, how to choose; weak restatements are rewritten in en-US.
 - [x] 9. The rewritten hints are translated into every desktop locale.

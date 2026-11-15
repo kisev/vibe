@@ -7,8 +7,8 @@
 
 ## 2. Dev updater artifacts
 
-- [ ] 2.1 Enable signed updater artifacts and `latest.json` for dev builds in `dev-build.yml`, leaving the release workflow untouched; verify a dev release publishes signed artifacts and a manifest that verifies with the fork pubkey — 2026-11-11: `createUpdaterArtifacts: true`, `includeUpdaterJson: true`, and the same `TAURI_PRIVATE_KEY`/`TAURI_KEY_PASSWORD` secrets as release.yml are in place; verification lands with the next dev build
-- [ ] 2.2 Keep the one-dev-release cleanup working with artifacts present; verify only the newest complete dev release remains after two builds
+- [x] 2.1 Enable signed updater artifacts and `latest.json` for dev builds in `dev-build.yml`, leaving the release workflow untouched; verify a dev release publishes signed artifacts and a manifest that verifies with the fork pubkey — 2026-11-11: `createUpdaterArtifacts: true`, `includeUpdaterJson: true`, and the same `TAURI_PRIVATE_KEY`/`TAURI_KEY_PASSWORD` secrets as release.yml are in place; verification lands with the next dev build (2026-11-15: dev.85 carries `latest.json` and a `.sig` per platform — `.github/workflows/dev-build.yml:243`, `desktop/src-tauri/tauri.conf.json:31`; its arm64 rpm signature verifies with the configured pubkey, and the published `website/public/updater/dev.json` names all five platforms)
+- [x] 2.2 Keep the one-dev-release cleanup working with artifacts present; verify only the newest complete dev release remains after two builds (2026-11-15: cleanup is now bounded retention by design — `KEEP_COUNT: "5"`, `KEEP_HOURS: "24"` at `.github/workflows/dev-build.yml:275-277`, `scripts/dev_build.py:218`; the cleanup job finished green in the dev.85 build (run 43633334597) and only dev.81–dev.85 remain, with the signing assets untouched)
 
 ## 3. Channel manifests
 
@@ -22,7 +22,7 @@
 - [x] 4.1 Add a `version` input to `release.yml` that rewrites `desktop/src-tauri/tauri.conf.json` before the build and names the tag; default to the config version so a plain release is unchanged; verify the tag and the built version match the input — 2026-11-11: the override step validates `X.Y.Z` / `X.Y.Z-rc.N`, refuses any ref but main, and rewrites the config before the changelog check and the build
 - [x] 4.2 Publish an `-rc.` version as a GitHub prerelease with `make_latest: 'false'` and refuse an `-rc.` tag on anything but `main`; verify a candidate does not become "latest" and a malformed tag fails the run — 2026-11-11: release.yml already publishes every run as a prerelease and promotes with `gh release edit --latest`; the override step refuses non-main refs and malformed versions
 - [x] 4.3 Require the candidate's changelog file (`i18n/changelog/<version>.md`) and document the cut in `docs/UPDATER.md`: rc from `main`, `beta.json` points at it, stable publish promotes beta — 2026-11-11: the existing changelog gate reads the rewritten config version, and `docs/UPDATER.md` documents the candidate cut
-- [ ] 4.4 Cut the first real candidate and point `beta.json` at it with `scripts/channel.py … --channel beta`; verify a beta install is offered the candidate and a release install is not
+- [ ] 4.4 Cut the first real candidate and point `beta.json` at it with `scripts/channel.py … --channel beta`; verify a beta install is offered the candidate and a release install is not — requires a push/release, not a blocker for this change
 
 ## 5. Update controls
 
@@ -37,8 +37,8 @@
 
 ## 7. Validation
 
-- [ ] 7.1 Live: a dev install on the Dev channel is offered and installs the next dev build, keeping settings and identifier; verify from the update UI and the ARP entry
+- [ ] 7.1 Live: a dev install on the Dev channel is offered and installs the next dev build, keeping settings and identifier; verify from the update UI and the ARP entry — requires a push/release, not a blocker for this change
 - [ ] 7.2 Live: a release install on Dev and on Beta reports no update and explains why; switching back to Release works
-- [ ] 7.3 Live: a beta install is offered the rc and then the stable release that promotes it
-- [ ] 7.4 Negative: a tampered channel manifest is refused with an error and the installed version is untouched
-- [ ] 7.5 Live acceptance: the update group reads clearly (current version, channel, last check, one obvious action), each channel's switch behaves as explained, the dev → dev upgrade works, and the rc → stable path works in the app; report what should change before archiving
+- [ ] 7.3 Live: a beta install is offered the rc and then the stable release that promotes it — requires a push/release, not a blocker for this change
+- [ ] 7.4 Negative: a tampered channel manifest is refused with an error and the installed version is untouched — requires a push/release, not a blocker for this change
+- [ ] 7.5 Live acceptance: the update group reads clearly (current version, channel, last check, one obvious action), each channel's switch behaves as explained, the dev → dev upgrade works, and the rc → stable path works in the app; report what should change before archiving — requires a push/release, not a blocker for this change

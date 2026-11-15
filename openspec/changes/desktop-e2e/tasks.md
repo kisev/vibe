@@ -12,4 +12,4 @@
   - `language.spec.ts` switches to Russian in place and proves no reload
 - [x] 1.5 Give the mock a test surface (`window.__vibeMockTauri`: IPC log, command overrides, event emission), the meeting-browser and `update_check` commands it was missing, and a second mock model so comparisons can run
 - [x] 1.6 Beta with no candidate: the provider treats a manifest without a version as nothing on the line, and the controls render "No candidate on this line" instead of an empty version
-- [ ] 1.7 Verify the job is green on a pull request
+- [ ] 1.7 Verify the job is green on a pull request — requires a push/release, not a blocker for this change

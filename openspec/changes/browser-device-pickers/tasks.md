@@ -1,6 +1,6 @@
 # Tasks
 
-- [ ] 1. Device list and selection reachable from the chrome-only webview without booting the app's providers.
-- [ ] 2. Pickers in the chrome, shared config with the main window, disabled while recording.
-- [ ] 3. Tests for selection persistence and the disabled state.
-- [ ] 4. The chrome's pickers use a rendering that is not clipped by the page webview.
+- [x] 1. Device list and selection reachable from the chrome-only webview without booting the app's providers. (2026-11-15: `readRecordingDeviceState` calls `get_audio_devices` and reads the config directly — `desktop/src/lib/meeting-browser.ts:164`, `desktop/src/windows/browser-window.tsx:178`; the chrome path in `desktop/src/bootstrap.tsx:50-62` still skips the full app boot and its providers.)
+- [x] 2. Pickers in the chrome, shared config with the main window, disabled while recording. (2026-11-15: two `DevicePicker`s at `desktop/src/windows/browser-window.tsx:385`, writing the main window's `recording.inputDeviceName`/`recording.outputDeviceName` keys (`meeting-browser.ts:193`, read by `use-recording.ts:21`), with `disabled={recording}` on both.)
+- [x] 3. Tests for selection persistence and the disabled state. (2026-11-15: `desktop/src/windows/browser-window.test.tsx:131` disables both pickers while recording, and `:146` persists a chrome pick under the shared key.)
+- [x] 4. The chrome's pickers use a rendering that is not clipped by the page webview. (2026-11-15: native `<select>` at `desktop/src/windows/browser-window.tsx:100`, platform-drawn popup; commit `baf6e6f8` records the reason.)

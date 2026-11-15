@@ -34,5 +34,5 @@
 
 ## 6. Validation
 
-- [ ] 6.1 Desktop tests, type-check, clippy and the website suite are green
+- [x] 6.1 Desktop tests, type-check, clippy and the website suite are green (2026-11-15: `task verify` green on the current revision — desktop and website suites, rustfmt+clippy, and `tsc` through the site build)
 - [ ] 6.2 Ship dev.76 and verify each item on the installed build

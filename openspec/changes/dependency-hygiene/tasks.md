@@ -2,7 +2,7 @@
 
 ## 1. Python project
 
-- [ ] 1.1 Create the root `pyproject.toml` with the union of the six scripts' PEP 723 dependencies and `requires-python = ">=3.12"`; run `uv lock` and commit `uv.lock`; verify `uv run python -c "import httpx"` works
+- [x] 1.1 Create the root `pyproject.toml` with the union of the six scripts' PEP 723 dependencies and `requires-python = ">=3.12"`; run `uv lock` and commit `uv.lock`; verify `uv run python -c "import httpx"` works (pyproject.toml and uv.lock are committed — 49dbe285 resolved the lock on a runner where PyPI is reachable and records `uv lock --check` and every script import green; the dependency list was later trimmed to flask/httpx/python-dotenv as the remaining scripts needed them, d6fdaaac; `uv run --frozen python -c "import httpx"` → 0.28.1 here)
 
   `pyproject.toml` is in place (`vibe-scripts`) with `bs4>=0.0.2`, `curl-cffi>=0.7`, `flask>=3.1`, `httpx>=0.28`, `pandas>=3.0`, `pyarrow>=23`, `pyjwt>=2.11`, `pyperclip>=1.9`, `python-dotenv>=1.2.1`. `uv lock` is blocked in this environment because PyPI is unreachable:
 
@@ -70,7 +70,7 @@
 
   Not run: it rewrites every lockfile, and the uv leg cannot resolve without PyPI. Lint was run on the hand-written files instead (`actionlint`, `yamllint`, `tombi lint`, `oxfmt --check`, `renovate-config-validator`).
 
-- [ ] 4.3 A manual Renovate dispatch opens or refreshes the grouped PRs; a major PR stays separate and unmerged by automation
+- [ ] 4.3 A manual Renovate dispatch opens or refreshes the grouped PRs; a major PR stays separate and unmerged by automation — requires a push/release, not a blocker for this change
 
   Not possible here: `RENOVATE_TOKEN` is not configured, and the GitHub action was not dispatched.
 

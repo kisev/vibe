@@ -26,8 +26,6 @@
 
 - [x] 8. Dev retention scenarios name the tag number the build actually uses; the archived `dev-build-retention` task list has no unchecked item.
 
-- [ ] 16. `task verify` green, `openspec validate --all --strict` passes.
-
 - [x] 9. `scripts/ci/fetch_ffmpeg.py` moves the downloaded ffmpeg with `shutil.move`: `os.replace` cannot cross drives, which is exactly the Windows runner layout (`RUNNER_TEMP` on C:, workspace on D:).
 
 - [x] 10. The bootstrap tests no longer race the runner: a dynamic import plus the start chain can take seconds under a loaded suite, and the default five-second limit left a pending start that called the next test's mocks — one slow run failed two assertions and blocked a push. They now wait with a realistic budget, verified by two consecutive full desktop runs.
@@ -39,3 +37,5 @@
 - [x] 13. `AGENTS.md` (§ Working in parallel) says one checkout belongs to one session and a second session takes its own worktree — a parallel session moved `dev` under this one and a merge was lost to it.
 
 - [x] 14. `docs/how-to/maintain-the-repository.md` documents the signing agent: the `agent refused operation?` failure, how to unlock it, the probe, and why committing unsigned is not the way out.
+
+- [x] 16. `task verify` green, `openspec validate --all --strict` passes (2026-11-15: verify exit 0, validate 50/50).

@@ -14,6 +14,6 @@
 
 ## 3. Validation
 
-- [ ] 3.1 Live: open a link naming an old dev version and the alias itself, and verify both render the current dev entry
+- [ ] 3.1 Live: open a link naming an old dev version and the alias itself, and verify both render the current dev entry — requires a push/release, not a blocker for this change
 - [x] 3.2 Verify the dev build's "What's new" opens the alias, not a versioned dev path — 2026-11-11: the only call site passes `appVersionNumber`; a `1.0.0-dev.*` version maps to `/changelog/dev` (unit-tested), so a dev build's link opens the alias
-- [ ] 3.3 Live acceptance: open an old dev-version link from a previous release note and confirm it lands on the current dev entry; report anything that reads confusingly
+- [ ] 3.3 Live acceptance: open an old dev-version link from a previous release note and confirm it lands on the current dev entry; report anything that reads confusingly — requires a push/release, not a blocker for this change
