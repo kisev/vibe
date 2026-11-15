@@ -141,3 +141,40 @@ describe('site build variants', () => {
 		await waitFor(() => expect(screen.getByRole('link', { name: 'Models' }).getAttribute('href')).toBe('/vibe/docs#models'))
 	})
 })
+
+describe('upstream support surfaces', () => {
+	const DONATION = /kofi|ko-fi|donat|patreon|buymeacoffee|opencollective|liberapay/i
+	const pages = ['/vibe/', '/vibe/features', '/vibe/roadmap', '/vibe/docs', '/vibe/changelog']
+
+	// Scenario: browsing the site. No page links to, embeds or renders a donation
+	// surface, and the removed supporters wall does not come back.
+	it('shows no donation surface on any page', () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })),
+		)
+
+		for (const path of pages) {
+			window.history.replaceState({}, '', path)
+			const view = render(createElement(App))
+
+			const targets = [...document.querySelectorAll('a[href], iframe[src]')].map(
+				(element) => element.getAttribute('href') ?? element.getAttribute('src') ?? '',
+			)
+			expect(targets.filter((target) => DONATION.test(target)), path).toEqual([])
+			expect(screen.queryByText(/loved by thousands|support vibe|supporters/i), path).toBeNull()
+
+			view.unmount()
+		}
+	})
+
+	// Scenario: reading the privacy policy. The footer control opens the PDF the site serves.
+	it('opens the privacy policy PDF', async () => {
+		window.history.replaceState({}, '', '/vibe/')
+		render(createElement(App))
+
+		fireEvent.click(screen.getByRole('button', { name: m['privacy-policy']() }))
+		const frame = await screen.findByTitle(m['privacy-policy']())
+		expect(frame.getAttribute('src')).toBe(`${import.meta.env.BASE_URL}privacy_policy.pdf`)
+	})
+})
