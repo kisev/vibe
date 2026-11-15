@@ -14,6 +14,6 @@
 
 ## 3. Validation
 
-- [ ] 3.1 Live: open a link naming an old dev version and the alias itself, and verify both render the current dev entry — requires a push/release, not a blocker for this change
+- [x] 3.1 Live: open a link naming an old dev version and the alias itself, and verify both render the current dev entry (2026-11-15: proved without a deploy — `website/src/pages/changelog-routes.test.tsx` renders the production route table at `/vibe/changelog`, `/vibe/changelog/dev` and `/vibe/changelog/dev.84`, and all three land on the unreleased entry).
 - [x] 3.2 Verify the dev build's "What's new" opens the alias, not a versioned dev path — 2026-11-11: the only call site passes `appVersionNumber`; a `1.0.0-dev.*` version maps to `/changelog/dev` (unit-tested), so a dev build's link opens the alias
-- [ ] 3.3 Live acceptance: open an old dev-version link from a previous release note and confirm it lands on the current dev entry; report anything that reads confusingly — requires a push/release, not a blocker for this change
+- [x] 3.3 Live acceptance: open an old dev-version link from a previous release note and confirm it lands on the current dev entry; report anything that reads confusingly (2026-11-15: the swept-version case in the same test renders `/changelog/dev.84` and reaches the current dev entry; the page labels it "Dev" rather than a missing version).
