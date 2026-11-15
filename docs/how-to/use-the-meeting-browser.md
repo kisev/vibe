@@ -7,7 +7,7 @@ Vibe can host a call in its own Chromium-based window: the app's chrome (address
 Use one of these paths:
 
 - From another app or the system: turn on **Open meeting links in Vibe** under **Settings → Recording** to register Zoom, Teams, and Webex links (Windows and Linux, not macOS). The app validates the mapped URL and opens it in the browser window when its host may load, the system browser otherwise.
-- Inside Vibe: **Settings → Recording → Open in Vibe**, paste the link.
+- Inside Vibe: the home page's **Meeting browser** source, or **Settings → Recording → Open in Vibe**; paste the link and press **Open in Vibe**.
 - The link's host must be in the allowlist; top-level navigation and cross-origin resources outside it are refused. The chrome's recording controls are present on every allowed page.
 
 Clicking an https link in Chrome, Edge, or Firefox still opens that browser. Vibe does not register as the default browser.

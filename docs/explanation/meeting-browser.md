@@ -10,7 +10,7 @@ Vibe does the same honest thing:
 
 - Turn on **Open meeting links in Vibe** and Vibe registers the meeting schemes Zoom, Teams and Webex already use (`zoommtg://`, `msteams://`, `webex://`), mapping each to the web URL it carries. The app validates the URL in Rust and opens it in the browser window when its host may load, the system browser otherwise.
 - An `https` URL handed over as a launch argument takes the same route.
-- Inside the app, **Settings → Recording → Open in Vibe** pastes a link into the same path.
+- Inside the app, the home page's **Meeting browser** source and **Settings → Recording → Open in Vibe** paste a link into the same path.
 
 Vibe deliberately ships no `vibe://open/` link of its own: no meeting page emits one, which is why that first entry point was removed. Clicking an `https` link in Chrome, Edge, or Firefox still opens that browser. Making Vibe the default browser is deliberately out of scope: it would take over every link on the machine to serve one feature, and it would still be a user decision.
 

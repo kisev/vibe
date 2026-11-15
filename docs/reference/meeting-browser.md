@@ -35,6 +35,7 @@ Two modes decide how far that reaches, under `browser.policy` (**Settings → Re
 
 | Where | What |
 | --- | --- |
+| Home page → **Meeting browser** | Paste a link and open it in the single browser window without visiting Settings |
 | Settings → Recording → **Open in Vibe** | Paste a link and open it in the single browser window |
 | Settings → Recording → **Allowed domains** | Add or remove the domains the browser may load |
 | Settings → Recording → **Blocked** | Allow a host the browser refused; the page reloads |
