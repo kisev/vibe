@@ -83,8 +83,6 @@ Pull requests are limited to a few collaborators. See [CONTRIBUTE.md](CONTRIBUTE
 
 # Community
 
-[![Discord](https://img.shields.io/badge/chat-discord-7289da.svg)](https://discord.gg/EcxWSstQN8)
-
 This is the upstream project's community chat; the fork does not run a separate one.
 
 # Changelog 🛣️

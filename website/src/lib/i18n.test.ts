@@ -42,7 +42,6 @@ Object.defineProperty(globalThis, 'localStorage', { value: memoryStorage, config
 const BRAND_NAMES = new Set([
 	'Vibe',
 	'GitHub',
-	'Discord',
 	'macOS',
 	'Windows',
 	'Linux',

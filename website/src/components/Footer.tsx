@@ -1,6 +1,5 @@
 import { m } from '../paraglide/messages.js'
 import { Link } from 'react-router-dom'
-import Discord from '~/icons/Discord'
 import Github from '~/icons/Github'
 import Logo from '~/icons/Logo'
 
@@ -26,9 +25,6 @@ export default function Footer({ onOpenPrivacyPolicy }: FooterProps) {
 					<div className="flex items-center gap-2">
 						<a className={iconClass} href="https://github.com/thewh1teagle/vibe" target="_blank" rel="noreferrer" aria-label="GitHub">
 							<Github width="16" height="16" />
-						</a>
-						<a className={iconClass} href="https://discord.gg/EcxWSstQN8" target="_blank" rel="noreferrer" aria-label="Discord">
-							<Discord className="size-4" />
 						</a>
 					</div>
 					<p className="mt-2 text-xs text-muted-foreground" dir="ltr">
