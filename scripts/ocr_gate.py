@@ -49,7 +49,13 @@ def ocr_command() -> list[str] | None:
 
 
 def skip(reason: str) -> int:
-    print(f"ocr commit gate skipped: {reason}", file=sys.stderr)
+    """The commit proceeds without a review; say so where the commit output shows it.
+
+    A review that did not happen must never read like a review that found nothing:
+    "no medium/high findings" is the clean verdict, and this line is its opposite.
+    It goes to stdout because that is where the hook's summary lands.
+    """
+    print(f"ocr commit gate: review NOT run — {reason}")
     return 0
 
 
@@ -232,7 +238,7 @@ def parse_result_file(path: Path) -> object | None:
 
 def main() -> int:
     if os.environ.get("OCR_SKIP", "").strip().lower() in {"1", "true", "yes"}:
-        print("ocr commit gate: skipped via OCR_SKIP")
+        print("ocr commit gate: review NOT run — bypassed with OCR_SKIP")
         return 0
 
     root_result = run_git("rev-parse", "--show-toplevel", cwd=Path.cwd())

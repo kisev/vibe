@@ -220,7 +220,8 @@ class GateTest(unittest.TestCase):
     def test_infrastructure_failure_is_a_warning(self) -> None:
         result = run_gate(self.repo, self.stub, STUB_MODE="failed")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("ocr commit gate skipped:", result.stderr)
+        self.assertIn("review NOT run", result.stdout)
+        self.assertIn("provider", result.stdout)
 
     def test_no_reviewable_files_is_a_pass(self) -> None:
         result = run_gate(self.repo, self.stub, STUB_MODE="docs")
@@ -231,7 +232,8 @@ class GateTest(unittest.TestCase):
     def test_ocr_skip_bypasses_everything(self) -> None:
         result = run_gate(self.repo, self.stub, OCR_SKIP="1")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("skipped via OCR_SKIP", result.stdout)
+        self.assertIn("review NOT run", result.stdout)
+        self.assertIn("OCR_SKIP", result.stdout)
         self.assertEqual(self.calls(), [])
 
     def test_first_commit_warns_and_allows(self) -> None:
@@ -241,7 +243,8 @@ class GateTest(unittest.TestCase):
         git("add", "file.py", cwd=repo)
         result = run_gate(repo, self.stub)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("first commit", result.stderr)
+        self.assertIn("first commit", result.stdout)
+        self.assertIn("review NOT run", result.stdout)
 
 
 if __name__ == "__main__":
