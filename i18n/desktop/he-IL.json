@@ -847,6 +847,6 @@
   "meetingBrowserLoadFailedBody": "לא ניתן לטעון את הדף. לנסות שוב או לסגור את החלון?",
   "meetingBrowserRetry": "ניסיון חוזר",
   "recordingLongSilence": "אין צליל מ{name} כבר {minutes} דקות. בדקו שזהו ההתקן שממנו אתם רוצים להקליט.",
-  "recordingSilenceMinutes": "Silence warning after (minutes)",
-  "recordingSilenceMinutesInfo": "While recording, a source that stays quiet this long makes Vibe bring its window forward and name the device that heard nothing. Once per source per recording. A shorter window catches a muted or wrong device sooner but interrupts on long pauses; the default of 5 minutes suits meetings with real discussion."
+  "recordingSilenceMinutes": "התראת שקט לאחר (דקות)",
+  "recordingSilenceMinutesInfo": "במהלך ההקלטה, מקור שנשאר שקט כל כך הרבה זמן גורם ל-Vibe להביא את החלון שלו לחזית ולציין את ההתקן שלא נקלט ממנו צליל. פעם אחת לכל מקור בכל הקלטה. חלון קצר יותר מזהה מוקדם יותר מיקרופון מושתק או התקן שגוי, אך מפריע בהפסקות ארוכות; ברירת המחדל של 5 דקות מתאימה לפגישות עם דיון אמיתי."
 }

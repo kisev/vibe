@@ -847,6 +847,6 @@
   "meetingBrowserLoadFailedBody": "ページを読み込めませんでした。もう一度試すか、ウィンドウを閉じますか？",
   "meetingBrowserRetry": "もう一度試す",
   "recordingLongSilence": "{minutes} 分間 {name} から音がありません。録音するデバイスが正しいか確認してください。",
-  "recordingSilenceMinutes": "Silence warning after (minutes)",
-  "recordingSilenceMinutesInfo": "While recording, a source that stays quiet this long makes Vibe bring its window forward and name the device that heard nothing. Once per source per recording. A shorter window catches a muted or wrong device sooner but interrupts on long pauses; the default of 5 minutes suits meetings with real discussion."
+  "recordingSilenceMinutes": "無音警告までの時間（分）",
+  "recordingSilenceMinutesInfo": "録音中、音声がこの時間だけ途切れたままだと、Vibe はウィンドウを前面に出し、音が入っていないデバイス名を知らせます。1 回の録音につき、デバイスごとに 1 回です。短くするとミュートやデバイスの選択ミスに早く気づけますが、長い沈黙でも割り込みます。既定の 5 分は、実際に会話のある会議に適しています。"
 }

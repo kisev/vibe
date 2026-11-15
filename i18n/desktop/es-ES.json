@@ -847,6 +847,6 @@
   "meetingBrowserLoadFailedBody": "No se pudo cargar la página. ¿Intentar de nuevo o cerrar la ventana?",
   "meetingBrowserRetry": "Intentar de nuevo",
   "recordingLongSilence": "Sin sonido de {name} durante {minutes} minutos. Comprueba que este es el dispositivo que quieres grabar.",
-  "recordingSilenceMinutes": "Silence warning after (minutes)",
-  "recordingSilenceMinutesInfo": "While recording, a source that stays quiet this long makes Vibe bring its window forward and name the device that heard nothing. Once per source per recording. A shorter window catches a muted or wrong device sooner but interrupts on long pauses; the default of 5 minutes suits meetings with real discussion."
+  "recordingSilenceMinutes": "Aviso de silencio tras (minutos)",
+  "recordingSilenceMinutesInfo": "Durante la grabación, si una fuente se queda en silencio este tiempo, Vibe trae su ventana al frente y nombra el dispositivo que no ha captado nada. Una vez por fuente y grabación. Un intervalo más corto detecta antes un micrófono silenciado o un dispositivo equivocado, pero interrumpe en pausas largas; el valor predeterminado de 5 minutos va bien para reuniones con conversación real."
 }

@@ -847,6 +847,6 @@
   "meetingBrowserLoadFailedBody": "无法加载页面。要重试，还是关闭窗口？",
   "meetingBrowserRetry": "重试",
   "recordingLongSilence": "{minutes} 分钟没有听到 {name} 的声音。请确认这是你要录制的设备。",
-  "recordingSilenceMinutes": "Silence warning after (minutes)",
-  "recordingSilenceMinutesInfo": "While recording, a source that stays quiet this long makes Vibe bring its window forward and name the device that heard nothing. Once per source per recording. A shorter window catches a muted or wrong device sooner but interrupts on long pauses; the default of 5 minutes suits meetings with real discussion."
+  "recordingSilenceMinutes": "无声提醒时间（分钟）",
+  "recordingSilenceMinutesInfo": "录音过程中，如果某个音源持续这么长时间没有声音，Vibe 会把窗口提到前面，并指出没有收到声音的设备。每次录音中每个音源只提醒一次。时间越短越早发现静音或选错的设备，但长时间停顿也会被打断；默认的 5 分钟适合有实际讨论的会议。"
 }
