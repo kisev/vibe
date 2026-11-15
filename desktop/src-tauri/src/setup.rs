@@ -23,9 +23,6 @@ pub struct ServerState {
 pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     // Create app directories
     let local_app_data_dir = app.path().app_local_data_dir()?;
-    // Entries older than this are never reused in practice, and the cache holds
-    // transcript text, so it should not grow forever.
-    cleanup_transcription_cache(app.handle());
     let app_config_dir = app.path().app_config_dir()?;
     fs::create_dir_all(&local_app_data_dir)
         .unwrap_or_else(|_| panic!("cant create local app data directory at {}", local_app_data_dir.display()));
@@ -56,6 +53,9 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     crate::cleaner::clean_old_logs(app.handle()).log_error();
     crate::cleaner::clean_old_files().log_error();
     crate::cleaner::clean_updater_files().log_error();
+    // After logging, because the cleanup reports through `tracing`: entries older than this are
+    // never reused in practice, and the cache holds transcript text, so it must not grow forever.
+    cleanup_transcription_cache(app.handle());
     tracing::debug!("Vibe App Running");
 
     // Re-applying an existing registration upgrades installs created before the hidden launch
@@ -108,6 +108,13 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
             };
             let state = app_handle.state::<Mutex<ServerState>>();
             let mut guard = state.lock().await;
+            // The handshake can take up to `READY_TIMEOUT`, and the user may have turned the API
+            // off (or quit the app) meanwhile: re-read the intent under the lock, otherwise a
+            // server nobody asked for comes back and its URL is published again.
+            if !crate::cmd::config::api_server_enabled(&app_handle) {
+                // Dropping `process` kills the sidecar through its `Drop`.
+                return;
+            }
             // A command may have brought a server up while this one handshook; that process
             // serves, and the one just spawned is dropped (and killed) unused.
             let mut served = None;
@@ -273,10 +280,20 @@ pub(crate) fn prune_older_than(
         if !path.is_dir() {
             continue;
         }
-        let newest = newest_modified(&path)?;
+        // One unreadable or locked entry must not stop the rest of the cache from being pruned:
+        // it would otherwise fail at the same entry on every launch.
+        let newest = match newest_modified(&path) {
+            Ok(newest) => newest,
+            Err(error) => {
+                tracing::warn!("could not inspect cache entry {}: {error}", path.display());
+                continue;
+            }
+        };
         if now.duration_since(newest).unwrap_or_default() > max_age {
-            std::fs::remove_dir_all(&path)?;
-            removed += 1;
+            match std::fs::remove_dir_all(&path) {
+                Ok(()) => removed += 1,
+                Err(error) => tracing::warn!("could not remove cache entry {}: {error}", path.display()),
+            }
         }
     }
     Ok(removed)

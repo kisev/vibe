@@ -6,13 +6,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs::File;
 use std::io::BufWriter;
+use std::ops::Mul;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Listener};
 
-use crate::error::LogError;
+use crate::error::{CommandResult, LogError};
 use crate::ffmpeg::{get_local_time, random_string};
 
 type WavWriterHandle = Arc<Mutex<Option<hound::WavWriter<BufWriter<File>>>>>;
@@ -459,9 +460,6 @@ fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec 
         sample_format: sample_format(config.sample_format()),
     }
 }
-
-use crate::error::CommandResult;
-use std::ops::Mul;
 
 fn write_input_data<T, U>(input: &[T], writer: &WavWriterHandle)
 where

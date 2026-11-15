@@ -163,12 +163,13 @@ fn push_filter(filters: &mut Vec<String>, flag: &str, chain: &str) -> Result<(),
             "`{flag}` needs a filter chain after it, got `{chain}`; run the command without it if no filter is wanted"
         ));
     }
-    let quoted = |c: char| c == '"' || c == '\'';
-    if chain.starts_with(quoted) || chain.ends_with(quoted) {
-        // A quote at either edge means a space split the chain: `"volume=2dB,` lost its tail.
-        // Quotes inside one token (`enable='between(t,1,2)'`) are fine and reach ffmpeg intact.
+    let is_quote = |c: char| c == '"' || c == '\'';
+    // Balanced quotes around filter arguments (`volume='2dB'`, `enable='between(t,1,2)'`) are
+    // valid and reach ffmpeg intact; an odd count is what a space-split chain leaves behind
+    // (`"volume=2dB,` and `atempo=2"` each carry one).
+    if chain.chars().filter(|&c| is_quote(c)).count() % 2 == 1 {
         return Err(format!(
-            "`{flag}` chain `{chain}` starts or ends with a quote, so a space split it; write the chain without spaces"
+            "`{flag}` chain `{chain}` has an unbalanced quote, so a space split it; write the whole chain without spaces"
         ));
     }
     if chain.starts_with(',') || chain.ends_with(',') {
@@ -208,8 +209,13 @@ impl Drop for TempAudio {
 /// The audio the engine receives, plus the temporary copy its guard deletes when dropped.
 ///
 /// With nothing asked for the original path passes through untouched; otherwise the bundled
-/// ffmpeg writes a fresh temporary WAV and that copy is what gets uploaded.
-fn upload_audio(audio_path: &Path, options: Option<&FfmpegOptions>) -> Result<(PathBuf, TempAudio), CommandError> {
+/// ffmpeg writes a fresh temporary WAV and that copy is what gets uploaded. `cancel` stops the
+/// ffmpeg pass mid-recording instead of waiting for it to finish.
+fn upload_audio(
+    audio_path: &Path,
+    options: Option<&FfmpegOptions>,
+    cancel: &AtomicBool,
+) -> Result<(PathBuf, TempAudio), CommandError> {
     let args = match options.map(processing_args) {
         None | Some(Ok(None)) => return Ok((audio_path.to_path_buf(), TempAudio(None))),
         Some(Ok(Some(args))) => args,
@@ -224,8 +230,27 @@ fn upload_audio(audio_path: &Path, options: Option<&FfmpegOptions>) -> Result<(P
     // The guard exists before ffmpeg runs, not after it succeeds: a pass that dies mid-encode
     // leaves a half-written WAV, and the temp folder only prunes earlier days' files.
     let guard = TempAudio(Some(output.clone()));
-    crate::ffmpeg::normalize(audio_path.to_path_buf(), output.clone(), Some(args)).map_err(processing_error)?;
+    match crate::ffmpeg::normalize_cancellable(audio_path.to_path_buf(), output.clone(), Some(args), cancel) {
+        Ok(()) => {}
+        // A cancelled pass is the user's doing, not a conversion failure the frontend should
+        // report as one.
+        Err(_) if cancel.load(Ordering::Relaxed) => {
+            return Err(CommandError {
+                code: "aborted".to_string(),
+                message: "Transcription cancelled during preprocessing".to_string(),
+            })
+        }
+        Err(error) => return Err(processing_error(error)),
+    }
     Ok((output, guard))
+}
+
+/// The error a cancellation ends the command with, so the frontend can tell it from a failure.
+fn cancelled() -> CommandError {
+    CommandError {
+        code: "aborted".to_string(),
+        message: "Transcription cancelled during preprocessing".to_string(),
+    }
 }
 
 pub(crate) const SERVER_DIED: &str = "vibe-server process died during transcription";
@@ -282,10 +307,32 @@ pub async fn transcribe(
     let abort_atomic = Arc::new(AtomicBool::new(false));
     let abort_atomic_c = abort_atomic.clone();
     let listener_handle = app_handle.clone();
-    app_handle.listen("abort_transcribe", move |_| {
+    let listener_id = app_handle.listen("abort_transcribe", move |_| {
         let _ = set_progress_bar(&listener_handle, None);
         abort_atomic_c.store(true, Ordering::Relaxed);
     });
+
+    // The listener is removed on every way out of this command (`?` included); leaving it
+    // registered would pile up one global handler per transcription, each holding an `AppHandle`.
+    struct UnlistenOnDrop(tauri::AppHandle, tauri::EventId);
+    impl Drop for UnlistenOnDrop {
+        fn drop(&mut self) {
+            self.0.unlisten(self.1);
+        }
+    }
+    let _unlisten = UnlistenOnDrop(app_handle.clone(), listener_id);
+
+    // Without a model the preprocessing pass below would run for the length of the recording
+    // and then fail: check first, taking the lock only for the look-up.
+    {
+        let state = server_state.lock().await;
+        if state.process.is_none() {
+            return Err(CommandError {
+                code: "no_model".to_string(),
+                message: "Please load model first".to_string(),
+            });
+        }
+    }
 
     // Audio processing happens on this side, before upload: the pinned server converts to WAV
     // without a filter, so a setting it never sees is a setting that does nothing. The guard
@@ -294,19 +341,26 @@ pub async fn transcribe(
     // an async worker: a long preprocessing pass must not hold that worker.
     let (upload_path, _processed) = {
         let processing = options.ffmpeg_options.clone();
-        tauri::async_runtime::spawn_blocking(move || upload_audio(&audio_path, processing.as_ref()))
-            .await
-            .map_err(|error| CommandError {
-                code: "audio_processing_failed".to_string(),
-                message: format!("Audio processing task failed: {error}"),
-            })??
+        let processing_cancel = abort_atomic.clone();
+        let processed =
+            tauri::async_runtime::spawn_blocking(move || upload_audio(&audio_path, processing.as_ref(), &processing_cancel))
+                .await
+                .map_err(|error| CommandError {
+                    code: "audio_processing_failed".to_string(),
+                    message: format!("Audio processing task failed: {error}"),
+                })?;
+        // A cancel that lost the race with the pass ending still ends the command as cancelled.
+        match processed {
+            Ok(processed) => processed,
+            Err(_) if abort_atomic.load(Ordering::Relaxed) => return Err(cancelled()),
+            Err(error) => return Err(error),
+        }
     };
     if abort_atomic.load(Ordering::Relaxed) {
         tracing::debug!("transcription aborted by user during preprocessing");
-        return Ok(Transcript {
-            processing_time_sec: 0,
-            segments: Vec::new(),
-        });
+        // `Ok` with an empty transcript would look like a successful run: the frontend would
+        // mark the task done and overwrite an existing transcript's segments with nothing.
+        return Err(cancelled());
     }
     options.path = upload_path.to_string_lossy().into_owned();
 
@@ -488,7 +542,7 @@ mod tests {
             ("-filter:a=", "needs a filter chain after it"),
             ("-filter:a:0 volume=2dB", "targets one stream"),
             ("-filter:0 volume=2dB", "targets one stream"),
-            (r#"-af "volume=2dB, atempo=2""#, "starts or ends with a quote"),
+            (r#"-af "volume=2dB, atempo=2""#, "unbalanced quote"),
             ("-af volume=2dB, atempo=2", "ends on a comma"),
         ] {
             let options = FfmpegOptions {
@@ -497,6 +551,26 @@ mod tests {
             };
             let error = processing_args(&options).expect_err(custom);
             assert!(error.contains(fragment), "{custom}: {error}");
+        }
+    }
+
+    #[test]
+    fn balanced_quotes_in_a_filter_argument_pass_through() {
+        // Quote characters around a filter value are part of a valid ffmpeg chain; only an
+        // unbalanced count means the chain was split on a space.
+        for custom in [
+            "-af volume='2dB'",
+            "-af atempo='1.5'",
+            "-af silenceremove=stop_threshold='-30dB'",
+            "-af volume=enable='between(t,1,2)'",
+        ] {
+            let options = FfmpegOptions {
+                normalize_loudness: true,
+                custom_command: Some(custom.to_string()),
+            };
+            let args = processing_args(&options).expect(custom).expect("a mergeable chain");
+            let chain = custom.trim_start_matches("-af ");
+            assert_eq!(args[1], format!("{NORMALIZE},{chain}"), "{custom}");
         }
     }
 
@@ -571,7 +645,7 @@ mod tests {
                 custom_command: None,
             }),
         ] {
-            let (upload, guard) = upload_audio(&original, options).unwrap();
+            let (upload, guard) = upload_audio(&original, options, &AtomicBool::new(false)).unwrap();
             assert_eq!(upload, original);
             assert_eq!(std::fs::read(&original).unwrap(), b"not really audio");
             assert_eq!(guard.0, None);
@@ -606,7 +680,7 @@ mod tests {
 
         // A dev host without ffmpeg can only prove the failure is loud; the app ships ffmpeg.
         if crate::ffmpeg::find_ffmpeg_path().is_none() {
-            let Err(error) = upload_audio(&original, Some(&options)) else {
+            let Err(error) = upload_audio(&original, Some(&options), &AtomicBool::new(false)) else {
                 panic!("ffmpeg is missing, so preprocessing must fail rather than send the original");
             };
             assert_eq!(error.code, "ffmpeg_failed");
@@ -616,7 +690,7 @@ mod tests {
             return;
         }
 
-        let (upload, guard) = upload_audio(&original, Some(&options)).unwrap();
+        let (upload, guard) = upload_audio(&original, Some(&options), &AtomicBool::new(false)).unwrap();
         assert_ne!(upload, original);
         assert!(upload.is_file());
         assert_eq!(std::fs::read(&original).unwrap(), before);

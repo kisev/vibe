@@ -5,7 +5,14 @@ use rand::Rng;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use which::which;
+
+/// The error a cancelled pass ends with, so the caller can tell it apart from a failed one.
+pub const NORMALIZE_CANCELLED: &str = "the audio pass was cancelled";
+
+/// How often a cancellable pass asks whether the user cancelled it.
+const CANCEL_POLL: std::time::Duration = std::time::Duration::from_millis(100);
 
 pub fn get_local_time() -> String {
     let now = Local::now();
@@ -70,6 +77,18 @@ pub fn find_ffmpeg_path() -> Option<PathBuf> {
 }
 
 pub fn normalize(input: PathBuf, output: PathBuf, additional_ffmpeg_args: Option<Vec<String>>) -> Result<()> {
+    normalize_cancellable(input, output, additional_ffmpeg_args, &AtomicBool::new(false))
+}
+
+/// [`normalize`] that stops ffmpeg as soon as `cancel` is set, instead of holding the caller for
+/// the length of the recording. The pass ends with [`NORMALIZE_CANCELLED`], which the caller can
+/// report as a cancellation rather than a failed conversion.
+pub fn normalize_cancellable(
+    input: PathBuf,
+    output: PathBuf,
+    additional_ffmpeg_args: Option<Vec<String>>,
+    cancel: &AtomicBool,
+) -> Result<()> {
     let ffmpeg_path = find_ffmpeg_path().context("ffmpeg not found")?;
     tracing::debug!("ffmpeg path is {}", ffmpeg_path.display());
 
@@ -97,7 +116,20 @@ pub fn normalize(input: PathBuf, output: PathBuf, additional_ffmpeg_args: Option
     let cmd = cmd.creation_flags(CREATE_NO_WINDOW);
 
     let mut pid = cmd.spawn()?;
-    if !pid.wait()?.success() {
+    // Wait in short steps rather than blocking in `wait`: a pass over a long recording must be
+    // interruptible, and a killed child leaves no output to keep.
+    let status = loop {
+        if let Some(status) = pid.try_wait()? {
+            break status;
+        }
+        if cancel.load(Ordering::Relaxed) {
+            let _ = pid.kill();
+            let _ = pid.wait();
+            bail!(NORMALIZE_CANCELLED);
+        }
+        std::thread::sleep(CANCEL_POLL);
+    };
+    if !status.success() {
         let mut stderr_output = String::new();
         if let Some(ref mut stderr) = pid.stderr {
             stderr.take(1000).read_to_string(&mut stderr_output)?;
@@ -106,7 +138,7 @@ pub fn normalize(input: PathBuf, output: PathBuf, additional_ffmpeg_args: Option
     }
 
     if !output.exists() {
-        return Err(eyre::eyre!("seems like ffmpeg failed for some reason. output not exists"));
+        bail!("seems like ffmpeg failed for some reason. output not exists");
     }
     Ok(())
 }

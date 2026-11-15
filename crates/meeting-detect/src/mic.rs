@@ -198,23 +198,31 @@ mod platform {
             ProcessRefreshKind::nothing().with_exe(UpdateKind::OnlyIfNotSet),
         );
         for owner in std::mem::take(processes) {
-            let expected = owner.executable.as_deref().filter(|_| is_browser(&owner));
+            let Some(expected) = owner.executable.as_deref().filter(|_| is_browser(&owner)) else {
+                processes.push(owner);
+                continue;
+            };
             let pids: Vec<u32> = system
                 .processes()
                 .values()
                 .filter_map(|process| {
                     let actual = process.exe()?.to_string_lossy();
-                    actual.eq_ignore_ascii_case(expected?).then(|| process.pid().as_u32())
+                    actual.eq_ignore_ascii_case(expected).then(|| process.pid().as_u32())
                 })
                 .collect();
-            if pids.is_empty() {
+            let Some((last, rest)) = pids.split_last() else {
                 processes.push(owner);
-            } else {
-                processes.extend(pids.into_iter().map(|pid| ProcessInfo {
-                    pid: Some(pid),
-                    ..owner.clone()
-                }));
-            }
+                continue;
+            };
+            // The owner itself becomes the last pid's entry, so only the others need a clone.
+            processes.extend(rest.iter().map(|&pid| ProcessInfo {
+                pid: Some(pid),
+                ..owner.clone()
+            }));
+            processes.push(ProcessInfo {
+                pid: Some(*last),
+                ..owner
+            });
         }
     }
 

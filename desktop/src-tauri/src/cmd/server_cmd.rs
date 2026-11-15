@@ -226,7 +226,21 @@ pub async fn get_model_metadata(app_handle: tauri::AppHandle, model_path: String
     // A server that is already up (the API was asked for, or a transcription is running) serves
     // the read and keeps running.
     if state.process.as_mut().is_some_and(|process| process.is_alive()) {
-        return Ok(state.process.as_ref().unwrap().model_metadata(&model_path).await?);
+        let process = state.process.as_ref().expect("checked above");
+        let (client, base_url) = (process.client(), process.base_url());
+        // Nothing below needs the shared state; the client has no whole-request timeout, so a
+        // live but stalled server would otherwise hold this command, and every server command
+        // queued on the same lock, forever.
+        drop(state);
+        let read = crate::server::ServerProcess::model_metadata_with(&client, &base_url, &model_path);
+        return match tokio::time::timeout(METADATA_TIMEOUT, read).await {
+            Ok(metadata) => Ok(metadata?),
+            Err(_) => Err(eyre::eyre!(
+                "timed out after {}s reading model metadata from the running server",
+                METADATA_TIMEOUT.as_secs()
+            )
+            .into()),
+        };
     }
     state.process = None;
     // The probe path needs none of the shared state, and its spawn handshakes with the sidecar
@@ -249,7 +263,10 @@ pub async fn get_model_metadata(app_handle: tauri::AppHandle, model_path: String
             METADATA_TIMEOUT.as_secs()
         )),
     };
-    probe.kill();
+    // `kill` waits for the child, so it runs on a blocking thread like the spawn did.
+    tauri::async_runtime::spawn_blocking(move || probe.kill())
+        .await
+        .map_err(|error| eyre::eyre!("killing the probe server task failed: {error}"))?;
     Ok(metadata?)
 }
 

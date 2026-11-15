@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use tauri::{AppHandle, Emitter, Url};
 use tauri_plugin_store::StoreExt;
 
-/// The persisted allowlist. Replaces the old meeting-host key.
+/// The persistent allowlist. Replaces the old meeting-host key.
 pub const ALLOWED_HOSTS_KEY: &str = "browser.allowedHosts";
 /// The key the previous release wrote; migrated into [`ALLOWED_HOSTS_KEY`] on startup.
 pub const LEGACY_HOSTS_KEY: &str = "meeting.browserHosts";
@@ -21,6 +21,11 @@ pub const POLICY_KEY: &str = "browser.policy";
 pub const BLOCKED_HOSTS_EVENT: &str = "browser-blocked-hosts";
 /// Emitted with the new mode whenever the policy is saved, so an already-open chrome updates.
 pub const POLICY_CHANGED_EVENT: &str = "browser-policy";
+
+/// Whether this platform can enforce `strict` mode's resource filtering. Only the Windows
+/// WebView2 backend exposes a per-request hook; on macOS and Linux both modes are the same
+/// navigation gate, so Settings must not offer `strict` there as if it filtered resources.
+pub const RESOURCE_FILTER_SUPPORTED: bool = cfg!(windows);
 
 /// How far the allowlist reaches. `strict` checks every origin; `trusted-site` lets an allowed
 /// page load its resources from anywhere but never relaxes the navigation gate.
@@ -52,14 +57,15 @@ impl Policy {
 
     /// Navigation is gated identically in both modes.
     pub fn blocks_navigation(self, url: &str, allowed: &[String]) -> bool {
-        should_block(url, allowed)
+        should_block(url, allowed, false)
     }
 
-    /// Only `strict` blocks resources; `trusted-site` leaves them to the engine.
+    /// Only `strict` blocks resources; `trusted-site` leaves them to the engine. Only Windows
+    /// enforces this at all (see [`RESOURCE_FILTER_SUPPORTED`]).
     #[cfg_attr(not(windows), allow(dead_code))]
     pub fn blocks_resource(self, url: &str, allowed: &[String]) -> bool {
         match self {
-            Self::Strict => should_block(url, allowed),
+            Self::Strict => should_block(url, allowed, true),
             Self::TrustedSite => false,
         }
     }
@@ -77,6 +83,10 @@ static ALLOWED: Lazy<Mutex<Arc<Vec<String>>>> = Lazy::new(|| Mutex::new(Arc::def
 static POLICY: Lazy<RwLock<Policy>> = Lazy::new(|| RwLock::new(Policy::default()));
 /// Unique blocked hosts, newest first. Per app run, cleared only by allowing a host.
 static BLOCKED: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
+/// Serialises the allowlist read-modify-write. Tauri commands run on a thread pool, so two
+/// concurrent add/remove calls could each read the old list and the last save would drop the
+/// other's change (or bring a just-removed host back, which fails open at the gate).
+static HOSTS_EDIT: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 /// Accepts a bare host name or a pasted URL and returns a lowercase host name, or `None` when
 /// nothing usable is left (empty input, or a single label other than `localhost`).
@@ -150,21 +160,24 @@ pub fn is_allowed_url(url: &str, allowed: &[String]) -> bool {
     is_allowed_host(host, allowed)
 }
 
-/// Whether an engine event should be refused. Engine-internal schemes (`about:`, `data:`,
-/// `blob:`) stay untouched; plain http and ws are refused outright, and https/wss must point at
-/// an allowed host (so a page's secure socket to an allowed origin keeps working).
+/// Whether an engine event should be refused. `about:` stays untouched; plain http and ws are
+/// refused outright, and https/wss must point at an allowed host (so a page's secure socket to an
+/// allowed origin keeps working). `data:`/`blob:` documents are fine as subresources but not as a
+/// top-level navigation: the address bar would keep showing the previous URL while generated
+/// content paints the page.
 ///
 /// Everything else — `file:`, `javascript:`, a custom scheme, a URL the parser rejects — is
 /// refused too: navigation is gated in every mode, so the only schemes that pass without a host
 /// check are the engine's own internals.
-pub fn should_block(url: &str, allowed: &[String]) -> bool {
+pub fn should_block(url: &str, allowed: &[String], resource: bool) -> bool {
     let Ok(parsed) = Url::parse(url) else {
         return true;
     };
     match parsed.scheme() {
         "http" | "ws" => true,
         "https" | "wss" => parsed.host_str().map(|host| !is_allowed_host(host, allowed)).unwrap_or(true),
-        "about" | "data" | "blob" => false,
+        "about" => false,
+        "data" | "blob" => !resource,
         _ => true,
     }
 }
@@ -352,6 +365,8 @@ fn remove_blocked_host(app: &AppHandle, host: &str) -> bool {
 
 /// Add a host to the allowlist and drop it from the blocked registry.
 pub fn allow_host(app: &AppHandle, raw: &str) -> Result<Vec<String>, String> {
+    // Held from the read to the save, so a concurrent mutation cannot lose this one.
+    let _edit = HOSTS_EDIT.lock().map_err(|_| "allowlist state is unavailable".to_string())?;
     let host = normalize_host(raw).ok_or_else(|| format!("Enter a bare host name, not {raw:?}"))?;
     let mut hosts = load_allowed(app);
     if !hosts.contains(&host) {
@@ -365,6 +380,7 @@ pub fn allow_host(app: &AppHandle, raw: &str) -> Result<Vec<String>, String> {
 /// Remove a host from the allowlist; open pages keep what they already loaded until the next
 /// navigation, which is then refused and recorded.
 pub fn remove_allowed_host(app: &AppHandle, raw: &str) -> Result<Vec<String>, String> {
+    let _edit = HOSTS_EDIT.lock().map_err(|_| "allowlist state is unavailable".to_string())?;
     let host = normalize_host(raw).ok_or_else(|| format!("Invalid host {raw:?}"))?;
     let hosts = load_allowed(app);
     save_allowed(app, hosts.into_iter().filter(|item| item != &host).collect())
@@ -393,23 +409,27 @@ mod tests {
     #[test]
     fn navigation_and_resources_block_http_and_foreign_hosts_only() {
         let allowed = hosts(&["example.com"]);
-        assert!(!should_block("https://cdn.example.com/app.js", &allowed));
-        assert!(should_block("https://cdn.other.test/app.js", &allowed));
-        // Plain http is refused even from an allowed host, but engine internals pass through.
-        assert!(should_block("http://example.com/app.js", &allowed));
+        assert!(!should_block("https://cdn.example.com/app.js", &allowed, true));
+        assert!(should_block("https://cdn.other.test/app.js", &allowed, true));
+        // Plain http is refused even from an allowed host.
+        assert!(should_block("http://example.com/app.js", &allowed, true));
         // A secure socket keeps working only on an allowed origin.
-        assert!(!should_block("wss://meet.example.com/socket", &allowed));
-        assert!(should_block("wss://other.test/socket", &allowed));
-        assert!(should_block("ws://meet.example.com/socket", &allowed));
-        assert!(!should_block("about:blank", &allowed));
-        assert!(!should_block("data:text/plain,hi", &allowed));
-        assert!(!should_block("blob:https://example.com/abc", &allowed));
+        assert!(!should_block("wss://meet.example.com/socket", &allowed, true));
+        assert!(should_block("wss://other.test/socket", &allowed, true));
+        assert!(should_block("ws://meet.example.com/socket", &allowed, true));
+        // Generated documents pass as subresources, but a top-level data:/blob: navigation is
+        // refused: the address bar would keep showing the previous page's URL.
+        assert!(!should_block("about:blank", &allowed, false));
+        assert!(!should_block("data:text/plain,hi", &allowed, true));
+        assert!(!should_block("blob:https://example.com/abc", &allowed, true));
+        assert!(should_block("data:text/html,<script>alert(1)</script>", &allowed, false));
+        assert!(should_block("blob:https://example.com/abc", &allowed, false));
         // Only the engine's own internals pass without a host check; every other scheme,
         // including a URL the parser rejects, is refused.
-        assert!(should_block("file:///etc/passwd", &allowed));
-        assert!(should_block("javascript:alert(1)", &allowed));
-        assert!(should_block("zoommtg://zoom.us/join?confno=1", &allowed));
-        assert!(should_block("not a url", &allowed));
+        assert!(should_block("file:///etc/passwd", &allowed, true));
+        assert!(should_block("javascript:alert(1)", &allowed, true));
+        assert!(should_block("zoommtg://zoom.us/join?confno=1", &allowed, true));
+        assert!(should_block("not a url", &allowed, true));
     }
 
     #[test]

@@ -15,7 +15,12 @@ pub fn meeting_url(raw: &str) -> Option<String> {
     match scheme.to_ascii_lowercase().as_str() {
         "zoommtg" | "zoomus" => zoom_url(rest),
         "msteams" | "teams" => teams_url(rest),
-        "webex" | "wbx" => Some(format!("https://{rest}")),
+        "webex" | "wbx" => {
+            // Same host rule as the other branches: anything without a real host is not a URL
+            // the allowlist can judge, so it must not reach the opener.
+            let (host, tail) = split_host(rest)?;
+            Some(format!("https://{host}{tail}"))
+        }
         _ => None,
     }
 }
@@ -35,9 +40,12 @@ fn zoom_url(rest: &str) -> Option<String> {
     }
     let mut url = format!("https://{host}/j/{confno}");
     if let Some(pwd) = form_value(query, "pwd") {
+        // Zoom already percent-encodes the password in the link (`p%40ss` for `p@ss`), so decode
+        // it first: encoding the encoded form again would send `p%2540ss` and always fail.
+        let decoded = urlencoding::decode(pwd).ok()?;
         // The password rides in a query value: encode it so `#`, `&` or `=` cannot escape it.
         url.push_str("?pwd=");
-        url.push_str(&form_urlencoded::byte_serialize(pwd.as_bytes()).collect::<String>());
+        url.push_str(&form_urlencoded::byte_serialize(decoded.as_bytes()).collect::<String>());
     }
     Some(url)
 }
@@ -92,6 +100,25 @@ mod tests {
             meeting_url("zoommtg://zoom.us/join?confno=1&pwd=a#b"),
             Some("https://zoom.us/j/1?pwd=a%23b".to_string())
         );
+        // Zoom already encoded the password in the link; it must not be encoded again.
+        assert_eq!(
+            meeting_url("zoommtg://zoom.us/join?confno=1&pwd=p%40ss"),
+            Some("https://zoom.us/j/1?pwd=p%40ss".to_string())
+        );
+        assert_eq!(
+            meeting_url("zoommtg://zoom.us/join?confno=1&pwd=p%2540ss"),
+            Some("https://zoom.us/j/1?pwd=p%2540ss".to_string())
+        );
+    }
+
+    #[test]
+    fn webex_links_need_a_real_host() {
+        assert_eq!(
+            meeting_url("webex://acme.webex.com/meet/room"),
+            Some("https://acme.webex.com/meet/room".to_string())
+        );
+        assert_eq!(meeting_url("wbx://x"), None);
+        assert_eq!(meeting_url("webex:///meet/room"), None);
     }
 
     #[test]

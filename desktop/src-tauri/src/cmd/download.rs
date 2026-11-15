@@ -365,13 +365,27 @@ const LEGACY_DIARIZATION_FILES: [&str; 4] = [
     "segmentation-3.0.onnx",
 ];
 
-/// Delete one model file from disk, on request from the models settings. The
-/// path comes from the models folder scan, but the extension guard keeps a
-/// stale or malformed path from removing anything but model weights — the
-/// legacy diarization artifacts above are the one name-matched exception.
+/// Delete one model file from disk, on request from the models settings. The path comes from the
+/// models folder scan, but nothing in the Rust side may trust that: the meeting browser's webview
+/// renders remote content and shares the app's IPC, so the path is re-checked here.
 #[tauri::command]
-pub async fn delete_model_file(path: String) -> CommandResult<()> {
+pub async fn delete_model_file(app_handle: tauri::AppHandle, path: String) -> CommandResult<()> {
     let path = PathBuf::from(&path);
+    // Confinement first: the extension check alone would let a forged path delete any
+    // `.bin`/`.gguf` file, and any file at all under one of the legacy names. Both sides are
+    // canonicalised, so `..` and a symlinked folder cannot pass; comparing the parent (rather
+    // than a string prefix) rejects a sibling like `<models>-old/weights.bin`.
+    let models_folder = crate::cmd::app::get_models_folder(app_handle.clone())?
+        .canonicalize()
+        .map_err(|error| eyre::eyre!("the models folder is unavailable: {error}"))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| eyre::eyre!("refusing to delete a path without a parent: {path:?}"))?
+        .canonicalize()
+        .map_err(|error| eyre::eyre!("refusing to delete a file outside the models folder: {path:?} ({error})"))?;
+    if parent != models_folder {
+        return Err(eyre::eyre!("refusing to delete a file outside the models folder: {path:?}").into());
+    }
     let legacy = path
         .file_name()
         .and_then(|name| name.to_str())

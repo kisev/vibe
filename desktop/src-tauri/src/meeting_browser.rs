@@ -67,6 +67,11 @@ struct BrowserSession {
     /// A resource of this page was refused under the strict policy. Only such a page has
     /// anything to retry after a host is allowed, so only such a page is reloaded.
     blocked_requests: bool,
+    /// The URL and history position of the last load that finished. A navigation updates the
+    /// history before it lands; this is what the webview is actually showing, so a navigation
+    /// the engine refuses can put the chrome back on it.
+    loaded_url: String,
+    loaded_index: usize,
 }
 
 #[derive(Default)]
@@ -121,6 +126,19 @@ fn sync_meeting_suppression(count: usize) {
     crate::meeting_prompt::set_in_app_session(count > 0);
 }
 
+/// A URL for logs: the query and fragment are dropped, because meeting links carry the meeting
+/// password in `?pwd=…` and logs are routinely attached to bug reports.
+fn redact_query(raw: &str) -> String {
+    match Url::parse(raw) {
+        Ok(mut url) => {
+            url.set_query(None);
+            url.set_fragment(None);
+            url.to_string()
+        }
+        Err(_) => raw.split(['?', '#']).next().unwrap_or_default().to_string(),
+    }
+}
+
 /// Fold a finished page load into the session's history and publish the new state.
 fn handle_page_load(app: &AppHandle, session: u64, url: &Url) {
     // Only web pages belong in the browser history; about:/data: are webview internals.
@@ -147,7 +165,9 @@ fn handle_page_load(app: &AppHandle, session: u64, url: &Url) {
                     state.index = state.history.len() - 1;
                 }
             }
-            state.info.url = normalized;
+            state.info.url = normalized.clone();
+            state.loaded_url = normalized;
+            state.loaded_index = state.index;
             state.loaded = true;
             state.info.host = browser_policy::host_of(&state.info.url);
             state.info.can_back = state.index > 0;
@@ -191,9 +211,16 @@ fn close_session(app: &AppHandle, session: u64) -> Result<(), String> {
         state.force_close = true;
     }
     if let Some(window) = app.get_window(&browser_label(session)) {
-        window
-            .close()
-            .map_err(|error| format!("Could not close the browser window: {error}"))?;
+        if let Err(error) = window.close() {
+            // The close failed, so the session lives on: clear the bypass, otherwise the next
+            // manual close would skip the recording prompt without the user asking for that.
+            if let Ok(mut runtime) = lock_runtime() {
+                if let Some(state) = runtime.sessions.get_mut(&session) {
+                    state.force_close = false;
+                }
+            }
+            return Err(format!("Could not close the browser window: {error}"));
+        }
     } else {
         finalize_session(app, session);
     }
@@ -310,7 +337,7 @@ fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo
                 .on_page_load(move |webview, payload| {
                     tracing::info!(
                         session,
-                        url = %payload.url(),
+                        url = %redact_query(payload.url().as_str()),
                         event = ?payload.event(),
                         "meeting browser page load"
                     );
@@ -360,6 +387,9 @@ fn refuse_if_blocked(app: &AppHandle, session: u64, url: &str) -> bool {
     if !host.is_empty() {
         browser_policy::record_blocked_host(app, &host);
     }
+    // A refused redirect arrives after the chrome already recorded the URL it was started for:
+    // put the session back on the page the webview is still showing.
+    restore_displayed(app, session);
     if let Err(error) = app.emit(
         NAVIGATION_BLOCKED_EVENT,
         serde_json::json!({ "session": session, "host": host }),
@@ -367,6 +397,37 @@ fn refuse_if_blocked(app: &AppHandle, session: u64, url: &str) -> bool {
         tracing::warn!("could not emit the blocked navigation: {error}");
     }
     true
+}
+
+/// Put the session back on the page the webview still shows after a navigation was refused.
+///
+/// History is updated when a navigation is issued, before it lands; a redirect the gate refuses
+/// would otherwise leave the address bar on a URL that never loaded. When nothing was issued
+/// since the last finished load this is a no-op.
+fn restore_displayed(app: &AppHandle, session: u64) {
+    let changed = {
+        let Ok(mut runtime) = RUNTIME.lock() else {
+            return;
+        };
+        let Some(state) = runtime.sessions.get_mut(&session) else {
+            return;
+        };
+        if state.info.url == state.loaded_url {
+            return;
+        }
+        let previous = state.info.clone();
+        state.index = state.loaded_index;
+        // Everything after the displayed entry was reached through the refused navigation.
+        state.history.truncate(state.loaded_index + 1);
+        state.info.url = state.loaded_url.clone();
+        state.info.host = browser_policy::host_of(&state.info.url);
+        state.info.can_back = state.index > 0;
+        state.info.can_forward = state.index + 1 < state.history.len();
+        (state.info != previous).then(|| state.info.clone())
+    };
+    if let Some(info) = changed {
+        emit_session(app, &info);
+    }
 }
 
 /// macOS fallback: keep the page embedded but with no chrome bar. WKWebView in this Tauri
@@ -384,7 +445,7 @@ fn build_session_window(app: &AppHandle, session: u64, info: &BrowserSessionInfo
         .on_page_load(move |window, payload| {
             tracing::info!(
                 session,
-                url = %payload.url(),
+                url = %redact_query(payload.url().as_str()),
                 event = ?payload.event(),
                 "meeting browser page load"
             );
@@ -448,12 +509,15 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
                 session,
                 BrowserSession {
                     info: info.clone(),
-                    history: vec![normalized],
+                    history: vec![normalized.clone()],
                     index: 0,
                     force_close: false,
                     loaded: false,
                     expanded: false,
                     blocked_requests: false,
+                    // Nothing has loaded yet: the initial URL is what a refusal rolls back to.
+                    loaded_url: normalized,
+                    loaded_index: 0,
                 },
             );
             (None, Some(info))
@@ -470,7 +534,7 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
         return Err("the meeting browser session was neither found nor created".to_string());
     };
     let session = info.session;
-    tracing::info!(session, url = %info.url, host = %info.host, "opening meeting browser");
+    tracing::info!(session, url = %redact_query(&info.url), host = %info.host, "opening meeting browser");
     tracing::info!(session, "creating the browser window");
     // Suppress external detection as soon as the browser session exists, before the webview
     // has loaded enough to fire its first page event.
@@ -552,7 +616,7 @@ pub async fn open_meeting_browser(app: AppHandle, url: String) -> Result<Browser
             if !unloaded {
                 return;
             }
-            tracing::warn!(session, url = %watchdog_url, "meeting browser page did not finish loading");
+            tracing::warn!(session, url = %redact_query(&watchdog_url), "meeting browser page did not finish loading");
             if let Err(error) = watchdog_app.emit_to("main", LOAD_FAILED_EVENT, serde_json::json!({ "session": session })) {
                 tracing::warn!("could not emit meeting browser load failure: {error}");
             }
@@ -762,15 +826,24 @@ pub fn set_meeting_schemes_enabled(app: AppHandle, enabled: bool) -> Result<(), 
     if enabled && !crate::custom_protocol::MEETING_SCHEMES_SUPPORTED {
         return Err("registering meeting schemes is not supported on this platform".to_string());
     }
-    if enabled {
-        crate::custom_protocol::register_meeting_schemes()
-    } else {
-        crate::custom_protocol::unregister_meeting_schemes()
-    }
-    .map_err(|error| format!("Could not update the system link handlers: {error}"))?;
+    // Save the intent before touching the system: if the registration then fails, the flag is
+    // rolled back, so a failure can never leave the setting on while nothing was registered.
     let store = app.store(STORE_FILENAME).map_err(|error| error.to_string())?;
     store.set(SCHEMES_KEY, serde_json::json!(enabled));
     store.save().map_err(|error| error.to_string())?;
+    let registered = if enabled {
+        crate::custom_protocol::register_meeting_schemes()
+    } else {
+        crate::custom_protocol::unregister_meeting_schemes()
+    };
+    if let Err(error) = registered {
+        // Registration is idempotent, so toggling again retries whatever did not apply.
+        store.set(SCHEMES_KEY, serde_json::json!(!enabled));
+        if let Err(rollback) = store.save() {
+            tracing::error!("could not roll back the meeting schemes setting: {rollback}");
+        }
+        return Err(format!("Could not update the system link handlers: {error}"));
+    }
     Ok(())
 }
 
@@ -826,6 +899,14 @@ pub fn browser_remove_allowed_host(app: AppHandle, host: String) -> Result<Vec<S
 #[tauri::command]
 pub fn get_browser_policy(app: AppHandle) -> String {
     browser_policy::load_policy(&app).as_str().to_string()
+}
+
+/// Whether `strict` mode really filters resources on this platform. Where it cannot, Settings
+/// must offer the modes as the same navigation gate instead of a privacy difference that is not
+/// there (`trusted-site` behaves identically).
+#[tauri::command]
+pub fn browser_resource_filter_supported() -> bool {
+    browser_policy::RESOURCE_FILTER_SUPPORTED
 }
 
 /// Persist the strictness mode; anything but the two known values is refused.
@@ -1011,6 +1092,12 @@ mod tests {
         assert_eq!(scaled.page_y, 456);
         assert_eq!(scaled.page_height, 840);
         assert_eq!(scaled.chrome_height + scaled.page_height, 1296);
+    }
+
+    #[test]
+    fn logged_urls_drop_the_query_that_carries_the_password() {
+        assert_eq!(redact_query("https://zoom.us/j/1?pwd=s3cret#x"), "https://zoom.us/j/1");
+        assert_eq!(redact_query("not a url?pwd=x"), "not a url");
     }
 
     #[test]

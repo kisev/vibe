@@ -4,6 +4,7 @@
 //! Each file is the `latest.json` a release build produced. The plugin's own `check()` can only use
 //! the endpoint in `tauri.conf.json`, so picking the channel at runtime happens here.
 
+use crate::error::CommandResult;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
@@ -85,19 +86,12 @@ pub async fn update_check(
     app: AppHandle,
     pending: State<'_, PendingUpdate>,
     channel: Channel,
-) -> Result<Option<AvailableUpdate>, String> {
+) -> CommandResult<Option<AvailableUpdate>> {
     if is_local_build(&app.package_info().version.to_string()) {
         return Ok(None);
     }
-    let url = tauri::Url::parse(&channel.url()).map_err(|error| format!("{error}"))?;
-    let found = app
-        .updater_builder()
-        .endpoints(vec![url.clone()])
-        .map_err(|e| e.to_string())?
-        .build()
-        .map_err(|e| e.to_string())?
-        .check()
-        .await;
+    let url = tauri::Url::parse(&channel.url())?;
+    let found = app.updater_builder().endpoints(vec![url.clone()])?.build()?.check().await;
 
     let found = match found {
         Ok(found) => found,
@@ -105,10 +99,10 @@ pub async fn update_check(
             if channel_absent(url.as_str()).await {
                 None
             } else {
-                return Err(err.to_string());
+                return Err(err.into());
             }
         }
-        Err(err) => return Err(err.to_string()),
+        Err(err) => return Err(err.into()),
     };
 
     let mut guard = pending.0.lock().await;
@@ -127,10 +121,10 @@ pub async fn update_check(
 
 /// Downloads the pending update, reporting the percent done as `updater-progress`.
 #[tauri::command]
-pub async fn update_download(app: AppHandle, pending: State<'_, PendingUpdate>) -> Result<(), String> {
+pub async fn update_download(app: AppHandle, pending: State<'_, PendingUpdate>) -> CommandResult<()> {
     let update = match pending.0.lock().await.as_ref() {
         Some((update, _)) => update.clone(),
-        None => return Err("no update to download".into()),
+        None => return Err(eyre::eyre!("no update to download").into()),
     };
     let mut downloaded = 0u64;
     let mut last_percent = None;
@@ -149,10 +143,13 @@ pub async fn update_download(app: AppHandle, pending: State<'_, PendingUpdate>) 
             },
             || {},
         )
-        .await
-        .map_err(|e| e.to_string())?;
-    if let Some((_, slot)) = pending.0.lock().await.as_mut() {
-        *slot = Some(bytes);
+        .await?;
+    // A check that ran while the download was in flight clears the slot, and the bytes would be
+    // stored where no `update_install` looks: say so instead of silently dropping the download.
+    let mut guard = pending.0.lock().await;
+    match guard.as_mut() {
+        Some((pending_update, slot)) if pending_update.version == update.version => *slot = Some(bytes),
+        _ => return Err(eyre::eyre!("the pending update changed during the download").into()),
     }
     Ok(())
 }
@@ -160,11 +157,29 @@ pub async fn update_download(app: AppHandle, pending: State<'_, PendingUpdate>) 
 /// Installs what `update_download` fetched. Split from it so the caller can stop the server in
 /// between: Windows cannot replace a running `vibe-server.exe`.
 #[tauri::command]
-pub async fn update_install(pending: State<'_, PendingUpdate>) -> Result<(), String> {
+pub async fn update_install(pending: State<'_, PendingUpdate>) -> CommandResult<()> {
     let Some((update, Some(bytes))) = pending.0.lock().await.take() else {
-        return Err("no downloaded update to install".into());
+        return Err(eyre::eyre!("no downloaded update to install").into());
     };
-    update.install(bytes).map_err(|e| e.to_string())
+    // `install` writes the whole bundle and on Windows runs the installer: it blocks for seconds
+    // to minutes and must not hold a tokio worker that also serves commands and UI events.
+    let installer = update.clone();
+    let (bytes, outcome) = tauri::async_runtime::spawn_blocking(move || {
+        let outcome = installer.install(&bytes);
+        // Hand the bytes back so a failed attempt can be retried without a full re-download.
+        (bytes, outcome)
+    })
+    .await
+    .map_err(|error| eyre::eyre!("the update install task failed: {error}"))?;
+    match outcome {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            // A locked file on Windows is transient; keep what was downloaded so "Update now"
+            // can be pressed again.
+            *pending.0.lock().await = Some((update, Some(bytes)));
+            Err(error.into())
+        }
+    }
 }
 
 #[cfg(test)]
