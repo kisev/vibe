@@ -68,6 +68,18 @@ CARGO_PROFILE_DEV_CODEGEN_BACKEND="cranelift" cargo +nightly build -Zcodegen-bac
 $env:CARGO_PROFILE_DEV_CODEGEN_BACKEND="cranelift" ; cargo +nightly build -Zcodegen-backend
 ```
 
+## Sign a commit when the signing agent refuses
+
+Commits and tags are signed with the SSH key `~/.ssh/personal` (`gpg.format=ssh`). The agent behind that key can be locked — a commit then stops with `error: Signing file … agent refused operation?` (or `Couldn't sign message`), after the hooks have already run.
+
+```console
+ssh-add ~/.ssh/personal          # unlock: asks for the key's passphrase once
+ssh-add -l                       # confirm the key is listed
+ssh-keygen -Y sign -f ~/.ssh/personal -n git /dev/null   # probe: writes a signature, no prompt if unlocked
+```
+
+With the key loaded the retry signs silently; if a confirmation window appears, approve it — it belongs to the commit, not to the editor. Do not commit with `-c commit.gpgsign=false`: an unsigned commit in a signed history is what the pre-push gate and the release flow are meant to prevent.
+
 ## Check out someone else's pull request
 
 Pull requests are limited to a few collaborators, but a review sometimes needs a local checkout:

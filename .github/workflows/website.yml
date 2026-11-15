@@ -17,6 +17,9 @@ on:
             - main
         paths:
             - "website/**"
+            # The build copies docs/ into the site; without this a docs-only edit
+            # reaches the repository and never reaches the published pages.
+            - "docs/**"
             - "i18n/**"
             - "openspec/changes/**"
             - "scripts/roadmap.py"

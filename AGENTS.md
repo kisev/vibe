@@ -34,6 +34,8 @@ Agent mode: parallel moves, instant iteration, speed by default. Split heavy wor
 
 Practically everything goes through an OpenSpec change: if a request does not map to an existing `openspec/changes/<name>/`, create or update one before touching code. Proposal, spec delta, design, and tasks come first; implementation follows the tasks. The only exceptions are a production hotfix, a typo, or a pure translation refresh — and even those leave a note in the nearest change or a new one the same day. Never build a feature, a refactor of behavior, or a CI/process change "outside openspec".
 
+A delta that introduces a new capability carries a `## Purpose` section. `openspec archive` seeds the new main spec from it and otherwise writes `TBD … Update Purpose after archive`, which is how three archived changes left a placeholder behind; `openspec validate` does not catch it, so the delta is the only place to get it right.
+
 ## Thin workflows, thick tasks
 
 GitHub workflows are thin: checkout, toolchain setup, and a call to a `task` target. All logic — version computation, release bodies, cleanup rules, manifest generation, guards, retries — lives in `taskfile.yml` tasks or standalone scripts under `scripts/`. A YAML file holds `run: task <name>` and env/inputs, nothing else. If a step grows past a couple of lines of shell or jq, it becomes a task before it lands.
@@ -53,6 +55,8 @@ Cleanup is bounded retention, not a one-release sweep: the newest **5** dev rele
 ## Working in parallel
 
 Split large work across ~4–5 subagents, one disjoint module-group each — no shared files; only the coordinator touches shared/root config. Fix contracts (interfaces, design docs) up front. Throughput is per-agent (~100 tok/s, no global limit), so N agents ≈ N× speed — delegate bulk implementation to strong subagents (e.g. Opus 5 for correctness-sensitive code); keep the main loop for planning, contracts, and integration.
+
+One checkout belongs to one session. A second session working in the same working tree moves branches and the index under the first one's feet — a merge was undone and a commit landed on the wrong base that way. Give the second session its own `git worktree`; parallel agents that only edit disjoint files can stay in one tree, but the coordinator alone stages and commits.
 
 ## ETA rule
 
