@@ -1,6 +1,10 @@
-# Spec Delta
+# site-changelog Specification
 
-## ADDED Requirements
+## Purpose
+
+The website changelog page shows each release in the visitor's chosen language, including the unreleased dev entry, which is translated and audited like a released one.
+
+## Requirements
 
 ### Requirement: The dev entry is translated like every release
 

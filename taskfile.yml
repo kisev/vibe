@@ -343,6 +343,7 @@ tasks:
       - uv run scripts/check_docs_pages.py
       - uv run scripts/ocr_gate_test.py
       - uv run scripts/local_windows_build_test.py
+      - uv run scripts/content_i18n_test.py
 
   test:
     desc: All unit suites
