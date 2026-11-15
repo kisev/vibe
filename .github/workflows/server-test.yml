@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Server release tag to test (for example: server-v0.7.0)"
+        description: "Server release tag to test (for example: server-v1.0.2)"
         required: true
         type: string
 

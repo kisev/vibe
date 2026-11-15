@@ -73,5 +73,7 @@ VIBE_SERVER_VERSION=<tag> VIBE_SERVER_COMMIT=<sha> cargo build -p vibe-server --
 
 You can run releases in two ways:
 
-1. Push a tag like `v0.1.0` (workflow trigger: `push tags: v*`)
-1. Manual dispatch with input `version` (example: `v0.1.0`)
+1. Push a tag like `server-v1.0.2` (workflow trigger: `push tags: server-v*`)
+1. Manual dispatch with input `version` (example: `server-v1.0.2`)
+
+The server has its own version line: it starts at `server-v1.0.0` and never follows upstream's 0.x numbers. Tagging publishes the release as a prerelease; `.server-version` in the repository root takes the new tag only afterwards.

@@ -29,7 +29,7 @@ takes the new tag only once that release exists — pulling it ahead makes every
 build point at a release that is not there.
 
 ```
-pin=$(cat .server-version)                          # e.g. v0.6.9
+pin=$(cat .server-version)                          # e.g. v1.0.2
 git log --oneline "server-${pin#v}"..main -- server/ 2>/dev/null ||
   git log --oneline "server-$pin"..main -- server/
 ```
