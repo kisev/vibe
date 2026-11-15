@@ -79,6 +79,7 @@ function DevicePicker({
 	unavailableName,
 	hiddenNames,
 	disabled,
+	recordedName,
 	onPick,
 }: {
 	type: 'input' | 'output'
@@ -88,11 +89,29 @@ function DevicePicker({
 	unavailableName: string | null
 	hiddenNames: string[]
 	disabled: boolean
+	/** The device the running recording actually captures; undefined when idle or unreported. */
+	recordedName?: string | null
 	onPick: (entry: DeviceMenuEntry) => void
 }) {
 	const entries = deviceMenuEntries(devices, type, hiddenNames, unavailableName)
-	const value = device?.id ?? (unavailableName ? 'unavailable' : 'none')
-	const triggerLabel = device?.name ?? (unavailableName ? m.deviceUnavailable({ name: unavailableName }) : m.noRecord())
+	// While a recording runs the picker names what it captures, which need not be what the shared
+	// config says now: the run resolved its devices when it started, possibly in another window.
+	const shownDevice =
+		recordedName === undefined
+			? device
+			: (devices.find((candidate) => candidate.name === recordedName && candidate.isInput === (type === 'input')) ?? null)
+	const value =
+		recordedName === undefined
+			? (device?.id ?? (unavailableName ? 'unavailable' : 'none'))
+			: shownDevice
+				? shownDevice.id
+				: recordedName
+					? 'recorded'
+					: 'none'
+	const triggerLabel =
+		recordedName === undefined
+			? (device?.name ?? (unavailableName ? m.deviceUnavailable({ name: unavailableName }) : m.noRecord()))
+			: (recordedName ?? m.noRecord())
 
 	return (
 		// A native select on purpose: its popup is drawn by the platform, so the device list is not
@@ -158,6 +177,8 @@ export default function BrowserWindow({ session }: { session: number }) {
 	const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null)
 	const [recordingSources, setRecordingSources] = useState<('microphone' | 'system')[]>(['microphone', 'system'])
 	const [recordingDevices, setRecordingDevices] = useState<RecordingDeviceState | null>(null)
+	/** The devices the running recording reports; null when idle or when the reporter omitted them. */
+	const [recordedDevices, setRecordedDevices] = useState<{ input: string | null; output: string | null } | null>(null)
 
 	/** Hidden with no hosts to show, or when the policy leaves resources unfiltered. */
 	const showBlockedList = policy === 'strict' && blockedHosts.length > 0
@@ -240,6 +261,12 @@ export default function BrowserWindow({ session }: { session: number }) {
 			setRecording(event.payload.recording)
 			setRecordingStartedAt(event.payload.recording ? (event.payload.startedAt ?? Date.now()) : null)
 			if (event.payload.sources?.length) setRecordingSources(event.payload.sources)
+			// Several surfaces report the same run. One that did not resolve its devices omits the
+			// fields, so an absent report keeps what a surface that did know already said.
+			if (!event.payload.recording) setRecordedDevices(null)
+			else if (event.payload.inputName !== undefined || event.payload.outputName !== undefined) {
+				setRecordedDevices({ input: event.payload.inputName ?? null, output: event.payload.outputName ?? null })
+			}
 		}).then((fn) => {
 			if (active) unlisteners.push(fn)
 			else fn()
@@ -318,8 +345,12 @@ export default function BrowserWindow({ session }: { session: number }) {
 		void refreshDevices()
 	}
 
-	const microphoneName = recordingDevices?.input?.name ?? m.noRecord()
-	const systemName = recordingDevices?.output?.name ?? m.noRecord()
+	// While the running recording reports its devices, they win over the shared config: the config
+	// may have moved since the run started, and a source it does not capture is not any device.
+	const recordedInputName = recording && recordedDevices ? recordedDevices.input : undefined
+	const recordedOutputName = recording && recordedDevices ? recordedDevices.output : undefined
+	const microphoneName = recordedInputName !== undefined ? (recordedInputName ?? m.noRecord()) : (recordingDevices?.input?.name ?? m.noRecord())
+	const systemName = recordedOutputName !== undefined ? (recordedOutputName ?? m.noRecord()) : (recordingDevices?.output?.name ?? m.noRecord())
 
 	return (
 		<div className="flex h-screen w-screen flex-col bg-background text-sm">
@@ -392,6 +423,7 @@ export default function BrowserWindow({ session }: { session: number }) {
 							unavailableName={recordingDevices?.inputUnavailableName ?? null}
 							hiddenNames={recordingDevices?.hiddenInputDevices ?? []}
 							disabled={recording}
+							recordedName={recordedInputName}
 							onPick={(entry) => pickDevice('input', entry)}
 						/>
 						<DevicePicker
@@ -402,6 +434,7 @@ export default function BrowserWindow({ session }: { session: number }) {
 							unavailableName={recordingDevices?.outputUnavailableName ?? null}
 							hiddenNames={recordingDevices?.hiddenOutputDevices ?? []}
 							disabled={recording}
+							recordedName={recordedOutputName}
 							onPick={(entry) => pickDevice('output', entry)}
 						/>
 					</div>

@@ -25,6 +25,8 @@ interface RecordingShortcutContextValue {
 	isShortcutRecording: boolean
 	/** Epoch ms the shortcut-started recording began; null when idle. */
 	shortcutStartedAt: number | null
+	/** The devices the shortcut-started run records; null for a source it does not capture. */
+	shortcutDevices: { input: string | null; output: string | null } | null
 }
 
 const RecordingShortcutContext = createContext<RecordingShortcutContextValue | null>(null)
@@ -47,6 +49,7 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 	const [capturing, setCapturing] = useState(false)
 	const [isShortcutRecording, setIsShortcutRecording] = useState(false)
 	const [shortcutStartedAt, setShortcutStartedAt] = useState<number | null>(null)
+	const [shortcutDevices, setShortcutDevices] = useState<{ input: string | null; output: string | null } | null>(null)
 	const recordingRef = useRef(false)
 	const normalRecordingActiveRef = useRef(false)
 	const startingRef = useRef(false)
@@ -88,6 +91,12 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 			normalRecordingActiveRef.current = true
 			setIsShortcutRecording(true)
 			setShortcutStartedAt(Date.now())
+			// The chrome mirrors the run: it needs the devices this shortcut actually opened,
+			// which need not match the config (system audio is optional here).
+			setShortcutDevices({
+				input: options.microphone ? (microphone?.name ?? null) : null,
+				output: options.systemAudio ? (systemAudio?.name ?? null) : null,
+			})
 			return true
 		} catch (error) {
 			console.error('Recording shortcut failed to start:', error)
@@ -128,6 +137,7 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 			recordingRef.current = false
 			setIsShortcutRecording(false)
 			setShortcutStartedAt(null)
+			setShortcutDevices(null)
 		}
 		const unlistenFinish = listen('record_finish', resetRecording)
 		const unlistenError = listen('record_error', resetRecording)
@@ -216,6 +226,7 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 				setNormalRecordingActive,
 				isShortcutRecording,
 				shortcutStartedAt,
+				shortcutDevices,
 			}}>
 			{children}
 		</RecordingShortcutContext.Provider>

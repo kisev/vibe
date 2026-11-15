@@ -29,6 +29,12 @@ export function useRecording(onBeforeStart: () => void) {
 	const [inputUnavailableName, setInputUnavailableName] = useState<string | null>(null)
 	const [outputUnavailableName, setOutputUnavailableName] = useState<string | null>(null)
 	const [isRecording, setIsRecording] = useState(false)
+	/**
+	 * Whether this hook started the running recording. An adopted run (the meeting chrome starts
+	 * the same recorder) has a recording state but not necessarily this hook's device knowledge,
+	 * so a reporter must not name devices it did not resolve.
+	 */
+	const [ownsRecording, setOwnsRecording] = useState(false)
 	// When the running recording began, so a remounted indicator keeps its clock and its silence
 	// window instead of restarting them. Null whenever no recording is active.
 	const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null)
@@ -110,6 +116,7 @@ export function useRecording(onBeforeStart: () => void) {
 		startKeepAwake(KEEP_AWAKE.record)
 		onBeforeStart()
 		setIsRecording(true)
+		setOwnsRecording(true)
 		const selectedDevices = [inputDevice, outputDevice].filter((device): device is AudioDevice => device !== null)
 		try {
 			await invoke('start_record', {
@@ -120,6 +127,7 @@ export function useRecording(onBeforeStart: () => void) {
 		} catch (error) {
 			stopKeepAwake(KEEP_AWAKE.record)
 			setIsRecording(false)
+			setOwnsRecording(false)
 			console.error('startRecord error: ', error)
 			setErrorModal?.({ log: String(error), open: true })
 			// The device set may have changed under us; refresh before the next attempt.
@@ -134,6 +142,7 @@ export function useRecording(onBeforeStart: () => void) {
 	const adoptRecording = useCallback((active: boolean, startedAt: number | null) => {
 		setIsRecording(active)
 		setRecordingStartedAt(active ? startedAt : null)
+		setOwnsRecording(false)
 	}, [])
 
 	async function stopRecord() {
@@ -163,6 +172,8 @@ export function useRecording(onBeforeStart: () => void) {
 		refreshDevices: loadAudioDevices,
 		isRecording,
 		setIsRecording,
+		/** True while this hook's own run (not one adopted from another surface) is active. */
+		ownsRecording: isRecording && ownsRecording,
 		/** Epoch ms the running recording began; null when idle. */
 		startedAt: recordingStartedAt,
 		recordingName,

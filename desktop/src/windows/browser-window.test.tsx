@@ -44,7 +44,13 @@ const devices: AudioDevice[] = [
 	{ id: '3', name: 'Headphones', isInput: false, isDefault: false },
 ]
 
-const recordingState = (payload: { recording: boolean; startedAt: number | null }) => {
+const recordingState = (payload: {
+	recording: boolean
+	startedAt: number | null
+	sources?: ('microphone' | 'system')[]
+	inputName?: string | null
+	outputName?: string | null
+}) => {
 	act(() => mocks.listeners.get('meeting-browser-recording-state')?.({ payload }))
 }
 
@@ -143,11 +149,39 @@ describe('browser chrome', () => {
 		await waitFor(() => expect((screen.getByRole('combobox', { name: m.microphone() }) as HTMLButtonElement).disabled).toBe(false))
 	})
 
+	it('mirrors the devices the running recording actually uses', async () => {
+		render(<BrowserWindow session={7} />)
+		await screen.findByRole('combobox', { name: m.microphone() })
+
+		// A run started elsewhere reports its devices: the microphone differs from the config and
+		// the output is not captured at all.
+		recordingState({ recording: true, startedAt: Date.now(), sources: ['microphone'], inputName: 'USB Mic', outputName: null })
+
+		const microphone = screen.getByRole('combobox', { name: m.microphone() }) as HTMLSelectElement
+		const systemAudio = screen.getByRole('combobox', { name: m.systemAudio() }) as HTMLSelectElement
+		expect(microphone.disabled).toBe(true)
+		expect(microphone.value).toBe('1')
+		expect(microphone.selectedOptions[0].textContent).toBe('USB Mic')
+		expect(systemAudio.disabled).toBe(true)
+		expect(systemAudio.value).toBe('none')
+		expect(systemAudio.selectedOptions[0].textContent).toBe(m.noRecord())
+		expect(screen.getByRole('meter', { name: `${m.microphone()} USB Mic` })).toBeDefined()
+		expect(screen.queryByRole('meter', { name: `${m.systemAudio()} Speakers` })).toBeNull()
+
+		recordingState({ recording: false, startedAt: null })
+		await waitFor(() => expect((screen.getByRole('combobox', { name: m.microphone() }) as HTMLSelectElement).value).toBe('0'))
+	})
+
 	it('persists a device picked in the chrome under the shared config key', async () => {
 		render(<BrowserWindow session={7} />)
 		const microphone = await screen.findByRole('combobox', { name: m.microphone() })
 
 		// A native select: its options are drawn by the platform, not by a popup inside the chrome.
+		// The whole device list is offered, so nothing is cut off at the toolbar's edge.
+		expect([...microphone.querySelectorAll('option')].map((option) => option.textContent)).toEqual([m.noRecord(), 'Camera Mic', 'USB Mic'])
+		const systemAudio = screen.getByRole('combobox', { name: m.systemAudio() })
+		expect([...systemAudio.querySelectorAll('option')].map((option) => option.textContent)).toEqual([m.noRecord(), 'Speakers', 'Headphones'])
+
 		await userEvent.selectOptions(microphone, 'USB Mic')
 
 		await waitFor(() => expect(mocks.writeConfig).toHaveBeenCalledWith(CONFIG_KEYS.inputDeviceName, 'USB Mic'))

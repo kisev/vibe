@@ -37,9 +37,10 @@ Two modes decide how far that reaches, under `browser.policy` (**Settings → Re
 | Settings → Recording → **Allowed domains** | Add or remove the domains the browser may load |
 | Settings → Recording → **Blocked** | Allow a host the browser refused; the page reloads |
 | Browser chrome (top of the window) | Address, back, forward, reload, close, **Open in system browser** |
+| Browser chrome (top of the window) | Microphone and speaker pickers, writing the same devices as **Settings → Recording** |
 | Browser chrome (top of the window) | **Record this call**, and stop while recording |
 
-The recorder captures the configured microphone and, when enabled, the system-audio loopback. Closing the window while recording asks whether to stop or keep recording in the background.
+The recorder captures the configured microphone and, when enabled, the system-audio loopback. The chrome's pickers change the same selection the main window uses; while a recording runs both are disabled and name the devices it actually captures, including a source that is not being recorded. Closing the window while recording asks whether to stop or keep recording in the background.
 
 ## Limits
 

@@ -22,11 +22,21 @@ export default function MeetingBrowserRecordGate() {
 		const active = latest.current.isRecording
 		if (active) startedAt.current ??= Date.now()
 		else startedAt.current = null
-		return { recording: active, startedAt: startedAt.current, sources: capturedSources(latest.current) }
+		return { recording: active, startedAt: startedAt.current, sources: capturedSources(latest.current), ...recordedDevices(latest.current) }
 	}
 
 	function capturedSources(state: ReturnType<typeof useRecording>): ('microphone' | 'system')[] {
 		return [...(state.inputDevice ? (['microphone'] as const) : []), ...(state.outputDevice ? (['system'] as const) : [])]
+	}
+
+	/**
+	 * The devices this run records. Only a run this hook started is known from its own state;
+	 * for one started in the main window the fields stay absent so the chrome keeps the shared
+	 * config rather than being told "no device" by a hook that never saw the run.
+	 */
+	function recordedDevices(state: ReturnType<typeof useRecording>): Pick<RecordingStatePayload, 'inputName' | 'outputName'> {
+		if (!state.isRecording) return {}
+		return { inputName: state.inputDevice?.name ?? null, outputName: state.outputDevice?.name ?? null }
 	}
 
 	/**
@@ -38,7 +48,7 @@ export default function MeetingBrowserRecordGate() {
 		const active = await isRecordingActive()
 		if (active) startedAt.current ??= Date.now()
 		else startedAt.current = null
-		return { recording: active, startedAt: startedAt.current, sources: capturedSources(latest.current) }
+		return { recording: active, startedAt: startedAt.current, sources: capturedSources(latest.current), ...recordedDevices(latest.current) }
 	}
 
 	useEffect(() => {

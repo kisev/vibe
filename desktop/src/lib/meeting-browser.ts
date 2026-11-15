@@ -217,4 +217,11 @@ export interface RecordingStatePayload {
 	startedAt: number | null
 	/** Which sources this run captures, so the chrome draws only the meters that mean something. */
 	sources?: ('microphone' | 'system')[]
+	/**
+	 * Names of the devices this run actually records, so the chrome names them even when the
+	 * config has moved since the start. Absent when the reporter does not know the run (a
+	 * recording it did not start); null when that source is not captured at all.
+	 */
+	inputName?: string | null
+	outputName?: string | null
 }

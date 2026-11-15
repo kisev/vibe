@@ -20,6 +20,8 @@ Clicking an https link in Chrome, Edge, or Firefox still opens that browser. Vib
 
 Recording is manual; a meeting window never starts recording on its own. The recorder captures the configured microphone and, when enabled, the system-audio loopback, so both sides of the call are recorded.
 
+The microphone and speaker pickers in the chrome change the same devices the main window uses, so a call can be routed without leaving it. While a recording runs they are disabled and name the devices it is capturing; a source the run does not capture reads **None**.
+
 Closing the window while recording asks whether to stop or keep recording in the background.
 
 ## Allow the sites you use

@@ -151,10 +151,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 		}
 	}, [manualRecording.adoptRecording])
 
-	// ...and publishing our own changes reaches a chrome that is already open.
+	// ...and publishing our own changes reaches a chrome that is already open. The devices are
+	// named only for a run this window actually owns: an adopted chrome run carries its own names
+	// from the gate, and a run the main window did not resolve devices for must not claim none.
+	const ownInputName = recording.ownsRecording ? (manualRecording.inputDevice?.name ?? null) : undefined
+	const ownOutputName = recording.ownsRecording ? (manualRecording.outputDevice?.name ?? null) : undefined
+	const shortcutInputName = recordingShortcut.shortcutDevices?.input
+	const shortcutOutputName = recordingShortcut.shortcutDevices?.output
 	useEffect(() => {
-		void emit(RECORDING_STATE_EVENT, { recording: recording.isRecording, startedAt: recording.startedAt })
-	}, [recording.isRecording, recording.startedAt])
+		const devices = recording.ownsRecording
+			? { inputName: ownInputName, outputName: ownOutputName }
+			: recordingShortcut.isShortcutRecording && recordingShortcut.shortcutDevices
+				? { inputName: shortcutInputName, outputName: shortcutOutputName }
+				: {}
+		void emit(RECORDING_STATE_EVENT, { recording: recording.isRecording, startedAt: recording.startedAt, ...devices })
+	}, [
+		recording.isRecording,
+		recording.startedAt,
+		recording.ownsRecording,
+		ownInputName,
+		ownOutputName,
+		recordingShortcut.isShortcutRecording,
+		recordingShortcut.shortcutDevices,
+		shortcutInputName,
+		shortcutOutputName,
+	])
 
 	useEffect(() => {
 		recordingShortcut.setNormalRecordingActive(recording.isRecording)
