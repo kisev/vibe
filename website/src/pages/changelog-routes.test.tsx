@@ -53,17 +53,36 @@ describe('changelog routes in the production build', () => {
 		expect(screen.getAllByText(m.changelogUnreleased()).length).toBeGreaterThan(0)
 	})
 
-	it('resolves a swept dev version to the current dev entry', () => {
-		renderAt('/vibe/changelog/dev.84')
+	it('resolves a swept dev version to the current dev entry and canonicalizes it', () => {
+		// A real dev version carries the `-dev.` marker; the release it named is gone,
+		// which is exactly what the alias exists for.
+		renderAt('/vibe/changelog/1.0.0-dev.84')
 		expect(screen.getAllByText(m.changelogUnreleased()).length).toBeGreaterThan(0)
+		// The dev line labels itself, and the unknown-version notice is the one thing
+		// that would say the release does not exist.
+		expect(screen.getAllByText(m.changelogDevLine()).length).toBeGreaterThan(0)
+		expect(screen.queryByText(/There is no release/)).toBeNull()
+		// Copying the address bar must give the permanent alias, not the swept version.
+		// Vitest serves the site at `/`, so the alias is `/changelog/dev` here; the
+		// production build prefixes the same path with its `/vibe` base.
+		expect(window.location.pathname).toBe('/changelog/dev')
 	})
 
 	it('resolves /changelog/dev to the unreleased entry', () => {
 		renderAt('/vibe/changelog/dev')
 		expect(screen.getAllByText(m.changelogUnreleased()).length).toBeGreaterThan(0)
-		// The dev line names itself, and an unknown version is the only thing that says
-		// the release does not exist.
 		expect(screen.getAllByText(m.changelogDevLine()).length).toBeGreaterThan(0)
 		expect(screen.queryByText(/There is no release/)).toBeNull()
+		// The alias stays the alias — the versioned dev path above never survives in
+		// the address bar.
+		expect(window.location.pathname).toBe('/changelog/dev')
+	})
+
+	it('keeps a stable version on its own entry', () => {
+		renderAt('/vibe/changelog/1.0.0')
+		expect(screen.getByText('One engine, one model catalog, and long recordings that plan themselves')).toBeTruthy()
+		expect(screen.queryByText(/There is no release/)).toBeNull()
+		expect(screen.queryByText(m.changelogDevLine())).toBeNull()
+		expect(window.location.pathname).toBe('/vibe/changelog/1.0.0')
 	})
 })
