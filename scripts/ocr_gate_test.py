@@ -41,6 +41,8 @@ output = args[args.index("--output") + 1]
 if mode == "failed":
     payload = {"status": "failed", "comments": None, "message": "provider down", "session_id": "stub"}
     code = 1
+elif mode == "nojson":
+    sys.exit(0)
 elif mode == "none":
     payload = {"status": "completed", "comments": [], "session_id": "stub"}
     code = 0
@@ -222,11 +224,30 @@ class GateTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("review NOT run", result.stdout)
         self.assertIn("provider", result.stdout)
+        # Never a clean-verdict line: the review did not happen.
+        self.assertNotIn("no medium/high findings", result.stdout)
+
+    def test_no_usable_output_is_a_warning(self) -> None:
+        result = run_gate(self.repo, self.stub, STUB_MODE="nojson")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("review NOT run", result.stdout)
+        self.assertIn("no JSON output", result.stdout)
+        self.assertNotIn("no medium/high findings", result.stdout)
+
+    def test_no_staged_changes_is_not_a_skip(self) -> None:
+        (self.repo / "file.py").write_text("a = 1\n", encoding="utf-8")
+        git("add", "file.py", cwd=self.repo)
+        result = run_gate(self.repo, self.stub, STUB_MODE="medium", STUB_ARGS=str(self.args))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("no staged changes", result.stdout)
+        self.assertNotIn("review NOT run", result.stdout)
+        self.assertEqual(self.calls(), [])
 
     def test_no_reviewable_files_is_a_pass(self) -> None:
         result = run_gate(self.repo, self.stub, STUB_MODE="docs")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("no reviewable files staged", result.stdout)
+        self.assertNotIn("review NOT run", result.stdout)
         self.assertEqual([call for call in self.calls() if "--output" in call], [])
 
     def test_ocr_skip_bypasses_everything(self) -> None:
