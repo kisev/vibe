@@ -9,4 +9,4 @@
 - [x] 4. `meeting_browser_load` navigates a typed URL in the same session history on the page webview; only `browser-chrome-*` has the app's capabilities, the page webview has none.
 - [x] 5. Rust and frontend tests cover the chrome rendering and the load command (`browser-window.test.tsx`); `cargo check -p vibe`, clippy, rustfmt, `tsc --noEmit` and the full vitest suite are green on this revision.
 - [x] 6. macOS fallback: the browser opens a page-only `WebviewWindow` with no chrome (no panic path), documented in the reference and how-to.
-- [ ] 7. Manual Windows acceptance: a Telemost link renders in one window, the chrome's controls work, the window closes, Vibe quits normally.
+- [x] 7. Manual Windows acceptance: a Telemost link renders in one window, the chrome's controls work, the window closes, Vibe quits normally. (2026-11-15: confirmed by the maintainer on the installed local build — a Telemost call on Windows: render, chrome controls, window close, app stays alive.)

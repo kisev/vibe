@@ -9,4 +9,4 @@
 
 ## 2. Validation
 
-- [ ] 2.1 Dev build on Windows: the row names Nemotron-3-Diarization, reports Installed (the machine has the file), and the leftover `diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf` is gone from the models folder after startup
+- [x] 2.1 Dev build on Windows: the row names Nemotron-3-Diarization, reports Installed (the machine has the file), and the leftover `diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf` is gone from the models folder after startup (2026-11-15: confirmed by the maintainer on the installed local build — the speaker row named the model as installed and no leftover sorting model appeared after startup.)

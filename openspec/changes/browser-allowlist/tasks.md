@@ -16,4 +16,4 @@
 - The Windows COM path (`desktop/src-tauri/src/meeting_browser.rs`, `install_resource_interceptor`) is `cfg(windows)` and was not compiled on the Linux host that implemented this change.
 - [x] 10. Strictness setting `browser.policy` (`strict` default, `trusted-site` skips the per-origin resource filter, never the navigation gate) with a Settings selector.
 - [x] 11. The chrome lists blocked hosts with Allow in a popover of its own, hidden when empty or off-policy.
-- [ ] 12. Windows: open a page whose assets come from another origin and verify the blocked-host registry fills from real `WebResourceRequested` traffic and that Allow reloads it in place.
+- [x] 12. Windows: open a page whose assets come from another origin and verify the blocked-host registry fills from real `WebResourceRequested` traffic and that Allow reloads it in place. (2026-11-15: confirmed by the maintainer on the installed local build — a page with a cross-origin asset listed the blocked host and Allow reloaded it in place.)

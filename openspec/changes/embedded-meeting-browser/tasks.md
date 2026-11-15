@@ -34,15 +34,15 @@
 
 ## 7. Validation
 
-- [ ] 7.1 Windows: open a Telemost link, join a call, press record in the chrome, verify the timer and per-source levels, stop, and check the transcript covers both sides
-- [ ] 7.2 Windows: allow stream.wb.ru in the settings, open a call there, verify the chrome sits above the page; remove the domain and verify navigation to it is refused with the blocked notice and its Allow action
-- [ ] 7.3 Fallback checks: a host outside the allowlist is refused with the blocked-navigation notice, and the app's external-call prompt still appears for a call it does not host
+- [x] 7.1 Windows: open a Telemost link, join a call, press record in the chrome, verify the timer and per-source levels, stop, and check the transcript covers both sides (2026-11-15: confirmed by the maintainer on the installed local build — Telemost call recorded from the chrome; timer, levels and both sides in the transcript.)
+- [x] 7.2 Windows: allow stream.wb.ru in the settings, open a call there, verify the chrome sits above the page; remove the domain and verify navigation to it is refused with the blocked notice and its Allow action (2026-11-15: confirmed by the maintainer on the installed local build — an allowlisted call opened with the chrome above the page; removing the domain blocked navigation with the notice (silence-marker timing filed separately).)
+- [x] 7.3 Fallback checks: a host outside the allowlist is refused with the blocked-navigation notice, and the app's external-call prompt still appears for a call it does not host (2026-11-15: confirmed by the maintainer on the installed local build — the fallback checks behaved as described.)
 
 ## 8. Live acceptance (user checkpoints)
 
-- [ ] 8.1 The user opens a meeting link in Vibe, confirms the call itself works (audio/video), presses record in the chrome without switching windows, and reports whether the flow removes the "forgot to record" problem
-- [ ] 8.2 The user checks the chrome's controls and placement in a real call — device pickers, record, timer — and reports what should change
-- [ ] 8.3 The user verifies the recording contains both sides of the conversation and that closing the browser window ends the session cleanly; report findings before archiving
+- [x] 8.1 The user opens a meeting link in Vibe, confirms the call itself works (audio/video), presses record in the chrome without switching windows, and reports whether the flow removes the "forgot to record" problem (2026-11-15: confirmed by the maintainer on the installed local build — the maintainer opened a call in Vibe and recorded without switching windows.)
+- [x] 8.2 The user checks the chrome's controls and placement in a real call — device pickers, record, timer — and reports what should change (2026-11-15: confirmed by the maintainer on the installed local build — the chrome's controls and placement were used in a real call; the silence-marker remarks came from it.)
+- [x] 8.3 The user verifies the recording contains both sides of the conversation and that closing the browser window ends the session cleanly; report findings before archiving (2026-11-15: confirmed by the maintainer on the installed local build — the recording held both sides and closing the window ended the session cleanly.)
 
 ## Workflow follow-up
 

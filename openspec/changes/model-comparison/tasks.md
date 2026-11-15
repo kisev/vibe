@@ -26,4 +26,4 @@
 
 ## 5. Validation
 
-- [ ] 5.1 Local gates green (`desktop:test`, `tsc`), then a dev build comparing two installed models on a recorded clip: two markdown files, per-model times shown, links open
+- [x] 5.1 Local gates green (`desktop:test`, `tsc`), then a dev build comparing two installed models on a recorded clip: two markdown files, per-model times shown, links open (2026-11-15: confirmed by the maintainer on the installed local build — a three-model comparison on a long recording produced every column with its per-model time.)

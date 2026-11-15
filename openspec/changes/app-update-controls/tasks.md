@@ -38,7 +38,7 @@
 ## 7. Validation
 
 - [ ] 7.1 Live: a dev install on the Dev channel is offered and installs the next dev build, keeping settings and identifier; verify from the update UI and the ARP entry — requires a push/release, not a blocker for this change
-- [ ] 7.2 Live: a release install on Dev and on Beta reports no update and explains why; switching back to Release works
+- [x] 7.2 Live: a release install on Dev and on Beta reports no update and explains why; switching back to Release works (2026-11-15: confirmed by the maintainer on the installed local build — the channels were switched on the installed 1.0.0 and offered what each channel holds.)
 - [ ] 7.3 Live: a beta install is offered the rc and then the stable release that promotes it — requires a push/release, not a blocker for this change
 - [ ] 7.4 Negative: a tampered channel manifest is refused with an error and the installed version is untouched — requires a push/release, not a blocker for this change
 - [ ] 7.5 Live acceptance: the update group reads clearly (current version, channel, last check, one obvious action), each channel's switch behaves as explained, the dev → dev upgrade works, and the rc → stable path works in the app; report what should change before archiving — requires a push/release, not a blocker for this change
