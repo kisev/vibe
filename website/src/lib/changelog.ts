@@ -54,9 +54,14 @@ function parse(raw: string, locale: string): Release {
 	return { version: meta.version, date: meta.date, title: meta.title, locale, items }
 }
 
+/** The sentinel version of the in-progress entry the dev alias renders. */
+export const unreleasedVersion = 'unreleased'
+
 function compareVersions(a: string, b: string) {
 	// The unreleased entry always leads, whatever its neighbors.
-	if (a === 'unreleased' || b === 'unreleased') return a === 'unreleased' ? -1 : 1
+	if (a === b) return 0
+	if (a === unreleasedVersion) return -1
+	if (b === unreleasedVersion) return 1
 	const pa = a.split('.').map(Number)
 	const pb = b.split('.').map(Number)
 	for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return (pb[i] ?? 0) - (pa[i] ?? 0)
@@ -126,8 +131,9 @@ export interface DevRelease {
  * page or an unknown-version state.
  */
 export function findDevRelease(list: Release[] = releases): DevRelease | undefined {
-	const unreleased = list.find((r) => r.version === 'unreleased')
+	const unreleased = list.find((r) => r.version === unreleasedVersion)
 	if (unreleased && unreleased.items.length > 0) return { release: unreleased, fallback: false }
-	const newest = list.filter((r) => r.version !== 'unreleased').sort((a, b) => compareVersions(a.version, b.version))[0]
+	// The list is always newest first, so the first released entry is the newest.
+	const newest = list.find((r) => r.version !== unreleasedVersion)
 	return newest ? { release: newest, fallback: true } : undefined
 }

@@ -35,13 +35,13 @@ ______________________________________________________________________
 
 ### 4. External Links
 
-**Vibe** and its website link to external sites such as [GitHub](https://github.com/thewh1teagle/vibe). Those sites apply their own privacy policies.
+**Vibe** and its website link to external sites such as [GitHub](https://github.com/kisev/vibe). Those sites apply their own privacy policies.
 
 ______________________________________________________________________
 
 ### 5. Open Source
 
-**Vibe** is open source. The code is available at [github.com/thewh1teagle/vibe](https://github.com/thewh1teagle/vibe).
+**Vibe** is open source. The code is available at [github.com/kisev/vibe](https://github.com/kisev/vibe).
 
 ______________________________________________________________________
 

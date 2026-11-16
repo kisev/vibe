@@ -2,9 +2,5 @@
   {
     "title": "Quick Install",
     "command": "curl -sSf https://kisev.github.io/vibe/installer.sh | sh -s {tag}"
-  },
-  {
-    "title": "Yay (Arch Linux)",
-    "command": "yay -S vibe-bin"
   }
 ]

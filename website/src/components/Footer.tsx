@@ -1,5 +1,6 @@
 import { m } from '../paraglide/messages.js'
 import { Link } from 'react-router-dom'
+import { githubRepoURL } from '~/lib/site'
 import Github from '~/icons/Github'
 import Logo from '~/icons/Logo'
 
@@ -23,7 +24,7 @@ export default function Footer({ onOpenPrivacyPolicy }: FooterProps) {
 					</Link>
 					<p className="max-w-[36ch] text-start text-sm text-muted-foreground">{m.title()}</p>
 					<div className="flex items-center gap-2">
-						<a className={iconClass} href="https://github.com/kisev/vibe" target="_blank" rel="noreferrer" aria-label="GitHub">
+						<a className={iconClass} href={githubRepoURL} target="_blank" rel="noreferrer" aria-label="GitHub">
 							<Github width="16" height="16" />
 						</a>
 					</div>
@@ -55,7 +56,7 @@ export default function Footer({ onOpenPrivacyPolicy }: FooterProps) {
 						<button className={linkClass} onClick={onOpenPrivacyPolicy}>
 							{m['privacy-policy']()}
 						</button>
-						<a className={linkClass} href="https://github.com/kisev/vibe" target="_blank" rel="noreferrer">
+						<a className={linkClass} href={githubRepoURL} target="_blank" rel="noreferrer">
 							GitHub
 						</a>
 					</div>

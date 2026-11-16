@@ -11,6 +11,7 @@ import {
 	loadReleases,
 	releases,
 	sections,
+	unreleasedVersion,
 	type Release,
 	type Section,
 } from '~/lib/changelog'
@@ -37,7 +38,7 @@ const inline = [
 ].join(' ')
 
 /** The permanent address of the dev line, under whatever basename the site is deployed at. */
-const devPath = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/changelog/dev`
+const devPath = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/changelog/${devAlias}`
 
 /** One formatter per locale — building an Intl.DateTimeFormat is the expensive part, not using it. */
 const formatters = new Map<string, Intl.DateTimeFormat>()
@@ -52,13 +53,18 @@ function formatDate(date: string, locale: string) {
 	return formatter.format(new Date(`${date}T00:00:00Z`))
 }
 
+/** The version as it is shown: the localized label for the dev line, otherwise the `v` prefix. */
+function versionLabel(release: Pick<Release, 'version'>) {
+	return release.version === unreleasedVersion ? m.changelogUnreleased() : `v${release.version}`
+}
+
 function Entry({ release, single, dev }: { release: Release; single: boolean; dev: boolean }) {
 	// The unreleased entry has no version number yet — it is the dev line in progress.
 	// The id stays machine-made and language-independent so anchors survive a locale switch.
-	const id = release.version === 'unreleased' ? 'unreleased' : `v${release.version}`
-	const versionLabel = release.version === 'unreleased' ? m.changelogUnreleased() : `v${release.version}`
+	const id = release.version === unreleasedVersion ? 'unreleased' : `v${release.version}`
+	const shownVersion = versionLabel(release)
 	// The unreleased entry is the dev line, so its heading opens the permanent alias.
-	const href = release.version === 'unreleased' ? `/changelog/${devAlias}` : `/changelog/${release.version}`
+	const href = release.version === unreleasedVersion ? `/changelog/${devAlias}` : `/changelog/${release.version}`
 	return (
 		<article
 			id={id}
@@ -68,7 +74,7 @@ function Entry({ release, single, dev }: { release: Release; single: boolean; de
 			<div className="lg:sticky lg:top-24 lg:self-start">
 				<div className="flex items-baseline gap-2">
 					<Link to={href} className="text-[15px] font-medium text-foreground transition-colors hover:text-primary">
-						{versionLabel}
+						{shownVersion}
 					</Link>
 					{dev && (
 						<span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -91,7 +97,7 @@ function Entry({ release, single, dev }: { release: Release; single: boolean; de
 			</div>
 			<div className="max-w-[68ch]">
 				<h2 className="text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-foreground">
-					{release.version === 'unreleased' ? m.changelogUnreleasedTitle() : release.title}
+					{release.version === unreleasedVersion ? m.changelogUnreleasedTitle() : release.title}
 				</h2>
 				{sections.map((section) => {
 					const items = release.items.filter((item) => item.section === section)
@@ -146,13 +152,11 @@ export default function Changelog() {
 	}, [dev, version, navigate])
 
 	useEffect(() => {
-		let live = true
 		if (!hasTranslations(locale)) {
 			setList(releases)
-			return () => {
-				live = false
-			}
+			return
 		}
+		let live = true
 		setList(null)
 		loadReleases(locale).then((translated) => {
 			if (live) setList(translated)
@@ -164,9 +168,7 @@ export default function Changelog() {
 
 	const headline = one ?? devEntry?.release
 	useEffect(() => {
-		document.title = headline
-			? `Vibe ${headline.version === 'unreleased' ? m.changelogUnreleased() : `v${headline.version}`}: ${headline.title}`
-			: `Vibe ${m.changelog()}`
+		document.title = headline ? `Vibe ${versionLabel(headline)}: ${headline.title}` : `Vibe ${m.changelog()}`
 		return () => {
 			document.title = 'Vibe'
 		}

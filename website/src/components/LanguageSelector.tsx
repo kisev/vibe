@@ -14,6 +14,7 @@ interface LanguageSelectorProps {
 
 export default function LanguageSelector({ locale, availableLocales, onLocaleChange, placement, className }: LanguageSelectorProps) {
 	const [open, setOpen] = useState(false)
+	const triggerRef = useRef<HTMLButtonElement>(null)
 	const menuRef = useRef<HTMLLIElement>(null)
 	const languageNames = new Intl.DisplayNames([locale], { type: 'language' })
 	const shortLocale = locale.split('-')[0]?.toUpperCase() ?? locale
@@ -32,7 +33,7 @@ export default function LanguageSelector({ locale, availableLocales, onLocaleCha
 			if (event.key !== 'Escape') return
 			setOpen(false)
 			// Escape leaves the list, so the trigger takes focus back rather than dropping it.
-			menuRef.current?.querySelector<HTMLButtonElement>('button[type="button"]')?.focus()
+			triggerRef.current?.focus()
 		}
 		document.addEventListener('keydown', closeOnEscape)
 		return () => document.removeEventListener('keydown', closeOnEscape)
@@ -41,6 +42,7 @@ export default function LanguageSelector({ locale, availableLocales, onLocaleCha
 	return (
 		<li ref={menuRef} data-placement={placement} className={`relative ${className ?? ''}`}>
 			<button
+				ref={triggerRef}
 				type="button"
 				aria-label={m.language()}
 				title={m.language()}

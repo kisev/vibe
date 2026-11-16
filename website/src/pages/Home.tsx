@@ -112,12 +112,12 @@ function AppMock() {
 
 				<div className="flex flex-col gap-1 px-2 pb-3">
 					{[
-						{ name: m['mock-recent-podcast'](), time: m['mock-time-just-now'](), active: true },
-						{ name: m['mock-recent-team-standup'](), time: m['mock-time-2h-ago'](), active: false },
-						{ name: m['mock-recent-interview'](), time: m['mock-time-yesterday'](), active: false },
+						{ id: 'podcast', name: m['mock-recent-podcast'](), time: m['mock-time-just-now'](), active: true },
+						{ id: 'standup', name: m['mock-recent-team-standup'](), time: m['mock-time-2h-ago'](), active: false },
+						{ id: 'interview', name: m['mock-recent-interview'](), time: m['mock-time-yesterday'](), active: false },
 					].map((row) => (
 						<span
-							key={row.name}
+							key={row.id}
 							className="flex flex-col gap-[0.125rem] rounded-[0.625rem] px-2.5 py-1.5"
 							style={row.active ? { background: app.active } : undefined}>
 							<span className="text-[0.6875rem] font-medium" style={{ color: app.ink }}>

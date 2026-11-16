@@ -6,6 +6,7 @@ import Docs from '~/pages/Docs'
 import Changelog from '~/pages/Changelog'
 import Roadmap from '~/pages/Roadmap'
 import { siteRouter } from '~/lib/site'
+import { productionBase } from '~/lib/siteBase'
 
 function routes(hashRouting: boolean) {
 	return (
@@ -31,5 +32,5 @@ export default function App() {
 	// 404.html cannot serve path routes; its hashes never reach the server.
 	if (siteRouter() === 'hash') return <HashRouter>{routes(true)}</HashRouter>
 
-	return <BrowserRouter basename="/vibe">{routes(false)}</BrowserRouter>
+	return <BrowserRouter basename={productionBase.replace(/\/$/, '')}>{routes(false)}</BrowserRouter>
 }

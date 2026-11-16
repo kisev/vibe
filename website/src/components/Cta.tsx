@@ -10,6 +10,7 @@ import Mac from '~/icons/Mac'
 import Windows from '~/icons/Windows'
 import { isVersionOverride, release as latestRelease } from '~/lib/release'
 import { onDownloadRequest } from '~/lib/download-intent'
+import { githubRepoURL } from '~/lib/site'
 import linuxInstallOptions from '~/lib/linux_install_options.json'
 import CopyButton from './CopyButton'
 import PostDownload from './PostDownload'
@@ -110,7 +111,7 @@ export default function Cta() {
 				) : null}
 
 				<Button variant="outline" size="lg" asChild>
-					<a href="https://github.com/kisev/vibe" target="_blank" rel="noreferrer">
+					<a href={githubRepoURL} target="_blank" rel="noreferrer">
 						<Github width="18" height="18" />
 						{m['star-on-github']()}
 					</a>

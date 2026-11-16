@@ -87,6 +87,9 @@ export function clearRoadmapCache(): void {
 export async function loadRoadmap(locale: string, signal?: AbortSignal): Promise<RoadmapEntry[]> {
 	if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
 	const data = await fetchRoadmap()
+	// The shared request is not tied to one caller's signal, so an abort that
+	// arrived while it was in flight is honored here instead.
+	if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
 	if (!Array.isArray(data) || !data.every(isEntry)) {
 		roadmapData = undefined
 		throw new Error('roadmap: unexpected JSON')

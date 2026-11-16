@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getLocale, getTextDirection, setLocale, type Locale } from '../paraglide/runtime.js'
 import { localeFromSearch, supportedWebsiteLocales, websiteLocaleParam, writeLocaleToUrl } from '~/lib/i18n'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -16,8 +16,6 @@ export default function Layout() {
 	// The entry point resolves a supported ?lang= into Paraglide before the first render, so the
 	// first paint already speaks the shared language; here the state just starts from the same value.
 	const [locale, setCurrentLocale] = useState<Locale>(() => localeFromSearch(location.search) ?? getLocale())
-	const localeRef = useRef(locale)
-	localeRef.current = locale
 	const direction = getTextDirection(locale)
 	const availableLocales = supportedWebsiteLocales as readonly Locale[]
 	const onOpenPrivacyPolicy = useCallback(() => setPrivacyOpen(true), [])
@@ -44,16 +42,16 @@ export default function Layout() {
 		const fromUrl = localeFromSearch(location.search)
 		if (!fromUrl) return
 		if (fromUrl !== getLocale()) setLocale(fromUrl, { reload: false })
-		if (fromUrl !== localeRef.current) setCurrentLocale(fromUrl)
-	}, [location.pathname, location.search])
+		if (fromUrl !== locale) setCurrentLocale(fromUrl)
+	}, [location.pathname, location.search, locale])
 
 	// Keep lang in the URL so in-site navigation and shared links carry the choice.
 	useEffect(() => {
 		// A fresh ?lang= outranks a locale state that has not committed yet: writing the
 		// previous value here would clobber the address bar for a render.
 		const fromUrl = localeFromSearch(window.location.search)
-		if (fromUrl && fromUrl !== localeRef.current) return
-		writeLocaleToUrl(localeRef.current)
+		if (fromUrl && fromUrl !== locale) return
+		writeLocaleToUrl(locale)
 	}, [location.pathname, location.search, locale])
 
 	// Both document attributes follow the active locale, so RTL applies to the whole site.

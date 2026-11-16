@@ -1,3 +1,5 @@
+import { productionBase } from './siteBase'
+
 /**
  * Build inputs that separate the production site from the dev preview. They are
  * baked in at build time — never read at runtime — so neither artifact can drift
@@ -15,4 +17,7 @@ export function siteRouter(): SiteRouter {
 }
 
 /** The release site, outside the dev preview's hash base. */
-export const productionSiteURL = '/vibe/'
+export const productionSiteURL = productionBase
+
+/** The fork's repository — the one GitHub address the site publishes. */
+export const githubRepoURL = 'https://github.com/kisev/vibe'
