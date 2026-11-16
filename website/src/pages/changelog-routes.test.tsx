@@ -45,6 +45,8 @@ function renderAt(path: string) {
 	)
 }
 
+const releaseTitle = 'One engine, one model catalog, and long recordings that plan themselves'
+
 afterEach(cleanup)
 
 describe('changelog routes in the production build', () => {
@@ -53,14 +55,15 @@ describe('changelog routes in the production build', () => {
 		expect(screen.getAllByText(m.changelogUnreleased()).length).toBeGreaterThan(0)
 	})
 
-	it('resolves a swept dev version to the current dev entry and canonicalizes it', () => {
+	it('resolves a swept dev version to the newest notes and canonicalizes it', () => {
 		// A real dev version carries the `-dev.` marker; the release it named is gone,
-		// which is exactly what the alias exists for.
+		// which is exactly what the alias exists for. While the unreleased entry is
+		// empty — the state right after a release — the alias shows the newest notes
+		// rather than an empty page.
 		renderAt('/vibe/changelog/1.0.0-dev.84')
-		expect(screen.getAllByText(m.changelogUnreleased()).length).toBeGreaterThan(0)
-		// The dev line labels itself, and the unknown-version notice is the one thing
-		// that would say the release does not exist.
-		expect(screen.getAllByText(m.changelogDevLine()).length).toBeGreaterThan(0)
+		// With no unreleased bullets between releases the alias says so and shows the
+		// newest release instead of an empty page.
+		expect(screen.getByText(m.changelogDevFallback())).toBeTruthy()
 		expect(screen.queryByText(/There is no release/)).toBeNull()
 		// Copying the address bar must give the permanent alias, not the swept version.
 		// Vitest serves the site at `/`, so the alias is `/changelog/dev` here; the
@@ -68,10 +71,9 @@ describe('changelog routes in the production build', () => {
 		expect(window.location.pathname).toBe('/changelog/dev')
 	})
 
-	it('resolves /changelog/dev to the unreleased entry', () => {
+	it('resolves /changelog/dev to the unreleased entry, or the newest notes while it is empty', () => {
 		renderAt('/vibe/changelog/dev')
-		expect(screen.getAllByText(m.changelogUnreleased()).length).toBeGreaterThan(0)
-		expect(screen.getAllByText(m.changelogDevLine()).length).toBeGreaterThan(0)
+		expect(screen.getByText(m.changelogDevFallback())).toBeTruthy()
 		expect(screen.queryByText(/There is no release/)).toBeNull()
 		// The alias stays the alias — the versioned dev path above never survives in
 		// the address bar.
@@ -80,7 +82,7 @@ describe('changelog routes in the production build', () => {
 
 	it('keeps a stable version on its own entry', () => {
 		renderAt('/vibe/changelog/1.0.0')
-		expect(screen.getByText('One engine, one model catalog, and long recordings that plan themselves')).toBeTruthy()
+		expect(screen.getByText(releaseTitle)).toBeTruthy()
 		expect(screen.queryByText(/There is no release/)).toBeNull()
 		expect(screen.queryByText(m.changelogDevLine())).toBeNull()
 		expect(window.location.pathname).toBe('/vibe/changelog/1.0.0')

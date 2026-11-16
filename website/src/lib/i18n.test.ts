@@ -326,13 +326,15 @@ describe('layout document attributes', () => {
 })
 
 describe('translated surfaces after a locale switch', () => {
-	it('shows the dev changelog in the chosen locale without its English entry', async () => {
-		const englishTitle = boldLead(rawFile(englishChangelog, '/i18n/changelog/unreleased.md'))
-		const frenchTitle = boldLead(rawFile(translatedChangelog, '/fr-FR/unreleased.md'))
+	it('shows a release changelog in the chosen locale without its English entry', async () => {
+		// The dev alias is covered by the route tests; this uses a released entry so the
+		// assertion holds while the unreleased one is empty between releases.
+		const englishTitle = boldLead(rawFile(englishChangelog, '/i18n/changelog/1.0.0.md'))
+		const frenchTitle = boldLead(rawFile(translatedChangelog, '/fr-FR/1.0.0.md'))
 
 		// Opened from a shared link: after switching away from the link's language,
 		// the page must follow the switch rather than the locale captured on load.
-		renderSite('/vibe/changelog/dev?lang=en-US')
+		renderSite('/vibe/changelog/1.0.0?lang=en-US')
 		await waitFor(() => expect(document.body.textContent).toContain(englishTitle))
 
 		switchTo('fr-FR')
