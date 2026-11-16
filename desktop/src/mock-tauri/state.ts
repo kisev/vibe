@@ -11,6 +11,8 @@ export const DEFAULT_MODEL_FILE = 'ggml-medium.bin'
 // Virtual filesystem: path -> contents (string | Uint8Array | null for opaque binaries like models).
 export const virtualFs = new Map<string, string | Uint8Array | null>([
 	[`${MODELS_FOLDER}/${DEFAULT_MODEL_FILE}`, null],
+	// A second installed model, so the comparison lab and the catalog have two entries.
+	[`${MODELS_FOLDER}/ggml-small.bin`, null],
 	[`${DOCUMENTS_FOLDER}/sample.mp3`, null],
 	[`${DOCUMENTS_FOLDER}/interview.mp4`, null],
 	[`${DOCUMENTS_FOLDER}/meeting-notes.wav`, null],

@@ -1,19 +1,17 @@
 name: Bug Report
 description: File a bug report
 labels: ["bug"]
-assignees:
-    - octocat
 body:
     - type: markdown
       attributes:
           value: |
               Thanks for taking the time to fill out this bug report!
-              One second before you create, search if it's already reported [issues](https://github.com/thewh1teagle/vibe/issues?q=is:issue+label:bug+)
+              One second before you create, search if it's already reported [issues](https://github.com/kisev/vibe/issues?q=is:issue+label:bug+)
 
               Please, if possible, just open settings in vibe, and click 'Report Bug'
               This way I'll get all the relevant info required
 
-              If not reported, if possible please check [DEBUG.md](https://github.com/thewh1teagle/vibe/blob/main/docs/DEBUG.md) and add comments with more info.
+              If not reported, if possible please check the [crash troubleshooting guide](https://github.com/kisev/vibe/blob/main/docs/how-to/troubleshoot-a-crash.md) and add comments with more info.
 
     - type: textarea
       id: what-happened

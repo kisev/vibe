@@ -6,12 +6,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~
 import { IconAction, SettingsGroup, SettingsRow, rowControlClass, type SettingsViewModel } from './shared'
 import { ModelsCatalogSection } from './models-catalog'
 import { ModelsComparisonSection } from './models-comparison'
-import { getFriendlyModelName } from '~/lib/model'
+import { SpeakerSeparationModelGroup } from './models-speaker'
+import { getModelDisplayName } from '~/lib/model'
 
 /**
- * The models settings: hardware knobs and corrupt-file recovery, plus the one
- * catalog section that carries everything about choosing, installing and
- * selecting models (installed entries included, highlighted and sorted first).
+ * The models settings: hardware knobs and corrupt-file recovery, the auxiliary
+ * speaker-separation model, then the comparison lab, then the catalog section
+ * that carries everything about choosing, installing and selecting models
+ * (installed entries included, highlighted and sorted first). The catalog ends
+ * the page — it is the long list, and nothing should sit below it.
  */
 export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 	return (
@@ -22,7 +25,7 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 				</SettingsRow>
 
 				{!vm.isMacOS && !vm.preference.noGpu && (
-					<SettingsRow label={m.gpuDevice()}>
+					<SettingsRow label={m.gpuDevice()} description={m.infoGpuDevice()}>
 						{vm.gpuDevices.length > 0 ? (
 							<Select
 								value={vm.preference.gpuDevice != null ? String(vm.preference.gpuDevice) : 'auto'}
@@ -61,7 +64,7 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 					{vm.corruptModels.map((model) => (
 						<SettingsRow
 							key={model.path}
-							label={getFriendlyModelName(model.name)}
+							label={getModelDisplayName(model.name)}
 							description={m.modelFileCorruptDescription({ name: model.name })}>
 							<IconAction label={m.reDownload()} icon={<Download className="h-4 w-4" />} onClick={() => vm.redownloadModel(model)} />
 							<IconAction label={m.showInFolder()} icon={<FolderOpen className="h-4 w-4" />} onClick={() => vm.openSelectedModel(model.path)} />
@@ -70,8 +73,9 @@ export function ModelsSection({ vm }: { vm: SettingsViewModel }) {
 				</SettingsGroup>
 			)}
 
-			<ModelsCatalogSection vm={vm} />
+			<SpeakerSeparationModelGroup />
 			<ModelsComparisonSection vm={vm} />
+			<ModelsCatalogSection vm={vm} />
 		</div>
 	)
 }

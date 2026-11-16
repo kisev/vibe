@@ -1,0 +1,38 @@
+{
+  "app-update-controls": {
+    "title": "Ovládání aktualizací aplikace",
+    "why": "Aktualizace se kontrolují na pozadí a jediným ovládacím prvkem je nevysvětlený přepínač „Beta updates“ ukrytý v sekci Obecné: žádné výslovné „zkontrolovat nyní“, žádný vývojový kanál (vývojová sestavení vycházejí bez artefaktů aktualizátoru) a žádné stanovené pravidlo, co který kanál znamená."
+  },
+  "dependency-hygiene": {
+    "title": "Hygiena závislostí",
+    "why": "Závislosti se aktualizují ručně, pokud vůbec, a neexistuje jediné místo, které odpovídá na otázku „co je zastaralé?“."
+  },
+  "desktop-e2e": {
+    "title": "Desktopové e2e testy",
+    "why": "Každou dosavadní regresi desktopové aplikace objevil správce projektu tím, že nainstaloval vývojové sestavení a proklikal se jím."
+  },
+  "dev75-fixes": {
+    "title": "Opravy pro dev.75",
+    "why": "První sestavení, se kterým správce projektu strávil celý den (1.0.0-dev.75), odhalilo pět závad, které nezachytil žádný unit test: zobrazení porovnání hlásí u skutečných přepisů nula rozdílů, kanály aktualizací míchají anglické a přeložené názvy a na Beta nabízejí stabilní sestavení, prohlížeč schůzek otevírá nepoužitelné bílé okno, které nelze zavřít a které závisí na schématu vibe://, jež nikdo jiný nevytváří, vývojová stránka seznamu změn se vrací k 1.0.0 a nechává dva popisky nepřeložené a místní přepínač serveru API se po restartu sám zapne."
+  },
+  "fork-update-sources": {
+    "title": "Zdroje aktualizací forku",
+    "why": "Fork stále kontroluje upstreamový aktualizační kanál (thewh1teagle/vibe), takže sestavení forku může být nabídnuto — a nahrazeno — upstreamovým vydáním ve chvíli, kdy upstream nějaké zveřejní."
+  },
+  "live-conversation-assistant": {
+    "title": "Asistent živé konverzace",
+    "why": "Aplikace přepisuje schůzky, ale pomoc přichází až po hovoru: shrnutí a otázky se týkají dokončeného přepisu."
+  },
+  "security-scanning": {
+    "title": "Bezpečnostní skenování",
+    "why": "V repozitáři nic nezastaví sestavení kvůli tomu, že má závislost známou zranitelnost."
+  },
+  "speaker-voice-memory": {
+    "title": "Paměť hlasů mluvčích",
+    "why": "Diarizace označuje mluvčí každé nahrávky jako Mluvčí 1…N a jména, která uživatel zadá, se ukládají pro každý přepis zvlášť."
+  },
+  "website-language-selector": {
+    "title": "Výběr jazyka na webu",
+    "why": "Web už má runtime Paraglide, katalogy pro jednotlivé jazyky, LanguageSelector v navigaci a plně přeloženou dokumentaci i seznam změn — pokrytí je ale nerovnoměrné (Domů a Funkce stále obsahují natvrdo zapsanou angličtinu), volba žije jen v localStorage, takže sdílený odkaz se vždy otevře v jazyce příjemce, nikoli odesílatele, a na malých obrazovkách je výběr snadno přehlédnutelný."
+  }
+}

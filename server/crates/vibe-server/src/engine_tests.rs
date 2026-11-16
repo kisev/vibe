@@ -71,6 +71,13 @@ fn assert_timestamped(segments: &[Segment]) {
 }
 
 #[test]
+fn session_options_carry_the_requested_thread_count() {
+    assert_eq!(session_options(4).n_threads, 4);
+    // 0 is the library's "choose a default", not a request for no threads.
+    assert_eq!(session_options(0), transcribe_cpp::SessionOptions::default());
+}
+
+#[test]
 fn vad_options_split_speech_below_the_family_window() {
     let gigaam = vad_options_for(25_000.0);
     assert_eq!(gigaam.max_speech_ms, 24_500);
@@ -330,7 +337,8 @@ fn gigaam_request_contract_and_segments() {
         assert_eq!(crate::server::engine_error_status(&err), axum::http::StatusCode::BAD_REQUEST);
     }
 
-    // The request gate rejects the same options as the engine.
+    // The request gate rejects the same options as the engine, each with its
+    // own code rather than the language one.
     for options in [
         TranscribeOptions {
             translate: true,
@@ -341,9 +349,11 @@ fn gigaam_request_contract_and_segments() {
             ..transcription_options(Some(vad_path.clone()))
         },
     ] {
-        engine
+        let err = engine
             .validate_request(&mut options.clone())
             .expect_err("option is not supported");
+        assert_eq!(crate::server::engine_error_code(&err), "unsupported_option", "{err}");
+        assert_eq!(crate::server::engine_error_status(&err), axum::http::StatusCode::BAD_REQUEST);
     }
 
     // A stable-timestamp request the engine cannot honor is dropped with a
@@ -418,6 +428,171 @@ fn legacy_whisper_bin_files_do_not_load() {
     std::fs::write(&path, b"lmggml legacy header").unwrap();
     assert!(detect_model(path.to_str().unwrap()).is_err());
     assert!(Engine::load(path.to_str().unwrap(), ContextOptions::default()).is_err());
+}
+
+#[test]
+fn an_unreadable_model_reports_the_io_error_not_the_container() {
+    // A typo in the path or an unfinished download must not be reported as a
+    // foreign container, which would send the user to download the model again.
+    let error = reject_legacy_container("/nonexistent/vibe-missing-model.gguf").expect_err("cannot open");
+    let text = format!("{error:#}");
+    assert!(text.contains("cannot open model file"), "{text}");
+    assert!(!text.contains("unsupported model format"), "{text}");
+
+    // A file that exists but is not GGUF still gets the container message.
+    let directory = tempfile::tempdir().expect("temp dir");
+    let path = directory.path().join("legacy.bin");
+    std::fs::write(&path, b"lmggml legacy header").unwrap();
+    let error = reject_legacy_container(path.to_str().unwrap()).expect_err("not a GGUF");
+    assert!(format!("{error:#}").contains("not a GGUF file"));
+}
+
+/// A GGUF v3 header whose metadata holds the given `(key, type, value bytes)`.
+fn gguf_header(entries: &[(&str, u32, Vec<u8>)]) -> Vec<u8> {
+    let mut out = Vec::new();
+    out.extend_from_slice(b"GGUF");
+    out.extend_from_slice(&3u32.to_le_bytes()); // version
+    out.extend_from_slice(&0u64.to_le_bytes()); // tensor count
+    out.extend_from_slice(&(entries.len() as u64).to_le_bytes());
+    for (key, value_type, value) in entries {
+        out.extend_from_slice(&(key.len() as u64).to_le_bytes());
+        out.extend_from_slice(key.as_bytes());
+        out.extend_from_slice(&value_type.to_le_bytes());
+        out.extend_from_slice(value);
+    }
+    out
+}
+
+fn gguf_string(value: &str) -> Vec<u8> {
+    let mut out = (value.len() as u64).to_le_bytes().to_vec();
+    out.extend_from_slice(value.as_bytes());
+    out
+}
+
+#[test]
+fn the_architecture_walk_honours_every_scalar_width() {
+    // A u32 value before the key used to be skipped as one byte, which put the
+    // cursor inside the next key and lost the architecture.
+    let header = gguf_header(&[
+        ("general.version", 4, 1u32.to_le_bytes().to_vec()),
+        ("general.alignment", 10, 8u64.to_le_bytes().to_vec()),
+        ("general.name", 8, gguf_string("model")),
+        ("general.architecture", 8, gguf_string("nemotron3_diar")),
+    ]);
+    assert_eq!(architecture_from_header(&header).as_deref(), Some("nemotron3_diar"));
+}
+
+#[test]
+fn the_architecture_walk_skips_an_array_before_the_key() {
+    // Arrays are variable length; a fixed width would desynchronize the walk.
+    let mut array = 8u32.to_le_bytes().to_vec(); // element type: string
+    array.extend_from_slice(&2u64.to_le_bytes()); // two elements
+    array.extend_from_slice(&gguf_string("a"));
+    array.extend_from_slice(&gguf_string("b"));
+    let header = gguf_header(&[
+        ("tokenizer.ggml.tokens", 9, array),
+        ("general.architecture", 8, gguf_string("parakeet")),
+    ]);
+    assert_eq!(architecture_from_header(&header).as_deref(), Some("parakeet"));
+}
+
+#[test]
+fn a_damaged_header_is_unsupported_not_a_panic() {
+    // A truncated prefix and an oversized string length both end in None.
+    let header = gguf_header(&[("general.architecture", 8, gguf_string("whisper"))]);
+    assert!(architecture_from_header(&header[..header.len() - 4]).is_none());
+
+    let oversized = gguf_header(&[("general.architecture", 8, u64::MAX.to_le_bytes().to_vec())]);
+    assert!(architecture_from_header(&oversized).is_none());
+}
+
+#[test]
+fn the_architecture_is_read_from_a_bounded_prefix_and_cached() {
+    let directory = tempfile::tempdir().expect("temp dir");
+    let path = directory.path().join("model.gguf");
+    std::fs::write(&path, gguf_header(&[("general.architecture", 8, gguf_string("sortformer"))])).expect("write");
+    let path = path.to_str().expect("utf-8 path").to_owned();
+
+    // The first call reads the header; a second one answers from the cache.
+    assert_eq!(gguf_architecture(&path).as_deref(), Some("sortformer"));
+    assert_eq!(gguf_architecture(&path).as_deref(), Some("sortformer"));
+
+    // Replacing the model changes the file, so the cached answer is dropped.
+    std::fs::write(
+        &path,
+        gguf_header(&[("general.architecture", 8, gguf_string("nemotron3_diar"))]),
+    )
+    .expect("rewrite");
+    assert_eq!(gguf_architecture(&path).as_deref(), Some("nemotron3_diar"));
+
+    // A key past the read window is reported absent rather than pulling the
+    // file into memory.
+    let late = directory.path().join("late.gguf");
+    let filler = "x".repeat(70 * 1024);
+    std::fs::write(
+        &late,
+        gguf_header(&[
+            (filler.as_str(), 7, vec![0]),
+            ("general.architecture", 8, gguf_string("whisper")),
+        ]),
+    )
+    .expect("write");
+    assert!(read_gguf_architecture(late.to_str().expect("utf-8 path")).is_none());
+}
+
+/// One engine segment for the snapshot tests; every other field is zeroed.
+fn engine_segment(text: &str) -> transcribe_cpp::Segment {
+    transcribe_cpp::Segment {
+        text: text.to_owned(),
+        t1_ms: 100,
+        ..Default::default()
+    }
+}
+
+fn transcript(texts: &[&str]) -> transcribe_cpp::Transcript {
+    transcribe_cpp::Transcript {
+        segments: texts.iter().map(|text| engine_segment(text)).collect(),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn a_leading_empty_segment_never_duplicates_an_emitted_one() {
+    // whisper.cpp emits an empty leading segment; counting only the filtered
+    // ones used to re-emit "hello" on the next window.
+    let mut seen = 0usize;
+    let mut emitted: Vec<String> = Vec::new();
+    let mut on_segment: Option<OnSegment<'_>> = Some(Box::new(|segment: &Segment| emitted.push(segment.text.clone())));
+
+    emit_new(&mut seen, &transcript(&["", "hello"]), &mut on_segment);
+    emit_new(&mut seen, &transcript(&["", "hello", "world"]), &mut on_segment);
+    drop(on_segment);
+
+    assert_eq!(emitted, ["hello", "world"]);
+}
+
+#[test]
+fn allocation_failures_name_the_backend() {
+    let cuda = anyhow::anyhow!("ggml_backend_cuda_buffer_type_alloc_buffer: CUDA error: out of memory");
+    assert_eq!(allocation_failure(&cuda), Some(AllocationFailure::Gpu));
+    let vulkan = anyhow::anyhow!("vk::OutOfDeviceMemoryError");
+    assert_eq!(allocation_failure(&vulkan), Some(AllocationFailure::Gpu));
+    let system = anyhow::anyhow!("failed to allocate 4096 MiB");
+    assert_eq!(allocation_failure(&system), Some(AllocationFailure::System));
+    // "room" contains "oom"; it must not look like an allocation failure.
+    let ordinary = anyhow::anyhow!("the driver reported the room is unavailable");
+    assert_eq!(allocation_failure(&ordinary), None);
+}
+
+#[test]
+fn a_bounded_engine_refuses_an_unbounded_stream() {
+    let Some(mut engine) = gigaam_engine() else { return };
+    // A plan can degrade to None when the VAD model fails to load; the stream
+    // path must not then hand the whole recording to a bounded engine.
+    let error = engine
+        .transcribe_stream(&[], transcription_options(None), StreamCallbacks::default())
+        .expect_err("a bounded engine has no unbounded stream path");
+    assert!(format!("{error:#}").contains("requires externally chunked input"), "{error}");
 }
 
 fn fixture_audio(path: &str) -> Vec<f32> {

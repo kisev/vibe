@@ -1,0 +1,126 @@
+{
+  "status": "failed",
+  "llm": {
+    "provider": "claude-code-router",
+    "model": "glm-5.3"
+  },
+  "message": "Review failed: 0 finding(s); 1 of 1 selected item(s) failed.",
+  "summary": {
+    "files_reviewed": 1,
+    "comments": 0,
+    "total_tokens": 21000,
+    "input_tokens": 4616,
+    "output_tokens": 16384,
+    "cache_read_tokens": 2752,
+    "elapsed": "3m0s"
+  },
+  "tool_calls": {
+    "total": 1,
+    "by_tool": {
+      "code_comment": 1
+    },
+    "failure": 1,
+    "failure_by_tool": {
+      "code_comment": 1
+    },
+    "failure_details": [
+      {
+        "tool_call_number": 1,
+        "tool_name": "code_comment",
+        "file_path": "bad.py",
+        "arguments": "{}",
+        "error": "Error: 'comments' array is required. Got args: {}"
+      }
+    ]
+  },
+  "comments": null,
+  "groups": [
+    {
+      "label": "bad.py",
+      "files": ["bad.py"]
+    }
+  ],
+  "session_id": "d09131e6-69e1-4588-a6e6-89afc435a8d1",
+  "manifest": {
+    "schema_version": "ocr.run-manifest/v1",
+    "run_id": "d09131e6-69e1-4588-a6e6-89afc435a8d1",
+    "operation": "review",
+    "terminal_state": "failed",
+    "repository": {},
+    "input": {
+      "mode": "commit",
+      "requested_head": "8a000e8b578ec9ed556cdb8520b15f930a483b75",
+      "resolved_base": "7d2d7e68c1d34eed9efc995b401a61674e83ef91",
+      "resolved_head": "8a000e8b578ec9ed556cdb8520b15f930a483b75",
+      "exact_range": "7d2d7e68c1d34eed9efc995b401a61674e83ef91..8a000e8b578ec9ed556cdb8520b15f930a483b75",
+      "source_artifact_sha256": "594a23261cfec4b27b0e3ec7be5d49174cbfef151020ca58d9b00a2080ec3cc7"
+    },
+    "execution": {
+      "ocr_version": "v1.13.9",
+      "provider": "claude-code-router",
+      "model": "glm-5.3",
+      "configured_concurrency": 8,
+      "max_tool_request_times": 100,
+      "rule_config_sha256": "7d579740667a61cd408a2fe6647d5c01864f7117f22bd9edf00e5511d947a5ab",
+      "runtime_config_sha256": "94463faab2ae5a8130b0486c416334c2381955957cbf4388e5d49205fe825ceb"
+    },
+    "coverage": {
+      "selected": [
+        {
+          "item_id": "5ca65e9a4793c91911b1a8f3521063f5ad871da907f49b84213461ebc0921300",
+          "path": "bad.py",
+          "fingerprint": "95c5454a82b567c136d9e45cf5e49b7f8358174bc879e0f2049fcf3b40b0ccae"
+        }
+      ],
+      "completed": [],
+      "reused": [],
+      "failed": [
+        {
+          "item_id": "5ca65e9a4793c91911b1a8f3521063f5ad871da907f49b84213461ebc0921300",
+          "path": "bad.py",
+          "fingerprint": "95c5454a82b567c136d9e45cf5e49b7f8358174bc879e0f2049fcf3b40b0ccae",
+          "classification": "timeout",
+          "reason": "file review exhausted its task deadline (--timeout)"
+        }
+      ],
+      "waived": [],
+      "excluded": [
+        {
+          "item_id": "a9c470f70eb9a30fecac98c725ac7dbd40b53a1e236f6aa125da6466c805ae49",
+          "path": "a.txt",
+          "exclude_reason": "unsupported_ext"
+        }
+      ]
+    },
+    "elapsed_ms": 180099
+  },
+  "retry_report": {
+    "schema_version": "ocr.llm-retry-report/v1",
+    "total_requests": 2,
+    "retried_requests": 0,
+    "total_retries": 0,
+    "recovered_requests": 0,
+    "failed_requests": 1,
+    "cancelled_requests": 0,
+    "requests": [
+      {
+        "logical_request_id": "5835526da96be3b150e3dfbd047cd4544a778408661c65193b43b55f06266724",
+        "provider": "claude-code-router",
+        "model": "glm-5.3",
+        "file_path": "bad.py",
+        "task_type": "main_task",
+        "request_no": 2,
+        "outcome": "failed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "error",
+            "error_class": "timeout",
+            "failure_phase": "context",
+            "duration_to_headers_ms": 51139
+          }
+        ]
+      }
+    ]
+  }
+}

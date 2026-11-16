@@ -1,0 +1,38 @@
+{
+  "app-update-controls": {
+    "title": "Sterowanie aktualizacjami aplikacji",
+    "why": "Aktualizacje są sprawdzane w tle, a jedynym elementem sterującym jest niewyjaśniony przełącznik „Aktualizacje beta” ukryty w sekcji Ogólne: brak wyraźnego „sprawdź teraz”, brak jakiegokolwiek kanału dev (kompilacje dev są wydawane bez artefaktów aktualizatora) i brak określonej zasady, co oznacza każdy kanał."
+  },
+  "dependency-hygiene": {
+    "title": "Higiena zależności",
+    "why": "Zależności są aktualizowane ręcznie, o ile w ogóle, i nie ma jednego miejsca, które odpowiada na pytanie „co jest przestarzałe?”."
+  },
+  "desktop-e2e": {
+    "title": "E2E aplikacji desktopowej",
+    "why": "Każda dotychczasowa regresja w aplikacji desktopowej została znaleziona przez opiekuna projektu, który zainstalował kompilację dev i przeklikał ją."
+  },
+  "dev75-fixes": {
+    "title": "Poprawki dev75",
+    "why": "Pierwsza kompilacja, w której opiekun projektu spędził cały dzień (1.0.0-dev.75), ujawniła pięć usterek, których nie wychwycił żaden test jednostkowy: widok porównania zgłasza zero różnic na prawdziwych transkrypcjach, kanały aktualizacji ujawniają angielskie/przetłumaczone nazwy i oferują stabilną kompilację na kanale Beta, przeglądarka spotkań otwiera bezużyteczne białe okno, którego nie da się zamknąć i które zależy od schematu vibe://, którego nikt inny nie tworzy, strona dziennika zmian wersji dev cofa się do 1.0.0 i pozostawia dwie nieprzetłumaczone etykiety, a przełącznik lokalnego serwera API włącza się sam po ponownym uruchomieniu."
+  },
+  "fork-update-sources": {
+    "title": "Źródła aktualizacji forka",
+    "why": "Fork nadal sprawdza kanał aktualizacji upstreamu (thewh1teagle/vibe), więc kompilacja forka może otrzymać propozycję wydania upstreamu — i zostać przez nie zastąpiona — gdy tylko upstream je opublikuje."
+  },
+  "live-conversation-assistant": {
+    "title": "Asystent rozmów na żywo",
+    "why": "Aplikacja transkrybuje spotkania, ale pomoc przychodzi po rozmowie: podsumowania i pytania dotyczą już ukończonej transkrypcji."
+  },
+  "security-scanning": {
+    "title": "Skanowanie bezpieczeństwa",
+    "why": "Nic w repozytorium nie powoduje niepowodzenia kompilacji z powodu znanej luki w zależności."
+  },
+  "speaker-voice-memory": {
+    "title": "Pamięć głosów mówców",
+    "why": "Rozpoznawanie mówców etykietuje mówców każdego nagrania jako Mówca 1…N, a nazwy wpisane przez użytkownika są zapisywane osobno dla każdej transkrypcji."
+  },
+  "website-language-selector": {
+    "title": "Selektor języka strony",
+    "why": "Strona ma już środowisko uruchomieniowe Paraglide, katalogi dla poszczególnych języków, LanguageSelector w nawigacji oraz w pełni przetłumaczoną dokumentację i dziennik zmian — ale pokrycie jest nierówne (Strona główna i Funkcje wciąż zawierają zaszyty na stałe angielski), wybór żyje tylko w localStorage, więc udostępniony link zawsze otwiera się w języku odbiorcy, a nie nadawcy, a selektor łatwo przeoczyć na małych ekranach."
+  }
+}

@@ -19,7 +19,6 @@ pub async fn is_online(timeout: Option<u64>) -> CommandResult<bool> {
     Ok(futures::future::join_all(tasks).await.into_iter().any(|res| res))
 }
 use crate::error::CommandResult;
-use serde_json::Value;
 use std::path::PathBuf;
 use tauri::Manager;
 use tauri_plugin_store::StoreExt;
@@ -41,12 +40,6 @@ pub fn is_avx2_enabled() -> bool {
     {
         true
     }
-}
-
-#[tauri::command]
-pub fn track_analytics_event(app_handle: tauri::AppHandle, name: String, props: Option<Value>) -> CommandResult<()> {
-    crate::analytics::track_event_handle_with_props(&app_handle, &name, props);
-    Ok(())
 }
 
 #[tauri::command]

@@ -1,12 +1,11 @@
 import { ReactNode, SetStateAction, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { load } from '@tauri-apps/plugin-store'
 import * as config from '~/lib/config'
 import { DEFAULT_AUTO_EXPORT, type AutoExportSettings } from '~/lib/auto-export'
 import { CONFIG_KEYS } from '~/lib/config-keys'
 import { KEEP_AWAKE, startKeepAwake, stopKeepAwake } from '~/lib/keep-awake'
 import { usePersisted } from '~/lib/config-store'
-import { runDiarizationMigration } from '~/lib/diarization-migration'
+import { runDiarizationMigration, sweepLegacyDiarizationFiles } from '~/lib/diarization-migration'
 import { TextFormat } from '~/components/format-select'
 import { ModifyState } from '~/lib/types'
 import { supportedLanguages } from '~/lib/i18n'
@@ -130,9 +129,6 @@ export interface Preference {
 	recentLanguages: { code: string; ts: number }[]
 	setRecentLanguages: ModifyState<{ code: string; ts: number }[]>
 
-	analyticsEnabled: boolean
-	setAnalyticsEnabled: (value: boolean) => void
-
 	/** Auto-save every finished transcription into the projects folder (powers the Recents sidebar). */
 	saveTranscripts: boolean
 	setSaveTranscripts: ModifyState<boolean>
@@ -165,10 +161,6 @@ export interface ModelOptions {
 	translate?: boolean
 	max_text_ctx?: number
 	word_timestamps?: boolean
-	max_sentence_len?: number
-	sampling_strategy: 'greedy' | 'beam search'
-	best_of?: number
-	beam_size?: number
 }
 
 const systemIsDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -182,10 +174,6 @@ export const DEFAULT_MODEL_OPTIONS: ModelOptions = {
 	temperature: 0.4,
 	max_text_ctx: undefined,
 	word_timestamps: false,
-	max_sentence_len: undefined,
-	sampling_strategy: 'beam search' as 'greedy' | 'beam search',
-	best_of: 5,
-	beam_size: 5,
 }
 
 const defaultOptions = {
@@ -194,7 +182,8 @@ const defaultOptions = {
 	modelPath: null,
 	modelOptions: DEFAULT_MODEL_OPTIONS,
 	ffmpegOptions: {
-		normalize_loudness: false,
+		// On by default: the app's own note says it buys accuracy, and a silent default is worse.
+		normalize_loudness: true,
 		custom_command: null,
 	},
 	ytDlpVersion: null,
@@ -255,17 +244,40 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 	})
 
 	const [recentLanguages, setRecentLanguages] = usePersisted<{ code: string; ts: number }[]>(CONFIG_KEYS.recentLanguages, [])
-	const [diarizeEnabled, setDiarizeEnabled] = usePersisted<boolean>(CONFIG_KEYS.diarizeEnabled, false)
+	// On by default. The migration below only revalidates a preference the user persisted, so a
+	// fresh install keeps the flag on without downloading anything; until the switch is toggled,
+	// buildSharedOptions drops the missing model and transcribes without speakers.
+	const [diarizeEnabled, setDiarizeEnabled] = usePersisted<boolean>(CONFIG_KEYS.diarizeEnabled, true)
 	const [stableTimestampsEnabled, setStableTimestampsEnabled] = usePersisted<boolean>(CONFIG_KEYS.stableTimestampsEnabled, false)
 	// Once per session: the diarization model changed format with the unified
 	// engine, so a persisted toggle can point at a file that is no longer
 	// downloaded — revalidate it before the first transcription, not after.
 	const diarizationMigrationDone = useRef(false)
+	// Whether the superseded artifacts were already swept. Separate from the migration above:
+	// the sweep does not depend on the preference, so it must run even when there is no
+	// persisted toggle to revalidate.
+	const diarizationSweepDone = useRef(false)
+	// Only a preference the user actually persisted is revalidated: the default is on, and
+	// prompting every fresh install to migrate would be a dialog nobody asked for.
+	const persistedDiarize = readConfig<boolean | null>(CONFIG_KEYS.diarizeEnabled, null)
 	useEffect(() => {
-		if (diarizationMigrationDone.current || !diarizeEnabled) return
+		if (!diarizationSweepDone.current) {
+			diarizationSweepDone.current = true
+			// With the current model in place no replacement download ever runs, so the leftovers
+			// would stay forever. Best effort: a failed sweep must not disturb startup.
+			void sweepLegacyDiarizationFiles().catch((error) => {
+				console.error('failed to sweep superseded diarization artifacts:', error)
+			})
+		}
+		if (diarizationMigrationDone.current || !diarizeEnabled || persistedDiarize !== true) return
 		diarizationMigrationDone.current = true
-		void runDiarizationMigration(diarizeEnabled, () => setDiarizeEnabled(false))
-	}, [diarizeEnabled, setDiarizeEnabled])
+		void runDiarizationMigration(diarizeEnabled, () => setDiarizeEnabled(false)).catch((error) => {
+			// A revalidation that throws would otherwise leave the switch on with no model behind
+			// it; turn it off the same way a declined download does.
+			console.error('failed to migrate the diarization preference:', error)
+			setDiarizeEnabled(false)
+		})
+	}, [diarizeEnabled, setDiarizeEnabled, persistedDiarize])
 	const [chunkSeconds, setChunkSeconds] = usePersisted<number | null>(CONFIG_KEYS.chunkSeconds, null)
 	const [storedExportOptions, setStoredExportOptions] = usePersisted<Partial<ExportOptions>>(CONFIG_KEYS.exportOptions, DEFAULT_EXPORT_OPTIONS)
 	// One key holding several settings can be half-written by an older build or a hand-edited
@@ -288,8 +300,6 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 	const [saveTranscripts, setSaveTranscripts] = usePersisted<boolean>(CONFIG_KEYS.saveTranscripts, true)
 	const [meetingDetectionEnabled, setMeetingDetectionEnabled] = usePersisted<boolean>(CONFIG_KEYS.meetingDetectionEnabled, false)
 	const [autoTranscribeAfterRecording, setAutoTranscribeAfterRecording] = usePersisted<boolean>(CONFIG_KEYS.autoTranscribeAfterRecording, false)
-
-	const [analyticsEnabled, setAnalyticsEnabledLocal] = useState(true)
 
 	/**
 	 * The background hold: idle only, never the display. It exists so the app stays
@@ -330,22 +340,6 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 			return lang === previous.lang ? previous : { ...previous, lang }
 		})
 	}, [modelMetadata, setModelOptions])
-
-	useEffect(() => {
-		load(config.storeFilename).then((store) => {
-			store.get<boolean>('analytics_enabled').then((val) => {
-				if (val !== null && val !== undefined) {
-					setAnalyticsEnabledLocal(val)
-				}
-			})
-		})
-	}, [])
-	const setAnalyticsEnabled = async (value: boolean) => {
-		setAnalyticsEnabledLocal(value)
-		const store = await load(config.storeFilename)
-		await store.set('analytics_enabled', value)
-		await store.save()
-	}
 
 	useEffect(() => {
 		setIsFirstRun(false)
@@ -411,7 +405,7 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 	}
 
 	function enableSubtitlesPreset() {
-		setModelOptions({ ...preference.modelOptions, word_timestamps: true, max_sentence_len: 32 })
+		setModelOptions({ ...preference.modelOptions, word_timestamps: true })
 		setTextFormatTranscript('srt')
 		message(m.successAction())
 	}
@@ -486,8 +480,6 @@ export function PreferenceProvider({ children }: { children: ReactNode }) {
 		cpuVariant,
 		setCpuVariant,
 		setUnloadTimeoutMinutes,
-		analyticsEnabled,
-		setAnalyticsEnabled,
 		saveTranscripts,
 		setSaveTranscripts,
 		meetingDetectionEnabled,

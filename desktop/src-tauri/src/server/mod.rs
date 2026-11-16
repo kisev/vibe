@@ -259,29 +259,16 @@ impl ServerProcess {
                 form = form.text("prompt", prompt.clone());
             }
         }
-        for (name, value) in [
-            ("n_threads", options.n_threads),
-            ("max_text_ctx", options.max_text_ctx),
-            ("best_of", options.best_of),
-            ("beam_size", options.beam_size),
-        ] {
+        for (name, value) in [("n_threads", options.n_threads), ("max_text_ctx", options.max_text_ctx)] {
             if let Some(value) = value.filter(|value| *value > 0) {
                 form = form.text(name, value.to_string());
             }
-        }
-        // 0 is the UI's "unset"; 1 is a real request for one segment per word, so it has
-        // to reach server rather than being filtered out with it.
-        if let Some(value) = options.max_sentence_len.filter(|value| *value > 0) {
-            form = form.text("max_segment_len", value.to_string());
         }
         if let Some(temperature) = options.temperature.filter(|value| *value > 0.0) {
             form = form.text("temperature", temperature.to_string());
         }
         if options.word_timestamps.unwrap_or(false) {
             form = form.text("word_timestamps", "true");
-        }
-        if options.sampling_strategy.as_deref() == Some("beam search") {
-            form = form.text("sampling_strategy", "beam_search");
         }
         if let Some(ref model) = options.diarize_model {
             if !model.is_empty() {

@@ -7,14 +7,17 @@ interface LanguageSelectorProps {
 	locale: Locale
 	availableLocales: readonly Locale[]
 	onLocaleChange: (locale: Locale) => void
-	/** Renders a tiny muted "dev" badge next to the trigger. */
-	showDevBadge?: boolean
+	/** Which header slot this instance fills; the visible difference comes from the parent's `className`. */
+	placement: 'mobile' | 'desktop'
+	className?: string
 }
 
-export default function LanguageSelector({ locale, availableLocales, onLocaleChange, showDevBadge = false }: LanguageSelectorProps) {
+export default function LanguageSelector({ locale, availableLocales, onLocaleChange, placement, className }: LanguageSelectorProps) {
 	const [open, setOpen] = useState(false)
+	const triggerRef = useRef<HTMLButtonElement>(null)
 	const menuRef = useRef<HTMLLIElement>(null)
 	const languageNames = new Intl.DisplayNames([locale], { type: 'language' })
+	const shortLocale = locale.split('-')[0]?.toUpperCase() ?? locale
 
 	useEffect(() => {
 		function closeOnOutsideClick(event: MouseEvent) {
@@ -24,22 +27,32 @@ export default function LanguageSelector({ locale, availableLocales, onLocaleCha
 		return () => document.removeEventListener('mousedown', closeOnOutsideClick)
 	}, [])
 
+	useEffect(() => {
+		if (!open) return
+		function closeOnEscape(event: KeyboardEvent) {
+			if (event.key !== 'Escape') return
+			setOpen(false)
+			// Escape leaves the list, so the trigger takes focus back rather than dropping it.
+			triggerRef.current?.focus()
+		}
+		document.addEventListener('keydown', closeOnEscape)
+		return () => document.removeEventListener('keydown', closeOnEscape)
+	}, [open])
+
 	return (
-		<li ref={menuRef} className="relative">
+		<li ref={menuRef} data-placement={placement} className={`relative ${className ?? ''}`}>
 			<button
+				ref={triggerRef}
 				type="button"
 				aria-label={m.language()}
+				title={m.language()}
 				aria-expanded={open}
 				onClick={() => setOpen((value) => !value)}
 				className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">
 				<Languages aria-hidden="true" className="size-4" />
-				{showDevBadge && (
-					<span
-						dir="ltr"
-						className="rounded-full border border-border px-1.5 py-px font-mono text-[9px] leading-[1.4] tracking-[0.08em] text-muted-foreground uppercase">
-						dev
-					</span>
-				)}
+				<span aria-hidden="true" className="text-[11px] font-medium tracking-[0.04em] uppercase">
+					{shortLocale}
+				</span>
 			</button>
 			{open && (
 				<div className="absolute top-full end-0 z-50 mt-2 min-w-52 rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg">
@@ -47,6 +60,8 @@ export default function LanguageSelector({ locale, availableLocales, onLocaleCha
 						<button
 							key={code}
 							type="button"
+							data-locale={code}
+							aria-pressed={code === locale}
 							onClick={() => {
 								onLocaleChange(code)
 								setOpen(false)

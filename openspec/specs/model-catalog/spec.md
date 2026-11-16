@@ -22,7 +22,7 @@ The application SHALL bundle a model catalog combining the upstream handy catalo
 
 ### Requirement: Honest entry metadata
 
-Each catalog card SHALL show the provider, the file size in megabytes, the supported languages, streaming and translation availability, and the published accuracy and speed benchmarks for the selected quantization. Parameter counts are not shown on cards — they read as a second, confusing size.
+Each catalog card SHALL show the provider, the file size in megabytes, the supported languages, and streaming and translation availability for the selected quantization. Parameter counts and published accuracy/speed benchmark scores are not shown on cards — parameter counts read as a second, confusing size, and third-party benchmarks say nothing about the user's audio and hardware, which the comparison lab measures directly.
 
 #### Scenario: Filtering the catalog
 
@@ -31,13 +31,13 @@ Each catalog card SHALL show the provider, the file size in megabytes, the suppo
 
 #### Scenario: Card contents
 
-- **WHEN** a catalog model with benchmarks is displayed
-- **THEN** its card shows provider, size in MB, languages, streaming and translation badges, and accuracy/speed indicators for the chosen quantization
+- **WHEN** a catalog model is displayed
+- **THEN** its card shows provider, size in MB, languages, and streaming and translation badges for the chosen quantization, and no benchmark score bars
 
 #### Scenario: Per-quantization size
 
 - **WHEN** the user switches a model's quantization
-- **THEN** the shown size and benchmarks update to that file's values
+- **THEN** the shown size updates to that file's value
 
 ### Requirement: One model surface
 
@@ -215,3 +215,40 @@ The catalog SHALL display every model the vibe project publishes — the `vibe-a
 
 - **WHEN** an officially picked entry's card or link is inspected
 - **THEN** the entry still links to its actual repository, so the user can see where the file lives even though the provider group says Vibe
+
+### Requirement: Installed files use canonical names
+
+Labels for installed model files SHALL use the catalog's canonical model name and the published quantization spelling (`Q8_0`), auxiliary models SHALL be named as their projects name them, and a file the catalog does not know SHALL read as a spaced name that keeps acronyms and quantization tokens intact — never `Q8 0`.
+
+#### Scenario: A catalog model on disk
+
+- **WHEN** an installed file matches a catalog entry
+- **THEN** its label is the entry's name with the quantization key, e.g. `GigaAM v3 E2E-RNN-T · Q8_0`
+
+#### Scenario: An unknown file
+
+- **WHEN** an installed file matches no catalog entry
+- **THEN** its label keeps acronyms and quantization spelling readable, e.g. `My Custom Model Q5_K_S`
+
+### Requirement: Auxiliary model state is visible
+
+Settings SHALL name the bundled speaker-separation model and its size and show whether it is installed, outside the transcription-model catalog: the catalog stays a chooser of models the engine can load, and this auxiliary file is not one. A missing model SHALL offer its verified download without leaving the page; an installed one SHALL offer reveal-in-folder.
+
+#### Scenario: Model installed
+
+- **WHEN** the speaker-separation model file is on disk and passes its integrity check
+- **THEN** the Models page names the bundled model, shows its size and "Installed", and can reveal it in the folder
+
+#### Scenario: Model missing
+
+- **WHEN** the file is absent or fails its checks
+- **THEN** the row offers the verified download, and a successful download reports the model installed without a restart
+
+### Requirement: Superseded diarization artifacts are swept
+
+When the current speaker-separation model is already on disk, startup SHALL remove the superseded diarization artifacts if any remain, instead of waiting for a replacement download that will never run.
+
+#### Scenario: The current model predates the migration
+
+- **WHEN** the current model is installed and legacy diarization files are still in the models folder
+- **THEN** startup deletes the legacy files and leaves the current model untouched

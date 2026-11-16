@@ -1,0 +1,38 @@
+{
+  "app-update-controls": {
+    "title": "Oppdateringskontroller i appen",
+    "why": "Oppdateringer sjekkes i bakgrunnen, og den eneste kontrollen er en uforklart «Beta-oppdateringer»-bryter gjemt under Generelt: ingen tydelig «sjekk nå», ingen dev-kanal i det hele tatt (dev-bygg leveres uten oppdateringsartefakter), og ingen uttalt regel for hva hver kanal betyr."
+  },
+  "dependency-hygiene": {
+    "title": "Ryddighet i avhengigheter",
+    "why": "Avhengigheter oppdateres for hånd, om i det hele tatt, og det finnes ikke ett sted som svarer på «hva er utdatert?»."
+  },
+  "desktop-e2e": {
+    "title": "E2E for skrivebordsappen",
+    "why": "Hver skrivebordsregresjon så langt er funnet av vedlikeholderen som installerte et dev-bygg og klikket seg gjennom det."
+  },
+  "dev75-fixes": {
+    "title": "Rettelser for dev.75",
+    "why": "Det første bygget vedlikeholderen brukte en hel dag i (1.0.0-dev.75), avdekket fem feil som ingen enhetstest fanget opp: sammenligningsvisningen hevder null forskjeller på ekte transkripsjoner, oppdateringskanalene lekker engelske/oversatte navn og tilbyr et stabilt bygg på Beta, møtenettleseren åpner et ubrukelig hvitt vindu som ikke kan lukkes og er avhengig av et vibe://-skjema ingen andre produserer, dev-endringsloggsiden faller tilbake til 1.0.0 og lar to etiketter stå uoversatt, og bryteren for den lokale API-serveren slår seg selv på etter en omstart."
+  },
+  "fork-update-sources": {
+    "title": "Oppdateringskilder for forken",
+    "why": "Forken fortsetter å sjekke oppdateringskanalen til oppstrømsprosjektet (thewh1teagle/vibe), så et fork-bygg kan bli tilbudt — og erstattet av — en oppstrømsutgivelse i samme øyeblikk som oppstrøms publiserer en."
+  },
+  "live-conversation-assistant": {
+    "title": "Assistent for samtaler i sanntid",
+    "why": "Appen transkriberer møter, men hjelpen kommer etter samtalen: sammendrag og spørsmål stilles om en ferdig transkripsjon."
+  },
+  "security-scanning": {
+    "title": "Sikkerhetsskanning",
+    "why": "Ingenting i repositoriet får et bygg til å feile fordi en avhengighet har en kjent sårbarhet."
+  },
+  "speaker-voice-memory": {
+    "title": "Talerminne",
+    "why": "Diarisering merker talerne i hvert opptak som Taler 1…N, og navnene brukeren skriver inn, lagres per transkripsjon."
+  },
+  "website-language-selector": {
+    "title": "Språkvelger på nettstedet",
+    "why": "Nettstedet har allerede en Paraglide-runtime, kataloger per språk, en LanguageSelector i navigasjonen og fullt oversatte dokumenter og endringslogg — men dekningen er ujevn (Hjem og Funksjoner bærer fortsatt hardkodet engelsk), valget ligger bare i localStorage, så en delt lenke alltid åpnes på mottakerens språk og ikke avsenderens, og velgeren er lett å overse på små skjermer."
+  }
+}

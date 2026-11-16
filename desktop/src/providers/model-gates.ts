@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { m } from '~/paraglide/messages.js'
 import * as config from '~/lib/config'
 import type { ModelIntegrity } from '~/lib/config'
+import { errorMessage } from '~/lib/errors'
 import { isModelFileUsable } from '~/lib/model'
 import { usePreferenceProvider } from '~/providers/preference'
 import { useToastProvider } from '~/providers/toast'
@@ -70,7 +71,7 @@ export function useModelGates() {
 				if (ready) preference.setDiarizeEnabled(true)
 			} catch (error) {
 				console.error('diarization setup failed:', error)
-				toast.error(String(error))
+				toast.error(errorMessage(error))
 			}
 		},
 		[ensureDiarizeModel, preference],
@@ -93,11 +94,11 @@ export function useModelGates() {
 				if (ready) preference.setStableTimestampsEnabled(true)
 			} catch (error) {
 				console.error('stable timestamps setup failed:', error)
-				toast.error(String(error))
+				toast.error(errorMessage(error))
 			}
 		},
 		[ensureModel, preference],
 	)
 
-	return { ensureDiarizeModel, toggleDiarization, toggleStableTimestamps }
+	return { toggleDiarization, toggleStableTimestamps }
 }

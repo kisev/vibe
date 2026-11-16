@@ -27,10 +27,12 @@ const whisper: ModelMetadata = {
 }
 
 function fakeGate(options: { metadata?: ModelMetadata | null; usable?: boolean; confirmed?: boolean; downloadError?: Error } = {}) {
-	const isUsable = vi.fn(async () => options.usable ?? false)
+	let usable = options.usable ?? false
+	const isUsable = vi.fn(async () => usable)
 	const confirm = vi.fn(async () => options.confirmed ?? true)
 	const download = vi.fn(async () => {
 		if (options.downloadError) throw options.downloadError
+		usable = true
 	})
 	const gate: VadGate = {
 		metadata: options.metadata === undefined ? gigaam : options.metadata,
@@ -74,6 +76,20 @@ describe('ensureVadModel', () => {
 		await expect(ensureVadModel(gate)).resolves.toBe(true)
 		expect(download).toHaveBeenCalledOnce()
 		expect(download).toHaveBeenCalledWith(config.vadModelUrl, gate.vadPath)
+	})
+
+	it('reports failure when the download leaves no usable file', async () => {
+		// The settings caller toasts the error inside `download`, so a missing file must not read as success.
+		const isUsable = vi.fn(async () => false)
+		const gate: VadGate = {
+			metadata: gigaam,
+			vadPath: '/models/ggml-silero-v6.2.0.bin',
+			isUsable,
+			confirm: async () => true,
+			download: async () => {},
+		}
+
+		await expect(ensureVadModel(gate)).resolves.toBe(false)
 	})
 
 	it('propagates a failed download', async () => {

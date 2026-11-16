@@ -1,16 +1,14 @@
 import { m } from '../paraglide/messages.js'
 import { Dialog, DialogContent } from '~/components/ui/dialog'
-import SupportButton from './SupportButton'
 
 interface PostDownloadProps {
 	open: boolean
 	onOpenChange: (open: boolean) => void
-	onOpenKofi: () => void
 }
 
 const steps = [m['post-download-step-open-installer'], m['post-download-step-follow-prompts'], m['post-download-step-launch']]
 
-export default function PostDownload({ open, onOpenChange, onOpenKofi }: PostDownloadProps) {
+export default function PostDownload({ open, onOpenChange }: PostDownloadProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="w-[92vw] max-w-md p-7">
@@ -30,11 +28,6 @@ export default function PostDownload({ open, onOpenChange, onOpenKofi }: PostDow
 						</li>
 					))}
 				</ol>
-
-				<div className="mt-6 flex flex-col items-center gap-3">
-					<p className="text-[13px] text-muted-foreground">{m['support-while-you-wait']()}</p>
-					<SupportButton onOpenKofi={onOpenKofi} />
-				</div>
 			</DialogContent>
 		</Dialog>
 	)

@@ -64,4 +64,13 @@ describe('local storage migrations', () => {
 		expect(localStorage.getItem('prefs_store_record_in_documents')).toBeNull()
 		expect(localStorage.getItem('prefs_custom_recording_path')).toBeNull()
 	})
+
+	it('drops the telemetry opt-out flag the app no longer reads', () => {
+		localStorage.setItem('vibe:migration-version', '3')
+		writeConfig('analytics_enabled', true)
+
+		runMigrations()
+
+		expect(readConfig('analytics_enabled', 'removed')).toBe('removed')
+	})
 })

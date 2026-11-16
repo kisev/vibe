@@ -67,14 +67,24 @@ The dev build MUST run without any repository secret and MUST NOT require an ext
 - **WHEN** a dev build finishes
 - **THEN** its bundles carry no updater artifacts and require no signing key
 
-### Requirement: One dev release at a time
+### Requirement: Dev releases are pruned with bounded retention
 
-The repository SHALL hold exactly one dev prerelease: the newest dev run that completed. Each green run SHALL publish its bundles to a prerelease tagged `dev.<run-number>` — the number grows monotonically — and SHALL then delete every other `dev.*` release. Deleting a dev release SHALL NOT delete its tag, and stable releases SHALL never be touched. The release name SHALL carry the application version with its `-dev.<short-commit>` suffix and the release body SHALL name the full commit SHA, so the surviving build remains identifiable as a complete snapshot of one revision.
+The dev sweep SHALL be bounded retention: the newest five dev prereleases survive, every dev prerelease created within the last 24 hours survives, and only releases created before the running dev build started are considered at all.
+
+#### Scenario: A normal green run
+
+- **WHEN** a dev run completes and prunes older releases
+- **THEN** the newest five dev releases stay, and so does anything published in the last 24 hours
+
+#### Scenario: A late-healed older run
+
+- **WHEN** an older dev run finishes after a newer one
+- **THEN** it never deletes a release created after it started, so the build a newer run is filling survives
 
 #### Scenario: New commit
 
 - **WHEN** a run builds a commit that has no release yet
-- **THEN** it creates the prerelease `dev.<run-number>` named with the commit's dev version and attaches the bundles
+- **THEN** it creates the prerelease `dev.<n>` named with the commit's dev version and attaches the bundles
 
 #### Scenario: Failed run
 
@@ -84,12 +94,12 @@ The repository SHALL hold exactly one dev prerelease: the newest dev run that co
 #### Scenario: Re-run of a failed run
 
 - **WHEN** a partially failed run is re-run
-- **THEN** it reuses its own `dev.<run-number>` release, the five matrix jobs share it as before, and the cleanup runs when the run completes
+- **THEN** it reuses its own `dev.<n>` release, the five matrix jobs share it as before, and the cleanup runs when the run completes
 
 #### Scenario: Later builds
 
 - **WHEN** a later commit is built and completes
-- **THEN** its release becomes the only dev release — earlier dev releases are deleted with their tags left in place, so the tag numbers keep growing monotonically
+- **THEN** earlier dev releases outside the retention window are deleted while their `dev.<n>` tags stay, so tag numbers keep growing monotonically and the deleted build stays identifiable in history
 
 #### Scenario: Commit identity survives the tag change
 
@@ -100,6 +110,11 @@ The repository SHALL hold exactly one dev prerelease: the newest dev run that co
 
 - **WHEN** a dev release exists
 - **THEN** it does not become the repository's latest release
+
+#### Scenario: Stable releases
+
+- **WHEN** the sweep runs
+- **THEN** no stable release is touched
 
 ### Requirement: Dev version is identifiable
 
@@ -174,3 +189,40 @@ Every workflow that compiles the server from the tree — dev build, server rele
 
 - **WHEN** a future workflow compiles the server from the tree
 - **THEN** it carries the same prerequisite steps, or it fails visibly at configure time rather than passing locally and failing only in CI
+
+### Requirement: A dev revision is validated before it is tagged
+
+The Lint workflow SHALL be startable for any branch through `workflow_dispatch`, and a `dev.<n>` tag SHALL only point at a revision whose Lint dispatch finished green. Validating a dev revision SHALL NOT require a commit on `main`.
+
+#### Scenario: Customizing a dev build
+
+- **WHEN** the dev branch holds the changes intended for the next dev build
+- **THEN** `gh workflow run lint.yml --ref dev` lints that exact revision
+- **AND** the tag is cut only after that run is green
+
+#### Scenario: A red dev lint
+
+- **WHEN** the dispatched Lint run on the dev revision fails
+- **THEN** the failure is fixed on `dev` and Lint is dispatched again
+- **AND** no tag is created for the red revision
+
+#### Scenario: A commit needs to be on the release line
+
+- **WHEN** a commit must exist on `main` for a technical reason
+- **THEN** its main push still triggers Lint as before
+
+### Requirement: Lint compiles the platform-specific code a release builds
+
+A green Lint run SHALL cover the compile gates of every platform a release builds on, not only the Linux one: the desktop crate SHALL be type-checked on macOS as well, and the Windows-only link of the native-stack helper SHALL be exercised on Windows. A platform whose code compiles nowhere but that platform's own job belongs in Lint.
+
+#### Scenario: A macOS-only block stops compiling
+
+- **WHEN** a change breaks a code path only the macOS build compiles
+- **THEN** the dispatched Lint run fails in its macOS job
+- **AND** no `dev.<n>` tag is cut for that revision
+
+#### Scenario: The tag tooling refuses an unverified revision
+
+- **WHEN** `task dev:tag` runs on a commit with no green Lint run
+- **THEN** it stops before creating the tag and names the dispatch that is missing
+- **AND** a green run for a different commit does not satisfy it

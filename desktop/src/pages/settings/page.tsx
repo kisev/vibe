@@ -143,7 +143,7 @@ export default function SettingsPage({ setVisible, scrollTo }: SettingsPageProps
 				<div className="flex w-56 shrink-0 flex-col border-r border-border/55 bg-muted/40 p-3">
 					<div className="mb-2 flex items-center justify-between px-1 pb-1">
 						<span className="text-sm font-semibold">{m.settings()}</span>
-						<Button onMouseDown={() => setVisible(false)} variant="ghost" size="iconSm" className="h-7 w-7 rounded-lg">
+						<Button onMouseDown={() => setVisible(false)} variant="ghost" size="iconSm" className="h-7 w-7 rounded-lg" aria-label={m.modalClose()}>
 							<X className="h-4 w-4" />
 						</Button>
 					</div>
@@ -175,8 +175,10 @@ export default function SettingsPage({ setVisible, scrollTo }: SettingsPageProps
 								<button
 									type="button"
 									onClick={() => openUrl(config.changelogURL(vm.appVersionNumber))}
-									className="group flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/60 transition-colors hover:text-foreground">
-									<span className="truncate">{vm.appVersion}</span>
+									className="group flex w-full cursor-pointer items-start gap-1.5 rounded-md px-2.5 py-1 text-start font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/60 transition-colors hover:text-foreground">
+									{/* A local build's version is long; wrap it whole instead of clipping the build id. */}
+									{/* `select-text` undoes the browser's unselectable button text so it can be copied. */}
+									<span className="min-w-0 break-all leading-tight select-text">{vm.appVersion}</span>
 									<ArrowUpRight
 										aria-hidden="true"
 										className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"

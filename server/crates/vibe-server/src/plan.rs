@@ -76,11 +76,12 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// Longest audio range a chunk's core may occupy. A core of exactly the
-    /// bound leaves no room for padding; `padded` then clips the padding rather
-    /// than the core, so a turn at the bound stays one chunk.
+    /// Longest audio range a chunk's core may occupy. This is the engine's
+    /// input bound itself, never widened to the minimum chunk: `padded` may
+    /// shave padding but never the core, and a core wider than the bound is
+    /// recentered around its middle so its edges never reach the model.
     fn max_core(&self) -> f64 {
-        self.max_input_seconds.max(self.min_chunk_seconds)
+        self.max_input_seconds
     }
 }
 
@@ -103,7 +104,10 @@ pub fn plan(duration: f64, diarization: &[DiarSegment], speech: &[(f64, f64)], s
         let mut turns = turns(diarization, duration, settings);
         turns.extend(unattributed(speech, &turns, duration));
         turns.sort_by(|a, b| a.start.total_cmp(&b.start));
-        turns = absorb_slivers(&mut turns, duration, settings.sliver_seconds);
+        // Speech diarization missed keeps its own chunk with no speakers, so
+        // overlap matching can attribute it; the diarization turns were
+        // already folded inside `turns`.
+        turns = absorb_slivers(&mut turns, duration, settings.sliver_seconds, false);
         let pauses = pauses(speech, duration);
         for (index, turn) in turns.iter().enumerate() {
             let left_limit = if index == 0 {
@@ -174,7 +178,7 @@ pub fn turns(diarization: &[DiarSegment], duration: f64, settings: Settings) -> 
         }
     }
 
-    absorb_slivers(&mut merged, duration, settings.sliver_seconds)
+    absorb_slivers(&mut merged, duration, settings.sliver_seconds, true)
 }
 
 /// Speech VAD found that no diarization turn covers.
@@ -224,10 +228,17 @@ fn unattributed(speech: &[(f64, f64)], turns: &[Turn], duration: f64) -> Vec<Tur
 }
 
 /// Fold every turn shorter than `sliver_seconds` into the nearest neighbour.
-fn absorb_slivers(turns: &mut Vec<Turn>, duration: f64, sliver_seconds: f64) -> Vec<Turn> {
+///
+/// With `absorb_unattributed` false a turn without speakers is left alone:
+/// speech diarization missed must keep its own chunk so overlap matching can
+/// attribute it, instead of inheriting a neighbour's speakers.
+fn absorb_slivers(turns: &mut Vec<Turn>, duration: f64, sliver_seconds: f64, absorb_unattributed: bool) -> Vec<Turn> {
     // A recording made only of slivers would collapse to nothing, so keep one.
     while turns.len() > 1 {
-        let Some(index) = turns.iter().position(|turn| turn.end - turn.start < sliver_seconds) else {
+        let Some(index) = turns
+            .iter()
+            .position(|turn| turn.end - turn.start < sliver_seconds && (absorb_unattributed || !turn.speakers.is_empty()))
+        else {
             break;
         };
         let turn = turns.remove(index);
@@ -288,6 +299,11 @@ pub fn pauses(speech: &[(f64, f64)], duration: f64) -> Vec<(f64, f64)> {
 /// preferred length and falling back to the bound.
 fn cores(turn: &Turn, pauses: &[(f64, f64)], settings: Settings) -> Vec<(f64, f64)> {
     let max_core = settings.max_core();
+    // Loop progress is guaranteed only for a positive bound; a caller that
+    // passes zero or less gets no chunks rather than a spin.
+    if max_core <= 0.0 {
+        return Vec::new();
+    }
     let mut cores = Vec::new();
     let mut position = turn.start;
     while turn.end - position > max_core {
@@ -580,6 +596,59 @@ mod tests {
         for chunk in &plan.chunks {
             assert!(chunk.input_end - chunk.input_start <= 12.0 + 1e-9);
         }
+    }
+
+    #[test]
+    fn a_bound_below_the_minimum_chunk_still_covers_every_core() {
+        // chunk_seconds may be smaller than the shortest chunk worth
+        // producing. The core must shrink to the bound rather than being
+        // wider than the input the model can hear.
+        let diarization = [DiarSegment {
+            start: 0.0,
+            end: 60.0,
+            speaker: 1,
+        }];
+        let plan = plan(60.0, &diarization, &[speech(0.0, 60.0)], settings(0.5));
+        assert!(!plan.chunks.is_empty());
+        for chunk in &plan.chunks {
+            assert!(
+                chunk.core_end - chunk.core_start <= 0.5 + 1e-9,
+                "core over the bound: {chunk:?}"
+            );
+            assert!(
+                chunk.input_end - chunk.input_start <= 0.5 + 1e-9,
+                "input over the bound: {chunk:?}"
+            );
+            assert!(
+                chunk.input_start <= chunk.core_start + 1e-9,
+                "core edge outside the input: {chunk:?}"
+            );
+            assert!(
+                chunk.input_end >= chunk.core_end - 1e-9,
+                "core edge outside the input: {chunk:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_short_range_diarization_missed_stays_unattributed() {
+        // Speaker 1 talks for 0–4 s. VAD heard half a second of speech at
+        // 10 s that diarization did not label; that sliver must keep its own
+        // chunk with no speakers instead of inheriting speaker 1.
+        let diarization = [DiarSegment {
+            start: 0.0,
+            end: 4.0,
+            speaker: 1,
+        }];
+        let speech = [speech(0.0, 4.0), speech(10.0, 10.5)];
+        let plan = plan(20.0, &diarization, &speech, settings(30.0));
+
+        let missed = plan
+            .chunks
+            .iter()
+            .find(|chunk| chunk.core_start == 10.0)
+            .expect("the missed range is planned");
+        assert!(missed.speakers.is_empty(), "the missed range keeps no speakers: {missed:?}");
     }
 
     #[test]

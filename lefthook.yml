@@ -1,6 +1,6 @@
 # Local quality gates, same stack as kisev/skills and kisev/gitlaw. Install once
 # per checkout with `task hooks`. pre-commit runs the cheap, file-scoped checks
-# in parallel over the staged set; pre-push runs the unit suites; commit-msg
+# in parallel over the staged set; pre-push runs `task verify`; commit-msg
 # lints the message. Binaries come from mise (pinned in mise.toml).
 glob_matcher: doublestar
 
@@ -38,7 +38,7 @@ pre-commit:
         - ".opencode/**"
         - ".agents/**"
         - "i18n/changelog/**"
-        - "i18n/docs/*/models.md"
+        - "i18n/docs/*/reference/models.md"
       run: mise exec -- markdownlint-cli2 --no-globs {staged_files}
     markdown-format:
       glob: "**/*.md"
@@ -52,15 +52,16 @@ pre-commit:
         - ".opencode/**"
         - ".agents/**"
         - "i18n/changelog/**"
-        - "i18n/docs/*/models.md"
+        - "i18n/docs/*/reference/models.md"
       run: mise exec -- mdformat --check {staged_files}
     json:
       glob: "**/*.json"
-      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,desktop/project.inlang,website/project.inlang}/**,desktop/src/data/handy-catalog.json"
+      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,desktop/project.inlang,website/project.inlang}/**,desktop/src/data/handy-catalog.json,website/src/lib/latest_release.json"
       run: mise exec -- oxfmt --check {staged_files}
     js:
       glob: "**/*.{ts,tsx,js,mjs}"
-      exclude: "{node_modules,desktop/src/paraglide}/**"
+      # mock-tauri is ignored by oxlint itself; passing it alone made the hook fail with "no files".
+      exclude: "{node_modules,desktop/src/paraglide,desktop/src/mock-tauri}/**"
       run: mise exec -- oxlint {staged_files}
     shell:
       glob: "**/*.sh"
@@ -71,22 +72,38 @@ pre-commit:
     editorconfig:
       # server/libs and the engine export scripts are vendored from upstream
       # byte-for-byte; their formatting is upstream's, re-checked on every sync.
-      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,server/libs,server/crates/nemotron-rs/scripts,server/crates/parakeet-rs/scripts}/**"
+      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,server/libs,server/crates/*/scripts}/**"
       run: mise exec -- editorconfig-checker {staged_files}
     rust-format:
       # rustfmt needs no compilation, so every commit checks it; the lint
-      # workflow runs the same command tree-wide
-      glob: "desktop/src-tauri/**/*.rs"
-      run: cargo fmt --all -- --check
+      # workflow runs the same command tree-wide. server/ is its own workspace,
+      # which the root manifest excludes, so it needs its own invocation.
+      glob: "**/*.rs"
+      run: cargo fmt --all -- --check && cargo fmt --all --manifest-path server/Cargo.toml -- --check
+
+    prettier:
+      # The pages and style sheets had no pre-commit formatter, so an
+      # unformatted index.html reached CI and failed the whole Lint run.
+      glob: "**/*.{css,html}"
+      exclude: "{node_modules,desktop/src/paraglide,website/dist}/**"
+      run: mise exec -- prettier --check {staged_files}
 
     workflows:
       glob: ".github/workflows/*.{yml,yaml}"
       run: mise exec -- actionlint
 
+    review:
+      # Reviews exactly the staged snapshot with OCR. A medium/high finding
+      # blocks the commit; an unreachable provider only warns. OCR_SKIP=1
+      # bypasses the gate for a commit whose findings are already understood.
+      run: task review:staged
+
 pre-push:
   commands:
-    test:
-      run: task test
+    # The same set the workflows run: lint, format:check, rustfmt, clippy over
+    # both workspaces, the dependency gates, the unit suites and the E2E suite.
+    verify:
+      run: task verify
 
 commit-msg:
   commands:

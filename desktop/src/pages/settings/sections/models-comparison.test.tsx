@@ -6,7 +6,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { TooltipProvider } from '~/components/ui/tooltip'
 import { ToastProvider } from '~/providers/toast'
 import { m } from '~/paraglide/messages.js'
+import * as config from '~/lib/config'
 import type { InstalledModel } from '~/lib/model'
+import { MAX_DIFF_TOKENS } from '~/lib/text-diff'
 import type { SettingsViewModel } from './shared'
 import { ModelsComparisonSection } from './models-comparison'
 
@@ -18,6 +20,7 @@ const mocks = vi.hoisted(() => ({
 	stopRecord: vi.fn(),
 	refreshDevices: vi.fn(),
 	getMediaDurationSeconds: vi.fn(),
+	isModelFileUsable: vi.fn(),
 	openPath: vi.fn(),
 	listeners: new Map<string, (event: { payload: unknown }) => void>(),
 }))
@@ -26,7 +29,13 @@ vi.mock('~/lib/model-comparison', () => ({
 	runComparison: mocks.runComparison,
 	tauriComparisonIo: mocks.tauriComparisonIo,
 }))
-vi.mock('~/lib/model', () => ({ getFriendlyModelName: (name: string) => name }))
+vi.mock('~/lib/model', () => ({
+	getModelDisplayName: (name: string) => name,
+	isModelFileUsable: mocks.isModelFileUsable,
+}))
+vi.mock('@tauri-apps/api/path', () => ({
+	join: async (...parts: string[]) => parts.join('/'),
+}))
 vi.mock('~/pages/home/hooks/use-recording', () => ({
 	useRecording: () => ({
 		isRecording: false,
@@ -47,6 +56,7 @@ vi.mock('~/lib/fs', () => ({
 	pathToNamedPath: async (path: string) => ({ name: path.split('/').pop() ?? path, path }),
 }))
 vi.mock('~/lib/app', () => ({ openPath: mocks.openPath }))
+vi.mock('~/providers/preference', () => ({ usePreferenceProvider: () => ({ diarizeEnabled: false }) }))
 
 // jsdom has no pointer-capture API; Radix's tooltip trigger calls it.
 beforeAll(() => {
@@ -61,6 +71,9 @@ beforeEach(() => {
 	mocks.runComparison.mockResolvedValue([])
 	mocks.tauriComparisonIo.mockReturnValue({})
 	mocks.getMediaDurationSeconds.mockResolvedValue(12)
+	mocks.isModelFileUsable.mockResolvedValue(false)
+	mocks.startRecord.mockResolvedValue(true)
+	mocks.stopRecord.mockResolvedValue(true)
 })
 
 afterEach(() => {
@@ -153,6 +166,8 @@ describe('models comparison section', () => {
 			await mocks.listeners.get('record_finish')?.({ payload: { path: '/x/take.wav', name: 'take.wav' } })
 		})
 		expect(screen.getByText('take.wav')).toBeTruthy()
+		// The captured clip is shown with its duration before any run starts.
+		expect(screen.getByText(/· 12s/)).toBeTruthy()
 	})
 
 	it('runs the chosen models and renders done and error rows', async () => {
@@ -178,13 +193,155 @@ describe('models comparison section', () => {
 			{},
 			expect.any(Function),
 		)
-		expect(mocks.tauriComparisonIo).toHaveBeenCalledWith({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null)
+		expect(mocks.tauriComparisonIo).toHaveBeenCalledWith({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null, null)
 
 		expect(await screen.findByText('3s')).toBeTruthy()
 		expect(screen.getByText('Error: boom')).toBeTruthy()
 
 		await user.click(screen.getByRole('button', { name: m.showInFolder() }))
 		expect(mocks.openPath).toHaveBeenCalledWith({ name: 'Alpha', path: '/out/Alpha.md' })
+	})
+
+	it('offers speaker separation only when the separate model is installed, and applies it to every run', async () => {
+		// A metadata read here means the switch row exists; the file check decides.
+		mocks.isModelFileUsable.mockResolvedValue(true)
+		mocks.invoke.mockImplementation(async (command: string) => {
+			if (command === 'get_models_folder') return 'C:/models'
+			if (command === 'pick_media_paths') return ['/x/clip.wav']
+			return null
+		})
+		const user = userEvent.setup()
+		renderSection([model('alpha.gguf'), model('beta.gguf')])
+
+		// Separation is on by default once the model is usable, so the first run
+		// already shows speakers instead of a wall of text.
+		const toggle = await screen.findByRole('switch')
+		expect(toggle.getAttribute('aria-checked')).toBe('true')
+		expect(screen.getByText(m.diarization())).toBeTruthy()
+
+		await user.click(screen.getByRole('button', { name: m.compareChooseFile() }))
+		await screen.findByText('clip.wav')
+		await user.click(screen.getByRole('button', { name: 'alpha.gguf' }))
+		await user.click(screen.getByRole('button', { name: 'beta.gguf' }))
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+		expect(mocks.tauriComparisonIo).toHaveBeenCalledWith(expect.anything(), null, `C:/models/${config.diarizeModelFilename}`)
+
+		// Off is a real choice: the next run asks for plain transcripts and drops the
+		// stale side-by-side results of the run that used separation.
+		await user.click(toggle)
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+		expect(mocks.tauriComparisonIo).toHaveBeenLastCalledWith(expect.anything(), null, null)
+	})
+
+	it('opens the full results view with a baseline and diff switch after a run', async () => {
+		mocks.runComparison.mockResolvedValue([
+			{
+				model: { name: 'Alpha', path: '/models/alpha.gguf' },
+				status: 'done',
+				seconds: 3,
+				outputPath: '/out/Alpha.md',
+				segments: [{ start: 0, stop: 1, text: 'hello world' }],
+			},
+			{
+				model: { name: 'Beta', path: '/models/beta.gguf' },
+				status: 'done',
+				seconds: 5,
+				outputPath: '/out/Beta.md',
+				segments: [{ start: 0, stop: 1, text: 'hello there' }],
+			},
+		])
+		const user = userEvent.setup()
+		renderSection([model('alpha.gguf'), model('beta.gguf')])
+		await chooseFile(user)
+		await user.click(screen.getByRole('button', { name: 'alpha.gguf' }))
+		await user.click(screen.getByRole('button', { name: 'beta.gguf' }))
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+
+		await user.click(await screen.findByRole('button', { name: m.compareResults() }))
+
+		expect(await screen.findByText(m.compareBaseline())).toBeTruthy()
+		expect(screen.getByText(m.compareHighlight())).toBeTruthy()
+		expect(screen.getAllByText(/2 words/)).toHaveLength(2)
+	})
+
+	it('says highlighting is unavailable instead of showing +0 −0 for an overlong transcript', async () => {
+		const longText = Array.from({ length: MAX_DIFF_TOKENS + 1 }, (_, index) => `w${index}`).join(' ')
+		mocks.runComparison.mockResolvedValue([
+			{
+				model: { name: 'Alpha', path: '/models/alpha.gguf' },
+				status: 'done',
+				seconds: 3,
+				outputPath: '/out/Alpha.md',
+				segments: [{ start: 0, stop: 1, text: 'hello world' }],
+			},
+			{
+				model: { name: 'Beta', path: '/models/beta.gguf' },
+				status: 'done',
+				seconds: 5,
+				outputPath: '/out/Beta.md',
+				segments: [{ start: 0, stop: 1, text: longText }],
+			},
+		])
+		const user = userEvent.setup()
+		renderSection([model('alpha.gguf'), model('beta.gguf')])
+		await chooseFile(user)
+		await user.click(screen.getByRole('button', { name: 'alpha.gguf' }))
+		await user.click(screen.getByRole('button', { name: 'beta.gguf' }))
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+		await user.click(await screen.findByRole('button', { name: m.compareResults() }))
+
+		expect(await screen.findByText(m.compareTooLongNote())).toBeTruthy()
+		expect(screen.queryByText('+0')).toBeNull()
+		// The plain transcript still reads in its column; only the highlighting is skipped.
+		expect(screen.getByRole('region', { name: 'Beta' }).textContent).toContain('w0 w1 w2')
+	})
+
+	it('states how many models finished and how many failed before the results button', async () => {
+		mocks.runComparison.mockResolvedValue([
+			{
+				model: { name: 'Alpha', path: '/models/alpha.gguf' },
+				status: 'done',
+				seconds: 3,
+				outputPath: '/out/Alpha.md',
+				segments: [{ start: 0, stop: 1, text: 'hello world' }],
+			},
+			{
+				model: { name: 'Beta', path: '/models/beta.gguf' },
+				status: 'done',
+				seconds: 5,
+				outputPath: '/out/Beta.md',
+				segments: [{ start: 0, stop: 1, text: 'hello there' }],
+			},
+			{ model: { name: 'Gamma', path: '/models/gamma.gguf' }, status: 'error', error: 'boom' },
+		])
+		const user = userEvent.setup()
+		renderSection([model('alpha.gguf'), model('beta.gguf'), model('gamma.gguf')])
+		await chooseFile(user)
+		for (const name of ['alpha.gguf', 'beta.gguf', 'gamma.gguf']) {
+			await user.click(screen.getByRole('button', { name }))
+		}
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+
+		expect(await screen.findByText(`${m.compareRunsDone({ count: 2 })} · ${m.compareRunsFailed({ count: 1 })}`)).toBeTruthy()
+		expect(screen.getByRole('button', { name: m.compareResults() })).toBeTruthy()
+	})
+
+	it('opens the results when every run failed, without a baseline', async () => {
+		mocks.runComparison.mockResolvedValue([
+			{ model: { name: 'Alpha', path: '/models/alpha.gguf' }, status: 'error', error: 'boom' },
+			{ model: { name: 'Beta', path: '/models/beta.gguf' }, status: 'error', error: 'bang' },
+		])
+		const user = userEvent.setup()
+		renderSection([model('alpha.gguf'), model('beta.gguf')])
+		await chooseFile(user)
+		await user.click(screen.getByRole('button', { name: 'alpha.gguf' }))
+		await user.click(screen.getByRole('button', { name: 'beta.gguf' }))
+		await user.click(screen.getByRole('button', { name: m.compareRun() }))
+
+		await user.click(await screen.findByRole('button', { name: m.compareResults() }))
+
+		expect(await screen.findByText(m.compareAllFailed())).toBeTruthy()
+		expect(screen.queryByText(m.compareBaseline())).toBeNull()
 	})
 
 	it('does not offer corrupt model files', () => {

@@ -30,11 +30,11 @@ The fork is `kisev/vibe` (SSH remote `git@github.com:kisev/vibe.git`). Every sou
 
 - **Keep the upstream identifier** `github.com.thewh1teagle.vibe`. Changing it would strand settings, transcripts, deep links (`vibe://`), and OS registration for every existing install; the identifier is not itself an update source. The reverse-domain constant in `keepawake.rs` follows the identifier.
 
-- **Repoint functional URLs, keep credit URLs.** About/repo/issues/bug-report/changelog/models-doc/pairing point at the fork; donation (`supportVibeURL`) and Discord stay upstream — the fork benefits from upstream's community and owes upstream the credit. yt-dlp stays as is.
+- **Repoint functional URLs, keep credit URLs.** About/repo/issues/bug-report/changelog/models-doc/pairing point at the fork; donation (`supportVibeURL`) stays upstream — the fork owes upstream the credit; the Discord community link does not belong to the maintainer and is removed instead of repointed. yt-dlp stays as is.
 
 - **Fork origins derived from the repo:** website `https://kisev.github.io/vibe/`, repository `https://github.com/kisev/vibe`. `config.ts` stays the single source; `changelogURL(version)` keeps its shape.
 
-- **`server-v*` releases live in the fork.** `chorefile` switches to `gh://kisev/vibe`; the current pin (`v0.8.0`) must be published in the fork before a standard app build can fetch it. The dev-build workflow is unaffected (it builds the sidecar from the tree by design).
+- **`server-v*` releases live in the fork.** `task setup` switches to `gh://kisev/vibe`; the current pin (`v0.8.0`) must be published in the fork before a standard app build can fetch it. The dev-build workflow is unaffected (it builds the sidecar from the tree by design).
 
 ## Risks / Trade-offs
 
@@ -48,6 +48,6 @@ The fork is `kisev/vibe` (SSH remote `git@github.com:kisev/vibe.git`). Every sou
 1. Generate the updater keypair; add the private half to fork secrets.
 1. Land the URL/pubkey changes in one commit; verify with the mock test suite plus a packaging dry run.
 1. Publish `server-v0.8.0` in the fork; verify the sidecar fetch.
-1. The next fork release produces minisign-signed `latest.json` with unsigned binaries; install a prior fork build and update over it end to end.
+1. The fork's own version line starts at 1.0.0 and the upstream-based releases and dev tags were deleted (2026-11-10). A build from the old `3.3.0-dev.*` line sorts above 1.0.0, so the updater — which only offers `release.version > current_version` — never moves it into the new line: the first step is one manual install of 1.0.0, after which settings, data, and the identifier survive. From 1.0.0 on, every release produces minisign-signed `latest.json` with unsigned binaries, and the in-app update path is exercised between two releases of the new line.
 
 ## Open Questions

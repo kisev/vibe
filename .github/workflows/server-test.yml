@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Server release tag to test (for example: server-v0.7.0)"
+        description: "Server release tag to test (for example: server-v1.0.2)"
         required: true
         type: string
 
@@ -17,6 +17,7 @@ defaults:
 
 jobs:
   test:
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -51,7 +52,7 @@ jobs:
 
       - name: Setup MSYS2 wget (Windows)
         if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
         with:
           msystem: MINGW64
           install: wget
@@ -93,6 +94,8 @@ jobs:
           Expand-Archive -Path "$env:ARCHIVE" -DestinationPath "." -Force
           C:\msys64\usr\bin\wget.exe --progress=bar:force:noscroll "$env:MODEL_URL" -O "models/whisper-tiny-Q5_K_M.gguf"
           C:\msys64\usr\bin\wget.exe --progress=bar:force:noscroll "$env:SAMPLE_URL" -O "samples/jfk.wav"
+          $hash = (Get-FileHash -Algorithm SHA256 "models/whisper-tiny-Q5_K_M.gguf").Hash.ToLower()
+          if ($hash -ne $env:MODEL_SHA256) { throw "model checksum mismatch: $hash" }
 
       - name: Run binary (Windows)
         if: runner.os == 'Windows'

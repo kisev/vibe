@@ -155,10 +155,14 @@ impl SpeakerCache {
         let frames = probs.len() / speakers;
         let threshold = self.score_threshold;
         let mut scores = vec![f32::NEG_INFINITY; probs.len()];
+        let mut log_complements = vec![0.0f32; speakers];
         for f in 0..frames {
             let row = &probs[f * speakers..(f + 1) * speakers];
-            let log_complements = row.iter().map(|&p| (1.0 - p).max(threshold).ln()).collect::<Vec<_>>();
-            let sum_complements = log_complements.iter().sum::<f32>();
+            let mut sum_complements = 0.0f32;
+            for s in 0..speakers {
+                log_complements[s] = (1.0 - row[s]).max(threshold).ln();
+                sum_complements += log_complements[s];
+            }
             for s in 0..speakers {
                 if row[s] > 0.5 {
                     scores[f * speakers + s] = row[s].max(threshold).ln() - log_complements[s] + sum_complements - 0.5f32.ln();

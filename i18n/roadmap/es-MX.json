@@ -1,0 +1,38 @@
+{
+  "app-update-controls": {
+    "title": "Controles de actualización de la aplicación",
+    "why": "Las actualizaciones se comprueban en segundo plano y el único control es un interruptor «Actualizaciones Beta» sin explicación enterrado en General: no hay un «buscar ahora» explícito, no hay ningún canal de desarrollo (las compilaciones de desarrollo se publican sin artefactos del actualizador) y no hay una regla establecida sobre qué significa cada canal."
+  },
+  "dependency-hygiene": {
+    "title": "Higiene de dependencias",
+    "why": "Las dependencias se actualizan a mano, si acaso, y no hay un único lugar que responda «¿qué está desactualizado?»."
+  },
+  "desktop-e2e": {
+    "title": "E2E de escritorio",
+    "why": "Cada regresión del escritorio encontrada hasta ahora la detectó el mantenedor al instalar una compilación de desarrollo y recorrerla haciendo clic."
+  },
+  "dev75-fixes": {
+    "title": "Correcciones de Dev75",
+    "why": "La primera compilación en la que el mantenedor convivió durante un día (1.0.0-dev.75) expuso cinco defectos que ninguna prueba unitaria detectó: la vista de comparación afirma que hay cero diferencias en transcripciones reales, los canales de actualización filtran nombres en inglés/traducidos y ofrecen una compilación estable en Beta, el navegador de reuniones abre una ventana blanca inservible que no se puede cerrar y depende de un esquema vibe:// que nadie más genera, la página del registro de cambios de desarrollo recurre a 1.0.0 y deja dos etiquetas sin traducir, y el interruptor del servidor local de la API se enciende solo tras un reinicio."
+  },
+  "fork-update-sources": {
+    "title": "Fuentes de actualización del fork",
+    "why": "El fork sigue consultando el canal de actualización upstream (thewh1teagle/vibe), así que a una compilación del fork se le puede ofrecer —y ser reemplazada por— una versión upstream en el momento en que upstream publique una."
+  },
+  "live-conversation-assistant": {
+    "title": "Asistente de conversación en vivo",
+    "why": "La aplicación transcribe reuniones, pero la ayuda llega después de la llamada: los resúmenes y las preguntas se hacen sobre una transcripción terminada."
+  },
+  "security-scanning": {
+    "title": "Análisis de seguridad",
+    "why": "Nada en el repositorio hace fallar una compilación porque una dependencia tenga una vulnerabilidad conocida."
+  },
+  "speaker-voice-memory": {
+    "title": "Memoria de voz de los hablantes",
+    "why": "La diarización etiqueta a los hablantes de cada grabación como Hablante 1…N, y los nombres que escribe un usuario se guardan por transcripción."
+  },
+  "website-language-selector": {
+    "title": "Selector de idioma del sitio",
+    "why": "El sitio web ya tiene un entorno de ejecución de Paraglide, catálogos por idioma, un LanguageSelector en la navegación y documentación y registro de cambios totalmente traducidos, pero la cobertura es desigual (Inicio y Características aún contienen inglés escrito directamente en el código), la elección solo vive en localStorage, así que un enlace compartido siempre se abre en el idioma del destinatario en lugar del del remitente, y el selector es fácil de pasar por alto en pantallas pequeñas."
+  }
+}

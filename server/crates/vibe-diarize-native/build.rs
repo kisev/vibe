@@ -1,4 +1,7 @@
 fn main() {
+    // The output depends only on the target OS, so the script reruns only when
+    // it changes itself.
+    println!("cargo:rerun-if-changed=build.rs");
     // The prebuilt ggml-cpu reads the registry on Windows, so linking needs
     // advapi32. Upstream's vibe-server inherits that library transitively
     // because something in its large graph actually calls a registry

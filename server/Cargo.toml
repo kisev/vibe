@@ -3,7 +3,7 @@
 # crates are upstream's native stack; Nemotron diarization is served through
 # vibe-diarize-native, a runtime-loaded module (the two GGML builds cannot
 # share a binary). The rest stay dormant until their models route to them
-# (see openspec/changes/sync-upstream-main).
+# (see openspec/changes/archive/2026-11-08-sync-upstream-main).
 members = [
     "crates/nemotron-diarize-rs",
     "crates/nemotron-rs",
@@ -16,6 +16,11 @@ members = [
 ]
 resolver = "2"
 
+[workspace.dependencies]
+# Exact pin: engine upgrades are deliberate events (parity re-run), never a
+# cargo update side effect. Members add only their platform feature set.
+transcribe-cpp = { version = "=0.4.1", default-features = false }
+
 [workspace.package]
 edition = "2021"
 repository = "https://github.com/thewh1teagle/vibe"
@@ -25,3 +30,6 @@ license = "MIT"
 expect_used = "warn"
 undocumented_unsafe_blocks = "warn"
 unwrap_used = "warn"
+# Inheritance is opt-in: a member receives these only when its own manifest
+# declares `[lints] workspace = true`, and server:clippy must also name it
+# with -p. A member with neither is not linted by these rules at all.

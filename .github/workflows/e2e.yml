@@ -1,0 +1,51 @@
+# Browser-mode end-to-end suite for the desktop UI: the app runs on Vite with the
+# mock Tauri layer, so React surfaces are exercised without a native webview.
+name: Desktop E2E
+
+on:
+    pull_request:
+        paths:
+            - "desktop/**"
+            # The suite builds the app from the desktop translation catalogs and
+            # starts through scripts/ci/e2e.sh; taskfile.yml names that script.
+            - "i18n/desktop/**"
+            - "scripts/ci/e2e.sh"
+            - "taskfile.yml"
+            - ".github/workflows/e2e.yml"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: e2e-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    e2e:
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+        env:
+            # Setup mise installs only `task`; the suite needs no other lint tool.
+            MISE_EXEC_AUTO_INSTALL: "false"
+        steps:
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  # Four lock files exist in this tree; without the explicit
+                  # path setup-node finds several and fails the step.
+                  cache-dependency-path: desktop/pnpm-lock.yaml
+            - name: Setup mise
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+              with:
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
+            - name: Install dependencies
+              working-directory: ./desktop
+              run: pnpm install --frozen-lockfile
+            - name: Run the suite
+              run: mise exec -- task ci:e2e

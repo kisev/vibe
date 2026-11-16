@@ -114,6 +114,8 @@ pub(super) fn stream_transcription(request: StreamRequest) -> Result<Response, B
 
         let callbacks = StreamCallbacks {
             on_progress: Some(Box::new(move |progress| {
+                // The engine reports a percentage (0–100) — clients render the
+                // value directly, so a chunk number here would read as 1–5%.
                 if send_event(
                     &progress_tx,
                     serde_json::json!({

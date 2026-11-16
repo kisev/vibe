@@ -1,14 +1,14 @@
 #!/bin/sh
 
 # Linux installer for Vibe
-# Supports Linux x86-64 with RPM / DEB / PKG / Arch (vibe-bin)
+# Supports Linux x86-64 and aarch64 with DEB / RPM packages
 # Accepts tag in the first argument
 
 # Usage:
 # ./installer.sh {tag}
 
-# Available at https://thewh1teagle.github.io/vibe/installer.sh
-# Via curl -sSf https://thewh1teagle.github.io/vibe/installer.sh | sh -s {tag}
+# Available at https://kisev.github.io/vibe/installer.sh
+# Via curl -sSf https://kisev.github.io/vibe/installer.sh | sh -s {tag}
 
 set -e
 
@@ -41,11 +41,13 @@ esac
 # Determine the package type and download the appropriate file
 echo "Downloading Vibe version $TAG for $ARCH..."
 
-RPM_URL="https://github.com/thewh1teagle/vibe/releases/download/${TAG}/vibe-${TAG_WITHOUT_V}-1.${RPM_ARCH}.rpm"
-DEB_URL="https://github.com/thewh1teagle/vibe/releases/download/${TAG}/vibe_${TAG_WITHOUT_V}_${DEB_ARCH}.deb"
+RPM_URL="https://github.com/kisev/vibe/releases/download/${TAG}/vibe-${TAG_WITHOUT_V}-1.${RPM_ARCH}.rpm"
+DEB_URL="https://github.com/kisev/vibe/releases/download/${TAG}/vibe_${TAG_WITHOUT_V}_${DEB_ARCH}.deb"
 echo "$RPM_URL"
-# Create temporary directory for downloading
+# Create temporary directory for downloading. The trap removes it on the way out,
+# including the exits `set -e` takes when a download or an install step fails.
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 cd "$TEMP_DIR"
 
 # Download the correct package based on the distribution
@@ -60,21 +62,12 @@ if [ -f /etc/os-release ]; then
         wget -q "$RPM_URL" -O vibe.rpm
         sudo rpm -ivh vibe.rpm
     elif grep -iq "arch" /etc/os-release; then
-        # vibe-bin is in the AUR, not the official repos. Prompts read from the terminal,
-        # since stdin is the script itself when piped from curl.
-        echo "Detected Arch Linux. Installing vibe-bin from the AUR..."
-        if command -v paru >/dev/null 2>&1; then
-            paru -S --needed vibe-bin </dev/tty
-        elif command -v yay >/dev/null 2>&1; then
-            yay -S --needed vibe-bin </dev/tty
-        else
-            echo "No AUR helper found. Building vibe-bin with makepkg..."
-            sudo pacman -S --needed --noconfirm git base-devel </dev/tty
-            git clone https://aur.archlinux.org/vibe-bin.git
-            cd vibe-bin
-            makepkg -si </dev/tty
-            cd ..
-        fi
+        # The AUR's vibe-bin follows upstream, and an upstream package would let
+        # upstream's own updater replace this fork. The fork publishes no Arch
+        # package, so say that instead of installing someone else's build.
+        echo "Error: Vibe publishes no Arch package. Take the DEB or RPM from"
+        echo "https://github.com/kisev/vibe/releases/tag/${TAG} and convert it, or build from source."
+        exit 1
     else
         echo "Unsupported Linux distribution."
         exit 1
@@ -83,10 +76,6 @@ else
     echo "Unable to determine the package manager. Please install the package manually."
     exit 1
 fi
-
-# Clean up
-cd ..
-rm -rf "$TEMP_DIR"
 
 echo "Vibe installation complete!"
 echo "Run 'vibe' to open it!"

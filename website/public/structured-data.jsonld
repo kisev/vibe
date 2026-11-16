@@ -3,35 +3,34 @@
   "@graph": [
     {
       "@type": "Organization",
-      "@id": "https://thewh1teagle.github.io/vibe/#organization",
+      "@id": "https://kisev.github.io/vibe/#organization",
       "name": "Vibe",
-      "url": "https://thewh1teagle.github.io/vibe/",
-      "logo": "https://thewh1teagle.github.io/vibe/logo.png",
+      "url": "https://kisev.github.io/vibe/",
+      "logo": "https://kisev.github.io/vibe/logo.png",
       "sameAs": [
-        "https://github.com/thewh1teagle/vibe",
-        "https://discord.gg/EcxWSstQN8"
+        "https://github.com/kisev/vibe"
       ]
     },
     {
       "@type": "WebSite",
-      "@id": "https://thewh1teagle.github.io/vibe/#website",
-      "url": "https://thewh1teagle.github.io/vibe/",
+      "@id": "https://kisev.github.io/vibe/#website",
+      "url": "https://kisev.github.io/vibe/",
       "name": "Vibe",
       "publisher": {
-        "@id": "https://thewh1teagle.github.io/vibe/#organization"
+        "@id": "https://kisev.github.io/vibe/#organization"
       }
     },
     {
       "@type": "SoftwareApplication",
-      "@id": "https://thewh1teagle.github.io/vibe/#app",
+      "@id": "https://kisev.github.io/vibe/#app",
       "name": "Vibe",
       "applicationCategory": "MultimediaApplication",
       "operatingSystem": "Windows, macOS, Linux",
       "description": "Local-first transcription app for audio and video with AI summaries and multilingual support.",
-      "url": "https://thewh1teagle.github.io/vibe/",
-      "image": "https://thewh1teagle.github.io/vibe/preview.png",
+      "url": "https://kisev.github.io/vibe/",
+      "image": "https://kisev.github.io/vibe/preview.png",
       "publisher": {
-        "@id": "https://thewh1teagle.github.io/vibe/#organization"
+        "@id": "https://kisev.github.io/vibe/#organization"
       }
     }
   ]

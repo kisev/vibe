@@ -1,19 +1,42 @@
 name: Deploy Website
 
+# One deploy publishes two builds: the release site at /vibe/ from main and the
+# dev preview at /vibe/dev/ from dev. A push to main that touches the site (or a
+# manual dispatch) rebuilds both, so the preview follows the dev tree even though
+# the run itself belongs to the release line, and the release site only moves
+# when main does.
+#
+# Deploys start from `main` only. The github-pages environment's branch policy
+# lists `main` and `dev`, but GitHub still skips the deploy job of a run on a
+# `dev` ref — with no error, while the run reads success — so a dev start there
+# is a silent no-deploy. Until that is understood, the dev push builds nothing
+# on the site; /vibe/dev/ first appears when this pipeline reaches `main`.
 on:
     push:
         branches:
             - main
         paths:
             - "website/**"
+            # The build copies docs/ into the site; without this a docs-only edit
+            # reaches the repository and never reaches the published pages.
+            - "docs/**"
             - "i18n/**"
+            - "openspec/changes/**"
+            - "scripts/roadmap.py"
+            - "scripts/dev_manifest.py"
+            - "scripts/website_build.sh"
+            - "scripts/website_assemble.sh"
             - "scripts/website_links.py"
+            # The phone job runs these two from the main tree.
+            - "scripts/phone_*.sh"
             - "handoff/pwa/**"
             - "handoff/wasm/**"
-            - "chorefile"
+            - "taskfile.yml"
             - ".github/workflows/website.yml"
-    release:
-        types: [published]
+    # No `release` trigger: the environment's branch policy admits branches, so
+    # a tag ref leaves the deploy job skipped, and a dev tag would publish the
+    # dev branch. A release's content reaches the site through the main push
+    # that precedes it; workflow_dispatch covers the rest.
     workflow_dispatch:
 
 # Allow this job to clone the repo and create a page deployment
@@ -29,16 +52,58 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
+    # The phone handoff ships with the release site, which is built from main.
+    # Main only carries it once a release includes it, so ask before building:
+    # a release line without the handoff simply serves no /phone/.
+    probe:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            contents: read
+        outputs:
+            present: ${{ steps.probe.outputs.present }}
+        steps:
+            - name: Checkout main
+              uses: actions/checkout@v4
+              with:
+                  ref: main
+
+            # Inline on purpose: the checkout under test is main, which carries
+            # neither this workflow's newer steps nor any probe script of its
+            # own — a `task` or script call here would test the wrong tree.
+            - name: Does the release line carry the phone handoff?
+              id: probe
+              run: |
+                  if grep -Eq '^[[:space:]]*phone:pwa:' taskfile.yml && [ -f handoff/pwa/package.json ]; then
+                    echo "present=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "present=false" >> "$GITHUB_OUTPUT"
+                    echo "::notice::main carries no phone handoff; the release site ships without /phone/"
+                  fi
+
     # Built on Linux on purpose: the iroh client pulls in `ring`, which compiles C
     # for wasm32, and the macOS runners' Apple clang has no wasm target.
     pwa:
+        needs: probe
+        if: needs.probe.outputs.present == 'true'
         runs-on: ubuntu-latest
+        timeout-minutes: 30
+        permissions:
+            contents: read
+        env:
+            # Setup mise installs only `task`; the wasm toolchain comes from the
+            # actions below.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - name: Checkout
               uses: actions/checkout@v4
+              with:
+                  # The phone handoff is served from the release site, so it is
+                  # built from main even when a dev push started this run.
+                  ref: main
 
             - name: setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
               with:
                   package_json_file: handoff/pwa/package.json
 
@@ -48,17 +113,17 @@ jobs:
                   node-version: 22
 
             - name: setup Rust
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
               with:
                   targets: wasm32-unknown-unknown
 
             - name: cache Rust build
-              uses: Swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
               with:
                   workspaces: handoff/wasm
 
             - name: install wasm-bindgen-cli
-              uses: taiki-e/install-action@v2
+              uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
               with:
                   # Must match the pinned `wasm-bindgen` dependency in handoff/wasm/Cargo.toml
                   # exactly, or the CLI refuses to process the module.
@@ -71,13 +136,15 @@ jobs:
                 curl -sSfL https://github.com/WebAssembly/binaryen/releases/download/version_132/binaryen-version_132-x86_64-linux.tar.gz | tar xz
                 echo "$PWD/binaryen-version_132/bin" >> "$GITHUB_PATH"
 
-            - name: setup chore
-              uses: getchore/setup-chore@v1
+            - name: setup mise
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
-                  version: v1.6.0
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
 
             - name: Build
-              run: chore pwa /vibe/phone/
+              run: mise exec -- task phone:pwa -- /vibe/phone/
 
             - name: Upload phone PWA
               uses: actions/upload-artifact@v4
@@ -87,14 +154,42 @@ jobs:
                   if-no-files-found: error
 
     build:
-        needs: pwa
+        needs: [guard, probe, pwa]
+        # The site deploy must not hinge on the phone job: a release line
+        # without the handoff skips `pwa` and still publishes the two sites. A
+        # failed phone build does stop it — the artifact would be missing.
+        if: ${{ !cancelled() && needs.guard.result == 'success' && needs.probe.result == 'success' && (needs.pwa.result == 'success' || needs.pwa.result == 'skipped') }}
         runs-on: ubuntu-latest
+        timeout-minutes: 45
+        # It assembles the artifact and nothing else: the deploy job publishes it
+        # and is the only one that needs `pages: write` and an id token.
+        permissions:
+            contents: read
+        env:
+            # Setup mise installs only `task`; pnpm, Node and uv come from the
+            # actions below.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
-            - name: Checkout
+            - name: Checkout main
               uses: actions/checkout@v4
+              with:
+                  ref: main
+
+            # The release site's content comes from main, its pipeline from dev.
+            # Main lags a release behind: right after a rollback it carries no
+            # `website:build` task, no assembly script and no uv project at all,
+            # and using its own taskfile failed the deploy with "task does not
+            # exist" before the Python helpers failed on a missing httpx. The
+            # tool pin and the roadmap input travel with the pipeline: main may
+            # carry no `openspec/changes/`, which roadmap.py refuses to run
+            # without, and mise must resolve `task` by dev's pin.
+            - name: Take the deploy pipeline from dev
+              run: |
+                  git fetch --depth 1 origin dev
+                  git checkout FETCH_HEAD -- taskfile.yml scripts/ pyproject.toml uv.lock mise.toml openspec/changes
 
             - name: setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
               with:
                   package_json_file: website/package.json
 
@@ -106,35 +201,81 @@ jobs:
                   cache-dependency-path: website/pnpm-lock.yaml
 
             - name: setup uv
-              uses: astral-sh/setup-uv@v5
+              uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
 
-            - name: setup chore
-              uses: getchore/setup-chore@v1
+            - name: setup mise
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
-                  version: v1.6.0
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
 
-            - name: Build
-              run: chore website-build
+            - name: Build production site
+              run: mise exec -- task website:build
               env:
                   GH_TOKEN: ${{ github.token }}
 
             - name: Download phone PWA
+              if: needs.probe.outputs.present == 'true'
               uses: actions/download-artifact@v5
               with:
                   name: pwa-dist
                   path: website/dist/phone
 
-            - name: Setup Pages
-              uses: actions/configure-pages@v6
+            # A separate checkout path keeps the production build intact: the
+            # default checkout would clean untracked files, dist included.
+            - name: Checkout dev
+              uses: actions/checkout@v4
+              with:
+                  ref: dev
+                  path: dev-src
 
+            - name: Build dev site
+              working-directory: dev-src
+              run: mise exec -- task website:build:dev
+              env:
+                  GH_TOKEN: ${{ github.token }}
+
+            # Run from the dev checkout: dev is the integration branch, so it
+            # carries the current deploy pipeline even while main still lags a
+            # release behind.
+            - name: Assemble the deploy artifact
+              working-directory: dev-src
+              env:
+                  WEBSITE_PROD_DIR: ../website/dist
+                  WEBSITE_DEV_DIR: website/dist-dev
+                  WEBSITE_SITE_DIR: ../website/dist-site
+              run: mise exec -- task website:assemble
+
+            # No Setup Pages step: the job assembles the artifact, its
+            # `base_url` output is unused, and the step would need a Pages
+            # scope this job deliberately does not have. `deploy` owns the
+            # Pages API access.
             - name: Upload Artifacts
               uses: actions/upload-pages-artifact@v5
               with:
-                  path: website/dist
+                  path: website/dist-site
+
+    # A deploy job on a ref GitHub will not admit is skipped, not failed, and the
+    # run still reads "success". Fail loudly instead of reporting a deploy that
+    # never happened.
+    guard:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            contents: read
+        steps:
+            - name: Require a main ref
+              run: |
+                  if [ "$GITHUB_REF_NAME" != "main" ]; then
+                    echo "::error::Deploy Website publishes from main only; dispatch it on main."
+                    exit 1
+                  fi
 
     deploy:
-        needs: build
+        needs: [guard, build]
         runs-on: ubuntu-latest
+        timeout-minutes: 10
 
         environment:
             name: github-pages

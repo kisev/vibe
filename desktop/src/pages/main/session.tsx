@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { webviewWindow } from '@tauri-apps/api'
 import * as dialog from '@tauri-apps/plugin-dialog'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -13,18 +13,20 @@ import { autoProjectName } from '~/lib/project-name'
 import { notifyTranscriptsChanged, saveTranscript, TRANSCRIPT_VERSION, type TranscriptRecord } from '~/lib/transcripts-store'
 import type { NamedPath, ProjectSource } from '~/lib/types'
 import { useConfirmExit } from '~/lib/use-confirm-exit'
+import { RECORDING_STATE_EVENT, type RecordingStatePayload } from '~/lib/meeting-browser'
 import { hotkeyRecordingActive } from '~/providers/hotkey'
 import { useRecordingShortcut } from '~/providers/recording-shortcut'
 import { ErrorModalContext } from '~/providers/error-modal'
 import { usePreferenceProvider, type Preference } from '~/providers/preference'
 import { useAudioDownload } from '~/pages/home/hooks/use-audio-download'
 import { useRecording } from '~/pages/home/hooks/use-recording'
+import { isComparisonClipPending, OWN_RECORDING_REPORT } from '~/pages/recording-ownership'
 import { useDropTarget } from './hooks/use-drop-target'
 import { useSummaries, type Summaries } from './hooks/use-summaries'
 import { useTranscribeQueue, type TranscribeQueue } from './hooks/use-transcribe-queue'
 
 export type SessionMode = 'idle' | 'working' | 'done'
-export type IdlePanel = 'none' | 'record' | 'link'
+export type IdlePanel = 'none' | 'record' | 'link' | 'browser'
 
 type Recording = ReturnType<typeof useRecording>
 type AudioDownload = ReturnType<typeof useAudioDownload>
@@ -39,7 +41,6 @@ export interface Session {
 	panel: IdlePanel
 	setPanel: (panel: IdlePanel) => void
 	recording: Recording
-	recordElapsed: number
 	link: AudioDownload
 	collectingFolder: boolean
 	browse: () => Promise<void>
@@ -65,7 +66,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 	const summaries = useSummaries(queue)
 	const [panel, setPanel] = useState<IdlePanel>('none')
 	const [collectingFolder, setCollectingFolder] = useState(false)
-	const [recordElapsed, setRecordElapsed] = useState(0)
 
 	const enqueueRef = useRef(queue.enqueue)
 	useEffect(() => {
@@ -129,10 +129,76 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 	const manualRecording = useRecording(() => setPanel('record'))
 	const recording = useMemo(
-		() => ({ ...manualRecording, isRecording: manualRecording.isRecording || recordingShortcut.isShortcutRecording }),
-		[manualRecording, recordingShortcut.isShortcutRecording],
+		() => ({
+			...manualRecording,
+			isRecording: manualRecording.isRecording || recordingShortcut.isShortcutRecording,
+			// The clock lives with the recording, not with the panel showing it: a remounted
+			// indicator continues from the real start instead of beginning at 00:00.
+			startedAt: manualRecording.isRecording ? manualRecording.startedAt : recordingShortcut.shortcutStartedAt,
+		}),
+		[manualRecording, recordingShortcut.isShortcutRecording, recordingShortcut.shortcutStartedAt],
 	)
 	const link = useAudioDownload(transcribeDownloads)
+
+	// The meeting chrome starts and stops the same recorder through its own hook. Adopting its
+	// reports gives the whole app one recording state, so the main window shows a chrome-started
+	// run and a second start is impossible from either side.
+	useEffect(() => {
+		const unlisten = listen<RecordingStatePayload & { origin?: string }>(RECORDING_STATE_EVENT, ({ payload }) => {
+			// emit() delivers to the emitting window too: adopting our own broadcast would take
+			// ownership of a run this window started and re-publish it without its device names.
+			if (payload.origin === OWN_RECORDING_REPORT) return
+			manualRecording.adoptRecording(payload.recording, payload.startedAt)
+		})
+		return () => {
+			unlisten.then((fn) => fn())
+		}
+	}, [manualRecording.adoptRecording])
+
+	// ...and publishing our own changes reaches a chrome that is already open. The devices are
+	// named only for a run this window actually owns: an adopted chrome run carries its own names
+	// from the gate, and a run the main window did not resolve devices for must not claim none.
+	const ownInputName = recording.ownsRecording ? (manualRecording.inputDevice?.name ?? null) : undefined
+	const ownOutputName = recording.ownsRecording ? (manualRecording.outputDevice?.name ?? null) : undefined
+	const shortcutInputName = recordingShortcut.shortcutDevices?.input
+	const shortcutOutputName = recordingShortcut.shortcutDevices?.output
+	useEffect(() => {
+		// A run this window did not start carries its own names and channels from the gate.
+		let devices: { inputName?: string | null; outputName?: string | null } = {}
+		let sources: RecordingStatePayload['sources']
+		if (recording.ownsRecording) {
+			devices = { inputName: ownInputName, outputName: ownOutputName }
+			sources = [
+				...(manualRecording.inputDevice ? (['microphone'] as const) : []),
+				...(manualRecording.outputDevice ? (['system'] as const) : []),
+			]
+		} else if (recordingShortcut.isShortcutRecording && recordingShortcut.shortcutDevices) {
+			devices = { inputName: shortcutInputName, outputName: shortcutOutputName }
+			sources = [
+				...(shortcutInputName != null ? (['microphone'] as const) : []),
+				...(shortcutOutputName != null ? (['system'] as const) : []),
+			]
+		}
+		void emit(RECORDING_STATE_EVENT, {
+			recording: recording.isRecording,
+			startedAt: recording.startedAt,
+			...(sources ? { sources } : {}),
+			...devices,
+			origin: OWN_RECORDING_REPORT,
+		})
+	}, [
+		recording.isRecording,
+		recording.startedAt,
+		recording.ownsRecording,
+		ownInputName,
+		ownOutputName,
+		manualRecording.inputDevice,
+		manualRecording.outputDevice,
+		recordingShortcut.isShortcutRecording,
+		recordingShortcut.shortcutDevices,
+		shortcutInputName,
+		shortcutOutputName,
+	])
 
 	useEffect(() => {
 		recordingShortcut.setNormalRecordingActive(recording.isRecording)
@@ -143,22 +209,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 		if (recordingShortcut.isShortcutRecording) setPanel('record')
 	}, [recordingShortcut.isShortcutRecording])
 
-	useEffect(() => {
-		if (!recording.isRecording) {
-			setRecordElapsed(0)
-			return
-		}
-		setRecordElapsed(0)
-		const startedAt = Date.now()
-		const timer = window.setInterval(() => setRecordElapsed(Math.floor((Date.now() - startedAt) / 1000)), 500)
-		return () => window.clearInterval(timer)
-	}, [recording.isRecording])
-
 	// A recording becomes a durable project first. Transcription is an optional second step which
 	// updates that same project, so a failed/disabled transcription never costs the user the audio.
 	useEffect(() => {
 		const unlisten: Promise<UnlistenFn> = listen<{ path: string; name: string; warning?: string }>('record_finish', async ({ payload }) => {
-			if (hotkeyRecordingActive) return
+			// A hotkey run and a comparison-lab clip have their own handlers; saving this clip as a
+			// project would move its temp file out from under them.
+			if (hotkeyRecordingActive || isComparisonClipPending()) return
 			recording.setIsRecording(false)
 			setPanel('none')
 			if (payload.warning) toast.warning(m.recordingRecoveredWarning(), { description: payload.warning, position: 'bottom-center' })
@@ -321,13 +378,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 			panel,
 			setPanel,
 			recording,
-			recordElapsed,
 			link,
 			collectingFolder,
 			browse,
 			startNew,
 		}),
-		[mode, queue, summaries, preference, dragging, panel, recording, recordElapsed, link, collectingFolder, browse, startNew],
+		[mode, queue, summaries, preference, dragging, panel, recording, link, collectingFolder, browse, startNew],
 	)
 
 	return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

@@ -10,8 +10,17 @@ use tauri_plugin_store::StoreExt;
 /// Config key holding the base URL of the running local API. Must match `CONFIG_KEYS.apiBaseUrl`.
 pub const API_BASE_URL_KEY: &str = "api.baseUrl";
 
+/// Config key holding whether the user wants the local API running. Must match `CONFIG_KEYS.apiEnabled`.
+pub const API_ENABLED_KEY: &str = "api.enabled";
+
 /// Config key for the CPU backend build the engine should use. Must match `CONFIG_KEYS.cpuVariant`.
 pub const CPU_VARIANT_KEY: &str = "server.cpuVariant";
+
+/// Config key for how long the engine may keep a model loaded. Must match `CONFIG_KEYS.unloadTimeoutMinutes`.
+pub const UNLOAD_TIMEOUT_MINUTES_KEY: &str = "model.unloadTimeoutMinutes";
+
+/// Matches the frontend default in `providers/preference.tsx`.
+pub const DEFAULT_UNLOAD_TIMEOUT_MINUTES: u32 = 5;
 
 /// Which build of the engine's CPU backend to run.
 ///
@@ -70,6 +79,46 @@ pub fn set_cpu_variant(app_handle: &tauri::AppHandle, variant: CpuVariant) -> Re
     Ok(())
 }
 
+/// Read a stored API intent. Anything but a literal `true` means off, so a missing
+/// key (a fresh install) and a malformed one both leave the switch off.
+fn enabled_from_value(value: Option<&serde_json::Value>) -> bool {
+    value.and_then(serde_json::Value::as_bool).unwrap_or(false)
+}
+
+/// Whether the user wants the local API server running.
+///
+/// This is the intent the Settings switch reads. It is deliberately separate from
+/// [`API_BASE_URL_KEY`], which only says whether a shared `vibe-server` process is alive:
+/// transcription loads its model into that same process, so process state is not the user's choice.
+pub fn api_server_enabled(app_handle: &tauri::AppHandle) -> bool {
+    enabled_from_value(
+        app_handle
+            .store(STORE_FILENAME)
+            .ok()
+            .and_then(|store| store.get(API_ENABLED_KEY))
+            .as_ref(),
+    )
+}
+
+/// Persist the user's API server choice, so it survives a restart.
+pub fn set_api_server_enabled(app_handle: &tauri::AppHandle, enabled: bool) -> Result<()> {
+    let store = app_handle.store(STORE_FILENAME).map_err(|e| eyre!("{:?}", e))?;
+    store.set(API_ENABLED_KEY, serde_json::Value::Bool(enabled));
+    store.save().map_err(|e| eyre!("{:?}", e))?;
+    Ok(())
+}
+
+/// How long the engine may keep a model loaded; the frontend default when unset.
+pub fn unload_timeout_minutes(app_handle: &tauri::AppHandle) -> u32 {
+    app_handle
+        .store(STORE_FILENAME)
+        .ok()
+        .and_then(|store| store.get(UNLOAD_TIMEOUT_MINUTES_KEY))
+        .and_then(|value| value.as_u64())
+        .and_then(|value| u32::try_from(value).ok())
+        .unwrap_or(DEFAULT_UNLOAD_TIMEOUT_MINUTES)
+}
+
 /// Absolute path of `app_config.json`, so the UI (and agents told where to look) can find it.
 #[tauri::command]
 pub fn get_config_path(app_handle: tauri::AppHandle) -> CommandResult<PathBuf> {
@@ -123,4 +172,24 @@ pub fn write_config_atomically(app_handle: tauri::AppHandle, contents: String) -
     // `store.save()` cannot resurrect stale values on top of this write.
     crate::config_watcher::sync_store_from_disk(&app_handle)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::enabled_from_value;
+    use serde_json::json;
+
+    #[test]
+    fn a_missing_api_intent_is_off() {
+        assert!(!enabled_from_value(None));
+    }
+
+    #[test]
+    fn only_a_literal_true_turns_the_intent_on() {
+        assert!(!enabled_from_value(Some(&json!(false))));
+        assert!(enabled_from_value(Some(&json!(true))));
+        // A hand-edited config with the wrong type must not start the server.
+        assert!(!enabled_from_value(Some(&json!("true"))));
+        assert!(!enabled_from_value(Some(&json!(1))));
+    }
 }

@@ -1,18 +1,16 @@
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Moon, Sun } from 'lucide-react'
-import { useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { m } from '~/paraglide/messages.js'
-import { ReactComponent as DiscordIcon } from '~/icons/discord.svg'
 import { ReactComponent as GithubIcon } from '~/icons/github.svg'
-import { ReactComponent as HeartIcon } from '~/icons/heart.svg'
 import { ReactComponent as LinkIcon } from '~/icons/link.svg'
 import * as config from '~/lib/config'
 import { DisplayLanguageInput } from '~/components/display-language-input'
 import { Switch } from '~/components/ui/switch'
-import { UpdaterContext } from '~/providers/updater'
 import { SettingsGroup, SettingsRow, type SettingsViewModel } from './shared'
+import { UpdateControls } from './updater-controls'
 
 /**
  * The OS owns this setting, not our config: the user can remove the login item from
@@ -65,15 +63,14 @@ function LaunchAtStartupSwitch() {
 export function GeneralSection({ vm }: { vm: SettingsViewModel }) {
 	const themeLabels = { light: m.light, dark: m.dark } as const
 	const themeIcons = { light: Sun, dark: Moon } as const
-	const { channel, setChannel } = useContext(UpdaterContext)
 
 	return (
 		<div className="space-y-5">
 			<SettingsGroup>
-				<SettingsRow label={m.displayLanguage()}>
+				<SettingsRow label={m.displayLanguage()} description={m.infoDisplayLanguage()}>
 					<DisplayLanguageInput value={vm.preference.displayLanguage} onSelect={vm.preference.setDisplayLanguage} className="w-52" />
 				</SettingsRow>
-				<SettingsRow label={m.theme()}>
+				<SettingsRow label={m.theme()} description={m.infoTheme()}>
 					<div role="radiogroup" aria-label={m.theme()} className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5">
 						{config.themes.map((theme) => {
 							const Icon = themeIcons[theme as keyof typeof themeIcons]
@@ -99,6 +96,8 @@ export function GeneralSection({ vm }: { vm: SettingsViewModel }) {
 				</SettingsRow>
 			</SettingsGroup>
 
+			<UpdateControls />
+
 			<SettingsGroup title={m.generalBehavior()}>
 				<SettingsRow label={m.closeToTray()} description={m.generalTrayInfo()}>
 					<Switch checked={vm.preference.closeToTray} onCheckedChange={vm.preference.setCloseToTray} />
@@ -109,9 +108,6 @@ export function GeneralSection({ vm }: { vm: SettingsViewModel }) {
 				<SettingsRow label={m.preventSleep()} description={m.generalAwakeInfo()}>
 					<Switch checked={vm.preference.preventSleep} onCheckedChange={vm.preference.setPreventSleep} />
 				</SettingsRow>
-				<SettingsRow label={m.betaUpdates()} description={m.betaUpdatesInfo()}>
-					<Switch checked={channel === 'beta'} onCheckedChange={(on) => setChannel(on ? 'beta' : 'stable')} />
-				</SettingsRow>
 			</SettingsGroup>
 
 			<section className="space-y-2">
@@ -120,15 +116,13 @@ export function GeneralSection({ vm }: { vm: SettingsViewModel }) {
 					{[
 						{ label: m.projectLink(), icon: LinkIcon, action: () => openUrl(config.aboutURL) },
 						{ label: m.reportIssue(), icon: GithubIcon, action: vm.reportIssue },
-						{ label: m.supportTheProject(), icon: HeartIcon, action: () => openUrl(config.supportVibeURL), support: true },
-						{ label: m.discordCommunity(), icon: DiscordIcon, action: () => openUrl(config.discordURL) },
-					].map(({ label, icon: Icon, action, support }) => (
+					].map(({ label, icon: Icon, action }) => (
 						<button
 							key={label}
 							type="button"
 							onClick={action}
 							className="flex min-h-11 items-center gap-2.5 rounded-lg border border-border/60 bg-card px-3 py-2.5 text-start text-xs font-medium transition-colors hover:bg-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-							<Icon aria-hidden="true" className={`h-4 w-4 shrink-0 ${support ? 'fill-rose-500 text-rose-500' : 'text-muted-foreground'}`} />
+							<Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
 							<span>{label}</span>
 						</button>
 					))}

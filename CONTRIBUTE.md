@@ -4,7 +4,7 @@ Thanks for thinking about contributing! 🎉
 
 ## How to Contribute
 
-The best way to help is to **[open an issue](https://github.com/thewh1teagle/vibe/issues)**:
+The best way to help is to **[open an issue](https://github.com/kisev/vibe/issues)**:
 
 - 🐛 **Bug reports** — what happened, what you expected, your OS and Vibe version, and steps to reproduce.
 - 💡 **Suggestions** — new features, improvements, or a model or tool you'd like Vibe to support.
@@ -20,4 +20,4 @@ Please don't open a PR. Describe your change in an issue instead. If it's a good
 
 ## Developers
 
-To build and run Vibe locally, see [docs/BUILDING.md](docs/BUILDING.md).
+To build and run Vibe locally, see [the build-and-run tutorial](docs/tutorials/build-and-run.md).

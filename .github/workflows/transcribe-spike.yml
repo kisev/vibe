@@ -24,6 +24,9 @@ concurrency:
     group: transcribe-spike-${{ github.ref }}
     cancel-in-progress: true
 
+permissions:
+    contents: read
+
 env:
     # Matches the handy-computer catalog entry for whisper-tiny Q5_K_M.
     SPIKE_MODEL_URL: https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf
@@ -32,6 +35,7 @@ env:
 
 jobs:
     spike:
+        timeout-minutes: 45
         strategy:
             fail-fast: false
             matrix:
@@ -46,7 +50,14 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+
+            # The C++ tree here is the bulk of the runtime; without a cache it
+            # is recompiled from scratch on every push and pull request.
+            - name: Cache cargo
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+              with:
+                  workspaces: server
 
             # Build-time Vulkan prerequisites for the ggml backend (the
             # runner's GPU is irrelevant; only the compiler toolchain matters).
@@ -60,22 +71,9 @@ jobs:
               timeout-minutes: 8
               env:
                   VULKAN_VERSION: 1.4.357.0
-              run: |
-                  # Same headless invocation as llama.cpp's build-vulkan CI: the
-                  # QtIFW flags --accept-licenses --default-answer --confirm-command
-                  # are the only silent form this installer accepts (/S and
-                  # --mode unattended hang a headless runner); it lands in
-                  # C:\VulkanSDK\<version> in well under a minute.
-                  curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
-                  & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
-                  if (-not (Test-Path "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin\glslc.exe")) { throw 'glslc.exe not found after the SDK install' }
-                  "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}" | Out-File -FilePath $env:GITHUB_ENV -Append
-                  "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
-                  # cmake links the loader by absolute path, but the rust crate links
-                  # vulkan-1 by name, so link.exe also needs the SDK lib dir on LIB.
-                  $vulkanLib = (Get-ChildItem "C:\VulkanSDK\${env:VULKAN_VERSION}" -Recurse -Filter vulkan-1.lib | Select-Object -First 1).DirectoryName
-                  if (-not $vulkanLib) { throw 'vulkan-1.lib not found in the SDK install' }
-                  "LIB=$vulkanLib;${env:LIB}" | Out-File -FilePath $env:GITHUB_ENV -Append
+              # Same script dev-build and server-release run; mise is not set up
+              # in this workflow, so the task facade is bypassed.
+              run: pwsh -NoProfile -File "${{ github.workspace }}/scripts/ci/vulkan-sdk-windows.ps1"
 
             # Compiles the transcribe-cpp-sys dependency (the whole C++ tree)
             # via cmake, then links vibe-server against it.

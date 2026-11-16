@@ -1,5 +1,5 @@
 use crate::engine::Engine;
-use crate::engine::{ContextOptions, TranscribeOptions};
+use crate::engine::{ContextOptions, RequestError, TranscribeOptions};
 use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::server::format;
@@ -62,6 +62,9 @@ enum Command {
         max_text_ctx: i32,
         #[arg(long)]
         word_timestamps: bool,
+        /// Accepted for older scripts; the unified engine ignores it. Sentence
+        /// segments are always returned, and --word-timestamps selects the
+        /// granularity instead.
         #[arg(long, default_value_t = 0)]
         max_segment_len: i32,
         #[arg(long, default_value_t = 0)]
@@ -251,13 +254,9 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
         temperature: args.temperature,
         max_text_ctx: args.max_text_ctx,
         word_timestamps: args.word_timestamps,
-        // One word per segment is what --word-timestamps is asking for, unless
-        // the caller picked a length themselves.
-        max_segment_len: if args.word_timestamps && args.max_segment_len == 0 {
-            1
-        } else {
-            args.max_segment_len
-        },
+        // The engine derives the granularity from the word timestamps; the
+        // length stays on the request only so an older caller still parses.
+        max_segment_len: args.max_segment_len,
         best_of: args.best_of,
         beam_size: args.beam_size,
         vad_model_path: args.vad_model,
@@ -266,9 +265,13 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
     // Validation raises the same language error the engine does, so the marker
     // has to cover both paths: a rejected language never reaches `transcribe`.
     ctx.validate_request(&mut options).map_err(unsupported_language_marker)?;
-    if let (Some(requested), Some(maximum)) = (args.chunk_seconds, ctx.max_input_seconds()) {
-        if requested > maximum {
-            anyhow::bail!("--chunk-seconds must not exceed {maximum} for this engine");
+    if let Some(requested) = args.chunk_seconds {
+        anyhow::ensure!(requested > 0.0, "--chunk-seconds must be positive");
+        if let Some(maximum) = ctx.max_input_seconds() {
+            anyhow::ensure!(
+                requested <= maximum,
+                "--chunk-seconds must not exceed {maximum} for this engine"
+            );
         }
     }
     let plan = crate::server::transcription::plan_for(
@@ -289,18 +292,7 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
     .map_err(unsupported_language_marker)?;
 
     let rendered = if args.word_timestamps && args.format == OutputFormat::Txt {
-        // whisper.cpp emits one segment per word here, plus a leading empty one for
-        // the silence before speech starts.
-        let mut out = String::new();
-        for word in result.segments.iter().filter(|segment| !segment.text.trim().is_empty()) {
-            out.push_str(&format!(
-                "[{} --> {}] {}\n",
-                format::cs_to_vtt_time(word.start),
-                format::cs_to_vtt_time(word.end),
-                word.text.trim()
-            ));
-        }
-        out
+        render_word_timestamps(&result)
     } else {
         match args.format {
             OutputFormat::Txt => format!("{}\n", result.text()),
@@ -318,15 +310,44 @@ async fn transcribe_command(args: TranscribeArgs, config: AppConfig) -> anyhow::
     Ok(())
 }
 
-/// Replace a rejected single-language model's language with the marker the CLI
-/// contract documents. The unified engine reports "{engine} supports only {lang}".
-fn unsupported_language_marker(err: anyhow::Error) -> anyhow::Error {
-    let text = format!("{err:#}");
-    if text.contains("supports only") {
-        let language = text.rsplit(' ').next().unwrap_or_default().to_owned();
-        return anyhow::anyhow!("unsupported_language: {language:?}");
+/// `--word-timestamps --format txt` prints one line per word. The unified
+/// engine keeps word timings inside sentence-level segments, so the rows are
+/// flattened here; a segment the engine produced without word rows still
+/// prints as one line rather than disappearing.
+fn render_word_timestamps(result: &crate::engine::TranscribeResult) -> String {
+    let mut out = String::new();
+    for segment in result.segments.iter().filter(|segment| !segment.text.trim().is_empty()) {
+        if segment.words.is_empty() {
+            out.push_str(&format!(
+                "[{} --> {}] {}\n",
+                format::cs_to_vtt_time(segment.start),
+                format::cs_to_vtt_time(segment.end),
+                segment.text.trim()
+            ));
+        }
+        for word in &segment.words {
+            if word.text.trim().is_empty() {
+                continue;
+            }
+            out.push_str(&format!(
+                "[{} --> {}] {}\n",
+                format::cs_to_vtt_time(word.start),
+                format::cs_to_vtt_time(word.end),
+                word.text.trim()
+            ));
+        }
     }
-    err
+    out
+}
+
+/// Replace a rejected single-language model's language with the marker the CLI
+/// contract documents. The engine returns a typed [`RequestError`], so the
+/// message text is never parsed.
+fn unsupported_language_marker(err: anyhow::Error) -> anyhow::Error {
+    match err.downcast_ref::<RequestError>() {
+        Some(RequestError::Language { only, .. }) => anyhow::anyhow!("unsupported_language: {only:?}"),
+        _ => err,
+    }
 }
 
 /// Write the rendered transcript to a new file. `create_new` refuses an existing
@@ -440,6 +461,68 @@ mod tests {
             panic!("expected transcribe");
         };
         assert_eq!(format, OutputFormat::Markdown);
+    }
+
+    #[test]
+    fn word_timestamps_print_one_line_per_word() {
+        let result = crate::engine::TranscribeResult {
+            segments: vec![crate::engine::Segment {
+                start: 0,
+                end: 200,
+                text: "привет пока".into(),
+                no_speech_prob: 0.0,
+                words: vec![
+                    crate::engine::Word {
+                        start: 0,
+                        end: 100,
+                        text: "привет ".into(),
+                    },
+                    crate::engine::Word {
+                        start: 100,
+                        end: 200,
+                        text: "пока ".into(),
+                    },
+                ],
+            }],
+            language: None,
+        };
+        assert_eq!(
+            render_word_timestamps(&result),
+            "[00:00:00.000 --> 00:00:01.000] привет\n[00:00:01.000 --> 00:00:02.000] пока\n"
+        );
+    }
+
+    #[test]
+    fn a_segment_without_word_rows_still_prints_one_line() {
+        let result = crate::engine::TranscribeResult {
+            segments: vec![crate::engine::Segment {
+                start: 0,
+                end: 250,
+                text: "привет".into(),
+                no_speech_prob: 0.0,
+                words: Vec::new(),
+            }],
+            language: None,
+        };
+        assert_eq!(render_word_timestamps(&result), "[00:00:00.000 --> 00:00:02.500] привет\n");
+    }
+
+    #[test]
+    fn a_language_rejection_keeps_its_documented_marker() {
+        let err = anyhow::Error::from(RequestError::Language {
+            engine: "gigaam".into(),
+            only: "ru".into(),
+        });
+        assert_eq!(unsupported_language_marker(err).to_string(), "unsupported_language: \"ru\"");
+    }
+
+    #[test]
+    fn another_option_rejection_is_not_reported_as_a_language() {
+        let err = anyhow::Error::from(RequestError::TextPrompt { engine: "gigaam".into() });
+        assert_eq!(
+            unsupported_language_marker(err).to_string(),
+            "gigaam does not support text prompts"
+        );
     }
 
     #[test]

@@ -19,7 +19,9 @@ if (process.argv[2] === 'sync') {
 	copyFileSync(source, target)
 	console.log(`synced ${target}`)
 } else if (process.argv[2] === 'check') {
-	if (readFileSync(source, 'utf8') !== readFileSync(target, 'utf8')) {
+	// Compare the bytes: two different invalid UTF-8 sequences decode to the same
+	// replacement characters and would pass a string comparison.
+	if (!readFileSync(source).equals(readFileSync(target))) {
 		console.error(`catalog copy drifted from the @handy-computer/models package; run pnpm sync:catalog`)
 		process.exit(1)
 	}

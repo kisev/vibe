@@ -25,6 +25,8 @@ const YTDLP_TICK_MS = 100
 let dictationIndicatorEnabled = false
 let meetingDetectionEnabled = false
 let meetingPromptState: { source: 'meet' | 'zoom' | 'teams' } | null = null
+/** What `recording_active` reports: the capture the mock is pretending to run. */
+let recordingActive = false
 
 function sleep(ms: number) {
 	return new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -40,6 +42,14 @@ function mockSpeechLevel(tick: number) {
 	const jitter = Math.random() * 0.18
 	const level = syllables * phrase * 0.8 + jitter
 	return Math.min(0.9, Math.max(0.05, level))
+}
+
+/**
+ * Stand-in for the two capture streams: the microphone and the system loopback move on their own
+ * envelopes, so the per-source meters can be exercised independently.
+ */
+function mockSystemLevel(tick: number) {
+	return Math.min(0.9, Math.max(0.05, mockSpeechLevel(tick + 7) * 0.85))
 }
 
 function basename(path: string) {
@@ -67,18 +77,27 @@ export const mediaMiscHandlers: CommandHandlerMap = {
 
 	get_audio_devices: () => MOCK_AUDIO_DEVICES,
 
+	recording_active: () => recordingActive,
+
 	start_record: (args) => {
+		// Mirror the Rust guard: a second recording is rejected atomically there, and the record and
+		// browser gates read `recording_active`, so the mock must not run two capture loops instead.
+		if (recordingActive) throw new Error('A recording is already in progress')
 		console.info('[mock] start_record', args)
+		recordingActive = true
 		const path = `${APP_LOCAL_DATA}/recording.wav`
-		// Stand in for the capture callbacks: a level event every 100ms, like the throttled Rust side.
+		// Stand in for the capture callbacks: one event per source every 100ms, like the throttled
+		// Rust side, tagged with the device so the UI can keep two meters.
 		let tick = 0
 		const levelTimer = window.setInterval(() => {
 			tick += 1
-			emitMockEvent('record_level', mockSpeechLevel(tick))
+			emitMockEvent('record_level', { device: 'microphone', level: mockSpeechLevel(tick) })
+			emitMockEvent('record_level', { device: 'system', level: mockSystemLevel(tick) })
 		}, RECORD_LEVEL_TICK_MS)
 		// The frontend stops recording by emitting `stop_record` on the event bus.
 		const unsub = onMockEvent('stop_record', () => {
 			unsub()
+			recordingActive = false
 			window.clearInterval(levelTimer)
 			setTimeout(() => {
 				virtualFs.set(path, null)
@@ -204,8 +223,6 @@ export const mediaMiscHandlers: CommandHandlerMap = {
 	open_microphone_settings: () => {
 		console.info('[mock] open_microphone_settings')
 	},
-
-	track_analytics_event: () => undefined,
 
 	// --- Dictation indicator ----------------------------------------------------
 

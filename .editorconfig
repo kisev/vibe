@@ -7,15 +7,20 @@ root = true
 [*]
 end_of_line = lf
 insert_final_newline = true
-# formatted trees (markdown, json, toml, shell, css, html) are written with
-# spaces by mdformat, oxfmt, tombi, shfmt and prettier
+# formatted trees (markdown, json, toml, shell) are written with spaces by
+# mdformat, oxfmt, tombi and shfmt
 indent_style = space
 indent_size = 4
+
+# css and html stay tab-indented: prettier owns them and .prettierrc.json pins
+# `useTabs: true`, so the prettier hook in lefthook.yml checks for tabs
+[*.{css,html}]
+indent_style = tab
 
 # yaml, data files and the python scripts historically use two-space steps
 # (editorconfig-checker only demands multiples of the size, so mixed 2/4
 # upstream files still pass; the formatters keep their own files exact)
-[*.{yml,yaml,json,toml,py,xml,plist}]
+[*.{yml,yaml,json,jsonc,jsonld,toml,py,xml,plist}]
 indent_size = 2
 
 # the frontend codebases are tab-indented

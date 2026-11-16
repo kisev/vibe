@@ -31,7 +31,7 @@ export function AudioProcessingSection({ vm }: { vm: SettingsViewModel }) {
 					label={m.resetAudioProcessing()}
 					icon={<RotateCcw className="h-4 w-4" />}
 					activateOnClick
-					onClick={() => vm.preference.setFfmpegOptions({ normalize_loudness: false, custom_command: null })}
+					onClick={() => vm.preference.setFfmpegOptions({ normalize_loudness: true, custom_command: null })}
 				/>
 			</SettingsGroup>
 		</div>

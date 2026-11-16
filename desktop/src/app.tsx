@@ -14,6 +14,8 @@ import { ErrorBoundary } from 'react-error-boundary'
 import { BoundaryFallback } from './components/boundary-fallback'
 import ErrorModalWithContext from './components/error-modal-with-context'
 import HandoffTranscriptSaver from './components/handoff-transcript-saver'
+import MeetingBrowserCloseGate from './components/meeting-browser-close-gate'
+import MeetingBrowserRecordGate from './components/meeting-browser-record-gate'
 import { FilesProvider } from './providers/files-provider'
 import { HotkeyProvider } from './providers/hotkey'
 import { RecordingShortcutProvider } from './providers/recording-shortcut'
@@ -38,7 +40,9 @@ function AppContent() {
 
 	useEffect(() => {
 		document.body.dir = dir
-	}, [dir])
+		// Both attributes describe the language in use; screen readers and translators read `lang`.
+		document.documentElement.lang = displayLanguage
+	}, [dir, displayLanguage])
 
 	useEffect(() => {
 		setMeetingDetectionEnabled(meetingDetectionEnabled).catch((error) => console.error('Failed to sync meeting detection:', error))
@@ -57,6 +61,8 @@ function AppContent() {
 										<UpdateProgress />
 										{/* Phone transcriptions arrive while the user is elsewhere, so this must outlive any page. */}
 										<HandoffTranscriptSaver />
+										<MeetingBrowserCloseGate />
+										<MeetingBrowserRecordGate />
 										<FilesProvider>
 											<Routes>
 												<Route path="/" element={<MainPage />} />

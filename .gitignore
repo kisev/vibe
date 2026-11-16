@@ -26,6 +26,7 @@ schemas/
 node_modules/
 .DS_Store
 venv/
+.venv/
 *.bin
 *.onnx
 *.pfx
@@ -42,10 +43,15 @@ desktop/src-tauri/binaries/
 # The engine lives in server/ now; an old nested sona checkout may still sit here.
 /sona/
 whisper.cpp/
-aptabase-python/
-tauri-plugin-aptabase/
 **/project.inlang/cache/
 **/project.inlang/project_id
 
 # Scratch artifacts for the engine/whisper output comparison (includes a 47MB binary).
 plans/
+
+# Generated at website build time from the active OpenSpec changes
+website/public/roadmap.json
+# copied in by the site build (task website:build)
+website/public/docs
+# written by the site build from the newest complete dev release
+website/public/updater/dev.json

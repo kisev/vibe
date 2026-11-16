@@ -2,10 +2,21 @@ import { useEffect, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { marked } from 'marked'
 import CopyButton from '~/components/CopyButton'
+import { siteRouter } from '~/lib/site'
 import { m } from '~/paraglide/messages.js'
 
 interface DocViewerProps {
 	content: string
+}
+
+/**
+ * Documentation prose links to other pages as `/vibe/docs#slug`, which is how the
+ * path build addresses them. The dev preview's router owns the hash, so there the
+ * same link becomes a route (`#/docs/slug`) and stays inside `/vibe/dev/`.
+ */
+function resolveDocLinks(html: string) {
+	if (siteRouter() !== 'hash') return html
+	return html.replace(/href="\/vibe\/docs#([^"]+)"/g, 'href="#/docs/$1"')
 }
 
 /**
@@ -43,7 +54,7 @@ export default function DocViewer({ content }: DocViewerProps) {
 
 		try {
 			const result = marked(content)
-			setHtml(typeof result === 'string' ? result : '')
+			setHtml(resolveDocLinks(typeof result === 'string' ? result : ''))
 		} catch (error: unknown) {
 			console.error('Error rendering document:', error)
 			setHtml(m.failedToLoadDocument())

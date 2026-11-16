@@ -1,11 +1,18 @@
 import { EyeOff } from 'lucide-react'
 import { m } from '~/paraglide/messages.js'
 import { AudioDevice } from '~/lib/audio'
-import { deviceMenuEntries } from '~/lib/device-selection'
+import { deviceMenuEntries, type DeviceMenuEntry } from '~/lib/device-selection'
 import { ModifyState } from '~/lib/types'
 import { cn } from '~/lib/style'
 import { Label } from '~/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '~/components/ui/select'
+
+/** "None" and the absent pin get their copy here; a device shows its own name. */
+function entryLabel(entry: DeviceMenuEntry) {
+	if (entry.kind === 'none') return m.noRecord()
+	if (entry.kind === 'unavailable') return m.deviceUnavailable({ name: entry.label })
+	return entry.label
+}
 
 interface AudioDeviceInputProps {
 	type: 'output' | 'input'
@@ -68,9 +75,20 @@ export default function AudioDeviceInput({
 					{entries
 						.filter((entry) => entry.kind !== 'hidden')
 						.map((entry) => (
-							<SelectItem key={entry.value} value={entry.value} disabled={entry.kind === 'unavailable'}>
+							<SelectItem
+								key={entry.value}
+								value={entry.value}
+								disabled={entry.kind === 'unavailable'}
+								onKeyDown={(event) => {
+									// The nested hide button is unreachable by Tab (the select keeps focus on
+									// the option), so Delete on a focused device is its keyboard gesture.
+									if (entry.kind !== 'device' || !onHide || (event.key !== 'Delete' && event.key !== 'Backspace')) return
+									event.preventDefault()
+									event.stopPropagation()
+									if (entry.device) onHide(entry.device)
+								}}>
 								<span className={cn('flex items-center justify-between gap-2', entry.kind === 'unavailable' && 'opacity-60')}>
-									{entry.kind === 'none' ? m.noRecord() : entry.kind === 'unavailable' ? m.deviceUnavailable({ name: entry.label }) : entry.label}
+									{entryLabel(entry)}
 									{entry.kind === 'device' && onHide && (
 										<button
 											type="button"
@@ -84,6 +102,14 @@ export default function AudioDeviceInput({
 											// so stopping it in capture would silence this button's own onClick.
 											onPointerDownCapture={(event) => event.stopPropagation()}
 											onPointerUpCapture={(event) => event.stopPropagation()}
+											// Keyboard activation must hide, not fall through to the item's own
+											// Enter/Space selection: handle it here and swallow the key.
+											onKeyDownCapture={(event) => {
+												if (event.key !== 'Enter' && event.key !== ' ') return
+												event.preventDefault()
+												event.stopPropagation()
+												if (entry.device) onHide(entry.device)
+											}}
 											onClick={(event) => {
 												event.stopPropagation()
 												if (entry.device) onHide(entry.device)
@@ -95,10 +121,10 @@ export default function AudioDeviceInput({
 								</span>
 							</SelectItem>
 						))}
-					{hasHidden && (
+					{hasHidden && onRestore && (
 						<SelectGroup>
 							{/* SelectLabel reads the group context; outside a SelectGroup it throws. */}
-						<SelectLabel>{m.hiddenDevices()}</SelectLabel>
+							<SelectLabel>{m.hiddenDevices()}</SelectLabel>
 							{entries
 								.filter((entry) => entry.kind === 'hidden')
 								.map((entry) => (

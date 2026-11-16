@@ -9,7 +9,9 @@
 //! Model-gated like the other CLI tests: an engine without `GIGAAM_MODEL`,
 //! `PARAKEET_MODEL`, or `NEMOTRON_MODEL` is skipped, and `DIARIZE_MODEL` must
 //! name a diarization model for any of them to run. `GIGAAM_VAD_MODEL` is
-//! required by all three.
+//! required by all three. GigaAM is Russian-only, so its audio never falls
+//! back to the tracked English fixture; name it with `GIGAAM_AUDIO` (or
+//! `DIARIZATION_AUDIO`).
 
 // Test harness: a panic with context beats a silent skip.
 #![allow(clippy::expect_used)]
@@ -22,7 +24,8 @@ use serde_json::Value;
 struct Engine {
     name: &'static str,
     model_env: &'static str,
-    /// Engine-specific audio; falls back to `DIARIZATION_AUDIO`, then the fixture.
+    /// Engine-specific audio; falls back to `DIARIZATION_AUDIO`. Parakeet and
+    /// Nemotron then fall back to the tracked fixture, GigaAM does not.
     audio_env: &'static str,
 }
 
@@ -46,22 +49,43 @@ const ENGINES: [Engine; 3] = [
 
 /// A lower bound on kept content, loose enough for a word changed at a cut.
 const MIN_WORDS_KEPT: f64 = 0.75;
-/// Words in order, so a lost passage or a scrambled transcript fails.
-const MIN_WORD_ORDER: f64 = 0.5;
+/// Words in order, so a lost passage or a scrambled transcript fails. Swapping
+/// two equal halves scores exactly 0.5, so the bound sits above it; word
+/// changes at chunk boundaries still score close to 1.0.
+const MIN_WORD_ORDER: f64 = 0.75;
 
+/// The path when `variable` names an existing file. A set variable pointing at
+/// a missing file says so, so a typo is not reported as an unset gate.
 fn existing(variable: &str) -> Option<String> {
-    std::env::var(variable).ok().filter(|path| Path::new(path).exists())
+    match std::env::var(variable) {
+        Ok(path) if Path::new(&path).exists() => Some(path),
+        Ok(path) => {
+            eprintln!("skipping: {variable}={path:?} does not exist");
+            None
+        }
+        Err(_) => {
+            eprintln!("skipping: {variable} is not set");
+            None
+        }
+    }
 }
 
 fn audio(engine: &Engine) -> Option<PathBuf> {
-    existing(engine.audio_env)
-        .or_else(|| existing("DIARIZATION_AUDIO"))
-        .map(PathBuf::from)
-        .or_else(|| {
-            // A multi-speaker English recording tracked with the repository.
-            let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/multi.wav");
-            fixture.exists().then_some(fixture)
-        })
+    if let Some(path) = existing(engine.audio_env).or_else(|| existing("DIARIZATION_AUDIO")) {
+        return Some(PathBuf::from(path));
+    }
+    // The tracked fixture is an English recording, which GigaAM would turn
+    // into a hallucinated reference transcript; its audio must be explicit.
+    if engine.name == "GigaAM" {
+        eprintln!("skipping GigaAM: the tracked fixture is English and GigaAM is Russian-only");
+        return None;
+    }
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/multi.wav");
+    if fixture.exists() {
+        return Some(fixture);
+    }
+    eprintln!("skipping {}: the tracked fixture is missing", engine.name);
+    None
 }
 
 fn transcribe(model: &str, vad: &str, audio: &Path, diarize: Option<&str>) -> Value {
@@ -114,18 +138,15 @@ fn word_order(left: &[String], right: &[String]) -> f64 {
 #[test]
 fn diarization_bounds_change_where_the_cuts_fall_not_the_words() {
     let Some(diarize) = existing("DIARIZE_MODEL") else {
-        eprintln!("skipping: DIARIZE_MODEL is not set");
         return;
     };
     let Some(vad) = existing("GIGAAM_VAD_MODEL") else {
-        eprintln!("skipping: GIGAAM_VAD_MODEL is not set");
         return;
     };
 
     let mut ran = 0;
     for engine in &ENGINES {
         let (Some(model), Some(audio)) = (existing(engine.model_env), audio(engine)) else {
-            eprintln!("skipping {}: {} or its audio is missing", engine.name, engine.model_env);
             continue;
         };
         ran += 1;

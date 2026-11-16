@@ -19,7 +19,7 @@ export function TuningSection({ vm, onOpenWhisper, onOpenAudio }: { vm: Settings
 	const options = vm.preference.modelOptions
 	const hidesStable = hidesStableTimestamps(vm.preference.modelMetadata?.capabilities)
 	const hidesDecoding = hidesDecodingOptions(vm.preference.modelMetadata?.capabilities)
-	const whisperOnlyHidden = hidesStable || hidesDecoding
+	const maxInputSeconds = vm.preference.modelMetadata?.capabilities.max_input_seconds ?? null
 	const customized =
 		Boolean(options.translate) ||
 		(Object.keys(DEFAULT_MODEL_OPTIONS) as (keyof typeof DEFAULT_MODEL_OPTIONS)[])
@@ -33,7 +33,7 @@ export function TuningSection({ vm, onOpenWhisper, onOpenAudio }: { vm: Settings
 					<Switch checked={vm.preference.diarizeEnabled} onCheckedChange={vm.toggleDiarization} />
 				</SettingsRow>
 				{vm.preference.diarizeEnabled && <SettingsNote>{m.diarizeMaxSpeakersNote()}</SettingsNote>}
-				{!whisperOnlyHidden && (
+				{!hidesStable && (
 					<>
 						<SettingsRow label={m.enableStableTimestamps()} description={m.stableTimestampsInfo()}>
 							<Switch checked={vm.preference.stableTimestampsEnabled} onCheckedChange={vm.handleStableTimestampsToggle} />
@@ -41,31 +41,29 @@ export function TuningSection({ vm, onOpenWhisper, onOpenAudio }: { vm: Settings
 						{vm.preference.stableTimestampsEnabled && <SettingsNote>{m.stableTimestampsSlowNote()}</SettingsNote>}
 					</>
 				)}
-				{whisperOnlyHidden && <SettingsNote>{m.whisperOnlyOptionsNote()}</SettingsNote>}
 			</SettingsGroup>
-			{vm.preference.modelMetadata?.capabilities.max_input_seconds != null && (
+			{maxInputSeconds != null && (
 				<SettingsGroup title={m.longRecordings()}>
-					<SettingsRow
-						label={m.chunkLength()}
-						description={m.chunkLengthInfo({ max: vm.preference.modelMetadata.capabilities.max_input_seconds })}>
+					<SettingsRow label={m.chunkLength()} description={m.chunkLengthInfo({ max: maxInputSeconds })}>
 						<Input
 							type="number"
 							min={1}
-							max={vm.preference.modelMetadata.capabilities.max_input_seconds}
+							max={maxInputSeconds}
 							step={1}
 							aria-label={m.chunkLength()}
 							className="w-24"
 							value={vm.preference.chunkSeconds ?? ''}
-							onChange={(event) => {
-								const parsed = parseChunkSeconds(event.target.value, vm.preference.modelMetadata!.capabilities.max_input_seconds!)
-								vm.preference.setChunkSeconds(parsed)
-							}}
+							onChange={(event) => vm.preference.setChunkSeconds(parseChunkSeconds(event.target.value, maxInputSeconds))}
 						/>
 					</SettingsRow>
 				</SettingsGroup>
 			)}
 			<SettingsGroup>
-				{!whisperOnlyHidden && (
+				{hidesDecoding ? (
+					// The note explains the Whisper options that this model hides; it belongs here,
+					// not beside the speaker toggle where it read as a limit on separation.
+					<SettingsNote>{m.whisperOnlyOptionsNote()}</SettingsNote>
+				) : (
 					<ActionRow
 						label={
 							<span className="flex items-center gap-2">

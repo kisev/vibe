@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '~/components/ui/tooltip'
 import { m } from '~/paraglide/messages.js'
 import type { ModelCapabilities } from '~/lib/model'
 import type { SettingsViewModel } from './shared'
@@ -40,7 +41,7 @@ function vmWith(capabilities: ModelCapabilities) {
 	return {
 		preference: {
 			modelMetadata: { format: 'gguf', capabilities },
-			modelOptions: { lang: 'en', verbose: false, sampling_strategy: 'beam search', best_of: 5, beam_size: 5 },
+			modelOptions: { lang: 'en', verbose: false },
 			diarizeEnabled: false,
 			stableTimestampsEnabled: false,
 			chunkSeconds: null,
@@ -51,9 +52,17 @@ function vmWith(capabilities: ModelCapabilities) {
 	} as unknown as SettingsViewModel
 }
 
+function renderTuning(vm: SettingsViewModel) {
+	return render(
+		<TooltipProvider>
+			<TuningSection vm={vm} onOpenWhisper={vi.fn()} onOpenAudio={vi.fn()} />
+		</TooltipProvider>,
+	)
+}
+
 describe('tuning section engine gating', () => {
 	it('offers stable timestamps and Whisper options for Whisper models', () => {
-		render(<TuningSection vm={vmWith(whisper)} onOpenWhisper={vi.fn()} onOpenAudio={vi.fn()} />)
+		renderTuning(vmWith(whisper))
 
 		expect(screen.getByText(m.enableStableTimestamps())).toBeTruthy()
 		expect(screen.getByText(m.whisperOptions())).toBeTruthy()
@@ -61,7 +70,7 @@ describe('tuning section engine gating', () => {
 	})
 
 	it('hides both for GigaAM but keeps diarization and audio processing', () => {
-		render(<TuningSection vm={vmWith(gigaam)} onOpenWhisper={vi.fn()} onOpenAudio={vi.fn()} />)
+		renderTuning(vmWith(gigaam))
 
 		expect(screen.queryByText(m.enableStableTimestamps())).toBeNull()
 		expect(screen.queryByText(m.whisperOptions())).toBeNull()
@@ -71,19 +80,24 @@ describe('tuning section engine gating', () => {
 	})
 
 	it('offers the chunk length to a bounded engine', () => {
-		render(<TuningSection vm={vmWith(gigaam)} onOpenWhisper={vi.fn()} onOpenAudio={vi.fn()} />)
+		renderTuning(vmWith(gigaam))
 		expect(screen.getByLabelText(m.chunkLength())).toBeTruthy()
 	})
 
 	it('hides the chunk length from an unbounded engine', () => {
-		render(<TuningSection vm={vmWith(whisper)} onOpenWhisper={vi.fn()} onOpenAudio={vi.fn()} />)
+		renderTuning(vmWith(whisper))
 		expect(screen.queryByLabelText(m.chunkLength())).toBeNull()
 	})
 
 	it('keys option visibility off capability flags, not the engine name', () => {
 		// A model that is not Whisper by name but reports Whisper-grade flags gets the same controls.
-		const futureEngine = { ...gigaam, engine: 'some-future-engine', stable_timestamps: true, decoding_options: true }
-		render(<TuningSection vm={vmWith(futureEngine)} onOpenWhisper={vi.fn()} onOpenAudio={vi.fn()} />)
+		const futureEngine = {
+			...gigaam,
+			engine: 'some-future-engine',
+			stable_timestamps: true,
+			decoding_options: true,
+		}
+		renderTuning(vmWith(futureEngine))
 		expect(screen.getByText(m.enableStableTimestamps())).toBeTruthy()
 		expect(screen.getByText(m.whisperOptions())).toBeTruthy()
 		expect(screen.queryByText(m.whisperOnlyOptionsNote())).toBeNull()
@@ -91,7 +105,7 @@ describe('tuning section engine gating', () => {
 
 	it('clamps an oversized chunk length to the engine maximum', () => {
 		const vm = vmWith(gigaam)
-		render(<TuningSection vm={vm} onOpenWhisper={vi.fn()} onOpenAudio={vi.fn()} />)
+		renderTuning(vm)
 		fireEvent.change(screen.getByLabelText(m.chunkLength()), { target: { value: '999' } })
 		expect(vm.preference.setChunkSeconds).toHaveBeenCalledWith(25)
 	})

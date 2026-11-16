@@ -10,7 +10,7 @@ The preferred way to report a vulnerability is via GitHub’s **Security Advisor
 - Please do NOT open a public GitHub issue for security-related reports.
 - Include as much detail as possible so I can understand and reproduce the issue.
 
-If you can’t use GitHub Security Advisories, you can also reach out to me directly via **Vibe’s Discord channel** (linked on the Vibe website) and send me a DM.\
+If you can’t use GitHub Security Advisories, open a private report through the repository's Security tab, which reaches the maintainer directly.\
 Please use this channel only for security-related matters.
 
 After the initial report, I’ll reply with next steps and may ask for more details if needed.

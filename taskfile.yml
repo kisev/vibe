@@ -3,11 +3,197 @@
 # through mise; `task hooks` installs the git gates once per checkout.
 version: "3"
 
+# CI helper tasks read their inputs from documented environment variables;
+# workflows pass them through `env:` rather than as arguments, so values with
+# spaces or newlines never reach a shell argument.
+vars:
+  # The new dev-build script is not tied to an old interpreter name; Windows
+  # images expose `python`, while Unix runners use `python3`.
+  PYTHON: '{{if eq OS "windows"}}python{{else}}python3{{end}}'
+
 tasks:
   hooks:
     desc: Install the lefthook git gates once per checkout
     cmds:
       - mise exec -- lefthook install
+
+  # The development loop: sidecars, the app, the site and the phone handoff.
+  # The logic is in scripts/; these targets only name it.
+  setup:
+    desc: Fetch the vibe-server and ffmpeg sidecars for a target triple (default - this machine)
+    cmds:
+      - bash scripts/setup_sidecars.sh {{.CLI_ARGS}}
+
+  server:build:
+    desc: Build vibe-server from server/ and stage it as the desktop sidecar
+    cmds:
+      - bash scripts/server_build.sh {{.CLI_ARGS}}
+
+  server:fetch-headers:
+    desc: Fetch the pinned ggml headers into server/libs/include
+    cmds:
+      - bash scripts/ggml_libs.sh fetch-headers
+
+  server:package-release:
+    desc: Package a built vibe-server with ffmpeg - arguments, goos, goarch and the archive path
+    cmds:
+      - bash scripts/package_server_release.sh {{.CLI_ARGS}}
+
+  linux-deps:
+    desc: Install the Linux build dependencies with the host package manager
+    cmds:
+      - bash scripts/ci/linux-build-deps.sh
+
+  dev:
+    desc: Run the app in development mode
+    cmds:
+      - task: setup
+      - pnpm --dir desktop exec tauri dev
+
+  dev:web:
+    desc: Run only the desktop frontend in a browser, with Tauri mocked
+    cmds:
+      - pnpm --dir desktop dev
+
+  app:build:
+    desc: Build the app for production
+    cmds:
+      - task: setup
+      - pnpm --dir desktop exec tauri build
+
+  app:build:windows:
+    desc: Build the Windows installer on the Windows host from this checkout (VIBE_WIN_CHECKOUT, default <home>\vibe-build)
+    cmds:
+      - bash scripts/local_windows_build.sh
+
+  app:build:windows:verified:
+    desc: Run the local gate, then build the Windows installer locally
+    cmds:
+      - bash scripts/local_windows_build.sh --verified
+
+  app:upgrade:
+    desc: Rebuild vibe.app, replace the installed one and relaunch it (macOS)
+    cmds:
+      - bash scripts/upgrade_app.sh
+
+  website:dev:
+    desc: Run the website locally
+    cmds:
+      - uv run scripts/roadmap.py
+      - pnpm --dir website install
+      - pnpm --dir website dev
+
+  website:build:
+    desc: Build the site into website/dist the way the deploy workflow does
+    cmds:
+      - bash scripts/website_build.sh prod
+
+  website:build:dev:
+    desc: Build the dev preview into website/dist-dev at /vibe/dev/ with hash routing
+    cmds:
+      - bash scripts/website_build.sh dev
+
+  website:assemble:
+    desc: Assemble the Pages artifact from both builds (WEBSITE_PROD_DIR, WEBSITE_DEV_DIR, WEBSITE_SITE_DIR)
+    cmds:
+      - bash scripts/website_assemble.sh
+
+  phone:wasm:
+    desc: Build the phone handoff's browser client into handoff/pwa/public/wasm
+    cmds:
+      - bash scripts/phone_wasm.sh
+
+  phone:pwa:
+    desc: Build the phone PWA - the base path it will be served under, default /
+    cmds:
+      - task: phone:wasm
+      - bash scripts/phone_pwa.sh {{.CLI_ARGS}}
+
+  phone:dev:
+    desc: Run the phone PWA on http://localhost:8088
+    cmds:
+      - task: phone:wasm
+      - bash scripts/phone_pwa.sh --dev
+
+  phone:tunnel:
+    desc: Serve the phone PWA over an HTTPS tunnel so a real phone can load it
+    cmds:
+      - bash scripts/phone_tunnel.sh
+
+  phone:probe:
+    desc: Send an audio file to a running Vibe - arguments, pairing URL and file
+    cmds:
+      - bash scripts/phone_probe.sh {{.CLI_ARGS}}
+
+  phone:caps:
+    desc: Ask a running Vibe what it supports - argument, pairing URL
+    cmds:
+      - bash scripts/phone_probe.sh --capabilities {{.CLI_ARGS}}
+
+  stamp-translations:
+    desc: Refresh the source hash on every translated changelog entry and docs page
+    cmds:
+      - uv run scripts/content_i18n.py stamp
+
+  check-types:
+    desc: Type-check the desktop app and the website
+    cmds:
+      - task: desktop:typecheck
+      - task: website:typecheck
+
+  libs:id:
+    desc: Print the short tree hash of server/libs at HEAD
+    cmds:
+      - bash scripts/ggml_libs.sh id
+
+  libs:tag:
+    desc: Print the GitHub release tag the current libs inputs are published under
+    cmds:
+      - bash scripts/ggml_libs.sh tag
+
+  libs:platform:
+    desc: Print the platform id used in the library archive names
+    cmds:
+      - bash scripts/ggml_libs.sh platform
+
+  libs:fetch:
+    desc: Download the prebuilt ggml static libraries for this platform
+    cmds:
+      - bash scripts/ggml_libs.sh fetch
+
+  libs:build:
+    desc: Build the ggml static libraries and package them into an archive
+    cmds:
+      - bash scripts/ggml_libs.sh build
+
+  libs:upload:
+    desc: Build the ggml libraries and upload the archive to its release
+    cmds:
+      - bash scripts/ggml_libs.sh upload
+
+  setup:remotes:
+    desc: Isolate upstream tags so fetches never collide with the fork's own history
+    cmds:
+      - |
+        # A fresh clone tracks only origin; everything below adjusts an upstream remote.
+        if ! git remote get-url upstream >/dev/null 2>&1; then
+          git remote add upstream https://github.com/thewh1teagle/vibe.git
+        fi
+        git config --unset-all remote.upstream.fetch 2>/dev/null || true
+        git config --add remote.upstream.fetch '+refs/heads/*:refs/remotes/upstream/*'
+        git config --add remote.upstream.fetch '^refs/tags/*'
+        git config remote.upstream.tagOpt --no-tags
+        echo "upstream now fetches branches only; fetch tags with: task upstream:tags"
+
+  upstream:fetch:
+    desc: Fetch upstream branches only - tags never collide with the fork's own
+    cmds:
+      - git fetch upstream --prune
+
+  upstream:tags:
+    desc: Fetch upstream tags into refs/upstream-tags for comparison (never refs/tags)
+    cmds:
+      - git fetch upstream '+refs/tags/*:refs/upstream-tags/*'
 
   i18n:generate:
     desc: Compile paraglide messages for desktop and website
@@ -60,6 +246,11 @@ tasks:
     cmds:
       - pnpm --dir website test
 
+  roadmap:test:
+    desc: Roadmap generator and translation tests
+    cmds:
+      - uv run scripts/roadmap_test.py
+
   website:typecheck:
     desc: Website type check (build)
     cmds:
@@ -71,10 +262,62 @@ tasks:
     cmds:
       - cargo test -p vibe-server
 
+  rust:fmt-check:
+    desc: Format check over both Rust workspaces (desktop app, CLI and server)
+    cmds:
+      - mise exec -- cargo fmt --all -- --check
+      # server/ is its own workspace, excluded by the root manifest.
+      - mise exec -- cargo fmt --all --manifest-path server/Cargo.toml -- --check
+
+  # The mirror of lint_rust.yml's clippy job: the desktop workspace is where a
+  # warning reaches CI as an error, and nothing else lints it locally.
+  rust:clippy:
+    desc: Clippy the desktop and CLI workspace, warnings fatal
+    # The desktop crate links GTK/WebKit: without the Linux build packages the
+    # compile dies inside gdk-sys minutes in, which looks like a code failure.
+    preconditions:
+      - sh: 'test "$(uname -s)" != Linux || pkg-config --exists gtk+-3.0'
+        msg: "The desktop crate needs the Linux build dependencies: run `task linux-deps` once (needs sudo)."
+    cmds:
+      # The crate embeds the web assets through generate_context!: without
+      # desktop/dist the compile fails on a missing frontendDist, which the
+      # lint workflow avoids by building the frontend first.
+      - pnpm --dir desktop build
+      # tauri.conf names both sidecars in externalBin, so the crate refuses to
+      # compile until the diarization helper is staged as well.
+      - mise exec -- task ci:diarize-helper
+      - mise exec -- bash scripts/ci/clippy.sh --manifest-path Cargo.toml --all-targets -- -D warnings
+
+  review:staged:
+    desc: Review exactly the staged snapshot with OCR - medium/high findings block (OCR_SKIP=1 bypasses)
+    cmds:
+      - uv run scripts/ocr_gate.py
+
+  verify:
+    desc: Every gate a push or PR runs that can run locally - the last step before pushing or tagging
+    cmds:
+      - task: lint
+      - task: format:check
+      - task: rust:fmt-check
+      - task: server:clippy
+      - task: server:deny
+      - task: server:machete
+      - task: test
+      - task: docs:models:check
+      # CI rebuilds the site on a push; a broken roadmap, link pass or Vite
+      # build must fail here, not minutes after the push.
+      - task: website:build
+      - task: ci:e2e
+      # Last: it is the one step that needs host build packages the others
+      # never touch, so a host that lacks them still runs every other gate.
+      - task: rust:clippy
+
   server:fmt:
     desc: rustfmt the server workspace
     cmds:
-      - cargo fmt --all -- server
+      # Same invocation as rust:fmt-check: server/ is its own workspace, which
+      # the root manifest excludes.
+      - mise exec -- cargo fmt --all --manifest-path server/Cargo.toml
 
   server:deny:
     desc: cargo-deny check for the server workspace
@@ -96,7 +339,17 @@ tasks:
       # cleanliness is upstream's CI (upstream never lints server/ — its root
       # workspace excludes it). New fork-owned crates join -p here; ggml-rs-sys
       # carries the one fork-side allow line for its generated bindings.
-      - cargo clippy -p vibe-server -p vibe-diarize-native --all-targets -- -D warnings
+      - bash ../scripts/ci/clippy.sh -p vibe-server -p vibe-diarize-native -p nemotron-diarize-rs --all-targets -- -D warnings
+
+  scripts:test:
+    desc: Unit tests for the standalone Python scripts
+    cmds:
+      - uv run scripts/roadmap_test.py
+      - uv run scripts/release_notes_test.py
+      - uv run scripts/check_docs_pages.py
+      - uv run scripts/ocr_gate_test.py
+      - uv run scripts/local_windows_build_test.py
+      - uv run scripts/content_i18n_test.py
 
   test:
     desc: All unit suites
@@ -104,6 +357,7 @@ tasks:
       - task: desktop:test
       - task: website:test
       - task: server:test
+      - task: scripts:test
 
   lint:
     desc: Run every linter (whole tree)
@@ -120,33 +374,33 @@ tasks:
 
   lint:yaml:
     cmds:
-      - mise exec -- fd -H -e yml -e yaml -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -X yamllint
+      - mise exec -- fd -H -E .git -e yml -e yaml -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -X yamllint
 
   lint:toml:
     cmds:
-      - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E desktop/project.inlang -E website/project.inlang -X tombi lint
+      - mise exec -- fd -H -E .git -e toml -E node_modules -E Cargo.toml -E desktop/project.inlang -E website/project.inlang -X tombi lint
 
   lint:md:
     cmds:
-      - mise exec -- fd -H -e md -E node_modules -E desktop/src/paraglide -E .claude -E .opencode -E .agents -E models.md -E i18n/changelog -X markdownlint-cli2 --no-globs
+      - mise exec -- fd -H -E .git -e md -E node_modules -E desktop/src/paraglide -E .claude -E .opencode -E .agents -E models.md -E i18n/changelog -X markdownlint-cli2 --no-globs
 
   lint:json:
     cmds:
       - >-
-        mise exec -- fd -H -e json -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
-        -E desktop/project.inlang -E website/project.inlang -X
+        mise exec -- fd -H -E .git -e json -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
+        -E desktop/project.inlang -E website/project.inlang -E website/src/lib/latest_release.json -X
         oxfmt --check
 
   lint:js:
     cmds:
-      - mise exec -- fd -H -e ts -e tsx -e js -e mjs -E node_modules -E desktop/src/paraglide -X oxlint
+      - mise exec -- fd -H -E .git -e ts -e tsx -e js -e mjs -E node_modules -E desktop/src/paraglide -X oxlint
 
   lint:shell:
     cmds:
       # installer.sh is upstream's script; its SC2024 info (sudo </dev/tty
       # redirect) is upstream's call, re-checked on every sync
-      - mise exec -- fd -H -e sh -E node_modules -E website/public/installer.sh -X shfmt -i 4 -d
-      - mise exec -- fd -H -e sh -E node_modules -E website/public/installer.sh -X shellcheck
+      - mise exec -- fd -H -E .git -e sh -E node_modules -E website/public/installer.sh -X shfmt -i 4 -d
+      - mise exec -- fd -H -E .git -e sh -E node_modules -E website/public/installer.sh -X shellcheck
 
   lint:editorconfig:
     cmds:
@@ -168,38 +422,236 @@ tasks:
     cmds:
       - task: format:md
       - task: format:json
-      - mise exec -- fd -H -e sh -E node_modules -X shfmt -i 4 -w
-      - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E desktop/project.inlang -E website/project.inlang -X tombi format
-      - mise exec -- fd -H -e css -e html -E node_modules -X prettier --write
+      - mise exec -- fd -H -E .git -e sh -E node_modules -X shfmt -i 4 -w
+      - mise exec -- fd -H -E .git -e toml -E node_modules -E Cargo.toml -E pyproject.toml -E desktop/project.inlang -E website/project.inlang -E "server/crates/*/scripts" -X tombi format
+      - mise exec -- fd -H -E .git -e css -e html -E node_modules -X prettier --write
 
   format:md:
     cmds:
-      - mise exec -- fd -H -e md -E node_modules -E desktop/src/paraglide -E .claude -E .opencode -E .agents -E models.md -E i18n/changelog -X mdformat
+      - mise exec -- fd -H -E .git -e md -E node_modules -E desktop/src/paraglide -E .claude -E .opencode -E .agents -E models.md -E i18n/changelog -X mdformat
 
   format:json:
     cmds:
       - >-
-        mise exec -- fd -H -e json -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
-        -E desktop/project.inlang -E website/project.inlang -X
+        mise exec -- fd -H -E .git -e json -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
+        -E desktop/project.inlang -E website/project.inlang -E website/src/lib/latest_release.json -X
         oxfmt
 
   format:check:
     desc: Fail when anything is unformatted
     cmds:
-      - mise exec -- fd -H -e md -E node_modules -E desktop/src/paraglide -E .claude -E .opencode -E .agents -E models.md -E i18n/changelog -X mdformat --check
+      - mise exec -- fd -H -E .git -e md -E node_modules -E desktop/src/paraglide -E .claude -E .opencode -E .agents -E models.md -E i18n/changelog -X mdformat --check
       - >-
-        mise exec -- fd -H -e json -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
-        -E desktop/project.inlang -E website/project.inlang -X
+        mise exec -- fd -H -E .git -e json -E node_modules -E desktop/src/paraglide -E desktop/src-tauri/gen -E desktop/src/data/handy-catalog.json
+        -E desktop/project.inlang -E website/project.inlang -E website/src/lib/latest_release.json -X
         oxfmt --check
-      - mise exec -- fd -H -e sh -E node_modules -X shfmt -i 4 -d
-      - mise exec -- fd -H -e toml -E node_modules -E Cargo.toml -E pyproject.toml -E desktop/project.inlang -E website/project.inlang -X tombi format --check
-      - mise exec -- fd -H -e css -e html -E node_modules -X prettier --check
+      - mise exec -- fd -H -E .git -e sh -E node_modules -X shfmt -i 4 -d
+      - mise exec -- fd -H -E .git -e toml -E node_modules -E Cargo.toml -E pyproject.toml -E desktop/project.inlang -E website/project.inlang -E "server/crates/*/scripts" -X tombi format --check
+      - mise exec -- fd -H -E .git -e css -e html -E node_modules -X prettier --check
+
+  deps:check:
+    desc: Report outdated dependencies across Cargo, pnpm and uv (read-only)
+    cmds:
+      - |
+        status=0
+        for manifest in Cargo.toml server/Cargo.toml handoff/wasm/Cargo.toml handoff/probe/Cargo.toml; do
+          echo
+          echo "== cargo: $manifest =="
+          mise exec -- cargo outdated --workspace --manifest-path "$manifest" || status=1
+        done
+        for dir in desktop website handoff/pwa; do
+          echo
+          echo "== pnpm: $dir =="
+          rc=0
+          pnpm --dir "$dir" outdated || rc=$?
+          # pnpm exits 1 when it found outdated packages; anything higher is a failure.
+          [ "$rc" -le 1 ] || status=$rc
+        done
+        echo
+        echo "== uv: vibe-scripts =="
+        uv sync --locked --quiet && uv pip list --outdated || status=1
+        exit "$status"
+
+  deps:update:
+    desc: Update dependencies within their declared ranges (lockfiles unless a range blocks)
+    cmds:
+      - |
+        for manifest in Cargo.toml server/Cargo.toml handoff/wasm/Cargo.toml handoff/probe/Cargo.toml; do
+          echo
+          echo "== cargo update: $manifest =="
+          cargo update --manifest-path "$manifest"
+        done
+        for dir in desktop website handoff/pwa; do
+          echo
+          echo "== pnpm update: $dir =="
+          pnpm --dir "$dir" update
+        done
+        echo
+        echo "== uv lock --upgrade =="
+        uv lock --upgrade
+
+  deps:update:major:
+    desc: Upgrade across major versions (review the diff; never run automatically)
+    prompt: This crosses major versions in every ecosystem. Review the resulting diff before merging. Continue?
+    cmds:
+      - |
+        for manifest in Cargo.toml server/Cargo.toml handoff/wasm/Cargo.toml handoff/probe/Cargo.toml; do
+          echo
+          echo "== cargo upgrade --incompatible: $manifest =="
+          mise exec -- cargo upgrade --incompatible --manifest-path "$manifest"
+        done
+        for dir in desktop website handoff/pwa; do
+          echo
+          echo "== pnpm update --latest: $dir =="
+          pnpm --dir "$dir" update --latest
+        done
+        echo
+        echo "== uv lock --upgrade =="
+        uv lock --upgrade
+
+  deps:renovate:dry:
+    desc: Show the updates Renovate would apply locally (no token, touches nothing)
+    cmds:
+      - |
+        RENOVATE_CONFIG_FILE=renovate.json LOG_LEVEL=info \
+          mise exec -- renovate --platform=local --dry-run
+
+  deps:renovate:
+    desc: Apply Renovate's updates to the working tree (review the diff, then commit)
+    cmds:
+      - |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "the working tree is dirty; commit or stash your changes before applying dependency updates" >&2
+          exit 1
+        fi
+        RENOVATE_CONFIG_FILE=renovate.json LOG_LEVEL=info \
+          mise exec -- renovate --platform=local
+
+  ci:e2e:
+    desc: Run the desktop browser-mode end-to-end suite
+    cmds:
+      - bash scripts/ci/e2e.sh
+
+  ci:vulkan-deps:
+    desc: Install the Vulkan build prerequisites on the lint runner (3 bounded attempts)
+    cmds:
+      - bash scripts/ci/vulkan-deps.sh
+
+  ci:vulkan-noble:
+    desc: Install Vulkan build prerequisites from noble apt (Ubuntu arm build)
+    cmds:
+      - bash scripts/ci/vulkan-noble.sh
+
+  ci:vulkan-jammy:
+    desc: Install the LunarG Vulkan SDK on jammy (Ubuntu x86_64 build)
+    cmds:
+      - bash scripts/ci/vulkan-jammy.sh
+
+  ci:vulkan-sdk-windows:
+    desc: Install the Vulkan SDK on a Windows runner (VULKAN_VERSION)
+    cmds:
+      - pwsh -NoProfile -File scripts/ci/vulkan-sdk-windows.ps1
+
+  ci:linux-build-deps:
+    desc: Install the Linux desktop build dependencies
+    cmds:
+      - bash scripts/ci/linux-build-deps.sh
+
+  ci:ggml-libs:
+    desc: Fetch the pinned prebuilt ggml libraries (TRIPLE)
+    cmds:
+      - bash scripts/ci/ggml-libs.sh
+
+  ci:diarize-helper:
+    desc: Build the native diarization helper and stage it as a sidecar (TRIPLE, EXE)
+    cmds:
+      - bash scripts/ci/diarize-helper.sh
+
+  ci:fetch-ffmpeg:
+    desc: Fetch the bundled ffmpeg sidecar (FFMPEG_URL, TRIPLE, EXE, RUNNER_TEMP)
+    cmds:
+      - '{{.PYTHON}} scripts/ci/fetch_ffmpeg.py'
+
+  ci:build-server:
+    desc: Build vibe-server and stage it as the desktop sidecar (TRIPLE, EXE, VIBE_SERVER_VERSION, VIBE_SERVER_COMMIT, TRANSCRIBE_CMAKE_ARGS)
+    cmds:
+      - bash scripts/ci/build-server.sh
+
+  ci:check-server:
+    desc: Check the server sidecar reports its version and embeds the commit (TRIPLE, EXE, GITHUB_SHA)
+    cmds:
+      - bash scripts/ci/check-server.sh
+
+  ci:macos-signing-env:
+    desc: Export the Apple signing secrets into GITHUB_ENV (APPLE_*)
+    cmds:
+      - bash scripts/ci/macos-signing-env.sh
+
+  ci:changelog-gate:
+    desc: Require i18n/changelog/<version>.md for the version being released
+    cmds:
+      - bash scripts/ci/changelog-gate.sh
+
+  ci:frontend-deps:
+    desc: Install the desktop and website frontend dependencies
+    cmds:
+      - pnpm --dir desktop install --frozen-lockfile
+      - pnpm --dir website install --frozen-lockfile
+
+  ci:desktop-build-deps:
+    desc: Install the desktop crate's build prerequisites on Ubuntu
+    cmds:
+      - bash scripts/ci/desktop-build-deps.sh
+
+  ci:desktop-check:
+    desc: Type-check the desktop crate with placeholder sidecars (Ubuntu)
+    cmds:
+      - bash scripts/ci/desktop-check.sh
+
+  dev:guard:
+    desc: Fail unless this dev build's commit is contained in the dev branch
+    cmds:
+      - '{{.PYTHON}} scripts/dev_build.py guard'
+
+  dev:prepare:
+    desc: Compute the dev version, tag, tauri config and release body into GITHUB_OUTPUT
+    cmds:
+      - '{{.PYTHON}} scripts/dev_build.py prepare'
+
+  dev:cleanup:
+    desc: Prune old dev releases with bounded retention (KEEP, KEEP_COUNT, KEEP_HOURS, GH_TOKEN, GITHUB_RUN_ID, GITHUB_REPOSITORY)
+    cmds:
+      - '{{.PYTHON}} scripts/dev_build.py cleanup'
+
+  dev:deploy-website:
+    desc: Dispatch the website deploy so the dev manifest refreshes (GH_TOKEN, GITHUB_REPOSITORY)
+    cmds:
+      - gh workflow run website.yml --ref main --repo "$GITHUB_REPOSITORY"
+
+  release:set-version:
+    desc: Validate and apply the release version override to tauri.conf.json (VERSION, GITHUB_REF)
+    cmds:
+      - '{{.PYTHON}} scripts/release_set_version.py'
+
+  release:notes:
+    desc: Assemble the GitHub release body - English notes under the website changelog link (VERSION defaults to tauri.conf.json; RELEASE_NOTES; --github-output appends to $GITHUB_OUTPUT)
+    cmds:
+      - '{{.PYTHON}} scripts/release_notes.py {{.CLI_ARGS}}'
 
   dev:tag:
-    desc: Cut a dev build - tag dev.<next> on HEAD and push the tag
+    desc: Cut a dev build - tag dev.<next> on the dev branch and push the tag
     cmds:
-      - git fetch origin --tags
+      - git fetch origin main dev --tags --prune --prune-tags
+      # The tag rule is "green pipeline first, tag second", and this is the
+      # only place that can enforce it: no tag on a commit whose Lint run has
+      # not finished green.
+      - '{{.PYTHON}} scripts/dev_build.py lint-gate'
       - |
+        branch=$(git rev-parse --abbrev-ref HEAD)
+        if [ "$branch" != "dev" ]; then
+          echo "dev tags are cut on the dev branch only (on $branch now): git switch dev && git merge --ff-only main" >&2
+          exit 1
+        fi
         next=$(git tag -l 'dev.*' | sed 's/dev\.//' | sort -n | tail -1)
         next=$((next + 1))
         git tag -s "dev.$next" -m "Dev build $next"

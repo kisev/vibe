@@ -24,10 +24,13 @@ git status --short          # must be empty
 ## 1. Does `server/` need a release first?
 
 The desktop app downloads a pinned engine, so engine fixes only reach users
-through a new server release.
+through a new server release. The server has its own version line: it starts at
+`server-v1.0.0` and never follows upstream's 0.x numbers, and `.server-version`
+takes the new tag only once that release exists — pulling it ahead makes every
+build point at a release that is not there.
 
 ```
-pin=$(cat .server-version)                          # e.g. v0.6.9
+pin=$(cat .server-version)                          # e.g. v1.0.2
 git log --oneline "server-${pin#v}"..main -- server/ 2>/dev/null ||
   git log --oneline "server-$pin"..main -- server/
 ```
@@ -36,9 +39,10 @@ git log --oneline "server-${pin#v}"..main -- server/ 2>/dev/null ||
 - **Only docs/comments** → say so and ask whether to skip.
 - **Code changed** → release the server first:
   - If anything under `server/libs/` changed (`ggml-version`, `patches/`,
-    `libs.chore`, `include/`), bump `server/libs/revision` in the same commit and
-    run `server-libs.yml` **first** (~9 min); `upload-libs` refuses a tag that
-    exists for another tree.
+    `include/`) or `scripts/ggml_libs.sh` changed, bump `server/libs/revision` in
+    the same commit and publish the new bundle with `task libs:upload` on each
+    platform it must serve (~9 min per host) **before** the release; the upload
+    refuses a release that exists for another tree.
   - `git tag server-vX.Y.Z && git push origin server-vX.Y.Z` on main.
   - **Gate:** `server-release.yml` green (~8 min) and all 5 assets uploaded — the
     Intel Mac asset lands last. It publishes as a *prerelease* on purpose; leave
@@ -73,7 +77,7 @@ locale over the new file and stamps the hashes. Untranslated is not fatal — th
 page falls back to English per entry — but the notes are the one page every user
 opens on update day, so translate them unless the user says otherwise.
 
-**Gate:** `uv run scripts/check_i18n.py` passes and `chore check-types` is clean.
+**Gate:** `uv run scripts/check_i18n.py` passes and `task check-types` is clean.
 
 ## 3. PR and squash merge
 
@@ -86,8 +90,7 @@ gh pr create --fill
 
 **Gate:** `fmt` and `clippy` pass, then `gh pr merge <n> --squash --delete-branch`.
 Repo-level auto-merge is **off** (`allow_auto_merge: false`), so `--auto` silently
-does nothing — poll the checks and merge when they settle. Then `git switch main
-&& git pull`.
+does nothing — poll the checks and merge when they settle. Then `git switch main && git pull`.
 
 ## 4. Release
 
@@ -95,7 +98,10 @@ does nothing — poll the checks and merge when they settle. Then `git switch ma
 gh workflow run release.yml --ref main
 ```
 
-~20 min. tauri-action creates the tag `vX.Y.Z` and a **prerelease**. Leave both
+~20 min. tauri-action creates the tag `vX.Y.Z` and a **prerelease**. The
+prerelease body is assembled with `task release:notes` before the build, so it
+already carries the website link line and the versioned English entry; step 5
+rebuilds the same body instead of posting a link-only replacement. Leave both
 signing inputs at their `false` defaults: there is no signing infrastructure to
 reach, and a signing-enabled run would only fail or ship an unexpected config.
 The Windows job produces an unsigned `vibe.exe`; that is the accepted permanent
@@ -107,14 +113,14 @@ state.
 ## 5. Promote
 
 ```
-awk 'c==2{print} /^---$/{c++}' i18n/changelog/<version>.md > /tmp/notes.md
+VERSION=<version> RELEASE_NOTES=/tmp/notes.md task release:notes
 gh release edit vX.Y.Z --prerelease=false --latest --notes-file /tmp/notes.md
 ```
 
-The release body carries the same content as the versioned entry, so GitHub and
-the website never disagree; the reader's-language version lives at
-`https://kisev.github.io/vibe/changelog/<version>`. Dev releases pick the body up
-from `unreleased.md` automatically.
+The body is the versioned English entry, so GitHub and the website never
+disagree, under `Read this changelog in your language: https://kisev.github.io/vibe/changelog/<version>` — the same entry in the
+reader's own language. Dev releases pick the body up from `unreleased.md`
+automatically and link to `/changelog/dev` instead.
 
 ## 6. Deploy the website
 
@@ -122,8 +128,9 @@ from `unreleased.md` automatically.
 gh workflow run website.yml --ref main
 ```
 
-The website also deploys on `release: published`, but trigger it explicitly so the
-changelog page carries the new entry without waiting.
+`website.yml` has no `release` trigger — the environment's branch policy leaves the
+deploy job of a tag run skipped — so trigger it explicitly: the changelog page then
+carries the new entry without waiting for the next push to `main`.
 
 **Gate:** `website.yml` green, and `https://kisev.github.io/vibe/changelog/<version>`
 serves the new entry.

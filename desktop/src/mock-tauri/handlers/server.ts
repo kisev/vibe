@@ -80,6 +80,8 @@ const MOCK_LANGUAGES = [
 
 // Module level state, reset only by the mock itself.
 let apiBaseUrl: string | null = null
+// The user's persisted intent, kept separate from whether the mock process is alive.
+let apiEnabled = false
 
 function fileExists(path: unknown): boolean {
 	return typeof path === 'string' && virtualFs.has(path)
@@ -228,12 +230,22 @@ export const serverHandlers: CommandHandlerMap = {
 
 	get_api_base_url: () => apiBaseUrl,
 
+	api_server_enabled: () => apiEnabled,
+
 	start_api_server: () => {
+		apiEnabled = true
 		apiBaseUrl = 'http://127.0.0.1:33333'
 		return apiBaseUrl
 	},
 
 	stop_api_server: () => {
+		apiEnabled = false
+		apiBaseUrl = null
+		return true
+	},
+
+	// Releasing the binary for an update must not clear the user's intent.
+	stop_api_server_process: () => {
 		apiBaseUrl = null
 		return true
 	},

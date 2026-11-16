@@ -1,6 +1,7 @@
 use crate::config::STORE_FILENAME;
 use meeting_detect::{MeetingState, Source};
 use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError, TryRecvError};
 use std::sync::Mutex;
 use std::thread::JoinHandle;
@@ -41,6 +42,10 @@ const TOP_MARGIN: f64 = MARGIN;
 /// so a meeting surfaces within roughly a second of the call opening the microphone.
 const POLL_INTERVAL: Duration = Duration::from_millis(500);
 
+/// True while at least one in-app meeting window is open on a configured meeting host.
+/// Reading it here keeps the external prompt from duplicating a call Vibe already hosts.
+static IN_APP_SESSION: AtomicBool = AtomicBool::new(false);
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct MeetingPromptPayload {
     pub source: Source,
@@ -52,11 +57,20 @@ struct PromptLogic {
     current: Option<MeetingPromptPayload>,
     dismissed: bool,
     own_recordings: u32,
+    /// Last observation, replayed when the in-app session state changes.
+    last_state: Option<MeetingState>,
 }
 
 impl PromptLogic {
     fn detection(&mut self, state: MeetingState) -> bool {
+        self.detection_with(state, IN_APP_SESSION.load(Ordering::SeqCst))
+    }
+
+    /// [`Self::detection`] with the in-app flag passed in, so the suppression rule is testable
+    /// without writing the process-wide state other tests in this module run against.
+    fn detection_with(&mut self, state: MeetingState, in_app: bool) -> bool {
         let before = self.current.clone();
+        self.last_state = Some(state.clone());
         if !state.recording {
             self.detected = None;
             self.current = None;
@@ -68,7 +82,7 @@ impl PromptLogic {
             }
             self.current = self
                 .detected
-                .filter(|_| !self.dismissed && self.own_recordings == 0)
+                .filter(|_| !self.dismissed && self.own_recordings == 0 && !in_app)
                 .map(|source| MeetingPromptPayload { source });
         }
         before != self.current
@@ -286,6 +300,45 @@ fn apply_detection(app: &tauri::AppHandle, state: MeetingState) {
     }
 }
 
+/// Replay the last detector observation after the in-app session state changes, so the
+/// prompt hides immediately when a meeting opens in Vibe and can return when it closes.
+fn reevaluate(app: &tauri::AppHandle) {
+    let Some(runtime) = app.try_state::<MeetingPromptRuntime>() else {
+        return;
+    };
+    let next = {
+        let Ok(mut inner) = runtime.inner.lock() else {
+            return;
+        };
+        let Some(state) = inner.logic.last_state.clone() else {
+            return;
+        };
+        if !inner.logic.detection(state) {
+            return;
+        }
+        inner.logic.current.clone()
+    };
+    match next {
+        Some(state) => {
+            if let Err(error) = show_state(app, state) {
+                tracing::error!("could not show meeting prompt: {error}");
+            }
+        }
+        None => hide_window(app),
+    }
+}
+
+/// Suppress the external meeting prompt while Vibe itself hosts a meeting session.
+pub fn set_in_app_session(active: bool) {
+    if IN_APP_SESSION.swap(active, Ordering::SeqCst) == active {
+        return;
+    }
+    let app = crate::setup::STATIC_APP.lock().ok().and_then(|app| app.clone());
+    if let Some(app) = app {
+        reevaluate(&app);
+    }
+}
+
 fn start_worker(app: &tauri::AppHandle) -> Result<(), String> {
     let runtime = app
         .try_state::<MeetingPromptRuntime>()
@@ -480,6 +533,17 @@ mod tests {
         assert!(state.current.is_none());
         state.detection(zoom(false));
         state.detection(zoom(true));
+        assert!(state.current.is_some());
+    }
+
+    #[test]
+    fn an_open_in_app_window_suppresses_the_external_prompt() {
+        let mut state = PromptLogic::default();
+        // The same external call stays silent while Vibe hosts a browser window.
+        assert!(!state.detection_with(zoom(true), true));
+        assert!(state.current.is_none());
+        // Once the last window closes, detection resumes unchanged.
+        assert!(state.detection_with(zoom(true), false));
         assert!(state.current.is_some());
     }
 }

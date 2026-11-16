@@ -1,8 +1,19 @@
 // The pure half of the comparison lab: `runComparison` against a fake world. The
 // Tauri-backed `tauriComparisonIo` is deliberately out of scope — everything that
 // touches the OS lives there, while the runner only needs the injected contract.
+import { invoke } from '@tauri-apps/api/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { comparisonFolderName, comparisonStamp, runComparison, type ComparisonIo, type ComparisonModel, type ComparisonStatus } from './model-comparison'
+import { renderExport } from '~/lib/auto-export'
+import * as config from '~/lib/config'
+import {
+	comparisonFolderName,
+	comparisonStamp,
+	runComparison,
+	tauriComparisonIo,
+	type ComparisonIo,
+	type ComparisonModel,
+	type ComparisonStatus,
+} from './model-comparison'
 
 // The module imports Tauri globals and the markdown renderer at load time; none of
 // them is on the path under test, so keep the real modules out of the runner.
@@ -25,19 +36,15 @@ const folder = `/projects/comparisons/${stamp}-clip`
 function fakeIo(failures: { load?: string; transcribe?: string; render?: string } = {}) {
 	const calls: string[] = []
 	const writes: { path: string; text: string }[] = []
-	// `transcribe` has no model argument, so the fake remembers what was loaded; that is
-	// how a transcribe failure is aimed at exactly one model of the comparison.
-	let loaded: string | null = null
 	const io: ComparisonIo = {
 		loadModel: async (path) => {
 			calls.push(`load ${path}`)
 			if (path === failures.load) throw new Error(`cannot load ${path}`)
-			loaded = path
 		},
-		transcribe: async (path, language) => {
+		transcribe: async (modelPath, path, language) => {
 			calls.push(`transcribe ${path} ${language}`)
 			// Tauri rejects with a bare string, so one test keeps that rejection shape.
-			if (loaded === failures.transcribe) return Promise.reject('no audio track')
+			if (modelPath === failures.transcribe) return Promise.reject('no audio track')
 			return [{ start: 0, stop: 1, text: 'spoken words' }]
 		},
 		renderMarkdown: async (name, segments) => {
@@ -101,6 +108,26 @@ describe('runComparison', () => {
 		])
 	})
 
+	it('keeps two models with the same display name in separate files', async () => {
+		const { io, writes } = fakeIo()
+		const twins: ComparisonModel[] = [
+			{ name: 'Alpha', path: '/models/one.gguf' },
+			{ name: 'Alpha', path: '/models/two.gguf' },
+		]
+
+		const runs = await runComparison(input, twins, 'en', io)
+
+		expect(writes.map((write) => write.path)).toEqual([`${folder}/Alpha.md`, `${folder}/Alpha (2).md`])
+		expect(runs.map((run) => run.outputPath)).toEqual([`${folder}/Alpha.md`, `${folder}/Alpha (2).md`])
+	})
+
+	it('creates the comparison folder once, before the first run', async () => {
+		const { io, calls } = fakeIo()
+		await runComparison(input, models, 'en', io)
+
+		expect(calls.filter((call) => call.startsWith('mkdir'))).toEqual([`mkdir ${folder}`])
+	})
+
 	it('isolates a load failure: the failed model errors, the rest still run', async () => {
 		const { io, writes } = fakeIo({ load: '/models/beta.gguf' })
 		const runs = await runComparison(input, models, 'en', io)
@@ -150,6 +177,90 @@ describe('runComparison', () => {
 		expect(runs.map((run) => run.status)).toEqual(['done', 'error'])
 		expect(runs[1].error).toBe('render exploded')
 		expect(writes.map((write) => write.path)).toEqual([`${folder}/Alpha.md`])
+	})
+})
+
+describe('tauriComparisonIo transcribe options', () => {
+	const io = () => tauriComparisonIo({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null)
+	const invokeMock = invoke as unknown as ReturnType<typeof vi.fn>
+
+	beforeEach(() => invokeMock.mockReset())
+
+	it('supplies the bundled VAD model to an engine that requires one', async () => {
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: true, languages: ['ru'], language_detection: false } }
+			if (command === 'get_models_folder') return 'C:/models'
+			return { segments: [] }
+		})
+
+		await io().transcribe('/models/gigaam.gguf', '/rec/clip.wav', 'ru')
+
+		expect(invokeMock).toHaveBeenCalledWith('transcribe', {
+			options: { path: '/rec/clip.wav', lang: 'ru', vad_model: `C:/models/${config.vadModelFilename}` },
+		})
+	})
+
+	it('leaves an engine without the requirement on the plain options', async () => {
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: false, languages: ['ru'], language_detection: false } }
+			return { segments: [] }
+		})
+
+		await io().transcribe('/models/whisper.gguf', '/rec/clip.wav', 'ru')
+
+		expect(invokeMock).toHaveBeenCalledWith('transcribe', { options: { path: '/rec/clip.wav', lang: 'ru' } })
+	})
+
+	it('runs a single-language model in its own language instead of the global one', async () => {
+		// The server rejects a language the model does not support; the main flow coerces it, and
+		// a comparison must too, or a working model fails its run.
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: false, languages: ['ru'], language_detection: false } }
+			return { segments: [] }
+		})
+
+		await io().transcribe('/models/gigaam.gguf', '/rec/clip.wav', 'en')
+
+		expect(invokeMock).toHaveBeenCalledWith('transcribe', { options: { path: '/rec/clip.wav', lang: 'ru' } })
+	})
+
+	it('adds the separation model to the options when the comparison asks for speakers', async () => {
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === 'get_model_metadata') return { capabilities: { requires_vad: false, languages: ['ru'], language_detection: false } }
+			return { segments: [] }
+		})
+		const withDiarize = tauriComparisonIo({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null, 'C:/models/speakers.gguf')
+
+		await withDiarize.transcribe('/models/whisper.gguf', '/rec/clip.wav', 'ru')
+
+		expect(invokeMock).toHaveBeenCalledWith('transcribe', {
+			options: { path: '/rec/clip.wav', lang: 'ru', diarize_model: 'C:/models/speakers.gguf' },
+		})
+	})
+
+	it('renders the speaker labels the results window shows when separation is on', async () => {
+		const renderExportMock = renderExport as unknown as ReturnType<typeof vi.fn>
+		renderExportMock.mockResolvedValue('# rendered')
+		const withDiarize = tauriComparisonIo({ gpuDevice: null, noGpu: false, unloadTimeoutMinutes: 5 }, null, 'C:/models/speakers.gguf')
+
+		await withDiarize.renderMarkdown('Alpha', [])
+
+		expect(renderExportMock).toHaveBeenCalledWith(
+			'md',
+			expect.anything(),
+			expect.objectContaining({ showSpeakers: true, speakerLabel: expect.any(String) }),
+		)
+	})
+
+	it('still transcribes when the model metadata cannot be read', async () => {
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === 'get_model_metadata') throw new Error('unreadable header')
+			return { segments: [] }
+		})
+
+		await io().transcribe('/models/odd.gguf', '/rec/clip.wav', 'ru')
+
+		expect(invokeMock).toHaveBeenCalledWith('transcribe', { options: { path: '/rec/clip.wav', lang: 'ru' } })
 	})
 })
 

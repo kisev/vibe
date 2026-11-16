@@ -50,5 +50,23 @@
   {
     "slug": "customize",
     "imageURL": "/feature-model-customize.png"
+  },
+  {
+    "slug": "model-comparison"
+  },
+  {
+    "slug": "update-channels"
+  },
+  {
+    "slug": "meeting-browser"
+  },
+  {
+    "slug": "api-agents"
+  },
+  {
+    "slug": "phone-handoff"
+  },
+  {
+    "slug": "site-language"
   }
 ]

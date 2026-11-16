@@ -3,6 +3,10 @@ name: Release
 on:
     workflow_dispatch:
         inputs:
+            version:
+                description: 'Version to build and tag, e.g. 1.1.0-rc.1 (default: the version in tauri.conf.json)'
+                type: string
+                default: ''
             sign-windows:
                 description: 'Sign Windows binaries via remote YubiKey'
                 type: boolean
@@ -38,11 +42,41 @@ jobs:
                       target_triple: "x86_64-pc-windows-msvc"
 
         runs-on: ${{ matrix.platform }}
+        env:
+            # Setup mise installs only `task`; do not let `mise exec` pull the
+            # rest of the toolchain into every matrix cell.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - uses: actions/checkout@v4
 
+            - name: Setup mise
+              # v2, pinned to a commit SHA: this job builds the release artifacts.
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+              with:
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
+
+            # A candidate is the same build as a release, only its version and
+            # tag differ: `X.Y.Z-rc.N` sorts below `X.Y.Z`, which is what keeps
+            # Dev → Beta → Release moving forward. See docs/reference/update-channels.md.
+            - name: Apply the version override
+              if: inputs.version != ''
+              shell: bash
+              env:
+                  VERSION: ${{ inputs.version }}
+              run: mise exec -- task release:set-version
+
+            # The prerelease carries the same body a promotion will: the
+            # versioned English entry under the website link line. A link-only
+            # placeholder is what let a stable release ship without its notes.
+            - name: Assemble the release body
+              id: release-notes
+              shell: bash
+              run: mise exec -- task release:notes -- --github-output
+
             - name: setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
               with:
                   package_json_file: desktop/package.json
 
@@ -54,18 +88,22 @@ jobs:
                   cache-dependency-path: desktop/pnpm-lock.yaml
 
             - name: setup uv
-              uses: astral-sh/setup-uv@v5
+              uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
 
-            - name: setup chore
-              uses: getchore/setup-chore@v1
-              with:
-                  version: v1.6.0
-
+            # The server is its own workspace, and `task setup` (below) builds
+            # vibe-diarize-native from it; a root-only cache would rebuild both
+            # from scratch on every release. The key keeps the two macOS cells
+            # (same arm64 runner, different --target) from evicting each other.
             - name: Rust cache
-              uses: swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+              with:
+                  workspaces: |
+                      . -> target
+                      server -> target
+                  key: ${{ matrix.target_triple }}
 
             - name: Install Rust stable
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
               with:
                   # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
                   targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
@@ -76,70 +114,53 @@ jobs:
 
             - name: Install Linux build dependencies
               if: runner.os == 'Linux'
-              run: chore linux-deps
+              run: mise exec -- task linux-deps
 
             - name: Require release notes for this version
               shell: bash
-              run: |
-                  version=$(python3 -c 'import json; print(json.load(open("desktop/src-tauri/tauri.conf.json"))["version"])')
-                  test -f "i18n/changelog/$version.md" || { echo "::error::i18n/changelog/$version.md is missing; write the release notes before releasing"; exit 1; }
+              run: mise exec -- task ci:changelog-gate
             - name: Fetch the sidecars for ${{ matrix.target_triple }}
-              run: chore setup ${{ matrix.target_triple }}
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: mise exec -- task setup -- ${{ matrix.target_triple }}
 
             # vibe-diarize-native statically links the prebuilt GGML the native
             # stack is built against; vibe-server stays on transcribe.cpp's GGML.
             # The pin is read from server/libs so a bump never rots this step.
             - name: Fetch the prebuilt ggml libraries
               shell: bash
-              run: |
-                  triple="${{ matrix.target_triple }}"
-                  case "$triple" in
-                    aarch64-apple-darwin) asset=darwin-arm64 ;;
-                    x86_64-apple-darwin) asset=darwin-x86_64 ;;
-                    x86_64-unknown-linux-gnu) asset=linux-x86_64 ;;
-                    aarch64-unknown-linux-gnu) asset=linux-aarch64 ;;
-                    x86_64-pc-windows-msvc) asset=windows-amd64-msvc ;;
-                    *) echo "no ggml libraries asset for $triple" >&2; exit 1 ;;
-                  esac
-                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
-                  curl --location --fail --retry 3 -o /tmp/ggml-libs.tar.gz \
-                    "https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-$asset.tar.gz"
-                  tar -xzf /tmp/ggml-libs.tar.gz -C /tmp
-                  mv /tmp/lib server/libs/lib
+              env:
+                  TRIPLE: ${{ matrix.target_triple }}
+                  GH_TOKEN: ${{ github.token }}
+              run: mise exec -- task ci:ggml-libs
 
             - name: Build the native diarization helper
               shell: bash
-              run: |
-                  triple="${{ matrix.target_triple }}"
-                  exe=""
-                  if [[ "$triple" == *windows* ]]; then exe=".exe"; fi
-                  cd server
-                  cargo build -p vibe-diarize-native --release --target "$triple"
-                  cp "target/$triple/release/vibe-diarize-native$exe" \
-                    "../desktop/src-tauri/binaries/vibe-diarize-native-$triple$exe"
+              env:
+                  TRIPLE: ${{ matrix.target_triple }}
+                  EXE: ${{ contains(matrix.target_triple, 'windows') && '.exe' || '' }}
+              run: mise exec -- task ci:diarize-helper
 
             - name: Setup macOS signing env
               if: matrix.platform == 'macos-latest' && inputs.sign-macos
-              run: |
-                  {
-                      echo "APPLE_CERTIFICATE=${{ secrets.APPLE_CERTIFICATE }}"
-                      echo "APPLE_CERTIFICATE_PASSWORD=${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
-                      echo "APPLE_SIGNING_IDENTITY=${{ secrets.APPLE_SIGNING_IDENTITY }}"
-                      echo "APPLE_ID=${{ secrets.APPLE_ID }}"
-                      echo "APPLE_PASSWORD=${{ secrets.APPLE_PASSWORD }}"
-                      echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
-                  } >> "$GITHUB_ENV"
+              env:
+                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+                  APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+                  APPLE_ID: ${{ secrets.APPLE_ID }}
+                  APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+                  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+              run: mise exec -- task ci:macos-signing-env
 
             - name: Build
-              uses: tauri-apps/tauri-action@v0
+              # v0.6.2, pinned to a commit SHA: this step gets the updater
+              # signing key and a contents:write token.
+              uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
               env:
                   GITHUB_TOKEN: ${{ github.token }}
                   # Tauri Updater
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
                   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-                  # Analytics (Aptabase)
-                  APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
-                  APTABASE_BASE_URL: ${{ secrets.APTABASE_BASE_URL }}
                   # Windows signing (remote YubiKey sign server)
                   SIGN_ENABLED: ${{ matrix.platform == 'windows-latest' && inputs.sign-windows && 'true' || 'false' }}
                   SIGN_TUNNEL_URL: ${{ secrets.SIGN_TUNNEL_URL }}
@@ -147,7 +168,10 @@ jobs:
               with:
                   tagName: v__VERSION__ # the action automatically replaces __VERSION__ with the app version.
                   releaseName: "v__VERSION__"
-                  releaseBody: "Release notes: https://kisev.github.io/vibe/changelog/__VERSION__"
+                  # Assembled above with `task release:notes`: the versioned
+                  # English notes under the same line, so the candidate body is
+                  # never a link-only placeholder.
+                  releaseBody: ${{ steps.release-notes.outputs.body }}
                   prerelease: true
                   args: ${{ matrix.args }} ${{ matrix.platform == 'windows-latest' && inputs.sign-windows && '--config src-tauri/tauri.windows.signing.conf.json' || '' }}
                   projectPath: "./desktop"

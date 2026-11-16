@@ -1,4 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react'
+import { Info } from 'lucide-react'
+import { m } from '~/paraglide/messages.js'
 import { cn } from '~/lib/style'
 import { Button } from '~/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
@@ -37,11 +39,40 @@ export function SettingsGroup({
 	)
 }
 
-/** Label + optional one-line description, used on the left side of every row. */
-function RowLabel({ label, description, clamp = true }: { label: ReactNode; description?: ReactNode; clamp?: boolean }) {
+/**
+ * Label + optional one-line description, used on the left side of every row. `help` is off inside
+ * `ActionRow`: its help trigger is a button, and a button cannot live inside the row's own button.
+ * The description stays visible there, unclamped, so nothing is only reachable by hover.
+ */
+function RowLabel({
+	label,
+	description,
+	clamp = true,
+	help = true,
+}: {
+	label: ReactNode
+	description?: ReactNode
+	clamp?: boolean
+	help?: boolean
+}) {
 	return (
 		<div className="min-w-0 space-y-0.5">
-			<div className="text-sm text-foreground">{label}</div>
+			<div className="flex items-center gap-1.5 text-sm text-foreground">
+				<span className="min-w-0">{label}</span>
+				{help && description && (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<button
+								type="button"
+								aria-label={m.parameterHelp()}
+								className="flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70">
+								<Info className="h-3.5 w-3.5" />
+							</button>
+						</TooltipTrigger>
+						<TooltipContent className="max-w-xs">{description}</TooltipContent>
+					</Tooltip>
+				)}
+			</div>
 			{description && <p className={cn('text-xs text-muted-foreground', clamp && 'line-clamp-1')}>{description}</p>}
 		</div>
 	)
@@ -54,17 +85,20 @@ export function SettingsRow({
 	children,
 	className,
 	clampDescription = true,
+	valueClassName,
 }: {
 	label: ReactNode
 	description?: ReactNode
 	children?: ReactNode
 	className?: string
 	clampDescription?: boolean
+	/** Overrides the value container's sizing, e.g. to let long text shrink and wrap. */
+	valueClassName?: string
 }) {
 	return (
 		<div className={cn('flex min-h-[52px] items-center justify-between gap-4 px-4 py-2.5', className)}>
 			<RowLabel label={label} description={description} clamp={clampDescription} />
-			{children && <div className="flex shrink-0 items-center gap-1.5">{children}</div>}
+			{children && <div className={cn('flex shrink-0 items-center gap-1.5', valueClassName)}>{children}</div>}
 		</div>
 	)
 }
@@ -130,7 +164,7 @@ export function ActionRow({
 				'disabled:pointer-events-none disabled:opacity-50',
 				className,
 			)}>
-			<RowLabel label={<span className="text-sm">{label}</span>} description={description} />
+			<RowLabel label={<span className="text-sm">{label}</span>} description={description} clamp={false} help={false} />
 			{icon && <span className={cn('shrink-0', destructive ? 'text-destructive' : 'text-muted-foreground')}>{icon}</span>}
 		</button>
 	)

@@ -8,7 +8,9 @@ One development-tooling contract for the fork: a single task facade over three t
 
 ### Requirement: One task facade
 
-The repository SHALL expose its developer commands through a root Taskfile so `task --list` is the complete entry surface — i18n generate/stamp/audit, docs generation and check, catalog sync, desktop tests and typecheck, server tests, lint, format, and hook installation — each delegating to the underlying pnpm/uv/cargo invocation rather than duplicating logic.
+The repository SHALL expose every developer command through the root Taskfile, so `task --list` is the complete entry surface, each target delegating to the underlying pnpm/uv/cargo/script invocation rather than duplicating logic.
+
+No second task runner SHALL exist in the repository: a `chorefile`, a `*.chore` file, or a workflow step that installs another task runner is a defect.
 
 #### Scenario: Discovering commands
 
@@ -17,32 +19,86 @@ The repository SHALL expose its developer commands through a root Taskfile so `t
 
 #### Scenario: Delegation, not duplication
 
-- **WHEN** a task wraps an existing package script
+- **WHEN** a task wraps an existing package script or a helper under `scripts/`
 - **THEN** the task invokes that script, so a change to the script needs no task edit
+
+#### Scenario: One runner
+
+- **WHEN** a workflow or a document tells someone how to build, test or release
+- **THEN** it names a `task` target, and no `chore` command, `chorefile`, `*.chore` file or `getchore/setup-chore` step remains in the tree
+
+#### Scenario: Local package manager
+
+- **WHEN** the Linux build dependencies are installed on a host that is not Debian-based
+- **THEN** the task uses that host's package manager instead of failing on `apt-get`
 
 ### Requirement: Local gates via git hooks
 
-The repository SHALL install lefthook hooks once per checkout (`task hooks`) with three gates: pre-commit runs fast, file-scoped checks in parallel over the staged set; pre-push runs the test suites; commit-msg enforces the commit message convention.
+The repository SHALL install lefthook hooks once per checkout (`task hooks`) with three gates: pre-commit runs file-scoped checks in parallel over the staged set and, when reviewable files are staged, the commit-time review gate; pre-push runs `task verify`, the local mirror of the CI gate set; commit-msg enforces the commit message convention.
 
 #### Scenario: Fast pre-commit
 
 - **WHEN** a commit stages a handful of files
-- **THEN** the pre-commit gate touches only staged files of matching types and completes in seconds
+- **THEN** the lint and format commands run in parallel over only the matching staged files and complete in seconds, independently of the review stage
 
 #### Scenario: Broken formatting blocked
 
-- **WHEN** a staged file fails its format check
+- **WHEN** a staged file fails its format check, including a style sheet or an HTML page
 - **THEN** the commit is rejected with the tool's own diff or message
 
 #### Scenario: Pre-push tests
 
 - **WHEN** a push happens
-- **THEN** desktop and server tests run first and a failure blocks the push
+- **THEN** `task verify` runs first and a failure blocks the push
 
 #### Scenario: Conventional messages
 
 - **WHEN** a commit message violates the configured convention
 - **THEN** the commit is rejected and the rule that failed is named
+
+### Requirement: Commit-time review gate
+
+When a commit stages at least one file the review tool supports, the repository SHALL review exactly the staged snapshot before the commit is created. A `critical`, `medium` or `high` finding SHALL block the commit; a `low` finding SHALL be reported without blocking. When the review cannot run — provider unreachable, timeout, or missing configuration — the gate SHALL warn and allow the commit. The gate SHALL be explicitly bypassable.
+
+#### Scenario: Only the staged snapshot is reviewed
+
+- **WHEN** a worktree has staged files, unstaged edits, and untracked files
+- **THEN** the review sees only the staged snapshot, and a finding in an unstaged or untracked file cannot block the commit
+
+#### Scenario: A medium finding blocks
+
+- **WHEN** the review reports a `medium` finding in the staged snapshot
+- **THEN** the commit is rejected and the finding's path, line, severity, and message are printed
+
+#### Scenario: A high finding blocks
+
+- **WHEN** the review reports a `high` finding in the staged snapshot
+- **THEN** the commit is rejected and the finding's path, line, severity, and message are printed
+
+#### Scenario: A critical finding blocks
+
+- **WHEN** the review reports a `critical` finding in the staged snapshot
+- **THEN** the commit is rejected and the finding's path, line, severity, and message are printed
+
+#### Scenario: Low findings do not block
+
+- **WHEN** the review reports only `low` findings
+- **THEN** the findings are printed and the commit proceeds
+
+#### Scenario: No reviewable files
+
+- **WHEN** the staged set contains no file the review tool supports
+- **THEN** the gate exits without calling the language model
+
+#### Scenario: Review infrastructure fails
+
+- **WHEN** the provider is unreachable, the review times out, or OCR is not configured
+- **THEN** the gate prints a warning naming the failure and the commit proceeds
+
+#### Scenario: Explicit bypass
+
+- **WHEN** `OCR_SKIP=1` is set for the commit
+- **THEN** no review runs and the commit proceeds
 
 ### Requirement: Pinned toolchain
 
@@ -55,7 +111,7 @@ Every lint/format tool SHALL be pinned by exact version in `mise.toml` and resol
 
 ### Requirement: Lint and format matrix
 
-Each file type SHALL have exactly one linter and at most one formatter, following the user's shared stack: yaml → yamllint; toml → tombi; markdown → markdownlint-cli2 (rules) + mdformat (format); json/jsonc → oxfmt; js/ts → oxlint; md/json/css → prettier where already configured; shell → shellcheck + shfmt; editorconfig → editorconfig-checker; secrets → gitleaks (staged and full-tree) + trivy (secret scanner over manifests); GitHub workflows → actionlint. Generated trees are excluded explicitly.
+Each file type SHALL have exactly one linter and at most one formatter, following the user's shared stack: yaml → yamllint; toml → tombi; markdown → markdownlint-cli2 (rules) + mdformat (format); json/jsonc → oxfmt; js/ts → oxlint; md/json/css → prettier; shell → shellcheck + shfmt; editorconfig → editorconfig-checker; secrets → gitleaks (staged and full-tree) + trivy; GitHub workflows → actionlint. Generated trees are excluded explicitly.
 
 #### Scenario: Whole-tree check
 
@@ -99,3 +155,118 @@ CI SHALL run the same lint and format tasks the hooks run, so a gate that passes
 
 - **WHEN** the lint matrix changes
 - **THEN** CI behavior changes with it, because CI invokes the tasks rather than re-stating the commands
+
+### Requirement: One command mirrors the CI gate set
+
+`task verify` SHALL run every deterministic, locally-runnable gate a push or pull request triggers: the lint matrix, formatting and both clippy gates, the server dependency gates, the unit suites, the site build, and the browser E2E suite. A green run SHALL mean every local-capable CI job is expected to pass on that revision. The transcribe spike stays CI-only: it downloads a model, runs an inference, and needs the Vulkan SDK on two platforms.
+
+#### Scenario: A warning in the desktop workspace
+
+- **WHEN** the desktop Rust code has a clippy warning that CI treats as an error
+- **THEN** `task verify` fails locally, before any push
+
+#### Scenario: An unformatted page
+
+- **WHEN** an HTML or CSS file does not match the formatter
+- **THEN** `task verify` fails locally at the same step CI runs
+
+#### Scenario: A broken E2E start
+
+- **WHEN** the browser suite cannot start its web server
+- **THEN** `task verify` reports it locally with the server's own output
+
+#### Scenario: Tagging
+
+- **WHEN** a `dev.<n>` or release tag is about to be created
+- **THEN** the tag is only created on a revision where `task verify` was green
+
+### Requirement: Sidecars come from the task facade
+
+The desktop app's sidecars — `vibe-server` and `ffmpeg` for the target triple — SHALL be fetched by `task setup [triple]`, and a locally built server SHALL be staged by `task server:build [triple]`. Both SHALL be callable from CI and from a workstation with the same arguments.
+
+#### Scenario: A release build needs its sidecars
+
+- **WHEN** the release workflow builds a target
+- **THEN** it runs `task setup <triple>` and gets `vibe-server-<triple>` and, outside Linux, `ffmpeg-<triple>` in `desktop/src-tauri/binaries`
+
+#### Scenario: Iterating on the engine
+
+- **WHEN** a contributor runs `task server:build <triple>`
+- **THEN** the server is built from `server/` and staged under the same sidecar name `task setup` would have produced
+
+#### Scenario: Sidecars already in place
+
+- **WHEN** the sidecar files for the requested triple exist
+- **THEN** `task setup` leaves them alone and reports that they are in place
+
+### Requirement: A Windows installer is built locally from the WSL checkout
+
+`task app:build:windows` SHALL sync the working tree to the Windows checkout named by `VIBE_WIN_CHECKOUT` (default: `<Windows home>\vibe-build`, derived from the Windows profile's `%USERPROFILE%`, never a hardcoded user name) and run `pnpm exec tauri build --config local-build.json --bundles nsis` on the Windows host through `powershell.exe`. It SHALL stamp the build `1.0.0-local.<YYYYMMDD>.<sha>` and SHALL publish nothing: no tag, no release, no artifact upload, no signature.
+
+#### Scenario: A fresh local build
+
+- **WHEN** `task app:build:windows` runs on the WSL workstation
+- **THEN** the tree is synced to the checkout, dependencies are installed there, and an NSIS `.exe` appears under the checkout's `target/release/bundle/nsis/`
+
+#### Scenario: A configured checkout path
+
+- **WHEN** `VIBE_WIN_CHECKOUT` names a different Windows directory
+- **THEN** the build uses that directory and leaves the default one alone
+
+#### Scenario: Verified before building
+
+- **WHEN** `task app:build:windows:verified` runs
+- **THEN** `task verify` runs first and a failure stops the build
+
+#### Scenario: Nothing is published
+
+- **WHEN** a local build finishes
+- **THEN** no git tag, release or uploaded asset exists for it
+
+### Requirement: A local build never joins an update channel
+
+The updater SHALL report no available update when the running version contains `-local`, so a locally built app cannot be replaced by a release or dev build.
+
+#### Scenario: Checking from a local build
+
+- **WHEN** `update_check` runs inside a `1.0.0-local.…` build
+- **THEN** it returns no update and contacts no channel manifest
+
+### Requirement: The local gate and CI call the same targets
+
+Every CI step that corresponds to a task target SHALL call that target, and `task verify` SHALL run every deterministic, locally-runnable job a push or pull request triggers. The transcribe spike stays CI-only: it downloads a model, runs a real inference, and installs the Vulkan SDK on a two-platform matrix, so it is not a deterministic local gate.
+
+#### Scenario: Rust formatting in CI
+
+- **WHEN** the lint workflows check formatting or clippy
+- **THEN** they run `task rust:fmt-check` / `task rust:clippy`, not a raw cargo command
+
+#### Scenario: A site change breaks the build
+
+- **WHEN** the website build or the site tests would fail
+- **THEN** `task verify` fails locally before the push
+
+#### Scenario: The E2E suite's inputs change
+
+- **WHEN** a translation catalog, `scripts/ci/e2e.sh` or `taskfile.yml` changes
+- **THEN** the E2E workflow runs
+
+### Requirement: An unreviewed commit says so
+
+The commit gate SHALL fail open when it cannot review, and SHALL say that the review did not run in wording distinct from a clean verdict: a skip names its reason and is printed where the commit's hook output shows it. Deliberate bypasses (`OCR_SKIP`) SHALL name the bypass, and the cases with nothing to review SHALL keep their own wording.
+
+#### Scenario: The provider is unreachable
+
+- **WHEN** the review cannot run because the provider fails, times out, or returns no usable output
+- **THEN** the commit proceeds
+- **AND** the output carries `review NOT run` with the reason, never a clean-verdict line
+
+#### Scenario: The gate is bypassed on purpose
+
+- **WHEN** a commit is made with `OCR_SKIP=1`
+- **THEN** the output says the review did not run and names the bypass
+
+#### Scenario: Nothing to review
+
+- **WHEN** the staged snapshot holds no reviewable file
+- **THEN** the output says there was nothing to review, not that a review was skipped

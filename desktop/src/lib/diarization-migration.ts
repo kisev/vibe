@@ -13,6 +13,18 @@ export type DiarizationMigration =
 	| 'declined' // offer declined or download failed: preference disabled
 
 /**
+ * Remove the superseded diarization artifacts once the current model is usable — the case where
+ * no replacement download will ever run to clean them up. Startup calls this whatever the
+ * speaker-separation preference says: the files are dead weight with the switch on or off, and
+ * only the current model being absent makes them the thing the app might still need.
+ */
+export async function sweepLegacyDiarizationFiles(): Promise<void> {
+	const modelsFolder = await invoke<string>('get_models_folder')
+	const modelPath = await join(modelsFolder, config.diarizeModelFilename)
+	if (await isModelFileUsable(modelPath)) await cleanupLegacyDiarizationFiles(modelsFolder)
+}
+
+/**
  * The diarization model changed format with the unified engine, but the download gate only runs
  * when the switch is toggled — a preference that predates the change points at a file that is no
  * longer downloaded, and the server logs the load error away, silently dropping speakers. This
@@ -23,7 +35,12 @@ export async function runDiarizationMigration(diarizeEnabled: boolean, disable: 
 	if (!diarizeEnabled) return 'not-needed'
 	const modelsFolder = await invoke<string>('get_models_folder')
 	const modelPath = await join(modelsFolder, config.diarizeModelFilename)
-	if (await isModelFileUsable(modelPath)) return 'installed'
+	if (await isModelFileUsable(modelPath)) {
+		// The replacement is already in place — a fresh install, or the download gate ran
+		// before this migration. The superseded artifacts are still dead weight; sweep them.
+		await cleanupLegacyDiarizationFiles(modelsFolder)
+		return 'installed'
+	}
 
 	const confirmed = await ask(m.diarizationMigrateQuestion(), { title: m.diarization(), kind: 'info' })
 	if (!confirmed) {
@@ -32,13 +49,22 @@ export async function runDiarizationMigration(diarizeEnabled: boolean, disable: 
 		return 'declined'
 	}
 
-	const downloaded = await downloadModel(
-		{ url: config.diarizeModelUrl, ...config.diarizeModelIntegrity },
-		{ displayName: config.diarizeModelFilename },
-	)
+	let downloaded: string | null = null
+	let failure: string | null = null
+	try {
+		downloaded = await downloadModel(
+			{ url: config.diarizeModelUrl, ...config.diarizeModelIntegrity },
+			{ displayName: config.diarizeModelFilename },
+		)
+	} catch (error) {
+		// A thrown download (network, disk) must land in the same branch as a refusal: otherwise
+		// the preference stays on pointing at a file that is not there.
+		console.error('diarization model download failed:', error)
+		failure = String(error)
+	}
 	if (!downloaded) {
 		disable()
-		toast.error(m.diarizationMigratedOff())
+		toast.error(failure ?? m.diarizationMigratedOff())
 		return 'declined'
 	}
 	await cleanupLegacyDiarizationFiles(modelsFolder)

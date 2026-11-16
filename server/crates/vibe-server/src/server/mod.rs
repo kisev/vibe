@@ -263,31 +263,27 @@ pub(super) struct ErrorBody {
     message: String,
 }
 
-/// The code a failed engine call reports. Running out of memory is the one failure a
-/// client can act on, by reloading on the CPU when it was the GPU's, so it is named;
-/// everything else is `internal_error` with the message for a human.
+/// The code a failed engine call reports. A contract rejection carries its own
+/// code from the engine layer, and running out of memory is the one failure a
+/// client can act on (by reloading on the CPU when it was the GPU's), so it is
+/// named; everything else is `internal_error` with the message for a human.
 pub(super) fn engine_error_code(err: &anyhow::Error) -> &'static str {
-    // The unified engine reports through anyhow messages, so the codes a client
-    // can act on are matched on the text the engine layer emits.
-    let text = format!("{err:#}");
-    if text.contains("supports only") || text.contains("does not support") {
-        return "unsupported_language";
+    if let Some(request) = err.downcast_ref::<crate::engine::RequestError>() {
+        return request.code();
     }
-    if text.contains("out of memory") {
-        return if text.contains("gpu") {
-            "gpu_out_of_memory"
-        } else {
-            "out_of_memory"
-        };
+    match crate::engine::allocation_failure(err) {
+        Some(crate::engine::AllocationFailure::Gpu) => "gpu_out_of_memory",
+        Some(crate::engine::AllocationFailure::System) => "out_of_memory",
+        None => "internal_error",
     }
-    "internal_error"
 }
 
 pub(super) fn engine_error_status(err: &anyhow::Error) -> axum::http::StatusCode {
-    if engine_error_code(err) == "unsupported_language" {
-        axum::http::StatusCode::BAD_REQUEST
-    } else {
-        axum::http::StatusCode::INTERNAL_SERVER_ERROR
+    // Both contract rejections are the caller's fault: the language is not
+    // available, or an option this engine cannot honor was requested.
+    match engine_error_code(err) {
+        "unsupported_language" | "unsupported_option" => axum::http::StatusCode::BAD_REQUEST,
+        _ => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -349,12 +345,44 @@ mod tests {
 
     #[test]
     fn unsupported_language_maps_to_a_400() {
-        let err = anyhow::anyhow!("GigaAM supports only ru");
+        let err = anyhow::Error::from(crate::engine::RequestError::Language {
+            engine: "GigaAM".to_string(),
+            only: "ru".to_string(),
+        });
+        assert_eq!(err.to_string(), "GigaAM supports only ru");
         assert_eq!(engine_error_code(&err), "unsupported_language");
         assert_eq!(engine_error_status(&err), axum::http::StatusCode::BAD_REQUEST);
 
         let response = error(engine_error_status(&err), engine_error_code(&err), &err.to_string());
         assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn an_unsupported_option_has_its_own_code() {
+        for err in [
+            crate::engine::RequestError::Translation {
+                engine: "gigaam".to_string(),
+            },
+            crate::engine::RequestError::TextPrompt {
+                engine: "gigaam".to_string(),
+            },
+        ] {
+            let err = anyhow::Error::from(err);
+            assert_eq!(engine_error_code(&err), "unsupported_option", "{err}");
+            assert_eq!(engine_error_status(&err), axum::http::StatusCode::BAD_REQUEST);
+        }
+    }
+
+    #[test]
+    fn a_cuda_allocation_failure_is_a_gpu_out_of_memory() {
+        // The canonical CUDA message carries no "gpu", so the old marker
+        // classified a real GPU failure as system memory and the client's
+        // CPU-reload recovery never ran.
+        let err = anyhow::anyhow!("ggml_backend_cuda_buffer_type_alloc_buffer: CUDA error: out of memory");
+        assert_eq!(engine_error_code(&err), "gpu_out_of_memory");
+
+        let system = anyhow::anyhow!("failed to allocate 1024 MiB");
+        assert_eq!(engine_error_code(&system), "out_of_memory");
     }
 
     #[test]

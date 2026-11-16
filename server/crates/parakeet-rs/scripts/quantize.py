@@ -7,6 +7,11 @@ Same bucket policy as transcribe.cpp's transcribe-quantize Q8_0 preset: matmul w
 1x1 pointwise convs -> F16, everything else (convs, norms, biases, embedding) stays F32.
 All metadata is copied; general.file_type is set to MOSTLY_Q8_0.
 
+`head.ctc.*` (the CTC variants' 1x1 conv) deliberately stays F32: its GGUF last
+axis is the kernel dimension, so it is not a matmul weight and Q8_0's 32-value
+blocks do not apply. A Q8 candidate whose last dimension is not a multiple of
+32 is reported by name instead of silently staying F32.
+
 uv run quantize.py in-F32.gguf out-Q8_0.gguf
 """
 
@@ -17,12 +22,16 @@ import numpy as np
 from gguf import GGMLQuantizationType, GGUFReader, GGUFValueType, GGUFWriter, LlamaFileType
 from gguf.quants import quantize
 
-Q8 = re.compile(r"(pre_encode\.out|\.ff[12]\.linear[12]|\.attn\.linear_\w+|pred\.lstm\.\d+\.W[xh]|joint\.(enc|pred|out))\.?(weight)?$")
+Q8 = re.compile(
+    r"(pre_encode\.out|\.ff[12]\.linear[12]|\.attn\.linear_\w+|pred\.lstm\.\d+\.W[xh]|joint\.(enc|pred|out)|prompt\.mlp\.\d+)\.?(weight)?$"
+)
 F16 = re.compile(r"\.conv\.pointwise[12]\.weight$")
 
 
 def main(src, dst):
     r = GGUFReader(src)
+    if "general.architecture" not in r.fields:
+        sys.exit(f"{src}: missing general.architecture")
     arch = r.fields["general.architecture"].contents()
     w = GGUFWriter(dst, arch)
     for f in r.fields.values():
@@ -35,13 +44,16 @@ def main(src, dst):
     counts = {}
     for t in r.tensors:
         data = np.asarray(t.data, dtype=np.float32)
-        if Q8.search(t.name) and data.shape[-1] % 32 == 0:
+        q8_candidate = bool(Q8.search(t.name))
+        if q8_candidate and data.shape[-1] % 32 == 0:
             w.add_tensor(t.name, quantize(data, GGMLQuantizationType.Q8_0), raw_dtype=GGMLQuantizationType.Q8_0)
             kind = "Q8_0"
         elif F16.search(t.name):
             w.add_tensor(t.name, data.astype(np.float16))
             kind = "F16"
         else:
+            if q8_candidate:
+                print(f"warning: {t.name}: last dim {data.shape[-1]} is not a multiple of 32, keeping F32")
             w.add_tensor(t.name, data)
             kind = "F32"
         counts[kind] = counts.get(kind, 0) + 1
@@ -53,4 +65,6 @@ def main(src, dst):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:3])
+    if len(sys.argv) != 3:
+        sys.exit("usage: uv run quantize.py in-F32.gguf out-Q8_0.gguf")
+    main(sys.argv[1], sys.argv[2])

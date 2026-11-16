@@ -3,14 +3,24 @@ import { platform } from '@tauri-apps/plugin-os'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import ShortcutRecorder from '~/components/shortcut-recorder'
+import { Input } from '~/components/ui/input'
 import { MeetingServiceIcons } from '~/components/meeting-service-icons'
 import { Button } from '~/components/ui/button'
 import { Switch } from '~/components/ui/switch'
 import { getDefaultRecordingShortcut } from '~/lib/config'
+import { CONFIG_KEYS } from '~/lib/config-keys'
+import { usePersisted } from '~/lib/config-store'
+import {
+	clampLongSilenceMinutes,
+	DEFAULT_LONG_SILENCE_MINUTES,
+	MAX_LONG_SILENCE_MINUTES,
+	MIN_LONG_SILENCE_MINUTES,
+} from '~/lib/recording-limits'
 import type { PermissionStatus } from '~/lib/permissions'
 import { m } from '~/paraglide/messages.js'
 import { useRecordingShortcut } from '~/providers/recording-shortcut'
 import { usePreferenceProvider } from '~/providers/preference'
+import { MeetingBrowserSettings } from './meeting-browser'
 import { SettingsGroup, SettingsRow } from './shared'
 
 type PermissionKind = 'microphone' | 'system_audio'
@@ -150,9 +160,20 @@ export function RecordingSection() {
 	const shortcut = useRecordingShortcut()
 	const { meetingDetectionEnabled, setMeetingDetectionEnabled, autoTranscribeAfterRecording, setAutoTranscribeAfterRecording } = usePreferenceProvider()
 	const isMacOS = platform() === 'macos'
+	const [silenceMinutes, setSilenceMinutes] = usePersisted<number>(CONFIG_KEYS.longSilenceMinutes, DEFAULT_LONG_SILENCE_MINUTES)
+	// The field keeps the raw text so it can be cleared mid-edit; the value is clamped on blur.
+	const [silenceDraft, setSilenceDraft] = useState(String(silenceMinutes))
+	useEffect(() => setSilenceDraft(String(silenceMinutes)), [silenceMinutes])
+	const commitSilenceMinutes = useCallback(() => {
+		const minutes = clampLongSilenceMinutes(Number(silenceDraft))
+		setSilenceMinutes(minutes)
+		setSilenceDraft(String(minutes))
+	}, [silenceDraft, setSilenceMinutes])
 
 	return (
 		<div className="space-y-6">
+			<MeetingBrowserSettings />
+
 			<SettingsGroup title={m.meetingDetection()}>
 				<SettingsRow label={<MeetingServiceIcons label={m.supportedMeetingServices()} />} description={m.meetingDetectionInfo()}>
 					<Switch checked={meetingDetectionEnabled} onCheckedChange={setMeetingDetectionEnabled} aria-label={m.meetingDetection()} />
@@ -181,6 +202,18 @@ export function RecordingSection() {
 						/>
 					</SettingsRow>
 				)}
+				<SettingsRow label={m.recordingSilenceMinutes()} description={m.recordingSilenceMinutesInfo()}>
+					<Input
+						type="number"
+						min={MIN_LONG_SILENCE_MINUTES}
+						max={MAX_LONG_SILENCE_MINUTES}
+						className="w-20"
+						aria-label={m.recordingSilenceMinutes()}
+						value={silenceDraft}
+						onChange={(event) => setSilenceDraft(event.target.value)}
+						onBlur={commitSilenceMinutes}
+					/>
+				</SettingsRow>
 			</SettingsGroup>
 
 			{isMacOS && (

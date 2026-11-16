@@ -84,6 +84,9 @@ pub(crate) struct Model {
     pub silence_embeds: Vec<f32>,
 }
 
+// SAFETY: the raw ggml/gguf contexts and the device buffer are not thread-safe
+// under concurrent access. `Diarizer` exposes only `&mut self` methods, so the
+// model can move between threads but is never used from two threads at once.
 unsafe impl Send for Model {}
 
 struct DeviceWeights {
@@ -98,6 +101,8 @@ impl Model {
         let started = Instant::now();
         let c_path = CString::new(path.to_string_lossy().as_bytes()).map_err(|_| Error::InvalidPath)?;
         let mut host = ptr::null_mut();
+        // SAFETY: `c_path` is a valid NUL-terminated string; the call creates
+        // both contexts and hands their ownership to the caller.
         let gguf = unsafe {
             sys::gguf_init_from_file(
                 c_path.as_ptr(),
@@ -108,6 +113,8 @@ impl Model {
             )
         };
         if gguf.is_null() || host.is_null() {
+            // SAFETY: freeing the handle just created here; `Drop` cannot run
+            // because `Model` has not been constructed yet.
             unsafe {
                 if !gguf.is_null() {
                     sys::gguf_free(gguf);
@@ -126,6 +133,8 @@ impl Model {
             weights: Weights::empty(),
             silence_embeds: Vec::new(),
         };
+        // SAFETY: `gguf` and `host` are the live contexts created above and are
+        // exclusively owned by `model` from here on.
         unsafe {
             let architecture = string(gguf, "general.architecture")?;
             if architecture != ARCHITECTURE {
@@ -147,6 +156,7 @@ impl Model {
             model.weights = model.resolve_weights()?;
         }
 
+        // SAFETY: `host` is alive and its tensors are not mutated by this read.
         let (tensors, bytes) = unsafe { tensor_stats(&model_tensors(gguf, host)) };
         tracing::info!(
             tensors,
@@ -157,6 +167,7 @@ impl Model {
             device = model
                 .device
                 .as_ref()
+                // SAFETY: `d` comes from `self.device`, which owns the backend.
                 .map(|d| unsafe { backend_name(d.backend) })
                 .unwrap_or_else(|| "cpu".into()),
             read_ms,
@@ -198,67 +209,75 @@ impl Model {
     }
 
     unsafe fn resolve_weights(&self) -> Result<Weights> {
+        let h = &self.hparams;
+        let hidden = h.hidden_size as i64;
+        let intermediate = h.intermediate_size as i64;
+        let head = h.head_hidden_size as i64;
+        let factor = h.subsampling_factor as i64;
+
         let t = |name: &str| self.tensor(name);
-        let layers = (0..self.hparams.num_layers)
+        let checked = |name: &str, expected: &[i64]| -> Result<Tensor> {
+            let tensor = t(name)?;
+            expect_shape(tensor, expected, name)?;
+            Ok(tensor)
+        };
+        let layers = (0..h.num_layers)
             .map(|i| {
-                let p = format!("model.audio_tower.layers.{i}");
+                let prefix = format!("model.audio_tower.layers.{i}");
+                let checked = |suffix: &str, expected: &[i64]| -> Result<Tensor> {
+                    let name = format!("{prefix}.{suffix}");
+                    let tensor = t(&name)?;
+                    expect_shape(tensor, expected, &name)?;
+                    Ok(tensor)
+                };
                 Ok(LayerWeights {
-                    ln1_w: t(&format!("{p}.layer_norm1.weight"))?,
-                    ln1_b: t(&format!("{p}.layer_norm1.bias"))?,
-                    q: t(&format!("{p}.self_attn.q_proj.weight"))?,
-                    k: t(&format!("{p}.self_attn.k_proj.weight"))?,
-                    v: t(&format!("{p}.self_attn.v_proj.weight"))?,
-                    o_w: t(&format!("{p}.self_attn.o_proj.weight"))?,
-                    o_b: t(&format!("{p}.self_attn.o_proj.bias"))?,
-                    ln2_w: t(&format!("{p}.layer_norm2.weight"))?,
-                    ln2_b: t(&format!("{p}.layer_norm2.bias"))?,
-                    fc1_w: t(&format!("{p}.mlp.fc1.weight"))?,
-                    fc1_b: t(&format!("{p}.mlp.fc1.bias"))?,
-                    fc2_w: t(&format!("{p}.mlp.fc2.weight"))?,
-                    fc2_b: t(&format!("{p}.mlp.fc2.bias"))?,
+                    ln1_w: checked("layer_norm1.weight", &[hidden])?,
+                    ln1_b: checked("layer_norm1.bias", &[hidden])?,
+                    q: checked("self_attn.q_proj.weight", &[hidden, hidden])?,
+                    k: checked("self_attn.k_proj.weight", &[hidden, hidden])?,
+                    v: checked("self_attn.v_proj.weight", &[hidden, hidden])?,
+                    o_w: checked("self_attn.o_proj.weight", &[hidden, hidden])?,
+                    o_b: checked("self_attn.o_proj.bias", &[hidden])?,
+                    ln2_w: checked("layer_norm2.weight", &[hidden])?,
+                    ln2_b: checked("layer_norm2.bias", &[hidden])?,
+                    fc1_w: checked("mlp.fc1.weight", &[hidden, intermediate])?,
+                    fc1_b: checked("mlp.fc1.bias", &[intermediate])?,
+                    fc2_w: checked("mlp.fc2.weight", &[intermediate, hidden])?,
+                    fc2_b: checked("mlp.fc2.bias", &[hidden])?,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
-        let weights = Weights {
-            embed: t("model.audio_tower.embedder.projection.weight")?,
-            in_ln_w: t("model.audio_tower.input_layer_norm.weight")?,
-            in_ln_b: t("model.audio_tower.input_layer_norm.bias")?,
+
+        let embed = checked(
+            "model.audio_tower.embedder.projection.weight",
+            &[h.num_mels as i64 * factor, hidden],
+        )?;
+
+        // The classifier's inner width is not in the metadata, so `dense` defines
+        // it and the output projection must agree on both dimensions.
+        let dense_w = t("classifier.dense.weight")?;
+        expect_shape(dense_w, &[head], "classifier.dense.weight")?;
+        let inner = (*dense_w).ne[1];
+        let dense_b = checked("classifier.dense.bias", &[inner])?;
+        let cls_w = checked("classifier.out_proj.weight", &[inner, h.num_speakers as i64])?;
+        let cls_b = checked("classifier.out_proj.bias", &[h.num_speakers as i64])?;
+
+        Ok(Weights {
+            embed,
+            in_ln_w: checked("model.audio_tower.input_layer_norm.weight", &[hidden])?,
+            in_ln_b: checked("model.audio_tower.input_layer_norm.bias", &[hidden])?,
             layers,
-            out_ln_w: t("model.audio_tower.layer_norm.weight")?,
-            out_ln_b: t("model.audio_tower.layer_norm.bias")?,
-            proj_w: t("model.proj.weight")?,
-            proj_b: t("model.proj.bias")?,
-            up_w: t("model.upsampler.conv.weight")?,
-            up_b: t("model.upsampler.conv.bias")?,
-            dense_w: t("classifier.dense.weight")?,
-            dense_b: t("classifier.dense.bias")?,
-            cls_w: t("classifier.out_proj.weight")?,
-            cls_b: t("classifier.out_proj.bias")?,
-        };
-        let h = &self.hparams;
-        let up_ne = (*weights.up_w).ne;
-        let expected = [
-            h.head_hidden_size as i64,
-            (h.head_hidden_size * h.subsampling_factor) as i64,
-            3,
-        ];
-        if up_ne[..3] != expected {
-            return Err(Error::InvalidMetadata {
-                key: "model.upsampler.conv.weight",
-                message: format!(
-                    "shape {:?}, expected {expected:?} (re-export with scripts/export.py)",
-                    &up_ne[..3]
-                ),
-            });
-        }
-        let embed_ne = (*weights.embed).ne;
-        if embed_ne[0] as usize != h.num_mels * h.subsampling_factor || embed_ne[1] as usize != h.hidden_size {
-            return Err(Error::InvalidMetadata {
-                key: "model.audio_tower.embedder.projection.weight",
-                message: format!("shape {:?}", &embed_ne[..2]),
-            });
-        }
-        Ok(weights)
+            out_ln_w: checked("model.audio_tower.layer_norm.weight", &[hidden])?,
+            out_ln_b: checked("model.audio_tower.layer_norm.bias", &[hidden])?,
+            proj_w: checked("model.proj.weight", &[hidden, head])?,
+            proj_b: checked("model.proj.bias", &[head])?,
+            up_w: checked("model.upsampler.conv.weight", &[head, head * factor, 3])?,
+            up_b: checked("model.upsampler.conv.bias", &[head * factor])?,
+            dense_w,
+            dense_b,
+            cls_w,
+            cls_b,
+        })
     }
 }
 
@@ -266,6 +285,8 @@ impl Drop for Model {
     fn drop(&mut self) {
         // Device weights first: they hold a backend and a buffer, the host context only memory.
         self.device = None;
+        // SAFETY: both handles were created in `load` and are freed exactly once
+        // here; the tensors referenced by `weights` are gone after this drop.
         unsafe {
             sys::ggml_free(self.host);
             sys::gguf_free(self.gguf);
@@ -308,6 +329,12 @@ impl DeviceWeights {
         }
         for &src in source {
             let dst = sys::ggml_get_tensor(ctx, sys::ggml_get_name(src));
+            if dst.is_null() {
+                sys::ggml_backend_buffer_free(buffer);
+                sys::ggml_free(ctx);
+                sys::ggml_backend_free(backend);
+                return Err(Error::Ggml("device weight tensor"));
+            }
             sys::ggml_backend_tensor_set(dst, (*src).data, 0, sys::ggml_nbytes(src));
         }
         tracing::info!(
@@ -322,6 +349,8 @@ impl DeviceWeights {
 
 impl Drop for DeviceWeights {
     fn drop(&mut self) {
+        // SAFETY: all three handles were created together in `upload` and are
+        // freed once, the buffer before the context it was allocated from.
         unsafe {
             sys::ggml_backend_buffer_free(self.buffer);
             sys::ggml_free(self.ctx);
@@ -359,6 +388,20 @@ unsafe fn model_tensors(gguf: *const sys::gguf_context, host: *mut sys::ggml_con
         .map(|id| sys::ggml_get_tensor(host, sys::gguf_get_tensor_name(gguf, id)))
         .filter(|tensor| !tensor.is_null())
         .collect()
+}
+
+/// Checks the leading `ne` dimensions against what the compute graph expects.
+/// A mismatch would otherwise reach `ggml_mul_mat`, which aborts the process.
+unsafe fn expect_shape(tensor: Tensor, expected: &[i64], name: &str) -> Result<()> {
+    let ne = (*tensor).ne;
+    let actual = &ne[..expected.len()];
+    if actual != expected {
+        return Err(Error::InvalidMetadata {
+            key: "tensor shape",
+            message: format!("{name}: shape {actual:?}, expected {expected:?} (re-export with scripts/export.py)"),
+        });
+    }
+    Ok(())
 }
 
 unsafe fn tensor_stats(tensors: &[Tensor]) -> (usize, usize) {
@@ -425,28 +468,97 @@ unsafe fn read_hparams(ctx: *const sys::gguf_context) -> Result<HParams> {
         hop_length: u("nemotron3_diar.mel.hop_length")?,
         preemphasis: f("nemotron3_diar.mel.preemphasis")?,
     };
+    validate_hparams(&hparams)?;
+    tracing::debug!(?hparams, "hparams");
+    Ok(hparams)
+}
+
+/// Upper bounds for metadata-supplied sizes: far above any real Nemotron
+/// variant, and low enough that dimensions cannot overflow when multiplied in
+/// the graph builders or request absurd allocations.
+const MAX_DIM: usize = 1 << 20;
+const MAX_LAYERS: usize = 1024;
+const MAX_SPEAKERS: usize = 4096;
+const MAX_SAMPLE_RATE: usize = 1 << 20;
+
+/// Rejects metadata that would make the pipeline divide or index by zero
+/// (or allocate an impossible graph) instead of failing on the first call.
+fn validate_hparams(h: &HParams) -> Result<()> {
     let invalid = |key: &'static str, message: &str| Error::InvalidMetadata {
         key,
         message: message.into(),
     };
-    if hparams.num_heads == 0 || !hparams.hidden_size.is_multiple_of(hparams.num_heads) {
+    for (key, value, max) in [
+        ("nemotron3_diar.audio.hidden_size", h.hidden_size, MAX_DIM),
+        ("nemotron3_diar.audio.intermediate_size", h.intermediate_size, MAX_DIM),
+        ("nemotron3_diar.audio.num_layers", h.num_layers, MAX_LAYERS),
+        ("nemotron3_diar.audio.num_heads", h.num_heads, MAX_DIM),
+        ("nemotron3_diar.audio.subsampling_factor", h.subsampling_factor, MAX_DIM),
+        ("nemotron3_diar.head.hidden_size", h.head_hidden_size, MAX_DIM),
+        ("nemotron3_diar.head.num_speakers", h.num_speakers, MAX_SPEAKERS),
+        ("nemotron3_diar.offline.chunk_length", h.chunk_length, MAX_DIM),
+        ("nemotron3_diar.cache.length", h.cache_length, MAX_DIM),
+        ("nemotron3_diar.mel.num_mels", h.num_mels, MAX_DIM),
+        ("nemotron3_diar.mel.n_fft", h.n_fft, MAX_DIM),
+        ("nemotron3_diar.mel.win_length", h.win_length, MAX_DIM),
+        ("nemotron3_diar.mel.hop_length", h.hop_length, MAX_DIM),
+        ("nemotron3_diar.mel.sample_rate", h.sample_rate, MAX_SAMPLE_RATE),
+    ] {
+        if value == 0 {
+            return Err(invalid(key, "must be greater than zero"));
+        }
+        if value > max {
+            return Err(invalid(key, "value is out of range"));
+        }
+    }
+    if !h.hidden_size.is_multiple_of(h.num_heads) {
         return Err(invalid("nemotron3_diar.audio.num_heads", "must divide hidden_size"));
     }
-    if hparams.chunk_right_context >= hparams.chunk_length {
+    if h.chunk_right_context >= h.chunk_length {
         return Err(invalid(
             "nemotron3_diar.offline.chunk_right_context",
             "must be below chunk_length",
         ));
     }
-    if hparams.cache_length < (1 + hparams.cache_silence_frames) * hparams.num_speakers {
-        return Err(invalid("nemotron3_diar.cache.length", "too small for the speaker count"));
+    // The Hann window divides by `win_length - 1` and is centered in an
+    // `n_fft` frame, so a shorter-than-2 or oversized window is unusable.
+    if h.win_length < 2 || h.win_length > h.n_fft {
+        return Err(invalid("nemotron3_diar.mel.win_length", "must be within 2..=n_fft"));
     }
-    tracing::debug!(?hparams, "hparams");
-    Ok(hparams)
+    // The cache picks `cache_length` frames (select_nth_unstable on index
+    // `cache_length - 1`) and divides by the speaker count.
+    match h
+        .cache_silence_frames
+        .checked_add(1)
+        .and_then(|slots| slots.checked_mul(h.num_speakers))
+    {
+        Some(slots) if h.cache_length >= slots => {}
+        Some(_) => return Err(invalid("nemotron3_diar.cache.length", "too small for the speaker count")),
+        None => return Err(invalid("nemotron3_diar.cache.length", "speaker cache size overflows")),
+    }
+    if !h.rope_theta.is_finite() || h.rope_theta <= 0.0 {
+        return Err(invalid("nemotron3_diar.audio.rope_theta", "must be a positive number"));
+    }
+    for (key, value) in [
+        ("nemotron3_diar.mel.preemphasis", h.preemphasis),
+        (
+            "nemotron3_diar.cache.prediction_score_threshold",
+            h.prediction_score_threshold,
+        ),
+        ("nemotron3_diar.cache.latest_frames_score_boost", h.latest_frames_score_boost),
+        ("nemotron3_diar.cache.strong_boost_rate", h.strong_boost_rate),
+        ("nemotron3_diar.cache.weak_boost_rate", h.weak_boost_rate),
+        ("nemotron3_diar.cache.min_positive_scores_rate", h.min_positive_scores_rate),
+    ] {
+        if !value.is_finite() {
+            return Err(invalid(key, "must be finite"));
+        }
+    }
+    Ok(())
 }
 
 unsafe fn key(ctx: *const sys::gguf_context, name: &'static str) -> Result<i64> {
-    let c_name = CString::new(name).unwrap();
+    let c_name = CString::new(name).map_err(|_| Error::MissingMetadata(name))?;
     let id = sys::gguf_find_key(ctx, c_name.as_ptr());
     (id >= 0).then_some(id).ok_or(Error::MissingMetadata(name))
 }
@@ -468,4 +580,106 @@ unsafe fn u32_value(ctx: *const sys::gguf_context, name: &'static str) -> Result
 
 unsafe fn f32_value(ctx: *const sys::gguf_context, name: &'static str) -> Result<f32> {
     Ok(sys::gguf_get_val_f32(ctx, key(ctx, name)?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The real model's geometry, so the validation tests also pin the values
+    /// a legitimate export carries.
+    fn valid_hparams() -> HParams {
+        HParams {
+            hidden_size: 1024,
+            intermediate_size: 4096,
+            num_layers: 31,
+            num_heads: 8,
+            num_mels: 128,
+            subsampling_factor: 8,
+            rope_theta: 10_000.0,
+            head_hidden_size: 256,
+            num_speakers: 8,
+            chunk_length: 24,
+            chunk_right_context: 4,
+            fifo_length: 16,
+            speaker_cache_update_period: 8,
+            cache_length: 188,
+            cache_silence_frames: 3,
+            prediction_score_threshold: 0.5,
+            latest_frames_score_boost: 0.5,
+            strong_boost_rate: 0.5,
+            weak_boost_rate: 0.25,
+            min_positive_scores_rate: 0.5,
+            sample_rate: 16_000,
+            n_fft: 512,
+            win_length: 400,
+            hop_length: 160,
+            preemphasis: 0.97,
+        }
+    }
+
+    fn rejected_key(hparams: &HParams) -> &'static str {
+        match validate_hparams(hparams) {
+            Err(Error::InvalidMetadata { key, .. }) => key,
+            other => panic!("expected InvalidMetadata, got {other:?}"),
+        }
+    }
+
+    fn assert_rejects(mutate: impl Fn(&mut HParams), key: &'static str) {
+        let mut hparams = valid_hparams();
+        mutate(&mut hparams);
+        assert_eq!(rejected_key(&hparams), key);
+    }
+
+    #[test]
+    fn accepts_the_model_geometry() {
+        assert!(validate_hparams(&valid_hparams()).is_ok());
+    }
+
+    #[test]
+    fn zero_dimensions_are_rejected() {
+        assert_rejects(|h| h.hidden_size = 0, "nemotron3_diar.audio.hidden_size");
+        assert_rejects(|h| h.intermediate_size = 0, "nemotron3_diar.audio.intermediate_size");
+        assert_rejects(|h| h.num_layers = 0, "nemotron3_diar.audio.num_layers");
+        assert_rejects(|h| h.num_heads = 0, "nemotron3_diar.audio.num_heads");
+        assert_rejects(|h| h.subsampling_factor = 0, "nemotron3_diar.audio.subsampling_factor");
+        assert_rejects(|h| h.head_hidden_size = 0, "nemotron3_diar.head.hidden_size");
+        assert_rejects(|h| h.num_speakers = 0, "nemotron3_diar.head.num_speakers");
+        assert_rejects(|h| h.chunk_length = 0, "nemotron3_diar.offline.chunk_length");
+        assert_rejects(|h| h.cache_length = 0, "nemotron3_diar.cache.length");
+        assert_rejects(|h| h.num_mels = 0, "nemotron3_diar.mel.num_mels");
+        assert_rejects(|h| h.n_fft = 0, "nemotron3_diar.mel.n_fft");
+        assert_rejects(|h| h.win_length = 0, "nemotron3_diar.mel.win_length");
+        assert_rejects(|h| h.hop_length = 0, "nemotron3_diar.mel.hop_length");
+        assert_rejects(|h| h.sample_rate = 0, "nemotron3_diar.mel.sample_rate");
+    }
+
+    #[test]
+    fn zero_speakers_cannot_reach_the_cache_division() {
+        // The regression #253 found: `cache_length >= (1 + silence) * speakers`
+        // is trivially true at zero, and `SpeakerCache::offline` then divides by it.
+        assert_rejects(|h| h.num_speakers = 0, "nemotron3_diar.head.num_speakers");
+    }
+
+    #[test]
+    fn geometry_cross_checks_are_enforced() {
+        assert_rejects(|h| h.num_heads = 7, "nemotron3_diar.audio.num_heads");
+        assert_rejects(
+            |h| h.chunk_right_context = h.chunk_length,
+            "nemotron3_diar.offline.chunk_right_context",
+        );
+        assert_rejects(|h| h.win_length = 1, "nemotron3_diar.mel.win_length");
+        assert_rejects(|h| h.win_length = h.n_fft + 1, "nemotron3_diar.mel.win_length");
+        assert_rejects(|h| h.cache_length = 31, "nemotron3_diar.cache.length");
+        assert_rejects(|h| h.cache_silence_frames = usize::MAX, "nemotron3_diar.cache.length");
+    }
+
+    #[test]
+    fn non_finite_floats_are_rejected() {
+        assert_rejects(|h| h.rope_theta = f32::INFINITY, "nemotron3_diar.audio.rope_theta");
+        assert_rejects(
+            |h| h.prediction_score_threshold = f32::NAN,
+            "nemotron3_diar.cache.prediction_score_threshold",
+        );
+    }
 }

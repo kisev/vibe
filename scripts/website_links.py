@@ -1,10 +1,4 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "httpx==0.28.1",
-# ]
-# ///
+#!/usr/bin/env -S uv run
 
 from __future__ import annotations
 
@@ -17,7 +11,7 @@ from pathlib import Path
 import httpx
 
 RELEASES_PATH = Path(__file__).resolve().parent.parent / "website/src/lib/latest_release.json"
-OWNER = "thewh1teagle"
+OWNER = "kisev"
 REPO = "vibe"
 BLACKLIST_PATTERNS = ["opencl", "nvidia", "older", ".rpm", "portable", "cuda", "ubuntu", "setup_", "arm64-setup"]
 VALID_EXTENSION_RE = re.compile(r"\.(sig|json|zip|tar\.gz)$")
@@ -86,8 +80,8 @@ def main() -> int:
         valid_assets = filter_valid_assets(latest_release.get("assets", []))
         mapped_assets = map_assets(valid_assets)
         releases_data = {"assets": mapped_assets, "version": tag_name}
-        RELEASES_PATH.write_text(json.dumps(releases_data, indent=4), encoding="utf-8")
-        print(f"Updated releases at {RELEASES_PATH} with \n{json.dumps(releases_data, indent=4)}")
+        RELEASES_PATH.write_text(json.dumps(releases_data, indent=2) + "\n", encoding="utf-8")
+        print(f"Updated releases at {RELEASES_PATH} with \n{json.dumps(releases_data, indent=2)}")
         return 0
     except Exception as exc:
         print(f"Error fetching or processing latest release: {exc}", file=sys.stderr)

@@ -10,10 +10,10 @@ import Mac from '~/icons/Mac'
 import Windows from '~/icons/Windows'
 import { isVersionOverride, release as latestRelease } from '~/lib/release'
 import { onDownloadRequest } from '~/lib/download-intent'
+import { githubRepoURL } from '~/lib/site'
 import linuxInstallOptions from '~/lib/linux_install_options.json'
 import CopyButton from './CopyButton'
 import PostDownload from './PostDownload'
-import SupportButton from './SupportButton'
 
 type Platform = 'macos' | 'windows' | 'linux'
 
@@ -30,11 +30,7 @@ function getOS(): Platform {
 	return 'macos'
 }
 
-interface CtaProps {
-	onOpenKofi: () => void
-}
-
-export default function Cta({ onOpenKofi }: CtaProps) {
+export default function Cta() {
 	const [currentPlatform, setCurrentPlatform] = useState<Platform>('macos')
 	const [macModalOpen, setMacModalOpen] = useState(false)
 	const [mobileModalOpen, setMobileModalOpen] = useState(false)
@@ -115,7 +111,7 @@ export default function Cta({ onOpenKofi }: CtaProps) {
 				) : null}
 
 				<Button variant="outline" size="lg" asChild>
-					<a href="https://github.com/thewh1teagle/vibe" target="_blank" rel="noreferrer">
+					<a href={githubRepoURL} target="_blank" rel="noreferrer">
 						<Github width="18" height="18" />
 						{m['star-on-github']()}
 					</a>
@@ -158,7 +154,7 @@ export default function Cta({ onOpenKofi }: CtaProps) {
 						<span
 							dir="ltr"
 							className="ms-2 inline-flex items-center rounded-full border border-rose-500/40 bg-rose-500/10 px-1.5 py-px align-middle font-mono text-[9px] font-semibold tracking-[0.1em] text-rose-500 uppercase">
-							Beta
+							{m['beta']()}
 						</span>
 					)}
 				</span>
@@ -225,14 +221,11 @@ export default function Cta({ onOpenKofi }: CtaProps) {
 								</div>
 							</div>
 						))}
-						<div className="mt-10 flex items-center justify-center">
-							<SupportButton onOpenKofi={onOpenKofi} />
-						</div>
 					</div>
 				</DialogContent>
 			</Dialog>
 
-			<PostDownload open={postDownloadOpen} onOpenChange={setPostDownloadOpen} onOpenKofi={onOpenKofi} />
+			<PostDownload open={postDownloadOpen} onOpenChange={setPostDownloadOpen} />
 		</>
 	)
 }

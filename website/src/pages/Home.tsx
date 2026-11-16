@@ -1,15 +1,9 @@
 import { useCallback, useRef } from 'react'
-import { useOutletContext } from 'react-router-dom'
 import { Copy, Download, Languages, Layers, Pause, Plus, Search, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react'
 import { requestDownload } from '~/lib/download-intent'
 import { m } from '../paraglide/messages.js'
 import Cta from '~/components/Cta'
-import WallOfLove from '~/components/WallOfLove'
 import { Button } from '~/components/ui/button'
-
-interface LayoutContext {
-	onOpenKofi: () => void
-}
 
 const highlights = [
 	{
@@ -99,7 +93,7 @@ function AppMock() {
 				<div className="px-2">
 					<span className="flex items-center gap-2 rounded-[0.625rem] px-2.5 py-1.5 text-[0.6875rem] font-medium">
 						<Plus className="size-[0.75rem]" strokeWidth={1.75} style={{ color: app.inkMuted }} />
-						New transcription
+						{m['mock-new-transcription']()}
 					</span>
 				</div>
 
@@ -108,22 +102,22 @@ function AppMock() {
 						className="flex items-center gap-1.5 rounded-full border px-2.5 py-[0.25rem] text-[0.5625rem]"
 						style={{ borderColor: app.line, color: app.inkMuted }}>
 						<Search className="size-[0.625rem]" strokeWidth={1.75} />
-						Search recents
+						{m['mock-search-recents']()}
 					</span>
 				</div>
 
 				<p className="px-3 pt-3 pb-1.5 text-[0.5625rem] font-medium tracking-[0.08em] uppercase" style={{ color: app.inkMuted }}>
-					Recents
+					{m['mock-recents']()}
 				</p>
 
 				<div className="flex flex-col gap-1 px-2 pb-3">
 					{[
-						{ name: 'podcast-episode', time: 'just now', active: true },
-						{ name: 'team-standup', time: '2h ago', active: false },
-						{ name: 'interview', time: 'yesterday', active: false },
+						{ id: 'podcast', name: m['mock-recent-podcast'](), time: m['mock-time-just-now'](), active: true },
+						{ id: 'standup', name: m['mock-recent-team-standup'](), time: m['mock-time-2h-ago'](), active: false },
+						{ id: 'interview', name: m['mock-recent-interview'](), time: m['mock-time-yesterday'](), active: false },
 					].map((row) => (
 						<span
-							key={row.name}
+							key={row.id}
 							className="flex flex-col gap-[0.125rem] rounded-[0.625rem] px-2.5 py-1.5"
 							style={row.active ? { background: app.active } : undefined}>
 							<span className="text-[0.6875rem] font-medium" style={{ color: app.ink }}>
@@ -139,7 +133,7 @@ function AppMock() {
 				<div className="mt-auto border-t p-2" style={{ borderColor: app.line }}>
 					<span className="flex items-center gap-2 rounded-[0.625rem] px-2.5 py-1.5 text-[0.6875rem] font-medium">
 						<Settings className="size-[0.75rem]" strokeWidth={1.75} style={{ color: app.inkMuted }} />
-						Settings
+						{m['mock-settings']()}
 					</span>
 				</div>
 			</div>
@@ -149,39 +143,39 @@ function AppMock() {
 				<div className="flex h-[2.25rem] shrink-0 items-center gap-3 border-b px-3" style={{ borderColor: app.line }}>
 					<span className="flex items-center gap-1.5 text-[0.625rem] font-medium">
 						<Copy className="size-[0.6875rem]" strokeWidth={1.75} style={{ color: app.inkMuted }} />
-						Copy
+						{m.copy()}
 					</span>
 					<span className="flex items-center gap-1.5 text-[0.625rem] font-medium">
 						<Download className="size-[0.6875rem]" strokeWidth={1.75} style={{ color: app.inkMuted }} />
-						Save
+						{m['mock-save']()}
 					</span>
 					<Search className="size-[0.6875rem]" strokeWidth={1.75} style={{ color: app.inkMuted }} />
 					<SlidersHorizontal className="size-[0.6875rem]" strokeWidth={1.75} style={{ color: app.inkMuted }} />
 					<span className="ms-auto flex items-center gap-1.5 text-[0.625rem] font-medium">
 						<Plus className="size-[0.6875rem]" strokeWidth={1.75} style={{ color: app.inkMuted }} />
-						New
+						{m['mock-new']()}
 					</span>
 				</div>
 
 				<div className="flex min-h-0 flex-1 flex-col gap-1 px-4 py-4 sm:px-8 sm:py-6">
 					<p className="pb-2 text-[0.5625rem] font-medium tracking-[0.08em] uppercase" style={{ color: app.inkMuted }}>
-						podcast-episode
+						{m['mock-recent-podcast']()}
 					</p>
-					<MockLine time="00:00" text="Welcome back to the show — today we talk about local AI." />
-					<MockLine time="00:12" text="Everything runs on your machine, so nothing leaves your laptop." active />
-					<MockLine time="00:24" text="Drop in a whole folder and it works through the queue on its own." />
-					<MockLine time="00:36" text="Transcripts, subtitles and summaries, all offline." />
-					<MockLine time="00:48" text="Speaker labels come from the audio itself, no cloud round trip." />
-					<MockLine time="01:02" text="Click any line to fix a word, or a timestamp to hear it again." />
-					<MockLine time="01:15" text="Then export to SRT, VTT, PDF or plain text in one click." />
+					<MockLine time="00:00" text={m['mock-transcript-1']()} />
+					<MockLine time="00:12" text={m['mock-transcript-2']()} active />
+					<MockLine time="00:24" text={m['mock-transcript-3']()} />
+					<MockLine time="00:36" text={m['mock-transcript-4']()} />
+					<MockLine time="00:48" text={m['mock-transcript-5']()} />
+					<MockLine time="01:02" text={m['mock-transcript-6']()} />
+					<MockLine time="01:15" text={m['mock-transcript-7']()} />
 				</div>
 
 				{/* Player bar */}
 				<div className="flex h-[2.75rem] shrink-0 items-center gap-3 border-t px-3" style={{ borderColor: app.line }}>
 					<span className="hidden min-w-0 flex-col sm:flex">
-						<span className="truncate text-[0.625rem] font-medium">podcast-episode.mp3</span>
+						<span className="truncate text-[0.625rem] font-medium">{m['mock-file-name']()}</span>
 						<span className="truncate text-[0.5625rem]" style={{ color: app.inkMuted }}>
-							Documents/Vibe
+							{m['mock-file-path']()}
 						</span>
 					</span>
 					<span className="flex size-[1.375rem] shrink-0 items-center justify-center rounded-full" style={{ background: app.accent }}>
@@ -207,7 +201,6 @@ function AppMock() {
 }
 
 export default function Home() {
-	const { onOpenKofi } = useOutletContext<LayoutContext>()
 	const ctaRef = useRef<HTMLDivElement>(null)
 
 	const scrollToCta = useCallback(() => {
@@ -225,7 +218,7 @@ export default function Home() {
 				<p className="mt-5 max-w-[52ch] text-base leading-7 text-muted-foreground">{m.description()}</p>
 
 				<div ref={ctaRef} className="mt-9 flex scroll-mt-24 flex-col items-center">
-					<Cta onOpenKofi={onOpenKofi} />
+					<Cta />
 				</div>
 			</section>
 
@@ -250,8 +243,6 @@ export default function Home() {
 					))}
 				</div>
 			</section>
-
-			<WallOfLove />
 
 			{/* Closing band */}
 			<section className="mt-20 lg:mt-28">

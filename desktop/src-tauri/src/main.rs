@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod analytics;
+mod browser_policy;
 mod cleaner;
 mod cli;
 mod cmd;
@@ -14,7 +14,9 @@ mod ffmpeg;
 mod handoff;
 mod keepawake;
 mod logging;
+mod meeting_browser;
 mod meeting_prompt;
+mod meeting_schemes;
 mod server;
 mod setup;
 mod transcript;
@@ -27,7 +29,8 @@ mod dock;
 #[cfg(target_os = "macos")]
 mod system_audio;
 
-#[cfg(windows)]
+// The meeting window asks this module where scheme registration stands on every
+// platform; the implementations themselves are per-OS with a stubbed fallback.
 mod custom_protocol;
 
 use eyre::{eyre, Result};
@@ -35,9 +38,6 @@ use tauri::Manager;
 use tauri_plugin_window_state::StateFlags;
 
 use error::LogError;
-
-/// Guards the clean-exit event: `ExitRequested` and `Exit` both fire on a quit.
-static EXIT_REPORTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -61,8 +61,6 @@ async fn main() -> Result<()> {
         }))
         .setup(|app| {
             setup::setup(app)?;
-            analytics::init(app);
-            analytics::track_event(app, analytics::events::APP_STARTED);
 
             Ok(())
         })
@@ -119,9 +117,10 @@ async fn main() -> Result<()> {
             cmd::server_cmd::get_gpu_devices,
             cmd::server_cmd::get_model_metadata,
             cmd::server_cmd::get_api_base_url,
+            cmd::server_cmd::api_server_enabled,
             cmd::server_cmd::start_api_server,
             cmd::server_cmd::stop_api_server,
-            cmd::app::track_analytics_event,
+            cmd::server_cmd::stop_api_server_process,
             cmd::app::get_commit_hash,
             cmd::app::is_avx2_enabled,
             cmd::app::is_online,
@@ -133,6 +132,7 @@ async fn main() -> Result<()> {
             cmd::files::get_default_projects_path,
             cmd::audio::get_audio_devices,
             cmd::audio::start_record,
+            cmd::audio::recording_active,
             cmd::app::get_models_folder,
             cmd::app::get_logs_folder,
             cmd::app::show_log_path,
@@ -159,6 +159,26 @@ async fn main() -> Result<()> {
             dictation_indicator::get_dictation_indicator_state,
             dictation_indicator::dictation_indicator_ready,
             dictation_indicator::hide_dictation_indicator,
+            meeting_browser::open_meeting_browser,
+            meeting_browser::meeting_browser_session,
+            meeting_browser::meeting_browser_navigate,
+            meeting_browser::meeting_browser_load,
+            meeting_browser::meeting_browser_open_external,
+            meeting_browser::meeting_browser_close,
+            meeting_browser::meeting_browser_confirm_close,
+            meeting_browser::browser_set_chrome_expanded,
+            meeting_browser::browser_allowed_hosts,
+            meeting_browser::browser_blocked_hosts,
+            meeting_browser::browser_allow_host,
+            meeting_browser::browser_remove_allowed_host,
+            meeting_browser::get_browser_policy,
+            meeting_browser::set_browser_policy,
+            meeting_browser::browser_resource_filter_supported,
+            meeting_browser::open_meeting_link,
+            meeting_browser::meeting_browser_retry,
+            meeting_browser::meeting_schemes_supported,
+            meeting_browser::meeting_schemes_enabled,
+            meeting_browser::set_meeting_schemes_enabled,
             meeting_prompt::get_meeting_detection_enabled,
             meeting_prompt::set_meeting_detection_enabled,
             meeting_prompt::get_meeting_prompt_state,
@@ -181,14 +201,6 @@ async fn main() -> Result<()> {
             }
         }
         tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
-            // Both events fire on a normal quit (and the tray's `app.exit(0)` bypasses the
-            // webview entirely), so report the clean exit exactly once, from whichever
-            // arrives first. Nothing here prevents the exit, so this is never a false signal.
-            if !EXIT_REPORTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
-                analytics::track_event_handle(app, analytics::events::APP_EXITED);
-                // Bounded: a slow or unreachable ingest host must not hold up quitting.
-                analytics::flush_events_bounded(std::time::Duration::from_secs(2));
-            }
             // A base URL left in the config file would point an agent at a dead port.
             cmd::config::set_api_base_url(app, None).log_error();
             let mutex = app.state::<tokio::sync::Mutex<setup::ServerState>>();

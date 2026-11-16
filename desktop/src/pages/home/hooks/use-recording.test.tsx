@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
 	emit: vi.fn(),
 	/** Stands in for the persisted config store: key -> value, no disk. */
 	persisted: new Map<string, unknown>(),
+	/** Subscribers per key, as the real store wakes every window on a shared write. */
+	persistedListeners: new Map<string, Set<() => void>>(),
 	errorModal: null as { log: string; open: boolean } | null,
 	beforeStart: vi.fn(),
 }))
@@ -36,6 +38,15 @@ vi.mock('~/lib/config-store', async () => {
 				mocks.persisted.set(key, resolved)
 				force()
 			}
+			// The real hook subscribes to the store, so a write from another window re-renders it.
+			React.useEffect(() => {
+				const subscribers = mocks.persistedListeners.get(key) ?? new Set()
+				mocks.persistedListeners.set(key, subscribers)
+				subscribers.add(force)
+				return () => {
+					subscribers.delete(force)
+				}
+			}, [key])
 			return [value, setValue]
 		},
 	}
@@ -55,11 +66,18 @@ function renderRecording() {
 	return renderHook(() => useRecording(mocks.beforeStart), { wrapper })
 }
 
+/** A write from another window (the browser chrome): same file, every window's subscribers wake. */
+function writeFromAnotherWindow(key: string, value: unknown) {
+	mocks.persisted.set(key, value)
+	for (const subscriber of mocks.persistedListeners.get(key) ?? []) subscriber()
+}
+
 beforeEach(() => {
 	mocks.invoke.mockReset()
 	mocks.errorModal = null
 	mocks.beforeStart.mockClear()
 	mocks.persisted.clear()
+	mocks.persistedListeners.clear()
 })
 
 describe('useRecording device enforcement', () => {
@@ -110,6 +128,67 @@ describe('useRecording device enforcement', () => {
 		})
 		expect(result.current.inputDevice?.name).toBe('Camera Mic')
 		expect(result.current.inputUnavailableName).toBeNull()
+	})
+
+	it('re-selects a device chosen in another window through the shared config key', async () => {
+		mocks.persisted.set('recording.inputDeviceName', 'Camera Mic')
+		mocks.invoke.mockImplementation(async (command: string) => {
+			if (command === 'get_audio_devices') return [device('Camera Mic', true, '0'), device('USB Mic', true, '1')]
+			throw new Error(`unexpected invoke: ${command}`)
+		})
+
+		const { result } = renderRecording()
+		await waitFor(() => expect(result.current.inputDevice?.name).toBe('Camera Mic'))
+
+		// The browser chrome's picker writes the same key; the main window follows the store.
+		act(() => writeFromAnotherWindow('recording.inputDeviceName', 'USB Mic'))
+
+		await waitFor(() => expect(result.current.inputDevice?.name).toBe('USB Mic'))
+	})
+
+	it('keeps an explicit "None" instead of falling back to the default device', async () => {
+		mocks.invoke.mockImplementation(async (command: string) => {
+			if (command === 'get_audio_devices') return [device('Camera Mic', true, '0', true)]
+			throw new Error(`unexpected invoke: ${command}`)
+		})
+
+		const { result } = renderRecording()
+		// Nothing stored yet: the system default stands in.
+		await waitFor(() => expect(result.current.inputDevice?.name).toBe('Camera Mic'))
+
+		act(() => result.current.setInputDevice(null))
+		// '' is the stored "None"; null would mean "nothing stored" and bring the default back.
+		expect(mocks.persisted.get('recording.inputDeviceName')).toBe('')
+
+		// The write re-enumerates the devices; None must survive that refresh.
+		await act(async () => {
+			await result.current.refreshDevices()
+		})
+		expect(result.current.inputDevice).toBeNull()
+		expect(result.current.inputUnavailableName).toBeNull()
+	})
+
+	it('starts with the devices enumerated at start, not the ones from the rendering closure', async () => {
+		let snapshot = [device('Camera Mic', true, '0', true)]
+		mocks.invoke.mockImplementation(async (command: string) => {
+			if (command === 'get_audio_devices') return snapshot
+			if (command === 'start_record') return null
+			throw new Error(`unexpected invoke: ${command}`)
+		})
+
+		const { result } = renderRecording()
+		await waitFor(() => expect(result.current.inputDevice?.name).toBe('Camera Mic'))
+
+		// The device set changed since the last render; a stale closure would still name the old mic.
+		snapshot = [device('Bluetooth', true, '0', true)]
+		await act(async () => {
+			await result.current.startRecord()
+		})
+
+		expect(mocks.invoke).toHaveBeenCalledWith(
+			'start_record',
+			expect.objectContaining({ devices: [expect.objectContaining({ name: 'Bluetooth' })] }),
+		)
 	})
 
 	it('starts normally when every pinned device is present', async () => {

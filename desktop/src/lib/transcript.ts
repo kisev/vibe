@@ -21,13 +21,13 @@ export interface Segment {
 	speakers?: number[]
 }
 
-/** Display names chosen for diarized speakers, keyed by the segment's zero-based speaker index. */
+/** Display names chosen for diarized speakers, keyed by the segment's one-based speaker id. */
 export type SpeakerNames = Record<number, string>
 
 /** What a speaker is called on screen and in exports: the chosen name, else "Speaker N". */
 export function speakerName(speaker: number, label: string, names?: SpeakerNames): string {
 	const chosen = names?.[speaker]?.trim()
-	return chosen || `${label} ${speaker + 1}`
+	return chosen || `${label} ${speaker}`
 }
 
 export function formatTimestamp(seconds: number, alwaysIncludeHours: boolean, decimalMarker: string, includeMilliseconds: boolean = true): string {
@@ -116,7 +116,7 @@ export function asCsv(segments: Segment[]) {
 		const end = formatTimestamp(segment.stop, true, '.')
 		const text = segment.text.trim()
 		if (hasSpeakers) {
-			const speaker = segment.speaker != null ? String(segment.speaker + 1) : ''
+			const speaker = segment.speaker != null ? String(segment.speaker) : ''
 			return `${escapeCsv(start)},${escapeCsv(end)},${escapeCsv(speaker)},${escapeCsv(text)}`
 		}
 		return `${escapeCsv(start)},${escapeCsv(end)},${escapeCsv(text)}`

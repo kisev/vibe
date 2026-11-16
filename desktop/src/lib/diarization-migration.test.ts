@@ -18,7 +18,7 @@ vi.mock('~/lib/model', () => ({
 	deleteModelFile: deleteMock,
 }))
 
-import { runDiarizationMigration } from './diarization-migration'
+import { runDiarizationMigration, sweepLegacyDiarizationFiles } from './diarization-migration'
 import * as config from '~/lib/config'
 
 const disable = vi.fn()
@@ -28,16 +28,43 @@ beforeEach(() => {
 	invokeMock.mockResolvedValue('C:/models')
 })
 
+describe('sweepLegacyDiarizationFiles', () => {
+	it('sweeps the superseded artifacts when the current model is in place', async () => {
+		isUsableMock.mockResolvedValue(true)
+
+		await sweepLegacyDiarizationFiles()
+
+		expect(deleteMock).toHaveBeenCalledTimes(config.legacyDiarizationFilenames.length)
+		for (const filename of config.legacyDiarizationFilenames) {
+			expect(deleteMock).toHaveBeenCalledWith(`C:/models/${filename}`)
+		}
+		expect(deleteMock).not.toHaveBeenCalledWith(`C:/models/${config.diarizeModelFilename}`)
+	})
+
+	it('leaves the folder alone when the current model is not usable', async () => {
+		// Without the replacement in place the legacy files are still the only ones the engine
+		// could use, so the sweep must not touch them.
+		isUsableMock.mockResolvedValue(false)
+
+		await sweepLegacyDiarizationFiles()
+
+		expect(deleteMock).not.toHaveBeenCalled()
+	})
+})
+
 describe('runDiarizationMigration', () => {
 	it('does nothing when speaker detection is off', async () => {
 		expect(await runDiarizationMigration(false, disable)).toBe('not-needed')
 		expect(invokeMock).not.toHaveBeenCalled()
 	})
 
-	it('does nothing when the current model is already on disk', async () => {
+	it('keeps the current model and sweeps the superseded artifacts', async () => {
 		isUsableMock.mockResolvedValue(true)
 		expect(await runDiarizationMigration(true, disable)).toBe('installed')
 		expect(askMock).not.toHaveBeenCalled()
+		expect(downloadMock).not.toHaveBeenCalled()
+		expect(deleteMock).toHaveBeenCalledTimes(config.legacyDiarizationFilenames.length)
+		expect(deleteMock).not.toHaveBeenCalledWith(`C:/models/${config.diarizeModelFilename}`)
 	})
 
 	it('disables the preference with a notice when the download is declined', async () => {
@@ -52,6 +79,15 @@ describe('runDiarizationMigration', () => {
 		isUsableMock.mockResolvedValue(false)
 		askMock.mockResolvedValue(true)
 		downloadMock.mockResolvedValue(null)
+		expect(await runDiarizationMigration(true, disable)).toBe('declined')
+		expect(disable).toHaveBeenCalledOnce()
+	})
+
+	it('disables the preference when the download rejects instead of returning', async () => {
+		// A network failure throws out of `downloadModel`; it must not become an unhandled rejection.
+		isUsableMock.mockResolvedValue(false)
+		askMock.mockResolvedValue(true)
+		downloadMock.mockRejectedValue(new Error('offline'))
 		expect(await runDiarizationMigration(true, disable)).toBe('declined')
 		expect(disable).toHaveBeenCalledOnce()
 	})

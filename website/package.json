@@ -8,6 +8,7 @@
     "test": "vitest run",
     "i18n:generate": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --emit-ts-declarations --strategy localStorage preferredLanguage baseLocale",
     "build": "pnpm i18n:generate && tsc && vite build && cp dist/index.html dist/404.html",
+    "build:dev": "pnpm i18n:generate && tsc && vite build --outDir dist-dev && cp dist-dev/index.html dist-dev/404.html",
     "preview": "vite preview"
   },
   "dependencies": {

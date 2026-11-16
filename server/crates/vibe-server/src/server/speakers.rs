@@ -159,7 +159,7 @@ mod tests {
     fn a_speaker_change_inside_a_segment_splits_it() {
         let words = vec![word(0, 100, "привет "), word(100, 200, "пока ")];
         let segment = segment(0, 200, "привет пока", words);
-        let turns = [turn(0.0, 1.0, 0), turn(1.0, 2.0, 1)];
+        let turns = [turn(0.0, 1.0, 1), turn(1.0, 2.0, 2)];
         let runs = attribute(&segment, &turns);
         assert_eq!(
             runs,
@@ -168,13 +168,13 @@ mod tests {
                     start: 0,
                     end: 100,
                     text: "привет".into(),
-                    speaker: Some(0)
+                    speaker: Some(1)
                 },
                 Run {
                     start: 100,
                     end: 200,
                     text: "пока".into(),
-                    speaker: Some(1)
+                    speaker: Some(2)
                 },
             ]
         );
@@ -185,7 +185,7 @@ mod tests {
         // Speaker 1 talks 0–1 s, nobody claims 1–2 s, speaker 2 talks 2–3 s.
         let words = vec![word(0, 100, "привет "), word(100, 200, "эээ "), word(200, 300, "пока ")];
         let segment = segment(0, 300, "привет эээ пока", words);
-        let turns = [turn(0.0, 1.0, 0), turn(2.0, 3.0, 1)];
+        let turns = [turn(0.0, 1.0, 1), turn(2.0, 3.0, 2)];
         let runs = attribute(&segment, &turns);
         assert_eq!(
             runs,
@@ -194,13 +194,13 @@ mod tests {
                     start: 0,
                     end: 200,
                     text: "привет эээ".into(),
-                    speaker: Some(0)
+                    speaker: Some(1)
                 },
                 Run {
                     start: 200,
                     end: 300,
                     text: "пока".into(),
-                    speaker: Some(1)
+                    speaker: Some(2)
                 },
             ]
         );
@@ -210,7 +210,7 @@ mod tests {
     fn the_segment_bounds_frame_the_word_runs() {
         let words = vec![word(50, 100, "привет ")];
         let segment = segment(0, 200, "привет", words);
-        let turns = [turn(0.5, 1.0, 0)];
+        let turns = [turn(0.5, 1.0, 1)];
         let runs = attribute(&segment, &turns);
         assert_eq!(runs[0].start, 0);
         assert_eq!(runs[0].end, 200);

@@ -1,0 +1,109 @@
+{
+  "status": "complete",
+  "llm": {
+    "provider": "claude-code-router",
+    "model": "glm-5.3"
+  },
+  "message": "Review complete: 0 finding(s) across 1 selected item(s).",
+  "summary": {
+    "files_reviewed": 1,
+    "comments": 0,
+    "total_tokens": 70354,
+    "input_tokens": 20702,
+    "output_tokens": 49652,
+    "cache_read_tokens": 12992,
+    "elapsed": "5m58s"
+  },
+  "tool_calls": {
+    "total": 3,
+    "by_tool": {
+      "code_comment": 3
+    },
+    "failure": 3,
+    "failure_by_tool": {
+      "code_comment": 3
+    },
+    "failure_details": [
+      {
+        "tool_call_number": 1,
+        "tool_name": "code_comment",
+        "file_path": "bad.py",
+        "arguments": "{}",
+        "error": "Error: 'comments' array is required. Got args: {}"
+      },
+      {
+        "tool_call_number": 2,
+        "tool_name": "code_comment",
+        "file_path": "bad.py",
+        "arguments": "{}",
+        "error": "Error: 'comments' array is required. Got args: {}"
+      },
+      {
+        "tool_call_number": 3,
+        "tool_name": "code_comment",
+        "file_path": "bad.py",
+        "arguments": "{}",
+        "error": "Error: 'comments' array is required. Got args: {}"
+      }
+    ]
+  },
+  "comments": [],
+  "groups": [
+    {
+      "label": "bad.py",
+      "files": ["bad.py"]
+    }
+  ],
+  "session_id": "0c8cf6d0-0412-4259-b4d2-1278f759d7f5",
+  "manifest": {
+    "schema_version": "ocr.run-manifest/v1",
+    "run_id": "0c8cf6d0-0412-4259-b4d2-1278f759d7f5",
+    "operation": "review",
+    "terminal_state": "complete",
+    "repository": {},
+    "input": {
+      "mode": "commit",
+      "requested_head": "8a000e8b578ec9ed556cdb8520b15f930a483b75",
+      "resolved_base": "7d2d7e68c1d34eed9efc995b401a61674e83ef91",
+      "resolved_head": "8a000e8b578ec9ed556cdb8520b15f930a483b75",
+      "exact_range": "7d2d7e68c1d34eed9efc995b401a61674e83ef91..8a000e8b578ec9ed556cdb8520b15f930a483b75",
+      "source_artifact_sha256": "594a23261cfec4b27b0e3ec7be5d49174cbfef151020ca58d9b00a2080ec3cc7"
+    },
+    "execution": {
+      "ocr_version": "v1.13.9",
+      "provider": "claude-code-router",
+      "model": "glm-5.3",
+      "configured_concurrency": 8,
+      "max_tool_request_times": 100,
+      "rule_config_sha256": "7d579740667a61cd408a2fe6647d5c01864f7117f22bd9edf00e5511d947a5ab",
+      "runtime_config_sha256": "94463faab2ae5a8130b0486c416334c2381955957cbf4388e5d49205fe825ceb"
+    },
+    "coverage": {
+      "selected": [
+        {
+          "item_id": "5ca65e9a4793c91911b1a8f3521063f5ad871da907f49b84213461ebc0921300",
+          "path": "bad.py",
+          "fingerprint": "95c5454a82b567c136d9e45cf5e49b7f8358174bc879e0f2049fcf3b40b0ccae"
+        }
+      ],
+      "completed": [
+        {
+          "item_id": "5ca65e9a4793c91911b1a8f3521063f5ad871da907f49b84213461ebc0921300",
+          "path": "bad.py",
+          "fingerprint": "95c5454a82b567c136d9e45cf5e49b7f8358174bc879e0f2049fcf3b40b0ccae"
+        }
+      ],
+      "reused": [],
+      "failed": [],
+      "waived": [],
+      "excluded": [
+        {
+          "item_id": "a9c470f70eb9a30fecac98c725ac7dbd40b53a1e236f6aa125da6466c805ae49",
+          "path": "a.txt",
+          "exclude_reason": "unsupported_ext"
+        }
+      ]
+    },
+    "elapsed_ms": 358048
+  }
+}

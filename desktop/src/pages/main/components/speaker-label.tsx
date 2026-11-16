@@ -51,11 +51,12 @@ export function SpeakerLabel({ speaker, speakerSet, speakers, speakerNames, edit
 
 	if (speaker == null && !uncertain && (!editable || speakers.length === 0)) return null
 
-	const shown = uncertain
-		? uncertain.map((index) => speakerName(index, label, speakerNames)).join(' / ')
-		: speaker != null
-			? speakerName(speaker, label, speakerNames)
-			: null
+	let shown: string | null = null
+	if (uncertain) {
+		shown = uncertain.map((index) => speakerName(index, label, speakerNames)).join(' / ')
+	} else if (speaker != null) {
+		shown = speakerName(speaker, label, speakerNames)
+	}
 	const note = uncertain ? m.speakerUncertain() : undefined
 	const marker = uncertain ? (
 		<span aria-hidden className="ms-0.5 text-[10px] font-bold">
@@ -92,7 +93,7 @@ export function SpeakerLabel({ speaker, speakerSet, speakers, speakerNames, edit
 		if (target !== speaker || uncertain) onAssign(target)
 	}
 
-	const nextSpeaker = speakers.length ? Math.max(...speakers) + 1 : 0
+	const nextSpeaker = speakers.length ? Math.max(...speakers) + 1 : 1
 
 	return (
 		<Popover open={open} onOpenChange={handleOpenChange}>
@@ -134,7 +135,7 @@ export function SpeakerLabel({ speaker, speakerSet, speakers, speakerNames, edit
 								// Radix closes the popover on Escape; mark it so the close does not save the draft.
 								if (event.key === 'Escape') cancelledRef.current = true
 							}}
-							placeholder={`${label} ${speaker + 1}`}
+							placeholder={`${label} ${speaker}`}
 							className="h-9"
 						/>
 					</form>

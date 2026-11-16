@@ -1,6 +1,6 @@
 [package]
 name = "vibe-server"
-version = "0.9.0"
+version = "1.0.3"
 edition.workspace = true
 description = "Rust CLI and server for local transcription on the GGML runtime"
 repository.workspace = true
@@ -11,9 +11,10 @@ name = "vibe-server"
 path = "src/main.rs"
 
 [dependencies]
-# Exact pin: engine upgrades are deliberate events (parity re-run), never a
-# cargo update side effect.
-transcribe-cpp = { version = "=0.4.1", default-features = false }
+# Exact pin lives in [workspace.dependencies]; only the platform feature set
+# is chosen here. Engine upgrades are deliberate events (parity re-run), never
+# a cargo update side effect.
+transcribe-cpp = { workspace = true }
 # Nemotron-3-Diarization runs in the vibe-diarize-native helper beside the
 # executable — transcribe.cpp's GGML and the native stack's prebuilt GGML
 # cannot share a binary, so the native engine is a separate process.
@@ -48,13 +49,13 @@ tokio = { version = "1", features = ["test-util"] }
 # Metal on Apple targets, matching the legacy build (ggml-rs-sys linked
 # ggml-metal + the Metal frameworks there). The feature is a no-op elsewhere.
 [target.'cfg(target_os = "macos")'.dependencies]
-transcribe-cpp = { version = "=0.4.1", default-features = false, features = ["metal"] }
+transcribe-cpp = { workspace = true, features = ["metal"] }
 
 # Vulkan is the GPU backend on Windows and Linux, matching the pre-port ggml
 # libraries; the loader is opened from the GPU driver at runtime, so building
 # needs only the Vulkan headers and glslc.
 [target.'cfg(any(windows, target_os = "linux"))'.dependencies]
-transcribe-cpp = { version = "=0.4.1", default-features = false, features = ["vulkan"] }
+transcribe-cpp = { workspace = true, features = ["vulkan"] }
 
 [target."cfg(windows)".dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading"] }

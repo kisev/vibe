@@ -5,8 +5,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { toast } from 'sonner'
 import { type AudioDevice } from '~/lib/audio'
 import { CONFIG_KEYS } from '~/lib/config-keys'
-import { resolveSelection } from '~/lib/device-selection'
-import { readConfig, usePersisted } from '~/lib/config-store'
+import { resolveConfiguredSelection } from '~/lib/device-selection'
+import { usePersisted } from '~/lib/config-store'
 import { getDefaultRecordingShortcut } from '~/lib/config'
 import type { MeetingRecordingOptions } from '~/lib/meeting-prompt'
 import { ensureSystemAudioPermission } from '~/lib/permissions'
@@ -23,6 +23,10 @@ interface RecordingShortcutContextValue {
 	/** Keep the global toggle synchronized with recordings started from the regular UI. */
 	setNormalRecordingActive: (active: boolean) => void
 	isShortcutRecording: boolean
+	/** Epoch ms the shortcut-started recording began; null when idle. */
+	shortcutStartedAt: number | null
+	/** The devices the shortcut-started run records; null for a source it does not capture. */
+	shortcutDevices: { input: string | null; output: string | null } | null
 }
 
 const RecordingShortcutContext = createContext<RecordingShortcutContextValue | null>(null)
@@ -44,6 +48,8 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 	const [recordingShortcut, setRecordingShortcut] = usePersisted(CONFIG_KEYS.recordingShortcut, getDefaultRecordingShortcut())
 	const [capturing, setCapturing] = useState(false)
 	const [isShortcutRecording, setIsShortcutRecording] = useState(false)
+	const [shortcutStartedAt, setShortcutStartedAt] = useState<number | null>(null)
+	const [shortcutDevices, setShortcutDevices] = useState<{ input: string | null; output: string | null } | null>(null)
 	const recordingRef = useRef(false)
 	const normalRecordingActiveRef = useRef(false)
 	const startingRef = useRef(false)
@@ -65,15 +71,14 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 		startingRef.current = true
 		try {
 			const devices = await invoke<AudioDevice[]>('get_audio_devices')
-			const savedName = readConfig<string | null>(CONFIG_KEYS.inputDeviceName, null)
-			const hiddenNames = readConfig<string[]>(CONFIG_KEYS.hiddenInputDevices, [])
-			const microphone = resolveSelection(
-				devices.filter((device) => device.isInput),
-				savedName,
-				hiddenNames,
-			).device
-			const systemAudio = devices.find((device) => device.isDefault && !device.isInput)
-			if (options.microphone && !microphone) throw new Error(m.noDefaultMicrophone())
+			const input = resolveConfiguredSelection(devices, 'input')
+			const microphone = input.device
+			// The output follows the same pin policy as the main window: a user who picked "None"
+			// does not want a shortcut capturing their system audio either.
+			const systemAudio = resolveConfiguredSelection(devices, 'output').device
+			if (options.microphone && !microphone) {
+				throw new Error(input.savedName ? m.pinnedDeviceMissing({ name: input.savedName }) : m.noDefaultMicrophone())
+			}
 			if (options.systemAudio && !systemAudio) throw new Error(m.systemAudioPermissionInfo())
 			if (options.systemAudio && !(await ensureSystemAudioPermission())) return false
 			const selectedDevices = [options.microphone ? microphone : null, options.systemAudio ? systemAudio : null].filter(
@@ -84,6 +89,13 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 			recordingRef.current = true
 			normalRecordingActiveRef.current = true
 			setIsShortcutRecording(true)
+			setShortcutStartedAt(Date.now())
+			// The chrome mirrors the run: it needs the devices this shortcut actually opened,
+			// which need not match the config (system audio is optional here).
+			setShortcutDevices({
+				input: options.microphone ? (microphone?.name ?? null) : null,
+				output: options.systemAudio ? (systemAudio?.name ?? null) : null,
+			})
 			return true
 		} catch (error) {
 			console.error('Recording shortcut failed to start:', error)
@@ -123,6 +135,8 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 			if (!recordingRef.current) return
 			recordingRef.current = false
 			setIsShortcutRecording(false)
+			setShortcutStartedAt(null)
+			setShortcutDevices(null)
 		}
 		const unlistenFinish = listen('record_finish', resetRecording)
 		const unlistenError = listen('record_error', resetRecording)
@@ -210,6 +224,8 @@ export function RecordingShortcutProvider({ children }: { children: ReactNode })
 				setRecordingShortcutCapturing,
 				setNormalRecordingActive,
 				isShortcutRecording,
+				shortcutStartedAt,
+				shortcutDevices,
 			}}>
 			{children}
 		</RecordingShortcutContext.Provider>

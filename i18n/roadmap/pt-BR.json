@@ -1,0 +1,38 @@
+{
+  "app-update-controls": {
+    "title": "Controles de atualização do app",
+    "why": "As atualizações são verificadas em segundo plano e o único controle é um interruptor “Atualizações Beta” não explicado, escondido em Geral: não há um “verificar agora” explícito, nenhum canal dev (as builds de dev são publicadas sem artefatos de atualizador) e nenhuma regra declarada sobre o que cada canal significa."
+  },
+  "dependency-hygiene": {
+    "title": "Higiene de dependências",
+    "why": "As dependências são atualizadas manualmente, quando são, e não há um único lugar que responda “o que está desatualizado?”."
+  },
+  "desktop-e2e": {
+    "title": "E2E do desktop",
+    "why": "Todas as regressões do desktop até agora foram encontradas pelo mantenedor instalando uma build de dev e clicando por ela."
+  },
+  "dev75-fixes": {
+    "title": "Correções da dev.75",
+    "why": "A primeira build em que o mantenedor viveu por um dia (1.0.0-dev.75) revelou cinco defeitos que nenhum teste unitário pegou: a visualização de comparação afirma zero diferenças em transcrições reais, os canais de atualização vazam nomes em inglês/traduzidos e oferecem uma build estável no Beta, o navegador de reuniões abre uma janela branca inutilizável que não pode ser fechada e depende de um esquema vibe:// que ninguém mais produz, a página do registro de alterações de dev recorre à 1.0.0 e deixa dois rótulos sem tradução, e o interruptor do servidor de API local se liga sozinho após uma reinicialização."
+  },
+  "fork-update-sources": {
+    "title": "Fontes de atualização do fork",
+    "why": "O fork continua verificando o canal de atualizações upstream (thewh1teagle/vibe), então uma build do fork pode receber a oferta de — e ser substituída por — uma versão upstream no momento em que o upstream publicar uma."
+  },
+  "live-conversation-assistant": {
+    "title": "Assistente de conversa ao vivo",
+    "why": "O app transcreve reuniões, mas a ajuda chega depois da chamada: resumos e perguntas são feitos sobre uma transcrição concluída."
+  },
+  "security-scanning": {
+    "title": "Verificação de segurança",
+    "why": "Nada no repositório faz uma build falhar porque uma dependência tem uma vulnerabilidade conhecida."
+  },
+  "speaker-voice-memory": {
+    "title": "Memória de voz dos falantes",
+    "why": "A diarização rotula os falantes de cada gravação como Palestrante 1…N, e os nomes que um usuário digita são armazenados por transcrição."
+  },
+  "website-language-selector": {
+    "title": "Seletor de idioma do site",
+    "why": "O site já tem um runtime Paraglide, catálogos por idioma, um LanguageSelector na navegação e documentação e registro de alterações totalmente traduzidos — mas a cobertura é irregular (Início e Recursos ainda carregam inglês fixo no código), a escolha vive apenas no localStorage, então um link compartilhado sempre abre no idioma do destinatário em vez do remetente, e o seletor é fácil de passar despercebido em telas pequenas."
+  }
+}

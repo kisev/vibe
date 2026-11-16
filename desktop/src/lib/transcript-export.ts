@@ -152,7 +152,7 @@ function serializeJson(segments: Segment[], summary: string, options: Transcript
 				row.stop = segment.stop / 100
 			}
 			if (options.showSpeakers && segment.speaker != null) {
-				row.speaker = segment.speaker + 1
+				row.speaker = segment.speaker
 				const name = chosenSpeakerName(segment, options)
 				if (name) row.speakerName = name
 			}
@@ -175,7 +175,7 @@ function serializeCsv(segments: Segment[], summary: string, options: TranscriptE
 			rows.push([
 				'transcript',
 				...(options.showTimestamps ? [formatTimestamp(segment.start, true, '.'), formatTimestamp(segment.stop, true, '.')] : []),
-				...(options.showSpeakers ? [segment.speaker != null ? (chosenSpeakerName(segment, options) ?? segment.speaker + 1) : ''] : []),
+				...(options.showSpeakers ? [segment.speaker != null ? (chosenSpeakerName(segment, options) ?? segment.speaker) : ''] : []),
 				segment.text.trim(),
 			])
 		}

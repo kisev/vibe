@@ -23,9 +23,6 @@ pub struct ServerState {
 pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     // Create app directories
     let local_app_data_dir = app.path().app_local_data_dir()?;
-    // Entries older than this are never reused in practice, and the cache holds
-    // transcript text, so it should not grow forever.
-    cleanup_transcription_cache(app.handle());
     let app_config_dir = app.path().app_config_dir()?;
     fs::create_dir_all(&local_app_data_dir)
         .unwrap_or_else(|_| panic!("cant create local app data directory at {}", local_app_data_dir.display()));
@@ -44,9 +41,21 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         *app_handle = Some(app.handle().clone());
     }
     crate::logging::setup_logging(app.handle(), store).unwrap();
+
+    // The allowlist replaced the meeting-host list; carry over whatever the user had stored.
+    // Both this and the policy seed report failures through `tracing`, so they run only once the
+    // global subscriber exists: a warning emitted before that is silently dropped.
+    if let Err(error) = crate::browser_policy::migrate(app.handle()) {
+        tracing::warn!("could not migrate the browser allowlist: {error}");
+    }
+    // Seed the cache the resource filter reads, so the first request needs no store access.
+    crate::browser_policy::seed_policy(app.handle());
     crate::cleaner::clean_old_logs(app.handle()).log_error();
     crate::cleaner::clean_old_files().log_error();
     crate::cleaner::clean_updater_files().log_error();
+    // After logging, because the cleanup reports through `tracing`: entries older than this are
+    // never reused in practice, and the cache holds transcript text, so it must not grow forever.
+    cleanup_transcription_cache(app.handle());
     tracing::debug!("Vibe App Running");
 
     // Re-applying an existing registration upgrades installs created before the hidden launch
@@ -67,6 +76,62 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
             app.manage(watcher);
         }
         Err(error) => tracing::error!("could not start config watcher: {:?}", error),
+    }
+
+    // The local API is a persisted intent, not a side effect: only a user who left the switch on
+    // gets a server at launch. A CLI launch exits through `std::process::exit`, which runs no
+    // destructors and fires no `RunEvent::Exit`, so a server started here would be orphaned with
+    // its base URL left published in the config: the autostart is GUI-only.
+    if !is_cli_detected() && crate::cmd::config::api_server_enabled(app.handle()) {
+        let app_handle = app.app_handle().clone();
+        let unload_timeout_minutes = crate::cmd::config::unload_timeout_minutes(&app_handle);
+        tauri::async_runtime::spawn(async move {
+            // The sidecar handshake blocks for up to `READY_TIMEOUT`, so it runs on a blocking
+            // thread and happens before the lock: taking the state lock first would queue every
+            // other server command (metadata, model load) behind a sidecar that may never answer.
+            let spawn_handle = app_handle.clone();
+            let spawned = tauri::async_runtime::spawn_blocking(move || {
+                let cpu_variant = crate::cmd::config::cpu_variant(&spawn_handle);
+                crate::cmd::server_cmd::spawn_process(&spawn_handle, unload_timeout_minutes, cpu_variant)
+            })
+            .await;
+            let process = match spawned {
+                Ok(Ok(process)) => process,
+                Ok(Err(error)) => {
+                    tracing::error!("could not start the local API server at launch: {:#}", error);
+                    return;
+                }
+                Err(error) => {
+                    tracing::error!("could not run the local API server start task: {error}");
+                    return;
+                }
+            };
+            let state = app_handle.state::<Mutex<ServerState>>();
+            let mut guard = state.lock().await;
+            // The handshake can take up to `READY_TIMEOUT`, and the user may have turned the API
+            // off (or quit the app) meanwhile: re-read the intent under the lock, otherwise a
+            // server nobody asked for comes back and its URL is published again.
+            if !crate::cmd::config::api_server_enabled(&app_handle) {
+                // Dropping `process` kills the sidecar through its `Drop`.
+                return;
+            }
+            // A command may have brought a server up while this one handshook; that process
+            // serves, and the one just spawned is dropped (and killed) unused.
+            let mut served = None;
+            if let Some(existing) = guard.process.as_mut() {
+                if existing.is_alive() {
+                    served = Some(existing.base_url());
+                }
+            }
+            let base_url = match served {
+                Some(base_url) => base_url,
+                None => {
+                    guard.process = Some(process);
+                    guard.process.as_ref().map(|process| process.base_url()).unwrap_or_default()
+                }
+            };
+            crate::cmd::config::set_api_base_url(&app_handle, Some(&base_url)).log_error();
+        });
     }
 
     // Crash handler
@@ -112,6 +177,14 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     {
         if let Err(error) = crate::custom_protocol::register() {
             tracing::error!("{:?}", error);
+        }
+    }
+
+    // An update moves the executable, so an opted-in scheme handler has to be re-pointed at
+    // the new path on every launch; the registration itself stays off unless the user chose it.
+    if crate::meeting_browser::schemes_enabled(app.handle()) {
+        if let Err(error) = crate::custom_protocol::register_meeting_schemes() {
+            tracing::warn!("could not refresh the meeting link handlers: {error}");
         }
     }
 
@@ -207,10 +280,20 @@ pub(crate) fn prune_older_than(
         if !path.is_dir() {
             continue;
         }
-        let newest = newest_modified(&path)?;
+        // One unreadable or locked entry must not stop the rest of the cache from being pruned:
+        // it would otherwise fail at the same entry on every launch.
+        let newest = match newest_modified(&path) {
+            Ok(newest) => newest,
+            Err(error) => {
+                tracing::warn!("could not inspect cache entry {}: {error}", path.display());
+                continue;
+            }
+        };
         if now.duration_since(newest).unwrap_or_default() > max_age {
-            std::fs::remove_dir_all(&path)?;
-            removed += 1;
+            match std::fs::remove_dir_all(&path) {
+                Ok(()) => removed += 1,
+                Err(error) => tracing::warn!("could not remove cache entry {}: {error}", path.display()),
+            }
         }
     }
     Ok(removed)

@@ -13,8 +13,7 @@ export const CONFIG_KEYS = {
 	skippedSetup: 'general.skippedSetup',
 	closeToTray: 'general.closeToTray',
 	preventSleep: 'general.preventSleep',
-	analyticsEnabled: 'analytics_enabled',
-	/** `stable` or `beta`: which website channel file the updater follows. */
+	/** `stable`, `beta` or `dev`: which website channel file the updater follows. */
 	updateChannel: 'general.updateChannel',
 
 	// Model
@@ -42,6 +41,8 @@ export const CONFIG_KEYS = {
 	projectsPath: 'transcription.projectsPath',
 	/** Export every finished transcript automatically: formats, destination, replace rule. */
 	autoExport: 'transcription.autoExport',
+	/** Upper bound per model input for long recordings; null = the engine maximum. */
+	chunkSeconds: 'transcription.chunkSeconds',
 
 	// Recording
 	/** Legacy enumeration-index ids; kept only so old stored values can be ignored. */
@@ -52,11 +53,11 @@ export const CONFIG_KEYS = {
 	outputDeviceName: 'recording.outputDeviceName',
 	hiddenInputDevices: 'recording.hiddenInputDevices',
 	hiddenOutputDevices: 'recording.hiddenOutputDevices',
-	/** Upper bound per model input for long recordings; null = the engine maximum. */
-	chunkSeconds: 'transcription.chunkSeconds',
 	recordingShortcutEnabled: 'recording.shortcutEnabled',
 	recordingShortcut: 'recording.shortcut',
 	meetingDetectionEnabled: 'recording.meetingDetectionEnabled',
+	/** Minutes of uninterrupted silence before Vibe brings itself forward; 5 by default. */
+	longSilenceMinutes: 'recording.longSilenceMinutes',
 	autoTranscribeAfterRecording: 'recording.autoTranscribeAfterRecording',
 
 	// Reading the transcript
@@ -85,8 +86,11 @@ export const CONFIG_KEYS = {
 	legacyLlmConfig: 'summarize.llm',
 	legacyAutoSummarizeOnFinish: 'summarize.autoOnFinish',
 
-	// Local API. Written by the app while the server runs so agents can find the per-run port;
-	// removed on stop and on exit. Not a user setting.
+	// Local API. The intent is the user setting the Agents switch reads; the base URL is written
+	// by the app while a shared process runs so agents can find the per-run port, and removed on
+	// stop and on exit. `api.enabled` is read and written only from Rust (`cmd/config.rs`); the
+	// frontend reads it back through the `api_server_enabled` command.
+	apiEnabled: 'api.enabled',
 	apiBaseUrl: 'api.baseUrl',
 
 	// Tools

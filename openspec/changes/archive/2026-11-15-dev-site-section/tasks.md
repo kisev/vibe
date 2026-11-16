@@ -1,0 +1,14 @@
+# Tasks
+
+- [x] 1. The website reads `VITE_SITE_BASE` and `VITE_SITE_ROUTER`, defaulting to `/vibe/` and browser routing so the production build is unchanged.
+  Done: `website/vite.config.ts` reads `VITE_SITE_BASE` (default `/vibe/`); `website/src/lib/site.ts` selects the router and `website/src/App.tsx` renders `HashRouter` without a basename or `BrowserRouter basename="/vibe"` exactly as before.
+- [x] 2. `scripts/website_build.sh` (and a `website:build:dev` task) build the dev variant with base `/vibe/dev/` and hash routing.
+  Done: the script takes `prod` (default) or `dev`; `website/package.json` has `build:dev` into `dist-dev`; `taskfile.yml` exposes `website:build:dev` and `website:assemble`.
+- [x] 3. `website.yml` checks out `main` and `dev`, builds both, assembles the artifact with `dev/` inside it, and deploys once; it triggers on a `main` push that touches site paths and on dispatch.
+  Done: `main` is checked out at the workspace root for the production build and PWA, `dev` into `dev-src` for the preview and the assembly step; `scripts/website_assemble.sh` copies production to the artifact root, dev under `dev/`, and checks the root `404.html` is still the production one; `website/tests/deployArtifact.test.ts` runs the script against stand-in builds. The trigger lists `main` only (the same site paths as before, plus dispatch) with a `guard` job that fails on any other ref: GitHub admits `main` to the `github-pages` environment but skips the deploy job of a `dev`-ref run while the run still reads success, so a `dev` push starts nothing and the preview follows `dev` on the next deploy from `main`.
+- [x] 4. The dev build shows a preview banner linking to the production site.
+  Done: `website/src/components/DevBanner.tsx` renders only when `VITE_SITE_ROUTER=hash`, at the top of `Layout`; strings are in `i18n/website/en-US.json` (`dev-preview-banner`, `dev-preview-link`) and every other locale carries them too.
+- [x] 5. Tests: the router choice follows the env; the dev build's links stay hash-based; the production build keeps path routing; pages that keep their own anchor state stay inside the dev base.
+  Done: `website/src/App.test.tsx` covers the env-to-router choice, the banner in dev vs production, production hrefs under `/vibe/`, a clicked nav link producing `#/features` at `/vibe/dev/`, a `/vibe/dev/#/roadmap` deep link, documentation pages and their nav (`#/docs/<slug>`), the dev changelog alias, and the `/vibe/docs#slug` cross-links rewritten for the dev build only; `website/tests/deployArtifact.test.ts` covers the assembled artifact.
+- [x] 6. Docs describe the two addresses and the deploy rule.
+  Done: `docs/how-to/maintain-the-repository.md` has a "Read the development site" section with both addresses, the one-deploy-two-refs rule and the local tasks; `docs/reference/tooling.md` names the new `website:*` tasks.

@@ -12,12 +12,17 @@ import { openPath } from '~/lib/app'
 import * as config from '~/lib/config'
 import { pathToNamedPath } from '~/lib/fs'
 import { getMediaDurationSeconds } from '~/lib/media'
-import { getFriendlyModelName } from '~/lib/model'
+import { getModelDisplayName } from '~/lib/model'
 import { runComparison, tauriComparisonIo, type ComparisonModel, type ComparisonRun } from '~/lib/model-comparison'
 import { cn } from '~/lib/style'
+import { errorMessage } from '~/lib/errors'
 import { useRecording } from '~/pages/home/hooks/use-recording'
+import { setComparisonClipPending } from '~/pages/recording-ownership'
 import { Button } from '~/components/ui/button'
+import { Switch } from '~/components/ui/switch'
 import { IconAction, SettingsField, SettingsGroup, SettingsRow, type SettingsViewModel } from './shared'
+import { ModelsComparisonResults } from './models-comparison-results'
+import { useDiarizationModel } from './models-speaker'
 
 const mediaExtensions = [...config.audioExtensions, ...config.videoExtensions]
 
@@ -70,6 +75,16 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 	const [selected, setSelected] = useState<Set<string>>(new Set())
 	const [runs, setRuns] = useState<ComparisonRun[]>([])
 	const [running, setRunning] = useState(false)
+	const [showResults, setShowResults] = useState(false)
+	// Speaker separation is optional: it makes the transcripts readable by voice but
+	// adds its own time to every run, so the same switch applies to all models. The model is
+	// shared with the group above, so downloading it there makes the switch appear without a reload.
+	const [diarize, setDiarize] = useState(false)
+	const diarization = useDiarizationModel()
+	// Separation is on by default once the model is present, so the first run already shows speakers.
+	useEffect(() => {
+		if (diarization.installed) setDiarize(true)
+	}, [diarization.installed])
 	// The record_finish listener outlives renders, so the awaiting flag needs a ref as well.
 	const awaitingRef = useRef(false)
 
@@ -86,13 +101,20 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 			// must not hijack the lab with a clip the user never chose here.
 			if (!awaitingRef.current) return
 			awaitingRef.current = false
-			setPhase('idle')
-			const named = await pathToNamedPath(payload.path)
-			setInput({ name: named.name, path: named.path, duration: await getMediaDurationSeconds(payload.path) })
-			setRuns([])
+			try {
+				setPhase('idle')
+				const named = await pathToNamedPath(payload.path)
+				setInput({ name: named.name, path: named.path, duration: await getMediaDurationSeconds(payload.path) })
+				setRuns([])
+			} finally {
+				// The main window's listener reads this flag; it must cover the whole delivery.
+				setComparisonClipPending(false)
+			}
 		})
 		return () => {
 			unlisten.then((fn) => fn())
+			// A lab closed while awaiting its clip must not keep the next recording from being saved.
+			setComparisonClipPending(false)
 		}
 	}, [])
 
@@ -115,17 +137,27 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 		setRuns([])
 	}
 
-	function startRecording() {
+	async function startRecording() {
 		setPhase('recording')
-		void recording.startRecord()
+		// startRecord reports a blocked start (a missing pinned device, a refused permission)
+		// instead of throwing, so the button never sticks on Stop without a recording behind it.
+		if (!(await recording.startRecord())) setPhase('idle')
 	}
 
 	async function stopRecording() {
 		// Arm the listener before asking the recorder to stop: record_finish can arrive
 		// before stopRecord resolves, and an arrived clip must not be dropped.
 		awaitingRef.current = true
+		// Claim the clip: the main window's listener would otherwise save it as a project and
+		// move the temp file out from under this section.
+		setComparisonClipPending(true)
 		setPhase('awaiting')
-		await recording.stopRecord()
+		if (!(await recording.stopRecord())) {
+			// The stop failed and no clip will arrive; drop the armed listener instead of spinning forever.
+			awaitingRef.current = false
+			setComparisonClipPending(false)
+			setPhase('idle')
+		}
 	}
 
 	function resetInput() {
@@ -143,13 +175,18 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 	}
 
 	function displayName(entry: { name: string; path: string }) {
-		return vm.preference.modelDisplayNames[entry.path] ?? getFriendlyModelName(entry.name)
+		return vm.preference.modelDisplayNames[entry.path] ?? getModelDisplayName(entry.name)
 	}
 
 	const selectableModels = vm.models.filter(selectable)
 	const chosenModels = selectableModels.filter((entry) => selected.has(entry.path))
 	const needMore = Boolean(input) && chosenModels.length < 2
 	const busy = running
+	// A failed run is worth surfacing before the results window: otherwise the
+	// only trace is a row that is easy to read as a model that never ran.
+	const finished = runs.filter((candidate) => candidate.status === 'done').length
+	const failed = runs.filter((candidate) => candidate.status === 'error').length
+	const settled = runs.length > 0 && !running
 
 	async function run() {
 		if (!input) return
@@ -160,8 +197,10 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 				gpuDevice: vm.preference.gpuDevice,
 				noGpu: vm.preference.noGpu,
 				unloadTimeoutMinutes: vm.preference.unloadTimeoutMinutes,
+				ffmpegOptions: vm.preference.ffmpegOptions,
 			},
 			vm.preference.projectsPath,
+			diarize && diarization.installed ? diarization.path : null,
 		)
 		const queued: ComparisonRun[] = models.map((model) => ({ model, status: 'queued' }))
 		setRunning(true)
@@ -176,7 +215,7 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 			// A setup failure (the comparisons folder) never reaches the per-run catch, so
 			// end the spinner here instead of leaving every row running forever.
 			setRuns((previous) =>
-				previous.map((candidate) => (candidate.status === 'done' ? candidate : { ...candidate, status: 'error', error: String(error) })),
+				previous.map((candidate) => (candidate.status === 'done' ? candidate : { ...candidate, status: 'error', error: errorMessage(error) })),
 			)
 		} finally {
 			setRunning(false)
@@ -186,6 +225,7 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 	return (
 		<SettingsGroup title={m.compareModels()}>
 			<SettingsRow
+				description={m.infoCompareRecord()}
 				label={
 					input ? (
 						<span className="flex items-center gap-1.5">
@@ -219,7 +259,20 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 				)}
 			</SettingsRow>
 
-			<SettingsField label={m.comparePickModels()}>
+			{diarization.installed && (
+				<SettingsRow label={m.diarization()} description={m.infoDiarization()}>
+					<Switch
+						checked={diarize}
+						disabled={busy}
+						onCheckedChange={(on) => {
+							setDiarize(on)
+							setRuns([])
+						}}
+					/>
+				</SettingsRow>
+			)}
+
+			<SettingsField label={m.comparePickModels()} description={m.infoComparePickModels()}>
 				<div className="space-y-1">
 					{selectableModels.map((entry) => {
 						const active = selected.has(entry.path)
@@ -248,6 +301,16 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 					{m.compareRun()}
 				</Button>
 				{needMore && !running && <span className="text-xs text-muted-foreground">{m.compareNeedTwo()}</span>}
+				{settled && (
+					<>
+						<span className="text-xs text-muted-foreground">
+							{m.compareRunsDone({ count: finished })} · {m.compareRunsFailed({ count: failed })}
+						</span>
+						<Button variant="secondary" onClick={() => setShowResults(true)}>
+							{m.compareResults()}
+						</Button>
+					</>
+				)}
 			</div>
 
 			{runs.map((run) => (
@@ -255,6 +318,10 @@ export function ModelsComparisonSection({ vm }: { vm: SettingsViewModel }) {
 					<RunStatus run={run} />
 				</SettingsRow>
 			))}
+
+			{input && (
+				<ModelsComparisonResults input={input} runs={runs} open={showResults} onOpenChange={setShowResults} />
+			)}
 		</SettingsGroup>
 	)
 }

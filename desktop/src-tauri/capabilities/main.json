@@ -4,6 +4,7 @@
   "description": "default permissions",
   "local": true,
   "windows": ["main", "meeting-prompt"],
+  "webviews": ["browser-chrome-*"],
   "permissions": [
     "http:default",
     "http:allow-fetch",

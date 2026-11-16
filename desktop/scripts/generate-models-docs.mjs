@@ -1,4 +1,4 @@
-// Generate ../i18n/docs/en-US/models.md from the vendored model catalogs.
+// Generate ../i18n/docs/en-US/reference/models.md from the vendored model catalogs.
 //
 //   node scripts/generate-models-docs.mjs        render the models page
 //   node scripts/generate-models-docs.mjs check  fail unless the page is current
@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const docsPath = join(root, '..', 'i18n', 'docs', 'en-US', 'models.md')
+const docsPath = join(root, '..', 'i18n', 'docs', 'en-US', 'reference', 'models.md')
 
 // --- catalog helpers, mirrored from src/lib/catalog.ts (the source of truth) ---
 
@@ -46,8 +46,13 @@ function mergeCatalogs(handy, vibe) {
 			if (!seenFiles.has(`${model.repository}@${model.revision}/${file.filename}`)) novel[quant] = file
 		}
 		if (Object.keys(novel).length === 0) continue
-		if (Object.keys(novel).length !== Object.keys(model.files).length) continue // partial overlap: data bug, skip loudly
-		seenFiles.add(identityKey(model, model.quant))
+		if (Object.keys(novel).length !== Object.keys(model.files).length) {
+			console.warn(`models docs: vibe model ${model.id} partially overlaps the handy layer; skipping`)
+			continue
+		}
+		// Register every file, not just the default quant: a later entry reusing another file of
+		// this model must count as a duplicate too.
+		for (const quant of Object.keys(model.files)) seenFiles.add(identityKey(model, quant))
 		models.push(model)
 	}
 	return { schema: handy.schema, models, results: handy.results ?? {} }
@@ -98,7 +103,7 @@ const FAMILY_EMOJI = {
 }
 
 const AVAILABLE_HEADING = '## Available Models'
-const TAIL_MARKER = 'Enjoy exploring these models'
+const TAIL_MARKER = '## More models'
 const GIGAAM_ANCHOR = 'handy-computer/gigaam-v3-e2e-rnnt-gguf'
 const GIGAAM_DETAILS_PATTERN = /<details>\n<summary>GigaAM limitations and command-line examples<\/summary>[\s\S]*?\n<\/details>/
 
@@ -126,7 +131,6 @@ function entryBlock(model, curated) {
 		.join(' · ')
 	const notes = []
 	if (model.capabilities?.streaming) notes.push('Supports streaming.')
-	if (!engineAtLeast(model.minEngine)) notes.push(`Requires transcribe.cpp ${model.minEngine}; the bundled engine is ${ENGINE_VERSION}, so it cannot load yet.`)
 	const heading = curated ? `### ${FAMILY_EMOJI[model.family] ?? '⭐'} ${model.name}` : `### ${model.name}`
 	const links = [`[👉 View Model](https://huggingface.co/${model.repository}/tree/${model.revision})`]
 	const quants = [
@@ -166,7 +170,7 @@ function render(markdown) {
 	const page = `${head}${AVAILABLE_HEADING}\n\n${blocks.join('\n\n')}\n\n${tail}`
 	return {
 		page,
-		counts: { documented: asr.length, curated: curated.length, legacy: 0, handy: handy.models.length, vibeKept: merged.models.length - handy.models.length },
+		counts: { documented: asr.length, curated: curated.length, handy: handy.models.length, vibeKept: merged.models.length - handy.models.length },
 	}
 }
 
@@ -182,7 +186,7 @@ if (process.argv[2] === 'check') {
 } else if (process.argv[2] === undefined) {
 	writeFileSync(docsPath, page)
 	console.log(
-		`rendered ${docsPath}: ${counts.documented} ASR entries (${counts.curated} curated, ${counts.legacy} legacy) from ${counts.handy} handy + ${counts.vibeKept} vibe models`,
+		`rendered ${docsPath}: ${counts.documented} ASR entries (${counts.curated} curated) from ${counts.handy} handy + ${counts.vibeKept} vibe models`,
 	)
 } else {
 	console.error('usage: generate-models-docs.mjs [check]')

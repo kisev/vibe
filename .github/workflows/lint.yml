@@ -8,6 +8,10 @@ on:
     push:
         branches: [main]
     pull_request:
+    # A dev revision is linted in place before it is tagged: `gh workflow run
+    # lint.yml --ref dev`. Nothing is built or published on a dev push, so this
+    # is the only way to compile that revision in CI.
+    workflow_dispatch:
 
 concurrency:
     group: lint-${{ github.ref }}
@@ -24,38 +28,45 @@ jobs:
             - uses: actions/checkout@v4
 
             - name: Setup mise
-              uses: jdx/mise-action@v2
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
                   install: true
                   cache: true
 
             - name: Setup Rust stable
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+
+            # Clippy below compiles the whole server workspace; without a cache
+            # every push rebuilds its dependencies from scratch.
+            - name: Cache cargo
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+              with:
+                  workspaces: server
 
             # clippy compiles the engine with GGML_VULKAN=ON since the Vulkan
             # backend landed, so the lint runner needs the same build
             # prerequisites as the dev and release builds (noble ships them
-            # all in apt).
+            # all in apt). The runner's DNS flakes often enough that a single
+            # apt call has failed whole lints; retry the pair, but bound every
+            # call so a hanging resolver cannot eat the job's 30 minutes.
             - name: Install Vulkan build prerequisites
-              run: sudo apt-get update && sudo apt-get install -y libvulkan-dev glslc glslang-tools spirv-headers
+              run: mise exec -- task ci:vulkan-deps
 
             # Clippy covers the whole server workspace, including the dormant
             # upstream crates: ggml-rs-sys's build script wants the prebuilt
-            # ggml libraries (upstream's `chore setup` fetches these; the pin
+            # ggml libraries (upstream's setup step fetches these; the pin
             # is read from server/libs so a bump never rots this step).
             - name: Fetch the prebuilt ggml libraries
-              run: |
-                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
-                  curl --location --fail --retry 3 -o /tmp/ggml-libs.tar.gz \
-                    "https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-linux-x86_64.tar.gz"
-                  tar -xzf /tmp/ggml-libs.tar.gz -C /tmp
-                  mv /tmp/lib server/libs/lib
+              env:
+                  TRIPLE: x86_64-unknown-linux-gnu
+                  GH_TOKEN: ${{ github.token }}
+              run: mise exec -- task ci:ggml-libs
 
             - name: Lint the tree
               run: mise exec -- task lint format:check
 
             - name: Rust format check
-              run: cargo fmt --all -- --check
+              run: mise exec -- task rust:fmt-check
 
             - name: Server clippy
               run: mise exec -- task server:clippy
@@ -70,13 +81,13 @@ jobs:
             - uses: actions/checkout@v4
 
             - name: Setup mise
-              uses: jdx/mise-action@v2
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
                   install: true
                   cache: true
 
             - name: Setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
               with:
                   package_json_file: desktop/package.json
 
@@ -90,9 +101,7 @@ jobs:
                       website/pnpm-lock.yaml
 
             - name: Install frontend dependencies
-              run: |
-                  pnpm --dir desktop install --frozen-lockfile
-                  pnpm --dir website install --frozen-lockfile
+              run: mise exec -- task ci:frontend-deps
 
             - name: Frontend unit tests
               run: mise exec -- task desktop:test website:test
@@ -104,65 +113,86 @@ jobs:
     helper-link-check:
         timeout-minutes: 20
         runs-on: windows-latest
+        env:
+            # Setup mise installs only `task`; this job does not need the
+            # lint/format toolchain.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - uses: actions/checkout@v4
 
+            - name: Setup mise
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+              with:
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
+
             - name: Setup Rust stable
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
               with:
                   target: x86_64-pc-windows-msvc
 
             - name: Cache cargo
-              uses: Swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
               with:
                   workspaces: server
 
             - name: Fetch the prebuilt ggml libraries
               shell: bash
-              run: |
-                  tag="libraries-ggml-$(cat server/libs/ggml-version)-r$(cat server/libs/revision)"
-                  curl --location --fail --retry 3 -o /tmp/ggml-libs.tar.gz \
-                    "https://github.com/thewh1teagle/vibe/releases/download/$tag/ggml-libs-windows-amd64-msvc.tar.gz"
-                  tar -xzf /tmp/ggml-libs.tar.gz -C /tmp
-                  mv /tmp/lib server/libs/lib
+              env:
+                  TRIPLE: x86_64-pc-windows-msvc
+                  GH_TOKEN: ${{ github.token }}
+              run: mise exec -- task ci:ggml-libs
 
             - name: Link the native diarization helper
               shell: bash
               run: cargo build --manifest-path server/Cargo.toml -p vibe-diarize-native --target x86_64-pc-windows-msvc
 
     # The release channel is not a compile gate. Dev machines without the GTK
-    # stack (and any host, for Windows-only code paths) get their first desktop
-    # Rust compile HERE — on every push to main, minutes after the push — so a
-    # dev tag is only ever cut from a revision whose desktop crate compiles.
+    # stack get their first desktop Rust compile HERE — on every push to main,
+    # minutes after the push — so a dev tag is only ever cut from a revision
+    # whose desktop crate compiles. Windows-only blocks are not compiled here;
+    # they still reach a compiler only in dev-build and release.
+    #
+    # macOS is in the matrix for one reason: the crate's macOS-only blocks
+    # compile nowhere else, and four dev releases in a row (dev.81–dev.84) went
+    # out with every macOS cell failing on a `bail!` that crate never imported
+    # while every other cell was green. The check costs minutes; a failed
+    # release costs a matrix and a janitor rerun chain.
     desktop-check:
-        timeout-minutes: 25
-        runs-on: ubuntu-24.04
+        timeout-minutes: 30
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-24.04, macos-latest]
+        runs-on: ${{ matrix.os }}
+        env:
+            # Setup mise installs only `task`; this job does not need the
+            # lint/format toolchain.
+            MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - uses: actions/checkout@v4
 
+            - name: Setup mise
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+              with:
+                  install: true
+                  install_args: aqua:go-task/task
+                  cache: true
+
             - name: Setup Rust stable
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
 
             - name: Cache cargo
-              uses: Swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
               with:
                   workspaces: desktop/src-tauri
 
+            # The GTK/WebKit headers the crate's Linux build needs; macOS ships
+            # its own SDK, so the step is Linux-only.
             - name: Install desktop build prerequisites
-              run: >
-                  sudo apt-get update && sudo apt-get install -y --no-install-recommends
-                  pkg-config build-essential libglib2.0-dev libgtk-3-dev
-                  libwebkit2gtk-4.1-dev clang cmake libssl-dev libasound2-dev
-                  libxdo-dev libayatana-appindicator3-dev
+              if: runner.os == 'Linux'
+              run: mise exec -- task ci:desktop-build-deps
 
             - name: Type-check the desktop crate
-              run: |
-                  # tauri's build script wants the frontend dist and the sidecar
-                  # binaries to exist; both are only real in a release build. The
-                  # sidecars are matched with their target-triple suffix.
-                  mkdir -p desktop/dist desktop/src-tauri/binaries
-                  triple="$(rustc -vV | sed -n 's/host: //p')"
-                  touch "desktop/src-tauri/binaries/vibe-server-$triple" \
-                    "desktop/src-tauri/binaries/vibe-diarize-native-$triple"
-                  chmod +x desktop/src-tauri/binaries/*
-                  cargo check --manifest-path desktop/src-tauri/Cargo.toml --all-targets
+              run: mise exec -- task ci:desktop-check

@@ -3,8 +3,8 @@ import { serializeTranscriptExport, type TranscriptExportOptions } from './trans
 import type { Segment } from './transcript'
 
 const segments: Segment[] = [
-	{ start: 125, stop: 350, speaker: 0, text: ' Hello <world> & "friends" ' },
-	{ start: 360, stop: 725, speaker: 1, text: 'Second --> line' },
+	{ start: 125, stop: 350, speaker: 1, text: ' Hello <world> & "friends" ' },
+	{ start: 360, stop: 725, speaker: 2, text: 'Second --> line' },
 ]
 
 const options: TranscriptExportOptions = {
@@ -30,7 +30,7 @@ describe('serializeTranscriptExport', () => {
 	})
 
 	it('uses the names given to speakers everywhere a speaker is shown', () => {
-		const named = { speakerNames: { 0: 'Jim', 1: '  ' } }
+		const named = { speakerNames: { 1: 'Jim', 2: '  ' } }
 		expect(serialize('normal', named)).toBe(
 			'00:01.250 --> 00:03.500 · Jim\nHello <world> & "friends"\n\n00:03.600 --> 00:07.250 · Speaker 2\nSecond --> line',
 		)

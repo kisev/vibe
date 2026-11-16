@@ -2,6 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '~/components/ui/tooltip'
 import { m } from '~/paraglide/messages.js'
 import type { ModelCapabilities } from '~/lib/model'
 import type { SettingsViewModel } from './shared'
@@ -47,10 +48,6 @@ function vmWith(capabilities: ModelCapabilities | null) {
 				init_prompt: '',
 				temperature: 0.4,
 				word_timestamps: false,
-				max_sentence_len: undefined,
-				sampling_strategy: 'beam search',
-				best_of: 5,
-				beam_size: 5,
 				max_text_ctx: undefined,
 				translate: false,
 			},
@@ -59,37 +56,49 @@ function vmWith(capabilities: ModelCapabilities | null) {
 	} as unknown as SettingsViewModel
 }
 
+function renderWhisper(vm: SettingsViewModel) {
+	return render(
+		<TooltipProvider>
+			<WhisperOptionsSection vm={vm} />
+		</TooltipProvider>,
+	)
+}
+
 describe('Whisper-only option gating', () => {
-	it('shows the decoding controls for a Whisper model', () => {
-		render(<WhisperOptionsSection vm={vmWith(whisper)} />)
+	it('shows only the decoding controls the engine honours', () => {
+		renderWhisper(vmWith(whisper))
 
 		expect(screen.getByText(m.translateToEnglish())).toBeTruthy()
 		expect(screen.getByText(m.useWordTimestamps())).toBeTruthy()
-		expect(screen.getByText(m.maxSentenceLen())).toBeTruthy()
 		expect(screen.getByText(m.prompt())).toBeTruthy()
-		expect(screen.getByText(m.samplingStrategy())).toBeTruthy()
 		expect(screen.getByText(m.temperature())).toBeTruthy()
 		expect(screen.getByText(m.maxTextCtx())).toBeTruthy()
+		expect(screen.getByText(m.threads())).toBeTruthy()
 		expect(screen.queryByText(m.whisperOnlyOptionsNote())).toBeNull()
+
+		// Beam search and the segment-length cap are gone: no strategy select, and the
+		// only number fields left are temperature, max text context and threads.
+		expect(screen.queryByRole('combobox')).toBeNull()
+		expect(screen.getAllByRole('spinbutton')).toHaveLength(3)
 	})
 
 	it('hides them for GigaAM while keeping the shared thread count', () => {
-		render(<WhisperOptionsSection vm={vmWith(gigaam)} />)
+		renderWhisper(vmWith(gigaam))
 
 		expect(screen.getByText(m.whisperOnlyOptionsNote())).toBeTruthy()
 		expect(screen.queryByText(m.translateToEnglish())).toBeNull()
 		expect(screen.queryByText(m.useWordTimestamps())).toBeNull()
-		expect(screen.queryByText(m.maxSentenceLen())).toBeNull()
 		expect(screen.queryByText(m.prompt())).toBeNull()
-		expect(screen.queryByText(m.samplingStrategy())).toBeNull()
 		expect(screen.queryByText(m.temperature())).toBeNull()
 		expect(screen.queryByText(m.maxTextCtx())).toBeNull()
+		expect(screen.queryByRole('combobox')).toBeNull()
 		// Threads apply to every ggml engine, so that row stays.
 		expect(screen.getByText(m.threads())).toBeTruthy()
+		expect(screen.getAllByRole('spinbutton')).toHaveLength(1)
 	})
 
 	it('keeps the controls when metadata has not loaded yet', () => {
-		render(<WhisperOptionsSection vm={vmWith(null)} />)
+		renderWhisper(vmWith(null))
 		expect(screen.getByText(m.translateToEnglish())).toBeTruthy()
 		expect(screen.queryByText(m.whisperOnlyOptionsNote())).toBeNull()
 	})

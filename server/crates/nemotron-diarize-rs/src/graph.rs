@@ -29,6 +29,8 @@ pub(crate) fn embed(model: &Model, runtime: &Runtime, mel: &[f32], num_mel_frame
     let mut embeds = Vec::with_capacity(num_embeds * h.hidden_size);
     for start in (0..num_embeds).step_by(EMBED_BLOCK) {
         let frames = (num_embeds - start).min(EMBED_BLOCK);
+        // SAFETY: the graph owns every tensor created in its context and the
+        // model's `embed` weight outlives this call.
         unsafe {
             let mut graph = Graph::new()?;
             let input = sys::ggml_new_tensor_2d(graph.ctx, F32, stacked_width as i64, frames as i64);
@@ -36,7 +38,7 @@ pub(crate) fn embed(model: &Model, runtime: &Runtime, mel: &[f32], num_mel_frame
             graph.output(output);
             let block = &stacked[start * stacked_width..(start + frames) * stacked_width];
             runtime.execute(&mut graph, &[(input, Input::F32(block))])?;
-            embeds.extend_from_slice(&read_f32(output));
+            embeds.extend_from_slice(&read_f32(output)?);
         }
     }
     tracing::debug!(
@@ -57,6 +59,15 @@ pub(crate) struct StepGraph {
     mask: Tensor,
     logits: Tensor,
     position_ids: Vec<i32>,
+    /// The key-padding mask and the `valid` vector it was built from. It is
+    /// all-zero for every chunk but the one that reaches the end of the audio,
+    /// so rebuilding the n×n buffer on every step is wasted work.
+    cached_mask: Option<MaskCache>,
+}
+
+struct MaskCache {
+    valid: Vec<bool>,
+    mask: Vec<f32>,
 }
 
 impl StepGraph {
@@ -64,6 +75,8 @@ impl StepGraph {
         let started = Instant::now();
         let h = &model.hparams;
         let n = frames as i64;
+        // SAFETY: `graph.ctx` owns every tensor created here, and the model's
+        // weight tensors outlive the graph built from them.
         unsafe {
             let mut graph = Graph::new()?;
             let ctx = graph.ctx;
@@ -99,6 +112,7 @@ impl StepGraph {
                 mask,
                 logits,
                 position_ids: (0..frames as i32).collect(),
+                cached_mask: None,
             })
         }
     }
@@ -107,24 +121,36 @@ impl StepGraph {
     /// Returns logits `[frames * subsampling_factor, num_speakers]`.
     pub fn run(&mut self, runtime: &Runtime, embeds: &[f32], valid: &[bool]) -> Result<Vec<f32>> {
         let n = self.frames;
-        let key_bias = valid
-            .iter()
-            .map(|&valid| if valid { 0.0 } else { f32::NEG_INFINITY })
-            .collect::<Vec<_>>();
-        let mut mask = Vec::with_capacity(n * n);
-        for _ in 0..n {
-            mask.extend_from_slice(&key_bias);
+        if !matches!(&self.cached_mask, Some(cache) if cache.valid.as_slice() == valid) {
+            let key_bias = valid
+                .iter()
+                .map(|&valid| if valid { 0.0 } else { f32::NEG_INFINITY })
+                .collect::<Vec<_>>();
+            let mut mask = Vec::with_capacity(n * n);
+            for _ in 0..n {
+                mask.extend_from_slice(&key_bias);
+            }
+            self.cached_mask = Some(MaskCache {
+                valid: valid.to_vec(),
+                mask,
+            });
         }
+        let mask = match &self.cached_mask {
+            Some(cache) => cache.mask.as_slice(),
+            None => &[],
+        };
+        // SAFETY: every tensor was created in `self.graph` and is live; all
+        // input slices outlive the synchronous `execute` call.
         unsafe {
             runtime.execute(
                 &mut self.graph,
                 &[
                     (self.input, Input::F32(embeds)),
                     (self.positions, Input::I32(&self.position_ids)),
-                    (self.mask, Input::F32(&mask)),
+                    (self.mask, Input::F32(mask)),
                 ],
             )?;
-            Ok(read_f32(self.logits))
+            read_f32(self.logits)
         }
     }
 }

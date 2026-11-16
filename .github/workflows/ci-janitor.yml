@@ -42,10 +42,28 @@ jobs:
               env:
                   GH_TOKEN: ${{ github.token }}
                   REPO: ${{ github.repository }}
+                  # Interpolated through env, never into the script text: these
+                  # come from a workflow run, not from this file.
+                  WF_NAME: ${{ github.event.workflow_run.name }}
+                  WF_ID: ${{ github.event.workflow_run.id }}
+                  WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
               run: |
+                  query_run() {
+                      gh api "repos/$REPO/actions/runs/$1" \
+                          --jq '"\(.status) \(.conclusion // "-") \(.run_attempt)"'
+                  }
                   rerun_if_needed() {
-                      read -r st concl attempt <<< "$(gh api "repos/$REPO/actions/runs/$1" \
-                          --jq '"\(.status) \(.conclusion // "-") \(.run_attempt)"' 2>/dev/null)"
+                      # A failed API call is not "still running": retry once, then
+                      # leave the run for the next sweep and say why.
+                      if ! info="$(query_run "$1")"; then
+                          sleep 2
+                          if ! info="$(query_run "$1")"; then
+                              echo "run $1: API error — left for the next sweep"
+                              return
+                          fi
+                      fi
+                      read -r st concl attempt <<< "$info"
+                      attempt=${attempt:-0}
                       echo "run $1 [$st/$concl] attempt $attempt"
                       if [ "$st" != "completed" ]; then
                           echo "  running — left alone"
@@ -66,8 +84,8 @@ jobs:
                       fi
                   }
                   if [ "$GITHUB_EVENT_NAME" = "workflow_run" ]; then
-                      echo "trigger: ${{ github.event.workflow_run.name }} run ${{ github.event.workflow_run.id }} finished ${{ github.event.workflow_run.conclusion }}"
-                      rerun_if_needed "${{ github.event.workflow_run.id }}"
+                      echo "trigger: $WF_NAME run $WF_ID finished $WF_CONCLUSION"
+                      rerun_if_needed "$WF_ID"
                   else
                       for wf in dev-build.yml website.yml; do
                           run_id=$(gh api "repos/$REPO/actions/workflows/$wf/runs?per_page=1" \

@@ -1,9 +1,8 @@
-/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import tailwindcss from '@tailwindcss/vite'
-import { defineConfig } from 'vite'
 import svgr from 'vite-plugin-svgr'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
@@ -31,6 +30,9 @@ export default defineConfig(async () => ({
 	clearScreen: false,
 	test: {
 		setupFiles: ['./src/vitest.setup.ts'],
+		// The end-to-end suite is Playwright's; vitest would collect it and fail on its imports.
+		// Extend the defaults so nested node_modules and dist are still excluded.
+		exclude: [...configDefaults.exclude, 'e2e/**'],
 	},
 	server: {
 		port: 1420,

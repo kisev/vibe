@@ -7,7 +7,9 @@
 // while this fork's server:clippy runs -D warnings over every workspace member
 // in the graph. The generated bindings are the only dirty spot; these three
 // allows are the whole fork-side delta in this crate.
-#![allow(clippy::missing_safety_doc, unnecessary_transmutes, clippy::ptr_offset_with_cast)]
+// `unnecessary_transmutes` is a rustc lint emitted by the generated bitfield
+// helpers, so unlike the other two it carries no `clippy::` prefix.
+#![allow(unnecessary_transmutes, clippy::missing_safety_doc, clippy::ptr_offset_with_cast)]
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 

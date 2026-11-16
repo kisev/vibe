@@ -64,7 +64,7 @@ export function AutoExportSection({ vm }: { vm: SettingsViewModel }) {
 	return (
 		<div className="space-y-6">
 			<SettingsGroup>
-				<SettingsRow label={m.autoExport()}>
+				<SettingsRow label={m.autoExport()} description={m.autoExportInfo()}>
 					<Switch checked={settings.enabled} onCheckedChange={(enabled) => update({ enabled })} />
 				</SettingsRow>
 			</SettingsGroup>
@@ -128,10 +128,10 @@ export function AutoExportSection({ vm }: { vm: SettingsViewModel }) {
 				<SettingsRow label={m.autoExportReplace()} description={m.autoExportReplaceInfo()}>
 					<Switch checked={settings.replace} onCheckedChange={(replace) => update({ replace })} />
 				</SettingsRow>
-				<SettingsRow label={m.showTimestamps()}>
+				<SettingsRow label={m.showTimestamps()} description={m.infoShowTimestamps()}>
 					<Switch checked={exportOptions.showTimestamps} onCheckedChange={(showTimestamps) => updateExport({ showTimestamps })} />
 				</SettingsRow>
-				<SettingsRow label={m.showSpeakers()}>
+				<SettingsRow label={m.showSpeakers()} description={m.infoShowSpeakers()}>
 					<Switch checked={exportOptions.showSpeakers} onCheckedChange={(showSpeakers) => updateExport({ showSpeakers })} />
 				</SettingsRow>
 			</SettingsGroup>

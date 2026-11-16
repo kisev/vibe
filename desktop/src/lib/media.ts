@@ -20,8 +20,7 @@ export function validPath(path: string) {
 
 /**
  * How long the media at `path` runs, in whole seconds, or `null` when the webview cannot read it —
- * an exotic container, a file that moved away, a decoder that never answers. Analytics uses it as
- * the denominator of a transcription: without it, "do long files fail more?" has no answer.
+ * an exotic container, a file that moved away, a decoder that never answers.
  *
  * Metadata only: nothing is decoded or downloaded beyond the header.
  */
