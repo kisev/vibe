@@ -446,6 +446,7 @@
   "updateUpToDate": "מעודכן",
   "updateAvailableVersion": "גרסה {version} זמינה",
   "updateNotChecked": "טרם נבדק",
+  "updateDownloadFailed": "לא ניתן היה להוריד את העדכון. בדוק את החיבור ונסה שוב.",
   "updateDownloading": "מוריד את העדכון…",
   "updateInstalling": "מתקין את העדכון…",
   "updateFailed": "בדיקת העדכונים האחרונה נכשלה",

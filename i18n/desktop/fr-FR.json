@@ -446,6 +446,7 @@
   "updateUpToDate": "À jour",
   "updateAvailableVersion": "La version {version} est disponible",
   "updateNotChecked": "Pas encore vérifié",
+  "updateDownloadFailed": "La mise à jour n'a pas pu être téléchargée. Vérifiez votre connexion et réessayez.",
   "updateDownloading": "Téléchargement de la mise à jour…",
   "updateInstalling": "Installation de la mise à jour…",
   "updateFailed": "La dernière recherche de mise à jour a échoué",

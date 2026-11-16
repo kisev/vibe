@@ -440,6 +440,7 @@
   "updateChannelInfo": "Estable es la línea de versiones finales. Beta incluye las versiones candidatas de la siguiente versión. Dev incluye las compilaciones más recientes.",
   "updateChecking": "Buscando actualizaciones…",
   "updateDevBoundary": "Las compilaciones de Dev se ordenan por debajo de tu versión instalada, así que la línea Dev empieza con una instalación manual de una compilación de Dev.",
+  "updateDownloadFailed": "No se pudo descargar la actualización. Comprueba la conexión y vuelve a intentarlo.",
   "updateDownloading": "Descargando la actualización…",
   "updateFailed": "La última comprobación de actualizaciones falló",
   "updateInstallFailed": "No se pudo instalar la actualización. Descarga la nueva versión desde el sitio web.",

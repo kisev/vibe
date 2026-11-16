@@ -440,6 +440,7 @@
   "updateChannelInfo": "La línia estable ofereix les versions finals. Beta conté les versions candidates de la següent versió. Dev conté les compilacions més recents.",
   "updateChecking": "Cercant actualitzacions…",
   "updateDevBoundary": "Les compilacions Dev queden per sota de la versió instal·lada; per això, la línia Dev comença amb una instal·lació manual d'una compilació Dev.",
+  "updateDownloadFailed": "No s'ha pogut descarregar l'actualització. Comprova la connexió i torna-ho a provar.",
   "updateDownloading": "Descarregant l'actualització…",
   "updateFailed": "La darrera comprovació d'actualitzacions ha fallat",
   "updateInstallFailed": "L'actualització no s'ha pogut instal·lar. Descarrega la nova versió des del lloc web.",

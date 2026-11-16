@@ -440,6 +440,7 @@
   "updateChannelInfo": "正式版是稳定版本线。Beta 提供下一版本的候选版本，Dev 提供最新构建。",
   "updateChecking": "正在检查更新…",
   "updateDevBoundary": "Dev 构建的版本号排序低于您已安装的版本，因此进入 Dev 线需先手动安装一次 Dev 构建。",
+  "updateDownloadFailed": "无法下载更新。请检查网络连接并重试。",
   "updateDownloading": "正在下载更新…",
   "updateFailed": "上次检查更新失败",
   "updateInstallFailed": "无法安装更新。请从网站下载新版本。",

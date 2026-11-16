@@ -440,6 +440,7 @@
   "updateChannelInfo": "Release är den stabila linjen. Beta innehåller releasekandidater för nästa version. Dev innehåller de senaste byggena.",
   "updateChecking": "Kontrollerar uppdateringar…",
   "updateDevBoundary": "Dev-byggen sorteras under din installerade version, så dev-linjen börjar med en manuell installation av ett dev-bygge.",
+  "updateDownloadFailed": "Uppdateringen kunde inte laddas ner. Kontrollera anslutningen och försök igen.",
   "updateDownloading": "Laddar ner uppdateringen…",
   "updateFailed": "Den senaste uppdateringskontrollen misslyckades",
   "updateInstallFailed": "Uppdateringen kunde inte installeras. Ladda ner den nya versionen från webbplatsen.",

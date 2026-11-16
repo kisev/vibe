@@ -440,6 +440,7 @@
   "updateChannelInfo": "Bản phát hành là dòng ổn định. Beta chứa các bản ứng viên của phiên bản tiếp theo. Dev chứa các bản dựng mới nhất.",
   "updateChecking": "Đang kiểm tra cập nhật…",
   "updateDevBoundary": "Các bản dựng Dev được xếp thấp hơn phiên bản đã cài, nên dòng Dev cần cài thủ công một bản dựng Dev trước.",
+  "updateDownloadFailed": "Không thể tải bản cập nhật. Hãy kiểm tra kết nối và thử lại.",
   "updateDownloading": "Đang tải bản cập nhật…",
   "updateFailed": "Lần kiểm tra cập nhật gần nhất đã thất bại",
   "updateInstallFailed": "Không thể cài đặt bản cập nhật. Hãy tải phiên bản mới từ trang web.",

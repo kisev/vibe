@@ -446,6 +446,7 @@
   "updateUpToDate": "Güncel",
   "updateAvailableVersion": "{version} sürümü mevcut",
   "updateNotChecked": "Henüz kontrol edilmedi",
+  "updateDownloadFailed": "Güncelleme indirilemedi. Bağlantınızı kontrol edip yeniden deneyin.",
   "updateDownloading": "Güncelleme indiriliyor…",
   "updateInstalling": "Güncelleme yükleniyor…",
   "updateFailed": "Son güncelleme kontrolü başarısız oldu",

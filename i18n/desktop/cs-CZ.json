@@ -440,6 +440,7 @@
   "updateChannelInfo": "Stabilní řada obsahuje vydané verze. Beta přináší kandidáty na vydání příští verze. Dev přináší nejnovější sestavení.",
   "updateChecking": "Kontrola aktualizací…",
   "updateDevBoundary": "Sestavení Dev se řadí pod nainstalovanou verzi, takže řada dev začíná jednou ruční instalací sestavení Dev.",
+  "updateDownloadFailed": "Aktualizaci se nepodařilo stáhnout. Zkontrolujte připojení a zkuste to znovu.",
   "updateDownloading": "Stahování aktualizace…",
   "updateFailed": "Poslední kontrola aktualizací selhala",
   "updateInstallFailed": "Aktualizaci se nepodařilo nainstalovat. Stáhněte si novou verzi z webu.",

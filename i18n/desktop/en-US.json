@@ -439,6 +439,7 @@
   "updateChannelInfo": "Release is the stable line. Beta carries release candidates of the next version. Dev carries the newest builds.",
   "updateChecking": "Checking for updates…",
   "updateDevBoundary": "Dev builds sort below your installed version, so the dev line starts with one manual install of a dev build.",
+  "updateDownloadFailed": "The update could not be downloaded. Check your connection and try again.",
   "updateDownloading": "Downloading the update…",
   "updateFailed": "The last update check failed",
   "updateInstallFailed": "The update could not be installed. Download the new version from the site.",

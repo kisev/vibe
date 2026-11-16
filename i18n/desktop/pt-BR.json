@@ -442,6 +442,7 @@
   "updateChannelInfo": "Release é a linha estável. Beta traz os candidatos a lançamento da próxima versão. Dev traz as compilações mais recentes.",
   "updateChecking": "Verificando atualizações…",
   "updateDevBoundary": "As compilações Dev ficam abaixo da sua versão instalada, então a linha dev começa com uma instalação manual de uma build dev.",
+  "updateDownloadFailed": "Não foi possível baixar a atualização. Verifique sua conexão e tente novamente.",
   "updateDownloading": "Baixando a atualização…",
   "updateFailed": "A última verificação de atualização falhou",
   "updateInstallFailed": "Não foi possível instalar a atualização. Baixe a nova versão do site.",

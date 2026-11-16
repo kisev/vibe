@@ -440,6 +440,7 @@
   "updateChannelInfo": "Wydanie to stabilna linia. Beta zawiera wersje kandydujące następnej wersji. Dev zawiera najnowsze kompilacje.",
   "updateChecking": "Sprawdzanie aktualizacji…",
   "updateDevBoundary": "Kompilacje Dev sortują się poniżej zainstalowanej wersji, więc kanał Dev zaczyna się od jednej ręcznej instalacji kompilacji Dev.",
+  "updateDownloadFailed": "Nie udało się pobrać aktualizacji. Sprawdź połączenie i spróbuj ponownie.",
   "updateDownloading": "Pobieranie aktualizacji…",
   "updateFailed": "Ostatnie sprawdzenie aktualizacji nie powiodło się",
   "updateInstallFailed": "Nie udało się zainstalować aktualizacji. Pobierz nową wersję ze strony.",

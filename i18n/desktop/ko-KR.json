@@ -446,6 +446,7 @@
   "updateUpToDate": "최신 상태",
   "updateAvailableVersion": "버전 {version}을(를) 사용할 수 있습니다",
   "updateNotChecked": "아직 확인하지 않음",
+  "updateDownloadFailed": "업데이트를 다운로드할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
   "updateDownloading": "업데이트 다운로드 중…",
   "updateInstalling": "업데이트 설치 중…",
   "updateFailed": "마지막 업데이트 확인에 실패했습니다",
