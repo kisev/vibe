@@ -78,4 +78,6 @@
 
   Pending the network restore and the first Renovate run. The local dry run and `deps:check` show the intended output shape.
 
+- [ ] 6. Review follow-up (#6): the scheduled run is given no target repository. `renovate.json` has no `repositories` key, `RENOVATE_REPOSITORIES` is not passed and autodiscover defaults to off, so a dispatch exits 0 having processed nothing — which is why 3.2 could report "verified" without a run. Pass the repository and make an empty run fail; re-check 4.3 against that. Remediated in `review-remediation` (task 8.1).
+
 - [ ] 5. `desktop/src-tauri/Cargo.toml` carries a Linux-only `openssl` dependency with `vendored`, which `cargo machete` reports as unused — the `vibe` manifest warning on every clippy run. On this host a system OpenSSL hides whether a transitive crate needs that vendored feature, so decide it on a clean Linux runner (or by removing it and reading the container build's configure output), then drop the line and its lockfile entries if nothing depends on it.

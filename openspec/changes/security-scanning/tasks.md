@@ -22,3 +22,9 @@
 - [ ] 4.3 Verify `task security:secrets` over the full history and that a planted test secret in a scratch clone is reported
 - [ ] 4.4 Live: the scheduled workflow runs green (or fails for a real finding) and its result is visible on the Actions page
 - [ ] 4.5 Live acceptance: `task security` reads clearly enough to act on without opening the script; report what should change before archiving
+
+## 5. Review follow-ups
+
+- [ ] 5.1 (#13, #14) The gitleaks config carries a pattern that is the base64 of a generic header, and an allow-path for `server/tests/`, a directory that does not exist at the top level. Rebuild both against the real tree; a rule that matches a header rather than a secret is noise that hides the finding it was meant to catch.
+- [ ] 5.2 (#23) `trivy-secret.yaml` allows `server/tests/**`, which matches no file, so the allow is dead while the tests it was written for are scanned. Point it at the directory the server tests actually use, or drop it and let the finding stand.
+- [ ] 5.3 (#292, #333) Sidecars and the server release archive are built from downloads with no integrity check. Add a checksum where the source publishes one; where it does not, pin the URL and record that the check is absent. Remediated in `review-remediation` (task 9.2).
