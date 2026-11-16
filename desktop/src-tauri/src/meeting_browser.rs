@@ -31,6 +31,9 @@ const CONTENT_HEIGHT: f64 = 760.0;
 /// The two webviews share one window, so this must match the toolbar height in the chrome
 /// component (`TOOLBAR_HEIGHT` in `desktop/src/windows/browser-window.tsx`).
 // Wide enough for two rows (address and recording) without the page clipping the button.
+// The multi-webview window exists on Windows and Linux only, so these three heights are
+// compiled where that window is; on macOS they would be dead code under `-D warnings`.
+#[cfg(not(target_os = "macos"))]
 const TOOLBAR_H: f64 = 104.0;
 /// Height of the blocked-hosts region that grows out of the toolbar, in logical pixels.
 ///
@@ -38,7 +41,9 @@ const TOOLBAR_H: f64 = 104.0;
 /// much while it is open and the page moves down; the region can never be clipped by the page.
 /// Wide enough for a handful of hosts; the region scrolls past that.
 /// This must match `BLOCKED_LIST_HEIGHT` in `desktop/src/windows/browser-window.tsx`.
+#[cfg(not(target_os = "macos"))]
 const BLOCKED_LIST_H: f64 = 200.0;
+#[cfg(not(target_os = "macos"))]
 const WINDOW_HEIGHT: f64 = CONTENT_HEIGHT + TOOLBAR_H;
 /// How long a page may stay unloaded before the window offers a retry instead of white.
 const LOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
