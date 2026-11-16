@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import subprocess
@@ -45,6 +47,14 @@ elif mode == "nojson":
     sys.exit(0)
 elif mode == "none":
     payload = {"status": "completed", "comments": [], "session_id": "stub"}
+    code = 0
+elif mode == "partial":
+    payload = {
+        "status": "completed",
+        "session_id": "stub",
+        "tool_calls": {"total": 3, "failure": 1},
+        "comments": [],
+    }
     code = 0
 else:
     severity = "low" if mode == "low" else "medium"
@@ -137,6 +147,18 @@ class ParsingTest(unittest.TestCase):
         self.assertFalse(ocr_gate.tool_calls_failed(payload))
         self.assertIsNone(ocr_gate.partial_failure({"tool_calls": {"total": 3, "failure": 0}}))
 
+    def test_warn_partial_accepts_a_fresh_tuple_and_a_cached_list(self) -> None:
+        for partial in ((1, 3), [1, 3]):
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                ocr_gate.warn_partial(partial)
+            self.assertIn("1 of 3 review subtasks failed", stderr.getvalue(), partial)
+        for ignored in (None, (0, 3), (3, 3), (3, 1), [1], ["1", 3]):
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                ocr_gate.warn_partial(ignored)
+            self.assertEqual(stderr.getvalue(), "", ignored)
+
     def test_cache_fingerprint_tracks_provider_and_model(self) -> None:
         with tempfile.TemporaryDirectory() as home:
             config = Path(home) / ".opencodereview" / "config.json"
@@ -192,10 +214,33 @@ class GateTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("file.py:3 [medium]", result.stdout)
 
-    def test_low_finding_passes(self) -> None:
+    def test_low_finding_passes_and_is_printed(self) -> None:
         result = run_gate(self.repo, self.stub, STUB_MODE="low")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("file.py:3 [low]", result.stdout)
+        self.assertIn("review session: ocr session export stub", result.stdout)
         self.assertIn("no medium/high findings (1 low)", result.stdout)
+
+    def test_partial_failure_warns_on_a_fresh_run(self) -> None:
+        result = run_gate(self.repo, self.stub, STUB_MODE="partial")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("1 of 3 review subtasks failed", result.stderr)
+        self.assertNotIn("cached verdict", result.stdout)
+
+    def test_no_cache_accepts_false_as_off(self) -> None:
+        run_gate(self.repo, self.stub, STUB_MODE="low")
+        result = run_gate(self.repo, self.stub, STUB_MODE="low", OCR_GATE_NO_CACHE="false")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("cached verdict", result.stdout)
+        fresh = run_gate(self.repo, self.stub, STUB_MODE="low", OCR_GATE_NO_CACHE="1")
+        self.assertNotIn("cached verdict", fresh.stdout)
+
+    def test_ocr_override_may_carry_arguments(self) -> None:
+        result = run_gate(
+            self.repo, self.stub, STUB_MODE="low", OCR_GATE_OCR=f"{sys.executable} {self.stub}"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("no medium/high findings", result.stdout)
 
     def test_review_sees_only_the_staged_snapshot(self) -> None:
         (self.repo / "unstaged.py").write_text("x = 1\n", encoding="utf-8")

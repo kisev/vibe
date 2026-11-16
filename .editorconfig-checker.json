@@ -4,8 +4,6 @@
     "\\.git/",
     "desktop/src/paraglide",
     "desktop/src-tauri/gen",
-    "desktop/src/data/handy-catalog\\.json",
-    "i18n/docs/[^/]+/models\\.md",
     "\\.claude/",
     "\\.opencode/",
     "\\.agents/",

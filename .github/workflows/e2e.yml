@@ -30,11 +30,14 @@ jobs:
             MISE_EXEC_AUTO_INSTALL: "false"
         steps:
             - uses: actions/checkout@v4
-            - uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
             - uses: actions/setup-node@v4
               with:
                   node-version: 22
                   cache: pnpm
+                  # Four lock files exist in this tree; without the explicit
+                  # path setup-node finds several and fails the step.
+                  cache-dependency-path: desktop/pnpm-lock.yaml
             - name: Setup mise
               uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:

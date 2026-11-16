@@ -28,6 +28,8 @@ def version_key(version: str) -> tuple:
     compared left to right, numeric ones numerically and below alphanumeric ones.
     """
     core, _, pre = version.removeprefix("v").partition("-")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", core):
+        sys.exit(f"{version} is not X.Y.Z")
     numbers = tuple(int(part) for part in core.split("."))
     if not pre:
         return (*numbers, 1, ())
@@ -73,7 +75,12 @@ def fetch_manifest(version: str) -> dict:
 
 def read_channel(channel: str) -> dict | None:
     path = CHANNELS_DIR / f"{channel}.json"
-    return json.loads(path.read_text()) if path.exists() else None
+    if not path.exists():
+        return None
+    manifest = json.loads(path.read_text())
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("version"), str):
+        sys.exit(f"{path} is not a release manifest; fix or delete it")
+    return manifest
 
 
 def write_channel(channel: str, manifest: dict) -> None:

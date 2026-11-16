@@ -51,7 +51,7 @@ jobs:
 
             - name: Setup mise
               # v2, pinned to a commit SHA: this job builds the release artifacts.
-              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac
+              uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
               with:
                   install: true
                   install_args: aqua:go-task/task
@@ -76,7 +76,7 @@ jobs:
               run: mise exec -- task release:notes -- --github-output
 
             - name: setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
               with:
                   package_json_file: desktop/package.json
 
@@ -90,11 +90,20 @@ jobs:
             - name: setup uv
               uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
 
+            # The server is its own workspace, and `task setup` (below) builds
+            # vibe-diarize-native from it; a root-only cache would rebuild both
+            # from scratch on every release. The key keeps the two macOS cells
+            # (same arm64 runner, different --target) from evicting each other.
             - name: Rust cache
-              uses: swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+              with:
+                  workspaces: |
+                      . -> target
+                      server -> target
+                  key: ${{ matrix.target_triple }}
 
             - name: Install Rust stable
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
               with:
                   # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
                   targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
@@ -144,7 +153,9 @@ jobs:
               run: mise exec -- task ci:macos-signing-env
 
             - name: Build
-              uses: tauri-apps/tauri-action@v0
+              # v0.6.2, pinned to a commit SHA: this step gets the updater
+              # signing key and a contents:write token.
+              uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
               env:
                   GITHUB_TOKEN: ${{ github.token }}
                   # Tauri Updater

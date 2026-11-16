@@ -6,8 +6,9 @@ set -euo pipefail
 
 mkdir -p desktop/dist desktop/src-tauri/binaries
 triple="$(rustc -vV | sed -n 's/host: //p')"
-# The macOS config swaps the diarization helper for ffmpeg, so a check on that
-# platform needs that placeholder too; elsewhere it is simply unused.
+# A platform config replaces the base `externalBin` array rather than merging it,
+# so the macOS and Windows configs list ffmpeg as well; placeholders for all
+# three keep the build script happy on any host.
 touch "desktop/src-tauri/binaries/vibe-server-$triple" \
     "desktop/src-tauri/binaries/vibe-diarize-native-$triple" \
     "desktop/src-tauri/binaries/ffmpeg-$triple"

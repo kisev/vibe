@@ -13,7 +13,9 @@ export default {
 		'subject-case': [0],
 		'scope-empty': [0],
 		'body-leading-blank': [2, 'always'],
-		'body-max-line-length': [2, 'always', 100],
+		// Off: a body line holding a release or PR URL easily passes 100
+		// characters, and the hook would block an otherwise clean commit.
+		'body-max-line-length': [0],
 		'footer-leading-blank': [2, 'always'],
 	},
 }

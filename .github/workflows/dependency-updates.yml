@@ -10,7 +10,9 @@ name: Dependency Updates
 
 on:
     schedule:
-        - cron: "0 6 * * 1"
+        # Off the top of the hour: GitHub delays or drops schedule events that
+        # land on :00 under load, and a dropped run is a week without updates.
+        - cron: "23 5 * * 1"
     workflow_dispatch:
 
 permissions:
@@ -38,7 +40,7 @@ jobs:
             - name: Renovate
               # v41.0.22, pinned to a commit SHA: this job runs on a schedule with
               # a PAT and no reviewer sees the code it downloads.
-              uses: renovatebot/github-action@8ac70de2fe55752c573155866e30735411e3b61c
+              uses: renovatebot/github-action@8ac70de2fe55752c573155866e30735411e3b61c # v41.0.22
               with:
                   token: ${{ secrets.RENOVATE_TOKEN }}
                   # Same version as mise.toml, so a local dry run matches this run.
@@ -46,4 +48,11 @@ jobs:
               env:
                   RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
                   RENOVATE_CONFIG_FILE: renovate.json
+                  # Self-hosted Renovate does not autodiscover repositories, and
+                  # without an explicit one it logs "No repositories found" and
+                  # exits 0 — a green job that updated nothing. With the list
+                  # set, an unreachable repository is a logged error and a
+                  # non-zero exit, so a broken token or missing config fails
+                  # this job instead of skipping the week.
+                  RENOVATE_REPOSITORIES: ${{ github.repository }}
                   LOG_LEVEL: info

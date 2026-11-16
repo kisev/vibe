@@ -20,7 +20,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LIBS="$ROOT/server/libs"
 version="$(tr -d '[:space:]' <"$LIBS/ggml-version")"
 revision="$(tr -d '[:space:]' <"$LIBS/revision")"
-repo="thewh1teagle/vibe"
+# Upstream publishes the bundles today; the fork has none. A fork that changes
+# server/libs has to publish its own and point this at it — `upload` needs write
+# access, which is only available on your own repository — and `fetch` then
+# reads that same repository, so both commands move together.
+repo="${VIBE_GGML_LIBS_REPO:-thewh1teagle/vibe}"
 ggml_git="https://github.com/ggml-org/ggml.git"
 
 os="$(uname -s)"
@@ -259,7 +263,7 @@ upload_libs() {
     id="$(libs_id)"
     # Fail closed: a transient API error leaves `existing` empty, and uploading
     # blind would put this build over another tree's release.
-    existing="$(gh api "repos/$repo/releases?per_page=100" --jq ".[] | select(.tag_name == \"$tag\") | .body")" ||
+    existing="$(gh api "repos/$repo/releases" --paginate --jq ".[] | select(.tag_name == \"$tag\") | .body")" ||
         {
             echo "could not read the releases to check $tag; refusing to upload blind" >&2
             exit 1

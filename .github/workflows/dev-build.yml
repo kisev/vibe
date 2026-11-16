@@ -31,6 +31,8 @@ jobs:
     guard:
         # Dev builds belong to the dev branch: a dev tag cut anywhere else is a
         # mistake, and so is a manual dispatch on another branch.
+        permissions:
+            contents: read
         runs-on: ubuntu-latest
         timeout-minutes: 10
         env:
@@ -73,7 +75,7 @@ jobs:
                     - runner: macos-latest
                       triple: aarch64-apple-darwin
                       exe: ""
-                      ffmpeg: https://www.osxexperts.net/ffmpeg80arm.zip
+                      ffmpeg: https://www.osxexperts.net/ffmpeg902arm.zip
                     - runner: macos-latest
                       triple: x86_64-apple-darwin
                       exe: ""
@@ -107,7 +109,7 @@ jobs:
                   cache: true
 
             - name: Setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
               with:
                   package_json_file: desktop/package.json
 
@@ -119,7 +121,7 @@ jobs:
                   cache-dependency-path: desktop/pnpm-lock.yaml
 
             - name: Install Rust stable
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
               with:
                   # macos-latest is arm64; the Intel bundle is cross-compiled here.
                   targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
@@ -127,7 +129,7 @@ jobs:
             # The server is its own workspace, so the default root-only cache
             # would leave its dependencies rebuilt on every run.
             - name: Rust cache
-              uses: swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
               with:
                   workspaces: |
                       . -> target
@@ -227,7 +229,9 @@ jobs:
             # tauri-action reuses an existing release for the same tag, which is
             # how the five matrix jobs share one release.
             - name: Build and publish
-              uses: tauri-apps/tauri-action@v0
+              # v0.6.2, pinned to a commit SHA: this step gets the updater
+              # signing key and a contents:write token.
+              uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
               env:
                   GITHUB_TOKEN: ${{ github.token }}
                   # The same updater key as release.yml: a dev install verifies

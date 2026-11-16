@@ -16,13 +16,19 @@ name (the identity is never translated). The generator reads them so a malformed
 translation file fails the build instead of disappearing silently; the site loads
 the same files itself and falls back to English per entry when one is missing.
 
-    uv run scripts/roadmap.py
+Archiving a change leaves its translations behind, which the site never shows. A
+build only names them, because it must not rewrite the tracked files it reads;
+`--prune` drops them and rewrites each locale file.
+
+    uv run scripts/roadmap.py            # write website/public/roadmap.json
+    uv run scripts/roadmap.py --prune    # also drop translations of changes no longer listed
 """
 
 from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import NoReturn
 
@@ -144,6 +150,23 @@ def translations(directory: Path = I18N) -> dict[str, dict[str, dict[str, str]]]
     return result
 
 
+def prune(known: set[str], directory: Path = I18N) -> dict[str, list[str]]:
+    """Drop translations for changes no longer on the roadmap, rewriting each locale file.
+
+    Entry order is kept, so a prune only removes lines. Returns the removed change
+    names per locale, and is a no-op for a locale that is already free of them.
+    """
+    removed: dict[str, list[str]] = {}
+    for locale, items in sorted(translations(directory).items()):
+        stale = sorted(set(items) - known)
+        if not stale:
+            continue
+        kept = {name: entry for name, entry in items.items() if name not in stale}
+        (directory / f"{locale}.json").write_text(json.dumps(kept, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        removed[locale] = stale
+    return removed
+
+
 def render(entries: list[dict[str, str]]) -> str:
     return json.dumps(entries, indent=2, ensure_ascii=False) + "\n"
 
@@ -157,12 +180,17 @@ def main() -> None:
     entries = collect()
     translated = translations()
     known = {entry["name"] for entry in entries}
+    prune_requested = "--prune" in sys.argv[1:]
     for locale, items in translated.items():
         # A translation for an archived change is harmless, but the site would never
         # show it; naming it keeps stale translation files from piling up unnoticed.
         unknown = sorted(set(items) - known)
-        if unknown:
-            print(f"roadmap: {locale}: ignoring translations for changes not on the roadmap: {', '.join(unknown)}")
+        if unknown and not prune_requested:
+            print(f"roadmap: {locale}: ignoring translations for changes not on the roadmap: {', '.join(unknown)} (run with --prune to drop them)")
+    if prune_requested:
+        for locale, names in prune(known).items():
+            print(f"roadmap: {locale}: pruned {len(names)} translation(s) for changes not on the roadmap: {', '.join(names)}")
+        translated = translations()
     write(entries)
     covered = sum(len(set(items) & known) for items in translated.values())
     print(f"roadmap: {len(entries)} changes -> {OUT.relative_to(ROOT)} ({covered} translated entries in {len(translated)} locales)")

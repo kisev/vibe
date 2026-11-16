@@ -10,12 +10,29 @@ paths = [
   '''desktop/src/mock-tauri/''',
   '''desktop/src/lib/config\.test\.''',
   '''website/src/lib/changelog\.test\.''',
-  '''server/tests/''',
+  '''server/crates/vibe-server/tests/''',
 ]
 
+# Paths, not the base64 "untrusted comment:" header: that prefix starts every
+# minisign artifact, including a secret key. These two locations are published
+# public artifacts on purpose — the updater pubkey and the signatures beside it.
+# The path alone would silence every other rule for the whole file, so the
+# suppression is ANDed with the base64 of the two public comment lines only:
+# a secret key's line ("minisign encrypted secret key") and any other secret
+# pasted into either place still fails the gate. Tauri writes those two lines;
+# if its wording changes, this regex has to change with it.
 [[allowlists]]
-description = "Public updater minisign key shipped on purpose (public half only)"
-regexes = ['''dW50cnVzdGVkIGNvbWVudG6''']
+description = "Public updater minisign key shipped on purpose (pubkey in tauri.conf.json, signatures in the updater manifests)"
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''website/public/updater/''',
+  '''desktop/src-tauri/tauri\.conf\.json''',
+]
+regexes = [
+  '''dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBr''',
+  '''dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBr''',
+]
 
 [[allowlists]]
 description = "Handoff protocol tests and old plans use one obvious fake token (0123456789abcdef repeated twice)"

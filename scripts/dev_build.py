@@ -195,7 +195,7 @@ def prepare() -> int:
         },
         separators=(",", ":"),
     )
-    body = f"Dev build of main at {sha}.\n\n{DEV_NOTES}\n\n".encode() + unreleased_changelog()
+    body = f"Dev build of dev at {sha}.\n\n{DEV_NOTES}\n\n".encode() + unreleased_changelog()
     with Path(env("GITHUB_OUTPUT")).open("ab") as handle:
         handle.write(f"version={version}\n".encode())
         handle.write(f"tag={tag}\n".encode())

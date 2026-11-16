@@ -34,7 +34,14 @@ jobs:
                   cache: true
 
             - name: Setup Rust stable
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+
+            # Clippy below compiles the whole server workspace; without a cache
+            # every push rebuilds its dependencies from scratch.
+            - name: Cache cargo
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+              with:
+                  workspaces: server
 
             # clippy compiles the engine with GGML_VULKAN=ON since the Vulkan
             # backend landed, so the lint runner needs the same build
@@ -80,7 +87,7 @@ jobs:
                   cache: true
 
             - name: Setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
               with:
                   package_json_file: desktop/package.json
 
@@ -121,12 +128,12 @@ jobs:
                   cache: true
 
             - name: Setup Rust stable
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
               with:
                   target: x86_64-pc-windows-msvc
 
             - name: Cache cargo
-              uses: Swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
               with:
                   workspaces: server
 
@@ -142,9 +149,10 @@ jobs:
               run: cargo build --manifest-path server/Cargo.toml -p vibe-diarize-native --target x86_64-pc-windows-msvc
 
     # The release channel is not a compile gate. Dev machines without the GTK
-    # stack (and any host, for Windows-only code paths) get their first desktop
-    # Rust compile HERE — on every push to main, minutes after the push — so a
-    # dev tag is only ever cut from a revision whose desktop crate compiles.
+    # stack get their first desktop Rust compile HERE — on every push to main,
+    # minutes after the push — so a dev tag is only ever cut from a revision
+    # whose desktop crate compiles. Windows-only blocks are not compiled here;
+    # they still reach a compiler only in dev-build and release.
     #
     # macOS is in the matrix for one reason: the crate's macOS-only blocks
     # compile nowhere else, and four dev releases in a row (dev.81–dev.84) went
@@ -173,10 +181,10 @@ jobs:
                   cache: true
 
             - name: Setup Rust stable
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
 
             - name: Cache cargo
-              uses: Swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
               with:
                   workspaces: desktop/src-tauri
 

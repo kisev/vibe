@@ -134,6 +134,32 @@ class RoadmapTest(unittest.TestCase):
 
         self.assertIn("missing a why", str(caught.exception))
 
+    def test_prunes_translations_for_changes_not_on_the_roadmap(self) -> None:
+        directory = Path(self.changes).parent / "i18n" / "roadmap"
+        write(
+            directory / "fr-FR.json",
+            json.dumps(
+                {
+                    "kept-change": {"title": "Un changement", "why": "Un changement existe."},
+                    "gone-change": {"title": "Une disparition", "why": "Ce changement est archivé."},
+                }
+            ),
+        )
+
+        removed = roadmap.prune({"kept-change"}, directory)
+
+        self.assertEqual(removed, {"fr-FR": ["gone-change"]})
+        self.assertEqual(list(json.loads((directory / "fr-FR.json").read_text(encoding="utf-8"))), ["kept-change"])
+
+    def test_prune_leaves_a_locale_without_stale_entries_alone(self) -> None:
+        directory = Path(self.changes).parent / "i18n" / "roadmap"
+        path = directory / "fr-FR.json"
+        write(path, json.dumps({"kept-change": {"title": "Un changement", "why": "Un changement existe."}}))
+        before = path.read_text(encoding="utf-8")
+
+        self.assertEqual(roadmap.prune({"kept-change"}, directory), {})
+        self.assertEqual(path.read_text(encoding="utf-8"), before)
+
 
 if __name__ == "__main__":
     unittest.main()

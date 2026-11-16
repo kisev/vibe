@@ -14,6 +14,8 @@ if (-not (Test-Path "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin\glslc.exe")) { throw
 "C:\VulkanSDK\${env:VULKAN_VERSION}\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 # cmake links the loader by absolute path, but the rust crate links vulkan-1 by
 # name, so link.exe also needs the SDK lib dir on LIB.
-$vulkanLib = (Get-ChildItem "C:\VulkanSDK\${env:VULKAN_VERSION}" -Recurse -Filter vulkan-1.lib | Select-Object -First 1).DirectoryName
-if (-not $vulkanLib) { throw 'vulkan-1.lib not found in the SDK install' }
+# Lib holds the x64 import library; a recursive search could just as easily
+# find Lib32\vulkan-1.lib and link a 64-bit build against the 32-bit one.
+$vulkanLib = "C:\VulkanSDK\${env:VULKAN_VERSION}\Lib"
+if (-not (Test-Path "$vulkanLib\vulkan-1.lib")) { throw "vulkan-1.lib not found in $vulkanLib" }
 "LIB=$vulkanLib;${env:LIB}" | Out-File -FilePath $env:GITHUB_ENV -Append

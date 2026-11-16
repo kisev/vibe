@@ -12,10 +12,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-command -v cloudflared >/dev/null || {
-    echo "cloudflared is not on PATH" >&2
-    exit 1
-}
+# Check everything the last step needs before the wasm and PWA builds run: a
+# missing tool would otherwise surface only after minutes of compiling.
+for tool in cloudflared uv pnpm; do
+    command -v "$tool" >/dev/null || {
+        echo "$tool is not on PATH" >&2
+        exit 1
+    }
+done
 
 bash scripts/phone_wasm.sh
 bash scripts/phone_pwa.sh /

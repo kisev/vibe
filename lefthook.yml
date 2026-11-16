@@ -72,7 +72,7 @@ pre-commit:
     editorconfig:
       # server/libs and the engine export scripts are vendored from upstream
       # byte-for-byte; their formatting is upstream's, re-checked on every sync.
-      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,server/libs,server/crates/nemotron-rs/scripts,server/crates/parakeet-rs/scripts}/**"
+      exclude: "{node_modules,desktop/src/paraglide,desktop/src-tauri/gen,server/libs,server/crates/*/scripts}/**"
       run: mise exec -- editorconfig-checker {staged_files}
     rust-format:
       # rustfmt needs no compilation, so every commit checks it; the lint

@@ -26,17 +26,46 @@ esac
 cp "$binary" "$stage/$name"
 chmod 755 "$stage/$name"
 
+# Each entry pins the exact archive: the URL and its SHA-256. gyan.dev's
+# .../ffmpeg-release-essentials.zip is a rolling alias, so the pin names the
+# versioned package it resolves to and the digest gyan.dev publishes beside it;
+# osxexperts.net publishes the digest of the binary inside, not of the zip, and
+# both macOS archives below carry the binary their page lists (verified
+# 2026-11-15). Keep these in step with PINS in scripts/ci/fetch_ffmpeg.py.
 case "$goos/$goarch" in
-darwin/amd64) url="https://www.osxexperts.net/ffmpeg80intel.zip" ;;
-darwin/arm64) url="https://www.osxexperts.net/ffmpeg80arm.zip" ;;
-windows/amd64) url="https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" ;;
+darwin/amd64)
+    url="https://www.osxexperts.net/ffmpeg80intel.zip"
+    sum="2d24d22db78c87f394a5822867acd5c5dc5e762cd261a44bd26923f3a5af3e07"
+    ;;
+darwin/arm64)
+    url="https://www.osxexperts.net/ffmpeg902arm.zip"
+    sum="4597f0f3a397cc0027bfd03dc4dd9c3066be15943cc788370846b4305d178bcb"
+    ;;
+windows/amd64)
+    url="https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip"
+    sum="60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba"
+    ;;
 *)
     echo "unsupported target for the ffmpeg URL: $goos/$goarch" >&2
     exit 1
     ;;
 esac
 
+# macOS ships shasum, not sha256sum; Git Bash on Windows has both.
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 "$1" | cut -d' ' -f1
+    fi
+}
+
 curl -fsSL --retry 3 --connect-timeout 20 --max-time 180 -o "$stage/ffmpeg.zip" "$url"
+got="$(sha256_of "$stage/ffmpeg.zip")"
+[ "$got" = "$sum" ] || {
+    echo "checksum mismatch for $url: got $got, expected $sum" >&2
+    exit 1
+}
 unzip -q -o "$stage/ffmpeg.zip" 'ffmpeg' 'ffmpeg.exe' -d "$stage" 2>/dev/null ||
     unzip -q -o "$stage/ffmpeg.zip" -d "$stage"
 found="$(find "$stage" -type f \( -name ffmpeg -o -name ffmpeg.exe \) ! -name '*.zip' -print -quit)"

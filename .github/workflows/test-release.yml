@@ -10,6 +10,8 @@ on:
 
 jobs:
   test:
+    permissions:
+      contents: read
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -34,7 +36,7 @@ jobs:
 
       - name: Setup MSYS2 wget (Windows)
         if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
         with:
           msystem: MINGW64
           install: wget
@@ -46,7 +48,14 @@ jobs:
         run: |
           tag="${{ inputs.tag }}"
           if [ -z "$tag" ]; then
-            tag=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName --jq '.[0].tagName')
+            # Only application releases carry the v-prefixed tag; dev and server
+            # prereleases are newer and would otherwise be picked as "latest".
+            tag=$(gh release list --repo ${{ github.repository }} --limit 50 --json tagName \
+              --jq '[.[] | select(.tagName | startswith("v"))][0].tagName // empty')
+          fi
+          if [ -z "$tag" ]; then
+            echo "::error::no application release found (expected a v-prefixed tag)"
+            exit 1
           fi
           echo "Downloading from release: $tag"
           gh release download "$tag" --repo ${{ github.repository }} --pattern "${{ matrix.pattern }}"
@@ -54,12 +63,18 @@ jobs:
       - name: Download tiny whisper model
         if: runner.os != 'Windows'
         shell: bash
-        run: wget -q https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf
+        run: |
+          wget -q https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf
+          # Same hash transcribe-spike.yml pins for this file.
+          echo "72cfa8ee436a635a5b6fb373cc056a828b9efe96d32d6eb8769ed3cc5b429719  whisper-tiny-Q5_K_M.gguf" | sha256sum -c -
 
       - name: Download tiny whisper model (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: C:\msys64\usr\bin\wget.exe --progress=bar:force:noscroll https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf -O whisper-tiny-Q5_K_M.gguf
+        run: |
+          C:\msys64\usr\bin\wget.exe --progress=bar:force:noscroll https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf -O whisper-tiny-Q5_K_M.gguf
+          $hash = (Get-FileHash -Algorithm SHA256 whisper-tiny-Q5_K_M.gguf).Hash.ToLower()
+          if ($hash -ne "72cfa8ee436a635a5b6fb373cc056a828b9efe96d32d6eb8769ed3cc5b429719") { throw "model checksum mismatch: $hash" }
 
       - name: Extract and test (macOS)
         if: runner.os == 'macOS'

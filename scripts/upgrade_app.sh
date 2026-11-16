@@ -22,6 +22,10 @@ for _ in $(seq 1 50); do
     pgrep -x vibe >/dev/null 2>&1 || break
     sleep 0.2
 done
+if pgrep -x vibe >/dev/null 2>&1; then
+    echo "vibe is still running; refusing to replace /Applications/vibe.app under it" >&2
+    exit 1
+fi
 rm -rf /Applications/vibe.app
 cp -R target/release/bundle/macos/vibe.app /Applications/vibe.app
 open /Applications/vibe.app

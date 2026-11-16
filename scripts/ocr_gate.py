@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -41,7 +42,7 @@ def run_git(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 def ocr_command() -> list[str] | None:
     override = os.environ.get("OCR_GATE_OCR")
     if override:
-        return [override]
+        return shlex.split(override)
     mise = shutil.which("mise")
     if mise is None:
         return None
@@ -206,11 +207,22 @@ def report(blocking: list[dict], low: list[dict], session_id: str | None) -> int
     if blocking:
         print(f"ocr commit gate blocked: {len(blocking)} medium/high finding(s).")
         if low:
-            print(f"{len(low)} low finding(s) not shown; run `ocr session export {session_id}` for the full list.")
+            if session_id:
+                print(
+                    f"{len(low)} low finding(s) not shown; run `ocr session export {session_id}` for the full list."
+                )
+            else:
+                print(f"{len(low)} low finding(s) not shown.")
         if session_id:
             print(f"review session: ocr session export {session_id}")
         print("Fix the findings, or bypass with OCR_SKIP=1 (document it in the commit body).")
         return 1
+    # The gate spec says low findings are printed and allowed through, so a clean
+    # verdict still names each one instead of only counting it.
+    for comment in low:
+        print(describe(comment))
+    if low and session_id:
+        print(f"review session: ocr session export {session_id}")
     print(f"ocr commit gate: no medium/high findings ({len(low)} low).")
     return 0
 
@@ -218,7 +230,9 @@ def report(blocking: list[dict], low: list[dict], session_id: str | None) -> int
 def warn_partial(partial: object) -> None:
     """A partly failed run still returns findings; say they may be incomplete."""
     if (
-        isinstance(partial, list)
+        # A fresh run hands over a tuple; the cached payload went through JSON,
+        # which turns it into a list.
+        isinstance(partial, (list, tuple))
         and len(partial) == 2
         and all(isinstance(value, int) for value in partial)
         and 0 < partial[0] < partial[1]
@@ -292,7 +306,7 @@ def main() -> int:
         return 0
 
     cache_path = cache_dir(root) / f"{cache_key(parent, tree, review_settings_fingerprint())}.json"
-    if os.environ.get("OCR_GATE_NO_CACHE", "") in {"", "0"}:
+    if os.environ.get("OCR_GATE_NO_CACHE", "").strip().lower() not in {"1", "true", "yes"}:
         cached = read_cache(cache_path)
         if cached is not None:
             blocking, low = classify(cached["comments"])

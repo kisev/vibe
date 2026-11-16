@@ -7,7 +7,6 @@
   ],
   "extends": ["config:recommended"],
   "timezone": "Etc/UTC",
-  "schedule": ["* 5-8 * * 1"],
   "ignorePaths": ["server/crates/*/scripts/**", "server/libs/**"],
   "automerge": false,
   "packageRules": [
@@ -43,7 +42,10 @@
       "customType": "regex",
       "description": "mise aqua: pins resolve through the tool's GitHub releases",
       "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
-      "matchStrings": ["\"aqua:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "matchStrings": [
+        "\"aqua:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\"",
+        "\"aqua:(?<depName>[^\"\\s]+)\"\\s*=\\s*\\{[^}]*version\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "loose"
     },
@@ -51,7 +53,10 @@
       "customType": "regex",
       "description": "mise github: pins resolve through GitHub releases",
       "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
-      "matchStrings": ["\"github:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "matchStrings": [
+        "\"github:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\"",
+        "\"github:(?<depName>[^\"\\s]+)\"\\s*=\\s*\\{[^}]*version\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "loose"
     },
@@ -77,7 +82,10 @@
       "customType": "regex",
       "description": "mise cargo: pins resolve through crates.io",
       "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
-      "matchStrings": ["\"cargo:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "matchStrings": [
+        "\"cargo:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\"",
+        "\"cargo:(?<depName>[^\"\\s]+)\"\\s*=\\s*\\{[^}]*version\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
       "datasourceTemplate": "crate",
       "versioningTemplate": "cargo"
     },
@@ -85,7 +93,10 @@
       "customType": "regex",
       "description": "mise pipx: pins resolve through PyPI",
       "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
-      "matchStrings": ["\"pipx:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      "matchStrings": [
+        "\"pipx:(?<depName>[^\"\\s]+)\"\\s*=\\s*\"(?<currentValue>[^\"]+)\"",
+        "\"pipx:(?<depName>[^\"\\s]+)\"\\s*=\\s*\\{[^}]*version\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
       "datasourceTemplate": "pypi",
       "versioningTemplate": "pep440"
     }
