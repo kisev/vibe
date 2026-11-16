@@ -28,6 +28,15 @@ permissions:
     contents: read
 
 env:
+    # The same x86_64 flag set the release cells pass (dev-build.yml,
+    # server-release.yml): never let ggml tune for the build host — a native
+    # build dies with an illegal instruction on a runner with an older CPU, and
+    # this workflow shares a cache between runners. The AVX2/FMA/BMI2 floors
+    # matter too: they are what users without a Haswell-class CPU get. It sits
+    # at workflow level so the test build compiles the C++ tree with the same
+    # baseline as the release build (scripts/ci/build-server.sh reads the same
+    # variable).
+    TRANSCRIBE_CMAKE_ARGS: -DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF
     # Matches the handy-computer catalog entry for whisper-tiny Q5_K_M.
     SPIKE_MODEL_URL: https://huggingface.co/handy-computer/whisper-tiny-gguf/resolve/main/whisper-tiny-Q5_K_M.gguf
     SPIKE_MODEL_SHA256: 72cfa8ee436a635a5b6fb373cc056a828b9efe96d32d6eb8769ed3cc5b429719
@@ -54,10 +63,15 @@ jobs:
 
             # The C++ tree here is the bulk of the runtime; without a cache it
             # is recompiled from scratch on every push and pull request.
+            # `prefix-key` rather than `key`: it leads the restore keys, so the
+            # entries saved by the earlier native-tuned build cannot be restored
+            # as a base. Bump its version whenever TRANSCRIBE_CMAKE_ARGS changes,
+            # since the automatic key does not cover the C++ build flags.
             - name: Cache cargo
               uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
               with:
                   workspaces: server
+                  prefix-key: v2-rust-portable
 
             # Build-time Vulkan prerequisites for the ggml backend (the
             # runner's GPU is irrelevant; only the compiler toolchain matters).
